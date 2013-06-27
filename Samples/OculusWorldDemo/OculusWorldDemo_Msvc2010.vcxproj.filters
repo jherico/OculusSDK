@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="CommonSrc">
+      <UniqueIdentifier>{ba6e9e50-0655-4f12-a136-6d2a06015925}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonSrc\Platform">
+      <UniqueIdentifier>{16e20d8b-eff7-454c-be85-02037c399e97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonSrc\Render">
+      <UniqueIdentifier>{1b6d51ae-a405-4f3d-be93-41a50db4f328}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\CommonSrc\Platform\Platform.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Platform\Win32_Platform.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Render\Render_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Render\Render_D3D1X_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Render\Render_D3D10_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="OculusWorldDemo.cpp" />
+    <ClCompile Include="..\CommonSrc\Render\Render_D3D11_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Render\Render_LoadTextureTGA.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Player.cpp" />
+    <ClCompile Include="..\..\3rdParty\TinyXml\tinyxml2.cpp" />
+    <ClCompile Include="..\CommonSrc\Render\Render_LoadTextureDDS.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Render\Render_XmlSceneLoader.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CommonSrc\Platform\Win32_Gamepad.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\CommonSrc\Platform\Win32_Platform.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Platform\Platform.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Platform\Platform_Default.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Render\Render_Font.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Render\Render_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Render\Render_D3D1X_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Render\Render_D3D10_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Render\Render_D3D11_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h" />
+    <ClInclude Include="..\..\3rdParty\TinyXml\tinyxml2.h" />
+    <ClInclude Include="..\CommonSrc\Render\Render_XmlSceneLoader.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Platform\Gamepad.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CommonSrc\Platform\Win32_Gamepad.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="OculusWorldDemo.rc" />
+  </ItemGroup>
+</Project>

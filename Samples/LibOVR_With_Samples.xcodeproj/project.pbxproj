@@ -1,0 +1,1092 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		37973B391739D78B0093BBB8 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945072216E55A0300B9FF78 /* Cocoa.framework */; };
+		37973B501739E1B60093BBB8 /* OculusRoomModel.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 37973B4F1739E1B60093BBB8 /* OculusRoomModel.cpp */; };
+		37973B531739E1D20093BBB8 /* RenderTiny_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 37973B511739E1D20093BBB8 /* RenderTiny_Device.cpp */; };
+		37973B561739E9230093BBB8 /* RenderTiny_GL_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 37973B541739E9230093BBB8 /* RenderTiny_GL_Device.cpp */; };
+		37973B591739E9E80093BBB8 /* OSX_OculusRoomTiny.mm in Sources */ = {isa = PBXBuildFile; fileRef = 37973B581739E9E80093BBB8 /* OSX_OculusRoomTiny.mm */; };
+		37973B5C1739FA620093BBB8 /* libovr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 49A5336D16E544BE0039CB59 /* libovr.a */; };
+		37973B5D1739FA920093BBB8 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C516E6A179008EA2ED /* IOKit.framework */; };
+		37973B5E1739FAB60093BBB8 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945071616E546F700B9FF78 /* OpenGL.framework */; };
+		37973B5F1739FAC80093BBB8 /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 49DB65F01718B1E10097A8DD /* ApplicationServices.framework */; };
+		37973B601739FAD50093BBB8 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C716E6A187008EA2ED /* CoreFoundation.framework */; };
+		494506DD16E5461F00B9FF78 /* OVR_Alg.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5337116E544E30039CB59 /* OVR_Alg.cpp */; };
+		494506DF16E5461F00B9FF78 /* OVR_Allocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5337316E544E30039CB59 /* OVR_Allocator.cpp */; };
+		494506E216E5461F00B9FF78 /* OVR_Atomic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5337616E544E30039CB59 /* OVR_Atomic.cpp */; };
+		494506E616E5461F00B9FF78 /* OVR_File.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5337A16E544E30039CB59 /* OVR_File.cpp */; };
+		494506E816E5461F00B9FF78 /* OVR_FileFILE.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5337C16E544E30039CB59 /* OVR_FileFILE.cpp */; };
+		494506EC16E5461F00B9FF78 /* OVR_Log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338016E544E30039CB59 /* OVR_Log.cpp */; };
+		494506EE16E5461F00B9FF78 /* OVR_Math.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338216E544E30039CB59 /* OVR_Math.cpp */; };
+		494506F016E5461F00B9FF78 /* OVR_RefCount.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338416E544E30039CB59 /* OVR_RefCount.cpp */; };
+		494506F216E5461F00B9FF78 /* OVR_Std.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338616E544E30039CB59 /* OVR_Std.cpp */; };
+		494506F416E5461F00B9FF78 /* OVR_String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338816E544E30039CB59 /* OVR_String.cpp */; };
+		494506F616E5461F00B9FF78 /* OVR_String_FormatUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338A16E544E30039CB59 /* OVR_String_FormatUtil.cpp */; };
+		494506F716E5461F00B9FF78 /* OVR_String_PathUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338B16E544E30039CB59 /* OVR_String_PathUtil.cpp */; };
+		494506F916E5461F00B9FF78 /* OVR_SysFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338D16E544E30039CB59 /* OVR_SysFile.cpp */; };
+		494506FB16E5461F00B9FF78 /* OVR_System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5338F16E544E30039CB59 /* OVR_System.cpp */; };
+		494506FE16E5461F00B9FF78 /* OVR_ThreadsPthread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5339216E544E30039CB59 /* OVR_ThreadsPthread.cpp */; };
+		494506FF16E5461F00B9FF78 /* OVR_Timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5339316E544E30039CB59 /* OVR_Timer.cpp */; };
+		4945070216E5461F00B9FF78 /* OVR_UTF8Util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5339616E544E30039CB59 /* OVR_UTF8Util.cpp */; };
+		4945070616E5462A00B9FF78 /* OVR_DeviceHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5339B16E544E30039CB59 /* OVR_DeviceHandle.cpp */; };
+		4945070816E5462A00B9FF78 /* OVR_DeviceImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5339D16E544E30039CB59 /* OVR_DeviceImpl.cpp */; };
+		4945070F16E5462A00B9FF78 /* OVR_SensorFusion.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A533A416E544E30039CB59 /* OVR_SensorFusion.cpp */; };
+		4945071116E5462A00B9FF78 /* OVR_ThreadCommandQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A533A616E544E30039CB59 /* OVR_ThreadCommandQueue.cpp */; };
+		4985385E16ECFE92008D0727 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945072216E55A0300B9FF78 /* Cocoa.framework */; };
+		4985387416ECFED8008D0727 /* Render_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335016E527820039CB59 /* Render_Device.cpp */; };
+		4985387816ECFED8008D0727 /* Render_GL_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335416E527820039CB59 /* Render_GL_Device.cpp */; };
+		4985387A16ECFED8008D0727 /* Render_LoadTextureTGA.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335816E527820039CB59 /* Render_LoadTextureTGA.cpp */; };
+		4985388016ECFEE5008D0727 /* Platform.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5334216E527820039CB59 /* Platform.cpp */; };
+		4985388616ECFF2D008D0727 /* OculusWorldDemo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4985388116ECFF23008D0727 /* OculusWorldDemo.cpp */; };
+		4985388716ECFF2D008D0727 /* Player.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4985388216ECFF23008D0727 /* Player.cpp */; };
+		4985388A16ECFF53008D0727 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C716E6A187008EA2ED /* CoreFoundation.framework */; };
+		4985388C16ECFF53008D0727 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C516E6A179008EA2ED /* IOKit.framework */; };
+		4985388D16ECFF53008D0727 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C916E9880D008EA2ED /* IOSurface.framework */; };
+		4985388E16ECFF53008D0727 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945071616E546F700B9FF78 /* OpenGL.framework */; };
+		4985389216ED0204008D0727 /* tinyxml2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4985389116ED0204008D0727 /* tinyxml2.cpp */; };
+		4985389516ED0218008D0727 /* Render_LoadTextureDDS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4985389316ED0218008D0727 /* Render_LoadTextureDDS.cpp */; };
+		4985389716ED1AA7008D0727 /* Assets in Resources */ = {isa = PBXBuildFile; fileRef = 4985389616ED1AA7008D0727 /* Assets */; };
+		49ABA2E91718A38100E288A7 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 49ABA2E81718A38100E288A7 /* AudioToolbox.framework */; };
+		49DB65F11718B1E10097A8DD /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 49DB65F01718B1E10097A8DD /* ApplicationServices.framework */; };
+		49DB65F71726F0C30097A8DD /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945072216E55A0300B9FF78 /* Cocoa.framework */; };
+		49DB660F1726F0EA0097A8DD /* OSX_Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9BBB8902171E2BE200563901 /* OSX_Platform.mm */; };
+		49DB66101726F0EA0097A8DD /* Platform.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5334216E527820039CB59 /* Platform.cpp */; };
+		49DB66111726F0F80097A8DD /* Render_LoadTextureDDS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4985389316ED0218008D0727 /* Render_LoadTextureDDS.cpp */; };
+		49DB66121726F0F80097A8DD /* Render_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335016E527820039CB59 /* Render_Device.cpp */; };
+		49DB66131726F0F80097A8DD /* Render_GL_Device.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335416E527820039CB59 /* Render_GL_Device.cpp */; };
+		49DB66141726F0F80097A8DD /* Render_LoadTextureTGA.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49A5335816E527820039CB59 /* Render_LoadTextureTGA.cpp */; };
+		49DB66171726F1350097A8DD /* ApplicationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 49DB65F01718B1E10097A8DD /* ApplicationServices.framework */; };
+		49DB66181726F13B0097A8DD /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 499ED4C516E6A179008EA2ED /* IOKit.framework */; };
+		49DB66191726F1530097A8DD /* libovr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 49A5336D16E544BE0039CB59 /* libovr.a */; };
+		49DB661A1726F1650097A8DD /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4945071616E546F700B9FF78 /* OpenGL.framework */; };
+		9B6DEF851728A6560071E76B /* SensorBoxTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9B6DEF841728A6560071E76B /* SensorBoxTest.cpp */; };
+		9BA4DDB61721E12400CF7715 /* OSX_Platform.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9BBB8902171E2BE200563901 /* OSX_Platform.mm */; };
+		9BA4DDB81727061100CF7715 /* Oculus.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9BA4DDB71727061100CF7715 /* Oculus.icns */; };
+		9BA4DDB91727083500CF7715 /* Oculus.icns in Resources */ = {isa = PBXBuildFile; fileRef = 9BA4DDB71727061100CF7715 /* Oculus.icns */; };
+		9BAB70F6170E69530006FE98 /* libovr.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 49A5336D16E544BE0039CB59 /* libovr.a */; };
+		9BB10AF1173C4918009ED618 /* OSX_Gamepad.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BB10AEF173C4918009ED618 /* OSX_Gamepad.cpp */; };
+		9BB86B6D1747178B0071C537 /* OSX_Gamepad.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BB10AEF173C4918009ED618 /* OSX_Gamepad.cpp */; };
+		9BCE53F916F0293A007A23FF /* OVR_HIDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53F416F0293A007A23FF /* OVR_HIDDevice.h */; };
+		9BCE53FA16F0293A007A23FF /* OVR_HIDDeviceBase.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53F516F0293A007A23FF /* OVR_HIDDeviceBase.h */; };
+		9BCE53FB16F0293A007A23FF /* OVR_HIDDeviceImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53F616F0293A007A23FF /* OVR_HIDDeviceImpl.h */; };
+		9BCE53FC16F0293A007A23FF /* OVR_LatencyTestImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE53F716F0293A007A23FF /* OVR_LatencyTestImpl.cpp */; };
+		9BCE53FD16F0293A007A23FF /* OVR_LatencyTestImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53F816F0293A007A23FF /* OVR_LatencyTestImpl.h */; };
+		9BCE540016F02A56007A23FF /* OVR_SensorImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE53FE16F02A56007A23FF /* OVR_SensorImpl.cpp */; };
+		9BCE540116F02A56007A23FF /* OVR_SensorImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53FF16F02A56007A23FF /* OVR_SensorImpl.h */; };
+		9BCE541616F02ABC007A23FF /* OVR_OSX_DeviceManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE53EB16F028A9007A23FF /* OVR_OSX_DeviceManager.cpp */; };
+		9BCE541716F02AD5007A23FF /* OVR_OSX_HIDDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE53ED16F028AA007A23FF /* OVR_OSX_HIDDevice.cpp */; };
+		9BCE541816F02ADB007A23FF /* OVR_OSX_DeviceManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53EC16F028AA007A23FF /* OVR_OSX_DeviceManager.h */; };
+		9BCE541916F02AE6007A23FF /* OVR_OSX_HIDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53EE16F028AA007A23FF /* OVR_OSX_HIDDevice.h */; };
+		9BCE541A16F02AEB007A23FF /* OVR_OSX_HMDDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE53EF16F028AA007A23FF /* OVR_OSX_HMDDevice.cpp */; };
+		9BCE541B16F02AF1007A23FF /* OVR_OSX_HMDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BCE53F016F028AA007A23FF /* OVR_OSX_HMDDevice.h */; };
+		9BCE541C16F02B04007A23FF /* OVR_Device.h in Headers */ = {isa = PBXBuildFile; fileRef = 499ED4B216E5703B008EA2ED /* OVR_Device.h */; };
+		9BCE541D16F02B13007A23FF /* OVR_DeviceConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A5339A16E544E30039CB59 /* OVR_DeviceConstants.h */; };
+		9BCE541E16F02B1D007A23FF /* OVR_DeviceHandle.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A5339C16E544E30039CB59 /* OVR_DeviceHandle.h */; };
+		9BCE541F16F02B26007A23FF /* OVR_DeviceImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A5339E16E544E30039CB59 /* OVR_DeviceImpl.h */; };
+		9BCE542016F02B2A007A23FF /* OVR_DeviceMessages.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A5339F16E544E30039CB59 /* OVR_DeviceMessages.h */; };
+		9BCE542216F02B88007A23FF /* OVR_SensorFusion.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A533A516E544E30039CB59 /* OVR_SensorFusion.h */; };
+		9BCE542316F02B91007A23FF /* OVR_ThreadCommandQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = 49A533A716E544E30039CB59 /* OVR_ThreadCommandQueue.h */; };
+		9BCE542516F2694F007A23FF /* OVR_OSX_SensorDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BCE542416F2694E007A23FF /* OVR_OSX_SensorDevice.cpp */; };
+		9BD2A642172069B300C3C389 /* Util_MagCalibration.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BD2A640172069B300C3C389 /* Util_MagCalibration.cpp */; };
+		9BD2A643172069B300C3C389 /* Util_MagCalibration.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BD2A641172069B300C3C389 /* Util_MagCalibration.h */; };
+		9BD2A646172069BF00C3C389 /* OVR_SensorFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BD2A644172069BF00C3C389 /* OVR_SensorFilter.cpp */; };
+		9BD2A647172069BF00C3C389 /* OVR_SensorFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BD2A645172069BF00C3C389 /* OVR_SensorFilter.h */; };
+		9BEAD55F17187B8A00A8AA1D /* Util_LatencyTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BEAD55B17187B8A00A8AA1D /* Util_LatencyTest.cpp */; };
+		9BEAD56017187B8A00A8AA1D /* Util_LatencyTest.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BEAD55C17187B8A00A8AA1D /* Util_LatencyTest.h */; };
+		9BEAD56117187B8A00A8AA1D /* Util_Render_Stereo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BEAD55D17187B8A00A8AA1D /* Util_Render_Stereo.cpp */; };
+		9BEAD56217187B8A00A8AA1D /* Util_Render_Stereo.h in Headers */ = {isa = PBXBuildFile; fileRef = 9BEAD55E17187B8A00A8AA1D /* Util_Render_Stereo.h */; };
+		9BEAD56517187CFF00A8AA1D /* OSX_WavPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BEAD56317187CFF00A8AA1D /* OSX_WavPlayer.cpp */; };
+		9BEAD56717187E7500A8AA1D /* Render_XmlSceneLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9BEAD56617187E7500A8AA1D /* Render_XmlSceneLoader.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		37973B5A1739FA100093BBB8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49A5332B16E527490039CB59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 49A5336C16E544BE0039CB59;
+			remoteInfo = ovr;
+		};
+		4985388F16ECFF5C008D0727 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49A5332B16E527490039CB59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 49A5336C16E544BE0039CB59;
+			remoteInfo = ovr;
+		};
+		49DB660D1726F0CD0097A8DD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 49A5332B16E527490039CB59 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 49A5336C16E544BE0039CB59;
+			remoteInfo = ovr;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		37973B381739D78B0093BBB8 /* OculusRoomTiny.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OculusRoomTiny.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		37973B4F1739E1B60093BBB8 /* OculusRoomModel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OculusRoomModel.cpp; sourceTree = "<group>"; };
+		37973B511739E1D20093BBB8 /* RenderTiny_Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderTiny_Device.cpp; sourceTree = "<group>"; };
+		37973B521739E1D20093BBB8 /* RenderTiny_Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderTiny_Device.h; sourceTree = "<group>"; };
+		37973B541739E9230093BBB8 /* RenderTiny_GL_Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderTiny_GL_Device.cpp; sourceTree = "<group>"; };
+		37973B551739E9230093BBB8 /* RenderTiny_GL_Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderTiny_GL_Device.h; sourceTree = "<group>"; };
+		37973B571739E9E80093BBB8 /* OSX_OculusRoomTiny.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSX_OculusRoomTiny.h; sourceTree = "<group>"; };
+		37973B581739E9E80093BBB8 /* OSX_OculusRoomTiny.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = OSX_OculusRoomTiny.mm; sourceTree = "<group>"; };
+		4945071616E546F700B9FF78 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		4945071816E5474000B9FF78 /* libGL.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGL.dylib; path = ../../../../../../../opt/X11/lib/libGL.dylib; sourceTree = "<group>"; };
+		4945071A16E5474A00B9FF78 /* libX11.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libX11.dylib; path = ../../../../../../../opt/X11/lib/libX11.dylib; sourceTree = "<group>"; };
+		4945072216E55A0300B9FF78 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		4945072516E55A0300B9FF78 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		4945072616E55A0300B9FF78 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+		4945072716E55A0300B9FF78 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		4985385D16ECFE92008D0727 /* OculusWorldDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OculusWorldDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4985388116ECFF23008D0727 /* OculusWorldDemo.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = OculusWorldDemo.cpp; path = OculusWorldDemo/OculusWorldDemo.cpp; sourceTree = "<group>"; };
+		4985388216ECFF23008D0727 /* Player.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Player.cpp; path = OculusWorldDemo/Player.cpp; sourceTree = "<group>"; };
+		4985388316ECFF23008D0727 /* Player.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Player.h; path = OculusWorldDemo/Player.h; sourceTree = "<group>"; };
+		4985389116ED0204008D0727 /* tinyxml2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = tinyxml2.cpp; path = ../3rdParty/TinyXml/tinyxml2.cpp; sourceTree = "<group>"; };
+		4985389316ED0218008D0727 /* Render_LoadTextureDDS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Render_LoadTextureDDS.cpp; sourceTree = "<group>"; };
+		4985389616ED1AA7008D0727 /* Assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Assets; path = OculusWorldDemo/Assets; sourceTree = "<group>"; };
+		499ED49B16E57027008EA2ED /* OVR_Alg.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Alg.h; sourceTree = "<group>"; };
+		499ED49C16E57027008EA2ED /* OVR_Allocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Allocator.h; sourceTree = "<group>"; };
+		499ED49D16E57027008EA2ED /* OVR_Array.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Array.h; sourceTree = "<group>"; };
+		499ED49E16E57027008EA2ED /* OVR_Atomic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Atomic.h; sourceTree = "<group>"; };
+		499ED49F16E57027008EA2ED /* OVR_Color.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Color.h; sourceTree = "<group>"; };
+		499ED4A016E57027008EA2ED /* OVR_ContainerAllocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_ContainerAllocator.h; sourceTree = "<group>"; };
+		499ED4A116E57027008EA2ED /* OVR_File.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_File.h; sourceTree = "<group>"; };
+		499ED4A216E57027008EA2ED /* OVR_Hash.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Hash.h; sourceTree = "<group>"; };
+		499ED4A316E57027008EA2ED /* OVR_KeyCodes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_KeyCodes.h; sourceTree = "<group>"; };
+		499ED4A416E57027008EA2ED /* OVR_List.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_List.h; sourceTree = "<group>"; };
+		499ED4A516E57027008EA2ED /* OVR_Log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Log.h; sourceTree = "<group>"; };
+		499ED4A616E57027008EA2ED /* OVR_Math.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Math.h; sourceTree = "<group>"; };
+		499ED4A716E57027008EA2ED /* OVR_RefCount.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_RefCount.h; sourceTree = "<group>"; };
+		499ED4A816E57027008EA2ED /* OVR_Std.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Std.h; sourceTree = "<group>"; };
+		499ED4A916E57027008EA2ED /* OVR_String.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_String.h; sourceTree = "<group>"; };
+		499ED4AA16E57027008EA2ED /* OVR_StringHash.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_StringHash.h; sourceTree = "<group>"; };
+		499ED4AB16E57027008EA2ED /* OVR_SysFile.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_SysFile.h; sourceTree = "<group>"; };
+		499ED4AC16E57027008EA2ED /* OVR_System.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_System.h; sourceTree = "<group>"; };
+		499ED4AD16E57027008EA2ED /* OVR_Threads.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Threads.h; sourceTree = "<group>"; };
+		499ED4AE16E57027008EA2ED /* OVR_ThreadsWinAPI.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_ThreadsWinAPI.cpp; sourceTree = "<group>"; };
+		499ED4AF16E57027008EA2ED /* OVR_Timer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Timer.h; sourceTree = "<group>"; };
+		499ED4B016E57027008EA2ED /* OVR_Types.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Types.h; sourceTree = "<group>"; };
+		499ED4B116E57027008EA2ED /* OVR_UTF8Util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_UTF8Util.h; sourceTree = "<group>"; };
+		499ED4B216E5703B008EA2ED /* OVR_Device.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OVR_Device.h; sourceTree = "<group>"; };
+		499ED4C516E6A179008EA2ED /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		499ED4C716E6A187008EA2ED /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		499ED4C916E9880D008EA2ED /* IOSurface.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
+		49A5334216E527820039CB59 /* Platform.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Platform.cpp; sourceTree = "<group>"; };
+		49A5334316E527820039CB59 /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
+		49A5334416E527820039CB59 /* Platform_Default.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Platform_Default.h; sourceTree = "<group>"; };
+		49A5335016E527820039CB59 /* Render_Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Render_Device.cpp; sourceTree = "<group>"; };
+		49A5335116E527820039CB59 /* Render_Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Render_Device.h; sourceTree = "<group>"; };
+		49A5335216E527820039CB59 /* Render_Font.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Render_Font.h; sourceTree = "<group>"; };
+		49A5335316E527820039CB59 /* Render_FontEmbed_DejaVu48.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Render_FontEmbed_DejaVu48.h; sourceTree = "<group>"; };
+		49A5335416E527820039CB59 /* Render_GL_Device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Render_GL_Device.cpp; sourceTree = "<group>"; };
+		49A5335516E527820039CB59 /* Render_GL_Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Render_GL_Device.h; sourceTree = "<group>"; };
+		49A5335816E527820039CB59 /* Render_LoadTextureTGA.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Render_LoadTextureTGA.cpp; sourceTree = "<group>"; };
+		49A5336D16E544BE0039CB59 /* libovr.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libovr.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		49A5337116E544E30039CB59 /* OVR_Alg.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Alg.cpp; sourceTree = "<group>"; };
+		49A5337316E544E30039CB59 /* OVR_Allocator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Allocator.cpp; sourceTree = "<group>"; };
+		49A5337616E544E30039CB59 /* OVR_Atomic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Atomic.cpp; sourceTree = "<group>"; };
+		49A5337A16E544E30039CB59 /* OVR_File.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_File.cpp; sourceTree = "<group>"; };
+		49A5337C16E544E30039CB59 /* OVR_FileFILE.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_FileFILE.cpp; sourceTree = "<group>"; };
+		49A5338016E544E30039CB59 /* OVR_Log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Log.cpp; sourceTree = "<group>"; };
+		49A5338216E544E30039CB59 /* OVR_Math.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Math.cpp; sourceTree = "<group>"; };
+		49A5338416E544E30039CB59 /* OVR_RefCount.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_RefCount.cpp; sourceTree = "<group>"; };
+		49A5338616E544E30039CB59 /* OVR_Std.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Std.cpp; sourceTree = "<group>"; };
+		49A5338816E544E30039CB59 /* OVR_String.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String.cpp; sourceTree = "<group>"; };
+		49A5338A16E544E30039CB59 /* OVR_String_FormatUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String_FormatUtil.cpp; sourceTree = "<group>"; };
+		49A5338B16E544E30039CB59 /* OVR_String_PathUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String_PathUtil.cpp; sourceTree = "<group>"; };
+		49A5338D16E544E30039CB59 /* OVR_SysFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_SysFile.cpp; sourceTree = "<group>"; };
+		49A5338F16E544E30039CB59 /* OVR_System.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_System.cpp; sourceTree = "<group>"; };
+		49A5339216E544E30039CB59 /* OVR_ThreadsPthread.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_ThreadsPthread.cpp; sourceTree = "<group>"; };
+		49A5339316E544E30039CB59 /* OVR_Timer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Timer.cpp; sourceTree = "<group>"; };
+		49A5339616E544E30039CB59 /* OVR_UTF8Util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_UTF8Util.cpp; sourceTree = "<group>"; };
+		49A5339A16E544E30039CB59 /* OVR_DeviceConstants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_DeviceConstants.h; sourceTree = "<group>"; };
+		49A5339B16E544E30039CB59 /* OVR_DeviceHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_DeviceHandle.cpp; sourceTree = "<group>"; };
+		49A5339C16E544E30039CB59 /* OVR_DeviceHandle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_DeviceHandle.h; sourceTree = "<group>"; };
+		49A5339D16E544E30039CB59 /* OVR_DeviceImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_DeviceImpl.cpp; sourceTree = "<group>"; };
+		49A5339E16E544E30039CB59 /* OVR_DeviceImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_DeviceImpl.h; sourceTree = "<group>"; };
+		49A5339F16E544E30039CB59 /* OVR_DeviceMessages.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_DeviceMessages.h; sourceTree = "<group>"; };
+		49A533A416E544E30039CB59 /* OVR_SensorFusion.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_SensorFusion.cpp; sourceTree = "<group>"; };
+		49A533A516E544E30039CB59 /* OVR_SensorFusion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_SensorFusion.h; sourceTree = "<group>"; };
+		49A533A616E544E30039CB59 /* OVR_ThreadCommandQueue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_ThreadCommandQueue.cpp; sourceTree = "<group>"; };
+		49A533A716E544E30039CB59 /* OVR_ThreadCommandQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_ThreadCommandQueue.h; sourceTree = "<group>"; };
+		49ABA2E81718A38100E288A7 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = ../../../../../../../System/Library/Frameworks/AudioToolbox.framework; sourceTree = "<group>"; };
+		49DB65F01718B1E10097A8DD /* ApplicationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ApplicationServices.framework; path = System/Library/Frameworks/ApplicationServices.framework; sourceTree = SDKROOT; };
+		49DB65F61726F0C30097A8DD /* SensorBoxTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensorBoxTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B22CBB517187F5C0046D43D /* tinyxml2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = tinyxml2.h; path = ../3rdParty/TinyXml/tinyxml2.h; sourceTree = "<group>"; };
+		9B6DEF841728A6560071E76B /* SensorBoxTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SensorBoxTest.cpp; path = SensorBox/SensorBoxTest.cpp; sourceTree = "<group>"; };
+		9BA4DDB71727061100CF7715 /* Oculus.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = Oculus.icns; sourceTree = "<group>"; };
+		9BB10AEF173C4918009ED618 /* OSX_Gamepad.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OSX_Gamepad.cpp; sourceTree = "<group>"; };
+		9BB10AF0173C4918009ED618 /* OSX_Gamepad.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSX_Gamepad.h; sourceTree = "<group>"; };
+		9BB10AF2173C49AC009ED618 /* Gamepad.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Gamepad.h; sourceTree = "<group>"; };
+		9BBB8901171E2BE200563901 /* OSX_Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSX_Platform.h; sourceTree = "<group>"; };
+		9BBB8902171E2BE200563901 /* OSX_Platform.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = OSX_Platform.mm; sourceTree = "<group>"; };
+		9BBB8903171E2BE200563901 /* OSX_PlatformObjc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSX_PlatformObjc.h; sourceTree = "<group>"; };
+		9BCE53EB16F028A9007A23FF /* OVR_OSX_DeviceManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_OSX_DeviceManager.cpp; sourceTree = "<group>"; };
+		9BCE53EC16F028AA007A23FF /* OVR_OSX_DeviceManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_OSX_DeviceManager.h; sourceTree = "<group>"; };
+		9BCE53ED16F028AA007A23FF /* OVR_OSX_HIDDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_OSX_HIDDevice.cpp; sourceTree = "<group>"; };
+		9BCE53EE16F028AA007A23FF /* OVR_OSX_HIDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_OSX_HIDDevice.h; sourceTree = "<group>"; };
+		9BCE53EF16F028AA007A23FF /* OVR_OSX_HMDDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_OSX_HMDDevice.cpp; sourceTree = "<group>"; };
+		9BCE53F016F028AA007A23FF /* OVR_OSX_HMDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_OSX_HMDDevice.h; sourceTree = "<group>"; };
+		9BCE53F416F0293A007A23FF /* OVR_HIDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_HIDDevice.h; sourceTree = "<group>"; };
+		9BCE53F516F0293A007A23FF /* OVR_HIDDeviceBase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_HIDDeviceBase.h; sourceTree = "<group>"; };
+		9BCE53F616F0293A007A23FF /* OVR_HIDDeviceImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_HIDDeviceImpl.h; sourceTree = "<group>"; };
+		9BCE53F716F0293A007A23FF /* OVR_LatencyTestImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_LatencyTestImpl.cpp; sourceTree = "<group>"; };
+		9BCE53F816F0293A007A23FF /* OVR_LatencyTestImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_LatencyTestImpl.h; sourceTree = "<group>"; };
+		9BCE53FE16F02A56007A23FF /* OVR_SensorImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_SensorImpl.cpp; sourceTree = "<group>"; };
+		9BCE53FF16F02A56007A23FF /* OVR_SensorImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_SensorImpl.h; sourceTree = "<group>"; };
+		9BCE542416F2694E007A23FF /* OVR_OSX_SensorDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_OSX_SensorDevice.cpp; sourceTree = "<group>"; };
+		9BD2A640172069B300C3C389 /* Util_MagCalibration.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Util_MagCalibration.cpp; path = Util/Util_MagCalibration.cpp; sourceTree = "<group>"; };
+		9BD2A641172069B300C3C389 /* Util_MagCalibration.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Util_MagCalibration.h; path = Util/Util_MagCalibration.h; sourceTree = "<group>"; };
+		9BD2A644172069BF00C3C389 /* OVR_SensorFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_SensorFilter.cpp; sourceTree = "<group>"; };
+		9BD2A645172069BF00C3C389 /* OVR_SensorFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_SensorFilter.h; sourceTree = "<group>"; };
+		9BEAD55B17187B8A00A8AA1D /* Util_LatencyTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Util_LatencyTest.cpp; path = Util/Util_LatencyTest.cpp; sourceTree = "<group>"; };
+		9BEAD55C17187B8A00A8AA1D /* Util_LatencyTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Util_LatencyTest.h; path = Util/Util_LatencyTest.h; sourceTree = "<group>"; };
+		9BEAD55D17187B8A00A8AA1D /* Util_Render_Stereo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Util_Render_Stereo.cpp; path = Util/Util_Render_Stereo.cpp; sourceTree = "<group>"; };
+		9BEAD55E17187B8A00A8AA1D /* Util_Render_Stereo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Util_Render_Stereo.h; path = Util/Util_Render_Stereo.h; sourceTree = "<group>"; };
+		9BEAD56317187CFF00A8AA1D /* OSX_WavPlayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OSX_WavPlayer.cpp; sourceTree = "<group>"; };
+		9BEAD56417187CFF00A8AA1D /* OSX_WavPlayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OSX_WavPlayer.h; sourceTree = "<group>"; };
+		9BEAD56617187E7500A8AA1D /* Render_XmlSceneLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Render_XmlSceneLoader.cpp; sourceTree = "<group>"; };
+		9BEAD56817187E8300A8AA1D /* Render_XmlSceneLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Render_XmlSceneLoader.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		37973B351739D78B0093BBB8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				37973B601739FAD50093BBB8 /* CoreFoundation.framework in Frameworks */,
+				37973B5F1739FAC80093BBB8 /* ApplicationServices.framework in Frameworks */,
+				37973B5E1739FAB60093BBB8 /* OpenGL.framework in Frameworks */,
+				37973B5D1739FA920093BBB8 /* IOKit.framework in Frameworks */,
+				37973B391739D78B0093BBB8 /* Cocoa.framework in Frameworks */,
+				37973B5C1739FA620093BBB8 /* libovr.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4985385A16ECFE92008D0727 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49DB65F11718B1E10097A8DD /* ApplicationServices.framework in Frameworks */,
+				49ABA2E91718A38100E288A7 /* AudioToolbox.framework in Frameworks */,
+				4985388A16ECFF53008D0727 /* CoreFoundation.framework in Frameworks */,
+				4985388C16ECFF53008D0727 /* IOKit.framework in Frameworks */,
+				4985388D16ECFF53008D0727 /* IOSurface.framework in Frameworks */,
+				4985388E16ECFF53008D0727 /* OpenGL.framework in Frameworks */,
+				4985385E16ECFE92008D0727 /* Cocoa.framework in Frameworks */,
+				9BAB70F6170E69530006FE98 /* libovr.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49A5336A16E544BE0039CB59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49DB65F31726F0C30097A8DD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49DB661A1726F1650097A8DD /* OpenGL.framework in Frameworks */,
+				49DB66191726F1530097A8DD /* libovr.a in Frameworks */,
+				49DB66181726F13B0097A8DD /* IOKit.framework in Frameworks */,
+				49DB66171726F1350097A8DD /* ApplicationServices.framework in Frameworks */,
+				49DB65F71726F0C30097A8DD /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		37973B3A1739D78B0093BBB8 /* OculusRoomTiny */ = {
+			isa = PBXGroup;
+			children = (
+				37973B571739E9E80093BBB8 /* OSX_OculusRoomTiny.h */,
+				37973B581739E9E80093BBB8 /* OSX_OculusRoomTiny.mm */,
+				37973B541739E9230093BBB8 /* RenderTiny_GL_Device.cpp */,
+				37973B551739E9230093BBB8 /* RenderTiny_GL_Device.h */,
+				37973B511739E1D20093BBB8 /* RenderTiny_Device.cpp */,
+				37973B521739E1D20093BBB8 /* RenderTiny_Device.h */,
+				37973B4F1739E1B60093BBB8 /* OculusRoomModel.cpp */,
+			);
+			path = OculusRoomTiny;
+			sourceTree = "<group>";
+		};
+		4945072116E55A0300B9FF78 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4945072216E55A0300B9FF78 /* Cocoa.framework */,
+				4945072416E55A0300B9FF78 /* Other Frameworks */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4945072416E55A0300B9FF78 /* Other Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4945072516E55A0300B9FF78 /* AppKit.framework */,
+				4945072616E55A0300B9FF78 /* CoreData.framework */,
+				4945072716E55A0300B9FF78 /* Foundation.framework */,
+			);
+			name = "Other Frameworks";
+			sourceTree = "<group>";
+		};
+		49A5332A16E527490039CB59 = {
+			isa = PBXGroup;
+			children = (
+				9BA4DDB71727061100CF7715 /* Oculus.icns */,
+				49DB65F01718B1E10097A8DD /* ApplicationServices.framework */,
+				49ABA2E81718A38100E288A7 /* AudioToolbox.framework */,
+				9B22CBB417187F380046D43D /* 3rdParty */,
+				9B6DEF831728A60A0071E76B /* SensorBox */,
+				9B22CBB317187EC70046D43D /* OculusWorldDemo */,
+				4985389616ED1AA7008D0727 /* Assets */,
+				37973B3A1739D78B0093BBB8 /* OculusRoomTiny */,
+				49A5333416E527490039CB59 /* Products */,
+				49A533A816E544E30039CB59 /* Src */,
+				49A5334116E527820039CB59 /* Platform */,
+				49A5334916E527820039CB59 /* Render */,
+				4945071816E5474000B9FF78 /* libGL.dylib */,
+				4945071A16E5474A00B9FF78 /* libX11.dylib */,
+				4945072116E55A0300B9FF78 /* Frameworks */,
+				499ED4C716E6A187008EA2ED /* CoreFoundation.framework */,
+				4945071616E546F700B9FF78 /* OpenGL.framework */,
+				499ED4C516E6A179008EA2ED /* IOKit.framework */,
+				499ED4C916E9880D008EA2ED /* IOSurface.framework */,
+			);
+			sourceTree = "<group>";
+		};
+		49A5333416E527490039CB59 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				49A5336D16E544BE0039CB59 /* libovr.a */,
+				4985385D16ECFE92008D0727 /* OculusWorldDemo.app */,
+				49DB65F61726F0C30097A8DD /* SensorBoxTest.app */,
+				37973B381739D78B0093BBB8 /* OculusRoomTiny.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		49A5334116E527820039CB59 /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				9BB10AF2173C49AC009ED618 /* Gamepad.h */,
+				9BB10AEF173C4918009ED618 /* OSX_Gamepad.cpp */,
+				9BB10AF0173C4918009ED618 /* OSX_Gamepad.h */,
+				9BEAD56317187CFF00A8AA1D /* OSX_WavPlayer.cpp */,
+				9BEAD56417187CFF00A8AA1D /* OSX_WavPlayer.h */,
+				9BBB8901171E2BE200563901 /* OSX_Platform.h */,
+				9BBB8902171E2BE200563901 /* OSX_Platform.mm */,
+				9BBB8903171E2BE200563901 /* OSX_PlatformObjc.h */,
+				49A5334216E527820039CB59 /* Platform.cpp */,
+				49A5334316E527820039CB59 /* Platform.h */,
+				49A5334416E527820039CB59 /* Platform_Default.h */,
+			);
+			name = Platform;
+			path = CommonSrc/Platform;
+			sourceTree = "<group>";
+		};
+		49A5334916E527820039CB59 /* Render */ = {
+			isa = PBXGroup;
+			children = (
+				9BEAD56817187E8300A8AA1D /* Render_XmlSceneLoader.h */,
+				9BEAD56617187E7500A8AA1D /* Render_XmlSceneLoader.cpp */,
+				4985389316ED0218008D0727 /* Render_LoadTextureDDS.cpp */,
+				49A5335016E527820039CB59 /* Render_Device.cpp */,
+				49A5335116E527820039CB59 /* Render_Device.h */,
+				49A5335216E527820039CB59 /* Render_Font.h */,
+				49A5335316E527820039CB59 /* Render_FontEmbed_DejaVu48.h */,
+				49A5335416E527820039CB59 /* Render_GL_Device.cpp */,
+				49A5335516E527820039CB59 /* Render_GL_Device.h */,
+				49A5335816E527820039CB59 /* Render_LoadTextureTGA.cpp */,
+			);
+			name = Render;
+			path = CommonSrc/Render;
+			sourceTree = "<group>";
+		};
+		49A5339816E544E30039CB59 /* Kernel */ = {
+			isa = PBXGroup;
+			children = (
+				499ED49B16E57027008EA2ED /* OVR_Alg.h */,
+				499ED49C16E57027008EA2ED /* OVR_Allocator.h */,
+				499ED49D16E57027008EA2ED /* OVR_Array.h */,
+				499ED49E16E57027008EA2ED /* OVR_Atomic.h */,
+				499ED49F16E57027008EA2ED /* OVR_Color.h */,
+				499ED4A016E57027008EA2ED /* OVR_ContainerAllocator.h */,
+				499ED4A116E57027008EA2ED /* OVR_File.h */,
+				499ED4A216E57027008EA2ED /* OVR_Hash.h */,
+				499ED4A316E57027008EA2ED /* OVR_KeyCodes.h */,
+				499ED4A416E57027008EA2ED /* OVR_List.h */,
+				499ED4A516E57027008EA2ED /* OVR_Log.h */,
+				499ED4A616E57027008EA2ED /* OVR_Math.h */,
+				499ED4A716E57027008EA2ED /* OVR_RefCount.h */,
+				499ED4A816E57027008EA2ED /* OVR_Std.h */,
+				499ED4A916E57027008EA2ED /* OVR_String.h */,
+				499ED4AA16E57027008EA2ED /* OVR_StringHash.h */,
+				499ED4AB16E57027008EA2ED /* OVR_SysFile.h */,
+				499ED4AC16E57027008EA2ED /* OVR_System.h */,
+				499ED4AD16E57027008EA2ED /* OVR_Threads.h */,
+				499ED4AE16E57027008EA2ED /* OVR_ThreadsWinAPI.cpp */,
+				499ED4AF16E57027008EA2ED /* OVR_Timer.h */,
+				499ED4B016E57027008EA2ED /* OVR_Types.h */,
+				499ED4B116E57027008EA2ED /* OVR_UTF8Util.h */,
+				49A5337116E544E30039CB59 /* OVR_Alg.cpp */,
+				49A5337316E544E30039CB59 /* OVR_Allocator.cpp */,
+				49A5337616E544E30039CB59 /* OVR_Atomic.cpp */,
+				49A5337A16E544E30039CB59 /* OVR_File.cpp */,
+				49A5337C16E544E30039CB59 /* OVR_FileFILE.cpp */,
+				49A5338016E544E30039CB59 /* OVR_Log.cpp */,
+				49A5338216E544E30039CB59 /* OVR_Math.cpp */,
+				49A5338416E544E30039CB59 /* OVR_RefCount.cpp */,
+				49A5338616E544E30039CB59 /* OVR_Std.cpp */,
+				49A5338816E544E30039CB59 /* OVR_String.cpp */,
+				49A5338A16E544E30039CB59 /* OVR_String_FormatUtil.cpp */,
+				49A5338B16E544E30039CB59 /* OVR_String_PathUtil.cpp */,
+				49A5338D16E544E30039CB59 /* OVR_SysFile.cpp */,
+				49A5338F16E544E30039CB59 /* OVR_System.cpp */,
+				49A5339216E544E30039CB59 /* OVR_ThreadsPthread.cpp */,
+				49A5339316E544E30039CB59 /* OVR_Timer.cpp */,
+				49A5339616E544E30039CB59 /* OVR_UTF8Util.cpp */,
+			);
+			path = Kernel;
+			sourceTree = "<group>";
+		};
+		49A533A816E544E30039CB59 /* Src */ = {
+			isa = PBXGroup;
+			children = (
+				9BD2A644172069BF00C3C389 /* OVR_SensorFilter.cpp */,
+				9BD2A645172069BF00C3C389 /* OVR_SensorFilter.h */,
+				9BEAD55A17187B5500A8AA1D /* Util */,
+				49A5339816E544E30039CB59 /* Kernel */,
+				9BCE542416F2694E007A23FF /* OVR_OSX_SensorDevice.cpp */,
+				9BCE53EB16F028A9007A23FF /* OVR_OSX_DeviceManager.cpp */,
+				9BCE53EC16F028AA007A23FF /* OVR_OSX_DeviceManager.h */,
+				9BCE53ED16F028AA007A23FF /* OVR_OSX_HIDDevice.cpp */,
+				9BCE53EE16F028AA007A23FF /* OVR_OSX_HIDDevice.h */,
+				9BCE53EF16F028AA007A23FF /* OVR_OSX_HMDDevice.cpp */,
+				9BCE53F016F028AA007A23FF /* OVR_OSX_HMDDevice.h */,
+				499ED4B216E5703B008EA2ED /* OVR_Device.h */,
+				49A5339A16E544E30039CB59 /* OVR_DeviceConstants.h */,
+				49A5339B16E544E30039CB59 /* OVR_DeviceHandle.cpp */,
+				49A5339C16E544E30039CB59 /* OVR_DeviceHandle.h */,
+				49A5339D16E544E30039CB59 /* OVR_DeviceImpl.cpp */,
+				49A5339E16E544E30039CB59 /* OVR_DeviceImpl.h */,
+				49A5339F16E544E30039CB59 /* OVR_DeviceMessages.h */,
+				9BCE53FE16F02A56007A23FF /* OVR_SensorImpl.cpp */,
+				9BCE53FF16F02A56007A23FF /* OVR_SensorImpl.h */,
+				9BCE53F416F0293A007A23FF /* OVR_HIDDevice.h */,
+				9BCE53F516F0293A007A23FF /* OVR_HIDDeviceBase.h */,
+				9BCE53F616F0293A007A23FF /* OVR_HIDDeviceImpl.h */,
+				9BCE53F716F0293A007A23FF /* OVR_LatencyTestImpl.cpp */,
+				9BCE53F816F0293A007A23FF /* OVR_LatencyTestImpl.h */,
+				49A533A416E544E30039CB59 /* OVR_SensorFusion.cpp */,
+				49A533A516E544E30039CB59 /* OVR_SensorFusion.h */,
+				49A533A616E544E30039CB59 /* OVR_ThreadCommandQueue.cpp */,
+				49A533A716E544E30039CB59 /* OVR_ThreadCommandQueue.h */,
+			);
+			name = Src;
+			path = ../LibOVR/Src;
+			sourceTree = "<group>";
+		};
+		9B22CBB317187EC70046D43D /* OculusWorldDemo */ = {
+			isa = PBXGroup;
+			children = (
+				4985388216ECFF23008D0727 /* Player.cpp */,
+				4985388316ECFF23008D0727 /* Player.h */,
+				4985388116ECFF23008D0727 /* OculusWorldDemo.cpp */,
+			);
+			name = OculusWorldDemo;
+			sourceTree = "<group>";
+		};
+		9B22CBB417187F380046D43D /* 3rdParty */ = {
+			isa = PBXGroup;
+			children = (
+				9B22CBB517187F5C0046D43D /* tinyxml2.h */,
+				4985389116ED0204008D0727 /* tinyxml2.cpp */,
+			);
+			name = 3rdParty;
+			sourceTree = "<group>";
+		};
+		9B6DEF831728A60A0071E76B /* SensorBox */ = {
+			isa = PBXGroup;
+			children = (
+				9B6DEF841728A6560071E76B /* SensorBoxTest.cpp */,
+			);
+			name = SensorBox;
+			sourceTree = "<group>";
+		};
+		9BEAD55A17187B5500A8AA1D /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				9BD2A640172069B300C3C389 /* Util_MagCalibration.cpp */,
+				9BD2A641172069B300C3C389 /* Util_MagCalibration.h */,
+				9BEAD55B17187B8A00A8AA1D /* Util_LatencyTest.cpp */,
+				9BEAD55C17187B8A00A8AA1D /* Util_LatencyTest.h */,
+				9BEAD55D17187B8A00A8AA1D /* Util_Render_Stereo.cpp */,
+				9BEAD55E17187B8A00A8AA1D /* Util_Render_Stereo.h */,
+			);
+			name = Util;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		49A5336B16E544BE0039CB59 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9BCE53F916F0293A007A23FF /* OVR_HIDDevice.h in Headers */,
+				9BCE53FA16F0293A007A23FF /* OVR_HIDDeviceBase.h in Headers */,
+				9BCE53FB16F0293A007A23FF /* OVR_HIDDeviceImpl.h in Headers */,
+				9BCE53FD16F0293A007A23FF /* OVR_LatencyTestImpl.h in Headers */,
+				9BCE540116F02A56007A23FF /* OVR_SensorImpl.h in Headers */,
+				9BCE541816F02ADB007A23FF /* OVR_OSX_DeviceManager.h in Headers */,
+				9BCE541916F02AE6007A23FF /* OVR_OSX_HIDDevice.h in Headers */,
+				9BCE541B16F02AF1007A23FF /* OVR_OSX_HMDDevice.h in Headers */,
+				9BCE541C16F02B04007A23FF /* OVR_Device.h in Headers */,
+				9BCE541D16F02B13007A23FF /* OVR_DeviceConstants.h in Headers */,
+				9BCE541E16F02B1D007A23FF /* OVR_DeviceHandle.h in Headers */,
+				9BCE541F16F02B26007A23FF /* OVR_DeviceImpl.h in Headers */,
+				9BCE542016F02B2A007A23FF /* OVR_DeviceMessages.h in Headers */,
+				9BCE542216F02B88007A23FF /* OVR_SensorFusion.h in Headers */,
+				9BCE542316F02B91007A23FF /* OVR_ThreadCommandQueue.h in Headers */,
+				9BEAD56017187B8A00A8AA1D /* Util_LatencyTest.h in Headers */,
+				9BEAD56217187B8A00A8AA1D /* Util_Render_Stereo.h in Headers */,
+				9BD2A643172069B300C3C389 /* Util_MagCalibration.h in Headers */,
+				9BD2A647172069BF00C3C389 /* OVR_SensorFilter.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		37973B371739D78B0093BBB8 /* OculusRoomTiny */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 37973B4E1739D7930093BBB8 /* Build configuration list for PBXNativeTarget "OculusRoomTiny" */;
+			buildPhases = (
+				37973B341739D78B0093BBB8 /* Sources */,
+				37973B351739D78B0093BBB8 /* Frameworks */,
+				37973B361739D78B0093BBB8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				37973B5B1739FA100093BBB8 /* PBXTargetDependency */,
+			);
+			name = OculusRoomTiny;
+			productName = OculusRoomTiny;
+			productReference = 37973B381739D78B0093BBB8 /* OculusRoomTiny.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4985385C16ECFE92008D0727 /* OculusWorldDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4985387116ECFE92008D0727 /* Build configuration list for PBXNativeTarget "OculusWorldDemo" */;
+			buildPhases = (
+				4985385916ECFE92008D0727 /* Sources */,
+				4985385A16ECFE92008D0727 /* Frameworks */,
+				4985385B16ECFE92008D0727 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4985389016ECFF5C008D0727 /* PBXTargetDependency */,
+			);
+			name = OculusWorldDemo;
+			productName = OculusWorldDemo;
+			productReference = 4985385D16ECFE92008D0727 /* OculusWorldDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+		49A5336C16E544BE0039CB59 /* ovr */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 49A5336E16E544BE0039CB59 /* Build configuration list for PBXNativeTarget "ovr" */;
+			buildPhases = (
+				49A5336916E544BE0039CB59 /* Sources */,
+				49A5336A16E544BE0039CB59 /* Frameworks */,
+				49A5336B16E544BE0039CB59 /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ovr;
+			productName = ovr;
+			productReference = 49A5336D16E544BE0039CB59 /* libovr.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		49DB65F51726F0C30097A8DD /* SensorBoxTest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 49DB660C1726F0C30097A8DD /* Build configuration list for PBXNativeTarget "SensorBoxTest" */;
+			buildPhases = (
+				49DB65F21726F0C30097A8DD /* Sources */,
+				49DB65F31726F0C30097A8DD /* Frameworks */,
+				49DB65F41726F0C30097A8DD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				49DB660E1726F0CD0097A8DD /* PBXTargetDependency */,
+			);
+			name = SensorBoxTest;
+			productName = SensorBoxTest;
+			productReference = 49DB65F61726F0C30097A8DD /* SensorBoxTest.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		49A5332B16E527490039CB59 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0460;
+				ORGANIZATIONNAME = "Oculus VR";
+			};
+			buildConfigurationList = 49A5332E16E527490039CB59 /* Build configuration list for PBXProject "LibOVR_With_Samples" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 49A5332A16E527490039CB59;
+			productRefGroup = 49A5333416E527490039CB59 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				49A5336C16E544BE0039CB59 /* ovr */,
+				4985385C16ECFE92008D0727 /* OculusWorldDemo */,
+				49DB65F51726F0C30097A8DD /* SensorBoxTest */,
+				37973B371739D78B0093BBB8 /* OculusRoomTiny */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		37973B361739D78B0093BBB8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4985385B16ECFE92008D0727 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4985389716ED1AA7008D0727 /* Assets in Resources */,
+				9BA4DDB81727061100CF7715 /* Oculus.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49DB65F41726F0C30097A8DD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9BA4DDB91727083500CF7715 /* Oculus.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		37973B341739D78B0093BBB8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				37973B501739E1B60093BBB8 /* OculusRoomModel.cpp in Sources */,
+				37973B531739E1D20093BBB8 /* RenderTiny_Device.cpp in Sources */,
+				37973B561739E9230093BBB8 /* RenderTiny_GL_Device.cpp in Sources */,
+				37973B591739E9E80093BBB8 /* OSX_OculusRoomTiny.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4985385916ECFE92008D0727 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4985388616ECFF2D008D0727 /* OculusWorldDemo.cpp in Sources */,
+				4985388716ECFF2D008D0727 /* Player.cpp in Sources */,
+				4985388016ECFEE5008D0727 /* Platform.cpp in Sources */,
+				4985387416ECFED8008D0727 /* Render_Device.cpp in Sources */,
+				4985387816ECFED8008D0727 /* Render_GL_Device.cpp in Sources */,
+				4985387A16ECFED8008D0727 /* Render_LoadTextureTGA.cpp in Sources */,
+				4985389216ED0204008D0727 /* tinyxml2.cpp in Sources */,
+				4985389516ED0218008D0727 /* Render_LoadTextureDDS.cpp in Sources */,
+				9BEAD56517187CFF00A8AA1D /* OSX_WavPlayer.cpp in Sources */,
+				9BEAD56717187E7500A8AA1D /* Render_XmlSceneLoader.cpp in Sources */,
+				9BA4DDB61721E12400CF7715 /* OSX_Platform.mm in Sources */,
+				9BB10AF1173C4918009ED618 /* OSX_Gamepad.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49A5336916E544BE0039CB59 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4945070616E5462A00B9FF78 /* OVR_DeviceHandle.cpp in Sources */,
+				4945070816E5462A00B9FF78 /* OVR_DeviceImpl.cpp in Sources */,
+				4945070F16E5462A00B9FF78 /* OVR_SensorFusion.cpp in Sources */,
+				4945071116E5462A00B9FF78 /* OVR_ThreadCommandQueue.cpp in Sources */,
+				494506DD16E5461F00B9FF78 /* OVR_Alg.cpp in Sources */,
+				494506DF16E5461F00B9FF78 /* OVR_Allocator.cpp in Sources */,
+				494506E216E5461F00B9FF78 /* OVR_Atomic.cpp in Sources */,
+				494506E616E5461F00B9FF78 /* OVR_File.cpp in Sources */,
+				494506E816E5461F00B9FF78 /* OVR_FileFILE.cpp in Sources */,
+				494506EC16E5461F00B9FF78 /* OVR_Log.cpp in Sources */,
+				494506EE16E5461F00B9FF78 /* OVR_Math.cpp in Sources */,
+				494506F016E5461F00B9FF78 /* OVR_RefCount.cpp in Sources */,
+				494506F216E5461F00B9FF78 /* OVR_Std.cpp in Sources */,
+				494506F416E5461F00B9FF78 /* OVR_String.cpp in Sources */,
+				494506F616E5461F00B9FF78 /* OVR_String_FormatUtil.cpp in Sources */,
+				494506F716E5461F00B9FF78 /* OVR_String_PathUtil.cpp in Sources */,
+				494506F916E5461F00B9FF78 /* OVR_SysFile.cpp in Sources */,
+				494506FB16E5461F00B9FF78 /* OVR_System.cpp in Sources */,
+				494506FE16E5461F00B9FF78 /* OVR_ThreadsPthread.cpp in Sources */,
+				494506FF16E5461F00B9FF78 /* OVR_Timer.cpp in Sources */,
+				4945070216E5461F00B9FF78 /* OVR_UTF8Util.cpp in Sources */,
+				9BCE53FC16F0293A007A23FF /* OVR_LatencyTestImpl.cpp in Sources */,
+				9BCE540016F02A56007A23FF /* OVR_SensorImpl.cpp in Sources */,
+				9BCE541616F02ABC007A23FF /* OVR_OSX_DeviceManager.cpp in Sources */,
+				9BCE541716F02AD5007A23FF /* OVR_OSX_HIDDevice.cpp in Sources */,
+				9BCE541A16F02AEB007A23FF /* OVR_OSX_HMDDevice.cpp in Sources */,
+				9BCE542516F2694F007A23FF /* OVR_OSX_SensorDevice.cpp in Sources */,
+				9BEAD55F17187B8A00A8AA1D /* Util_LatencyTest.cpp in Sources */,
+				9BEAD56117187B8A00A8AA1D /* Util_Render_Stereo.cpp in Sources */,
+				9BD2A642172069B300C3C389 /* Util_MagCalibration.cpp in Sources */,
+				9BD2A646172069BF00C3C389 /* OVR_SensorFilter.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		49DB65F21726F0C30097A8DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9BB86B6D1747178B0071C537 /* OSX_Gamepad.cpp in Sources */,
+				49DB66111726F0F80097A8DD /* Render_LoadTextureDDS.cpp in Sources */,
+				49DB66121726F0F80097A8DD /* Render_Device.cpp in Sources */,
+				49DB66131726F0F80097A8DD /* Render_GL_Device.cpp in Sources */,
+				49DB66141726F0F80097A8DD /* Render_LoadTextureTGA.cpp in Sources */,
+				49DB660F1726F0EA0097A8DD /* OSX_Platform.mm in Sources */,
+				49DB66101726F0EA0097A8DD /* Platform.cpp in Sources */,
+				9B6DEF851728A6560071E76B /* SensorBoxTest.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		37973B5B1739FA100093BBB8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 49A5336C16E544BE0039CB59 /* ovr */;
+			targetProxy = 37973B5A1739FA100093BBB8 /* PBXContainerItemProxy */;
+		};
+		4985389016ECFF5C008D0727 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 49A5336C16E544BE0039CB59 /* ovr */;
+			targetProxy = 4985388F16ECFF5C008D0727 /* PBXContainerItemProxy */;
+		};
+		49DB660E1726F0CD0097A8DD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 49A5336C16E544BE0039CB59 /* ovr */;
+			targetProxy = 49DB660D1726F0CD0097A8DD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		37973B4C1739D78C0093BBB8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+				);
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/OculusRoomTiny-Info.plist";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = OculusRoomTiny/MacOS/Debug;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		37973B4D1739D78C0093BBB8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+				);
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/OculusRoomTiny-Info.plist";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = OculusRoomTiny/MacOS/Release;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Release;
+		};
+		4985387216ECFE92008D0727 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = OculusWorldDemo/MacOS/Debug;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				GCC_PREFIX_HEADER = "";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				"GCC_PREPROCESSOR_DEFINITIONS[arch=*]" = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+					CommonSrc,
+					../3rdParty/TinyXml,
+				);
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/OculusWorldDemo-Info.plist";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = OculusWorldDemo/MacOS/Debug;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		4985387316ECFE92008D0727 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = OculusWorldDemo/MacOS/Release;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				GCC_PREFIX_HEADER = "";
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+					CommonSrc,
+					../3rdParty/TinyXml,
+				);
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/OculusWorldDemo-Info.plist";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = OculusWorldDemo/MacOS/Release;
+				WRAPPER_EXTENSION = app;
+			};
+			name = Release;
+		};
+		49A5333A16E527490039CB59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libstdc++";
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = ../LibOVR/Lib/MacOS/Debug;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					OVR_BUILD_DEBUG,
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+					CommonSrc,
+				);
+				LIBRARY_SEARCH_PATHS = "../LibOVR/Lib/MacOS/$(CONFIGURATION)";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Debug;
+		};
+		49A5333B16E527490039CB59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libstdc++";
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = ../LibOVR/Lib/MacOS/Release;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					../LibOVR/Src,
+					../LibOVR/Include,
+					CommonSrc,
+				);
+				LIBRARY_SEARCH_PATHS = "../LibOVR/Lib/MacOS/$(CONFIGURATION)";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Release;
+		};
+		49A5336F16E544BE0039CB59 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
+				EXECUTABLE_PREFIX = lib;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = "$(inherited)";
+				LIBRARY_SEARCH_PATHS = "../LIbOVR/MacOS/$(CONFIGURATION)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = ../LibOVR/Lib/MacOS;
+			};
+			name = Debug;
+		};
+		49A5337016E544BE0039CB59 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
+				EXECUTABLE_PREFIX = lib;
+				GCC_ENABLE_CPP_EXCEPTIONS = NO;
+				GCC_ENABLE_CPP_RTTI = NO;
+				LIBRARY_SEARCH_PATHS = "../LIbOVR/MacOS/$(CONFIGURATION)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SYMROOT = ../LibOVR/Lib/MacOS;
+			};
+			name = Release;
+		};
+		49DB660A1726F0C30097A8DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = Samples/SensorBoxTest/MacOS/Debug;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				GCC_PREFIX_HEADER = "";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/SensorBoxTest-Info.plist";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+			};
+			name = Debug;
+		};
+		49DB660B1726F0C30097A8DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LIBRARY = "libstdc++";
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = Samples/SensorBoxTest/MacOS/Release;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				GCC_PREFIX_HEADER = "";
+				INFOPLIST_FILE = "LibOVR_With_Samples.xcodeproj/SensorBoxTest-Info.plist";
+				MACOSX_DEPLOYMENT_TARGET = 10.6;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = app;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		37973B4E1739D7930093BBB8 /* Build configuration list for PBXNativeTarget "OculusRoomTiny" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37973B4C1739D78C0093BBB8 /* Debug */,
+				37973B4D1739D78C0093BBB8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4985387116ECFE92008D0727 /* Build configuration list for PBXNativeTarget "OculusWorldDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4985387216ECFE92008D0727 /* Debug */,
+				4985387316ECFE92008D0727 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49A5332E16E527490039CB59 /* Build configuration list for PBXProject "LibOVR_With_Samples" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49A5333A16E527490039CB59 /* Debug */,
+				49A5333B16E527490039CB59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49A5336E16E544BE0039CB59 /* Build configuration list for PBXNativeTarget "ovr" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49A5336F16E544BE0039CB59 /* Debug */,
+				49A5337016E544BE0039CB59 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49DB660C1726F0C30097A8DD /* Build configuration list for PBXNativeTarget "SensorBoxTest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49DB660A1726F0C30097A8DD /* Debug */,
+				49DB660B1726F0C30097A8DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 49A5332B16E527490039CB59 /* Project object */;
+}
