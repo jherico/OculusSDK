@@ -210,7 +210,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).     
+    // (unless a buffer is used, then each buffer is independent).
     virtual bool SetUniform(const char* name, int n, const float* v)
     {
         bool result = 0;
@@ -278,7 +278,7 @@ public:
    is recommended. Some renderers cannot have high-performance buffers which are readable,
    so reading in Map should not be relied on.
 
-   Constraints on buffers, such as ReadOnly, are not enforced by the api but may result in 
+   Constraints on buffers, such as ReadOnly, are not enforced by the api but may result in
    rendering-system dependent undesirable behavior, such as terrible performance or unreported failure.
 
    Use of a buffer inconsistent with usage is also not checked by the api, but it may result in bad
@@ -369,11 +369,11 @@ public:
     void  SetMatrix(const Matrix4f& m)
     {
         MatCurrent = true;
-        Mat = m;        
+        Mat = m;
     }
 
 
-    const Matrix4f&  GetMatrix() const 
+    const Matrix4f&  GetMatrix() const
     {
         if (!MatCurrent)
         {
@@ -395,7 +395,7 @@ struct Vertex
 	float     U2, V2;
     Vector3f  Norm;
 
-    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255), 
+    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255),
             float u = 0, float v = 0, Vector3f n = Vector3f(1,0,0))
       : Pos(p), C(c), U(u), V(v), Norm(n), U2(u), V2(v) {}
     Vertex(float x, float y, float z, const Color& c = Color(64,0,0,255),
@@ -524,7 +524,7 @@ public:
     static Model* CreateAxisFaceColorBox(float x1, float x2, Color xcolor,
                                          float y1, float y2, Color ycolor,
                                          float z1, float z2, Color zcolor);
-   
+
 
 
     // Uses texture coordinates for exactly covering each surface once.
@@ -634,24 +634,24 @@ enum DisplayMode
     Display_Fullscreen = 1,
     Display_FakeFullscreen
 };
-    
+
 struct DisplayId
 {
     // Windows
     String MonitorName; // Monitor name for fullscreen mode
-    
+
     // MacOS
     long   CgDisplayId; // CGDirectDisplayID
-    
+
     DisplayId() : CgDisplayId(0) {}
     DisplayId(long id) : CgDisplayId(id) {}
     DisplayId(String m, long id=0) : MonitorName(m), CgDisplayId(id) {}
-    
+
     operator bool () const
     {
         return MonitorName.GetLength() || CgDisplayId;
     }
-    
+
     bool operator== (const DisplayId& b) const
     {
         return CgDisplayId == b.CgDisplayId &&
@@ -667,7 +667,7 @@ struct RendererParams
     DisplayId Display;
 
     RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
-    
+
     bool IsDisplaySet() const
     {
         return Display;
@@ -730,7 +730,7 @@ public:
 
     const RendererParams& GetParams() const { return Params; }
 
-    
+
     // StereoParams apply Viewport, Projection and Distortion simultaneously,
     // doing full configuration for one eye.
     void        ApplyStereoParams(const StereoEyeParams& params)
@@ -778,7 +778,7 @@ public:
     virtual Buffer*  CreateBuffer() { return NULL; }
     virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount=1)
     { OVR_UNUSED5(format,width,height,data, mipcount); return NULL; }
-   
+
     virtual bool     GetSamplePositions(Render::Texture*, Vector3f* pos) { pos[0] = Vector3f(0); return 1; }
 
     virtual ShaderSet* CreateShaderSet() { return new ShaderSetMatrixTranspose; }
@@ -873,7 +873,7 @@ public:
 protected:
     // Stereo & post-processing
     virtual bool  initPostProcessSupport(PostProcessType pptype);
-    
+
     virtual Shader* CreateStereoShader(PrimitiveType prim, Shader* vs)
     { OVR_UNUSED2(prim, vs); return NULL; }
 

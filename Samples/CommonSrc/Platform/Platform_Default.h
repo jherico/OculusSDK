@@ -3,7 +3,7 @@
 Filename    :   Platform_Default.h
 Content     :   Default Platform class and RenderDevice selection file
 Created     :   October 4, 2012
-Authors     :   
+Authors     :
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -27,11 +27,11 @@ limitations under the License.
 // This should select proper header file for the platform/compiler.
 #include <Kernel/OVR_Types.h>
 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_WIN32) && !defined(OVR_USE_GLUT)
   #include "Win32_Platform.h"
 
   #include "../Render/Render_D3D11_Device.h"
-  #undef OVR_D3D_VERSION  
+  #undef OVR_D3D_VERSION
   #include "../Render/Render_D3D10_Device.h"
 //  #include "../Render/Render_GL_Win32_Device.h"
 
@@ -41,18 +41,22 @@ limitations under the License.
         SetupGraphicsDeviceSet("D3D11", &OVR::Render::D3D11::RenderDevice::CreateDevice,       \
         SetupGraphicsDeviceSet("D3D10", &OVR::Render::D3D10::RenderDevice::CreateDevice) )
 
-#elif defined(OVR_OS_MAC) && !defined(OVR_MAC_X11)
+#elif defined(OVR_OS_MAC) && !defined(OVR_MAC_X11) && !defined(OVR_USE_GLUT)
   #include "OSX_Platform.h"
 
   #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
     SetupGraphicsDeviceSet("GL", &OVR::Render::GL::OSX::RenderDevice::CreateDevice)
+#elif defined(OVR_LINUX_X11)
+
+  #error "Not implemented yet"
 
 #else
 
-  #include "X11_Platform.h"
+  #include "GLUT_Platform.h"
+  #include "../Render/Render_GL_GLUT_Device.h"
 
   #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
-    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::X11::RenderDevice::CreateDevice)
+    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::GLUT::RenderDevice::CreateDevice)
 
 #endif
 

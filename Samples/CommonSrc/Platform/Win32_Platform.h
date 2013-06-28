@@ -43,7 +43,7 @@ class PlatformCore : public Platform::PlatformCore
     int         ExitCode;
     int         Width, Height;
 
-    MouseMode   MMode;    
+    MouseMode   MMode;
     POINT       WindowCenter; // In desktop coordinates
     HCURSOR     Cursor;
     int         Modifiers;
@@ -71,7 +71,7 @@ public:
     void      GetWindowSize(int* w, int* h) const;
 
     void      SetWindowTitle(const char*title);
-	void	  PlayMusicFile(const char *fileName);
+        void      PlayMusicFile(const char *fileName);
     int       GetDisplayCount();
     Render::DisplayId    GetDisplay(int screen);
 

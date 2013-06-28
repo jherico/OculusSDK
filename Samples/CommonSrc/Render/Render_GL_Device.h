@@ -37,7 +37,15 @@ limitations under the License.
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 #include <GL/glext.h>
+
+extern "C" {
+    GLAPI void APIENTRY glAttachShader (GLuint program, GLuint shader);
+    GLAPI void APIENTRY glDeleteShader (GLuint shader);
+    GLAPI void APIENTRY glDetachShader (GLuint program, GLuint shader);
+
+}
 #endif
+
 
 namespace OVR { namespace Render { namespace GL {
 
@@ -154,7 +162,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).     
+    // (unless a buffer is used, then each buffer is independent).
     virtual bool SetUniform(const char* name, int n, const float* v);
     virtual bool SetUniform4x4f(const char* name, const Matrix4f& m);
 
@@ -185,7 +193,7 @@ class RenderDevice : public Render::RenderDevice
     GLuint                   CurrentFbo;
 
     const LightingParams*    Lighting;
-    
+
 
 public:
     RenderDevice(const RendererParams& p);

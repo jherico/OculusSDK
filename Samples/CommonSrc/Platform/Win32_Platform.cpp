@@ -68,13 +68,13 @@ bool PlatformCore::SetupWindow(int w, int h)
                           NULL, NULL, hInstance, (LPVOID)this);
     Modifiers = 0;
 
-    Cursor = LoadCursor(NULL, IDC_CROSS);    
+    Cursor = LoadCursor(NULL, IDC_CROSS);
 
     // Initialize Window center in screen coordinates
     POINT center = { Width / 2, Height / 2 };
     ::ClientToScreen(hWnd, &center);
     WindowCenter = center;
-    
+
     if (MMode == Mouse_Relative)
     {
         ::SetCursorPos(WindowCenter.x, WindowCenter.y);
@@ -100,7 +100,7 @@ void PlatformCore::DestroyWindow()
     Width = Height = 0;
 
     //DestroyCursor(Cursor);
-    Cursor = 0;    
+    Cursor = 0;
 }
 
 void PlatformCore::ShowWindow(bool visible)
@@ -143,7 +143,7 @@ void PlatformCore::SetWindowTitle(const char* title)
     ::SetWindowTextA(hWnd, title);
 }
 
-static UByte KeyMap[][2] = 
+static UByte KeyMap[][2] =
 {
     { VK_BACK,      Key_Backspace },
     { VK_TAB,       Key_Tab },
@@ -183,10 +183,10 @@ static UByte KeyMap[][2] =
     { VK_OEM_6,     Key_BracketRight },
     { VK_OEM_7,     Key_Quote },
 
-    { VK_OEM_AX,	Key_OEM_AX },   //  'AX' key on Japanese AX keyboard.
+    { VK_OEM_AX,        Key_OEM_AX },   //  'AX' key on Japanese AX keyboard.
     { VK_OEM_102,   Key_OEM_102 },  //  "<>" or "\|" on RT 102-key keyboard.
     { VK_ICO_HELP,  Key_ICO_HELP },
-    { VK_ICO_00,	Key_ICO_00 }
+    { VK_ICO_00,        Key_ICO_00 }
 };
 
 
@@ -210,12 +210,12 @@ KeyCode MapVKToKeyCode(unsigned vk)
     {
         key = vk - VK_F1 + Key_F1;
     }
-    else 
+    else
     {
         for (unsigned i = 0; i< (sizeof(KeyMap) / sizeof(KeyMap[1])); i++)
         {
             if (vk == KeyMap[i][0])
-            {                
+            {
                 key = KeyMap[i][1];
                 break;
             }
@@ -229,7 +229,7 @@ KeyCode MapVKToKeyCode(unsigned vk)
 
 LRESULT CALLBACK PlatformCore::systemWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    PlatformCore* self;  
+    PlatformCore* self;
 
     // WM_NCCREATE should be the first message to come it; use it to set class pointer.
     if (msg == WM_NCCREATE)
@@ -246,7 +246,7 @@ LRESULT CALLBACK PlatformCore::systemWindowProc(HWND hwnd, UINT msg, WPARAM wp, 
     {
         self = (PlatformCore*)(UPInt)GetWindowLongPtr(hwnd, 0);
     }
-        
+
     return self ? self->WindowProc(msg, wp, lp) :
                   DefWindowProc(hwnd, msg, wp, lp);
 }
@@ -281,7 +281,7 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
 
             LONG dx = newPos.x - WindowCenter.x;
             LONG dy = newPos.y - WindowCenter.y;
-           
+
             pApp->OnMouseMove(dx, dy, Mod_MouseRelative);
         }
         else
@@ -300,7 +300,7 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
         }
         break;
 
-    case WM_KEYDOWN:        
+    case WM_KEYDOWN:
         switch (wp)
         {
         case VK_CONTROL:        Modifiers |= Mod_Control; break;
@@ -333,12 +333,12 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
         break;
 
     case WM_LBUTTONDOWN:
-        //App->OnMouseButton(0, 
+        //App->OnMouseButton(0,
 
         ::SetCapture(hWnd);
 
         if (MMode == Mouse_RelativeEscaped)
-        {            
+        {
             ::SetCursorPos(WindowCenter.x, WindowCenter.y);
             ::ShowCursor(FALSE);
             MMode = Mouse_Relative;
@@ -352,19 +352,19 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
     case WM_SETFOCUS:
         // Do NOT restore the Relative mode here, since calling SetCursorPos
         // would screw up titlebar window dragging.
-        // Let users click in the center instead to resume.        
+        // Let users click in the center instead to resume.
         break;
 
     case WM_KILLFOCUS:
         if (MMode == Mouse_Relative)
-        {            
+        {
             MMode = Mouse_RelativeEscaped;
             ShowCursor(TRUE);
         }
         break;
 
     case WM_SIZE:
-        // Change window size as long as we're not being minimized. 
+        // Change window size as long as we're not being minimized.
         if (wp != SIZE_MINIMIZED)
         {
         Width = LOWORD(lp);
@@ -443,7 +443,7 @@ RenderDevice* PlatformCore::SetupGraphics(const SetupGraphicsDeviceSet& setupGra
 
 void PlatformCore::PlayMusicFile(const char *fileName)
 {
-	PlaySoundA(fileName, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC); 
+        PlaySoundA(fileName, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC);
 }
 
 
@@ -486,7 +486,7 @@ int PlatformCore::GetDisplayCount()
     {
         info.cbSize = sizeof(MONITORINFOEX);
         GetMonitorInfo(monitors.Monitors[m], &info);
-        
+
         if (info.dwFlags & MONITORINFOF_PRIMARY)
            primary++;
     }
@@ -494,7 +494,7 @@ int PlatformCore::GetDisplayCount()
     if (primary > 1)
         return 1;                      // Regard mirrored displays as a single screen
     else
-        return monitors.MonitorCount;  // Return all extended displays 
+        return monitors.MonitorCount;  // Return all extended displays
 }
 
 //-----------------------------------------------------------------------------
@@ -517,7 +517,7 @@ Render::DisplayId PlatformCore::GetDisplay(int screen)
     {
         info.cbSize = sizeof(MONITORINFOEX);
         GetMonitorInfo(monitors.Monitors[m], &info);
-        
+
         if (info.dwFlags & MONITORINFOF_PRIMARY)
         {
             if (screen == 0)
@@ -550,7 +550,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
     using namespace OVR::Platform;
 
     OVR_UNUSED2(prevInst, show);
-    
+
     // CreateApplication must be the first call since it does OVR::System::Initialize.
     Application*     app = Application::CreateApplication();
     Win32::PlatformCore* platform = new Win32::PlatformCore(app, hinst);
