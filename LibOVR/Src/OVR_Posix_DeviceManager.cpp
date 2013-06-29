@@ -1,17 +1,17 @@
 /************************************************************************************
 
-Filename    :   OVR_Posix_DeviceManager.cpp
-Content     :   Posix implementation of DeviceManager.
-Created     :   September 21, 2012
-Authors     :   Michael Antonov
+ Filename    :   OVR_Posix_DeviceManager.cpp
+ Content     :   Posix implementation of DeviceManager.
+ Created     :   September 21, 2012
+ Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+ Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
+ Use of this software is subject to the terms of the Oculus license
+ agreement provided at the time of installation or download, or which
+ otherwise accompanies this software in either electronic or hard copy form.
 
-*************************************************************************************/
+ *************************************************************************************/
 
 #include "OVR_Posix_DeviceManager.h"
 
@@ -27,25 +27,19 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "Kernel/OVR_Log.h"
 #include <unistd.h>
 
-namespace OVR { namespace Posix {
+namespace OVR {
+namespace Posix {
 
-
-//-------------------------------------------------------------------------------------
-// **** Posix::DeviceManager
-
-DeviceManager::DeviceManager()
-{
-    HidDeviceManager = *HIDDeviceManager::CreateInternal(this);
+DeviceManager::DeviceManager() {
+    HidDeviceManager = new HIDDeviceManager(this);
 }
 
-DeviceManager::~DeviceManager()
-{
+DeviceManager::~DeviceManager() {
     // make sure Shutdown was called.
     OVR_ASSERT(!pThread);
 }
 
-bool DeviceManager::Initialize(DeviceBase*)
-{
+bool DeviceManager::Initialize(DeviceBase*) {
     if (!DeviceManagerImpl::Initialize(0))
         return false;
 
@@ -58,8 +52,7 @@ bool DeviceManager::Initialize(DeviceBase*)
     return true;
 }
 
-void DeviceManager::Shutdown()
-{
+void DeviceManager::Shutdown() {
     LogText("OVR::DeviceManager - shutting down.\n");
 
     // Set Manager shutdown marker variable; this prevents
@@ -82,102 +75,69 @@ void DeviceManager::Shutdown()
     DeviceManagerImpl::Shutdown();
 }
 
-ThreadCommandQueue* DeviceManager::GetThreadQueue()
-{
+ThreadCommandQueue* DeviceManager::GetThreadQueue() {
     return pThread;
 }
 
-bool DeviceManager::GetDeviceInfo(DeviceInfo* info) const
-{
-    if ((info->InfoClassType != Device_Manager) &&
-        (info->InfoClassType != Device_None))
+bool DeviceManager::GetDeviceInfo(DeviceInfo* info) const {
+    if ((info->InfoClassType != Device_Manager) && (info->InfoClassType != Device_None))
         return false;
 
-    info->Type    = Device_Manager;
+    info->Type = Device_Manager;
     info->Version = 0;
     OVR_strcpy(info->ProductName, DeviceInfo::MaxNameLength, "DeviceManager");
-    OVR_strcpy(info->Manufacturer,DeviceInfo::MaxNameLength, "Oculus VR, Inc.");
+    OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, "Oculus VR, Inc.");
     return true;
 }
 
-DeviceEnumerator<> DeviceManager::EnumerateDevicesEx(const DeviceEnumerationArgs& args)
-{
+DeviceEnumerator<> DeviceManager::EnumerateDevicesEx(const DeviceEnumerationArgs& args) {
     // TBD: Can this be avoided in the future, once proper device notification is in place?
-    if (GetThreadId() != OVR::GetCurrentThreadId())
-    {
-        pThread->PushCall((DeviceManagerImpl*)this,
-            &DeviceManager::EnumerateAllFactoryDevices, true);
-    }
-    else
+    if (GetThreadId() != OVR::GetCurrentThreadId()) {
+        pThread->PushCall((DeviceManagerImpl*) this, &DeviceManager::EnumerateAllFactoryDevices, true);
+    } else
         DeviceManager::EnumerateAllFactoryDevices();
 
     return DeviceManagerImpl::EnumerateDevicesEx(args);
 }
 
-ThreadId DeviceManager::GetThreadId() const
-{
+ThreadId DeviceManager::GetThreadId() const {
     return pThread->GetThreadId();
 }
 
-bool DeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const
-{
-    if (GetHIDDeviceManager())
-        return static_cast<HIDDeviceManager*>(GetHIDDeviceManager())->GetHIDDeviceDesc(path, pdevDesc);
-    return false;
-}
-
+//bool DeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const {
+//    if (GetHIDDeviceManager())
+//        return static_cast<HIDDeviceManager*>(GetHIDDeviceManager())->GetHIDDeviceDesc(path, pdevDesc);
+//    return false;
+//}
 
 //-------------------------------------------------------------------------------------
 // ***** DeviceManager Thread
 
-DeviceManagerThread::DeviceManagerThread(DeviceManager* pdevMgr)
-    : Thread(ThreadStackSize), pDeviceMgr(pdevMgr) // , hCommandEvent(0)
-{
-//    // Create a non-signaled manual-reset event.
-//    hCommandEvent = ::CreateEvent(0, TRUE, FALSE, 0);
-//    if (!hCommandEvent)
-//        return;
-//
-//    // Must add event before starting.
-//    AddOverlappedEvent(0, hCommandEvent);
-//
-	// Create device messages object.
-	pStatusObject = *new DeviceStatus(this);
+DeviceManagerThread::DeviceManagerThread(DeviceManager* pdevMgr) :
+        Thread(ThreadStackSize), pDeviceMgr(pdevMgr) {
+    // Create device messages object.
+    pStatusObject = *new DeviceStatus(this);
 }
 
-DeviceManagerThread::~DeviceManagerThread()
-{
-//    // Remove overlapped event [0], after thread service exit.
-//    if (hCommandEvent)
-//    {
-//        RemoveOverlappedEvent(0, hCommandEvent);
-//        ::CloseHandle(hCommandEvent);
-//        hCommandEvent = 0;
-//    }
+DeviceManagerThread::~DeviceManagerThread() {
 }
 
-int DeviceManagerThread::Run()
-{
+int DeviceManagerThread::Run() {
     ThreadCommand::PopBuffer command;
 
     SetThreadName("OVR::DeviceManagerThread");
     LogText("OVR::DeviceManagerThread - running (ThreadId=0x%X).\n", GetThreadId());
 
-	if (!pStatusObject->Initialize())
-	{
-		LogText("OVR::DeviceManagerThread - failed to initialize MessageObject.\n");
-	}
+    if (!pStatusObject->Initialize()) {
+        LogText("OVR::DeviceManagerThread - failed to initialize MessageObject.\n");
+    }
 
-    while(!IsExiting())
-    {
+    while (!IsExiting()) {
         // PopCommand will reset event on empty queue.
-        if (PopCommand(&command))
-        {
+        if (PopCommand(&command)) {
             command.Execute();
-        }
-        else
-        {
-        	usleep(100);
+        } else {
+            usleep(100);
 //            DWORD eventIndex = 0;
 //            do {
 //                UPInt numberOfWaitHandles = WaitHandles.GetSize();
@@ -236,67 +196,53 @@ int DeviceManagerThread::Run()
         }
     }
 
-	pStatusObject->ShutDown();
+    pStatusObject->ShutDown();
 
     LogText("OVR::DeviceManagerThread - exiting (ThreadId=0x%X).\n", GetThreadId());
     return 0;
 }
 
-
-bool DeviceManagerThread::OnMessage(MessageType type, const String& devicePath)
-{
-	Notifier::DeviceMessageType notifierMessageType = Notifier::DeviceMessage_DeviceAdded;
-	if (type == DeviceAdded)
-	{
-	}
-	else if (type == DeviceRemoved)
-	{
-		notifierMessageType = Notifier::DeviceMessage_DeviceRemoved;
-	}
-	else
-	{
-		OVR_ASSERT(false);
-	}
-
-	bool error = false;
-    bool deviceFound = false;
-	for (UPInt i = 0; i < MessageNotifiers.GetSize(); i++)
-    {
-		if (MessageNotifiers[i] &&
-			MessageNotifiers[i]->OnDeviceMessage(notifierMessageType, devicePath, &error))
-		{
-			// The notifier belonged to a device with the specified device name so we're done.
-            deviceFound = true;
-			break;
-		}
+bool DeviceManagerThread::OnMessage(MessageType type, const String& devicePath) {
+    Notifier::DeviceMessageType notifierMessageType = Notifier::DeviceMessage_DeviceAdded;
+    if (type == DeviceAdded) {
+    } else if (type == DeviceRemoved) {
+        notifierMessageType = Notifier::DeviceMessage_DeviceRemoved;
+    } else {
+        OVR_ASSERT(false);
     }
-    if (type == DeviceAdded && !deviceFound)
-    {
-        Lock::Locker devMgrLock(&DevMgrLock);
+
+    bool error = false;
+    bool deviceFound = false;
+    for (UPInt i = 0; i < MessageNotifiers.GetSize(); i++) {
+        if (MessageNotifiers[i] && MessageNotifiers[i]->OnDeviceMessage(notifierMessageType, devicePath, &error)) {
+            // The notifier belonged to a device with the specified device name so we're done.
+            deviceFound = true;
+            break;
+        }
+    }
+    if (type == DeviceAdded && !deviceFound) {
+        boost::mutex::scoped_lock mtxWaitLock(lock);
         // a new device was connected. Go through all device factories and
         // try to detect the device using HIDDeviceDesc.
         HIDDeviceDesc devDesc;
-        if (pDeviceMgr->GetHIDDeviceDesc(devicePath, &devDesc))
-        {
-            Lock::Locker deviceLock(pDeviceMgr->GetLock());
-            DeviceFactory* factory = pDeviceMgr->Factories.GetFirst();
-            while(!pDeviceMgr->Factories.IsNull(factory))
-            {
-                if (factory->DetectHIDDevice(pDeviceMgr, devDesc))
-                {
-                    deviceFound = true;
-                    break;
-                }
-                factory = factory->pNext;
-            }
-        }
+        // FIXME
+//        if (pDeviceMgr->GetHIDDeviceDesc(devicePath, &devDesc)) {
+//            Lock::Locker deviceLock(pDeviceMgr->GetLock());
+//            DeviceFactory* factory = pDeviceMgr->Factories.GetFirst();
+//            while (!pDeviceMgr->Factories.IsNull(factory)) {
+//                if (factory->DetectHIDDevice(pDeviceMgr, devDesc)) {
+//                    deviceFound = true;
+//                    break;
+//                }
+//                factory = factory->pNext;
+//            }
+//        }
     }
 
-    if (!deviceFound && strstr(devicePath.ToCStr(), "#OVR00"))
-    {
+    if (!deviceFound && strstr(devicePath.ToCStr(), "#OVR00")) {
         Ptr<DeviceManager> pmgr;
         {
-            Lock::Locker devMgrLock(&DevMgrLock);
+            boost::mutex::scoped_lock mtxWaitLock(lock);
             pmgr = pDeviceMgr;
         }
         // HMD plugged/unplugged
@@ -306,56 +252,40 @@ bool DeviceManagerThread::OnMessage(MessageType type, const String& devicePath)
         pmgr->EnumerateDevices<HMDDevice>();
     }
 
-	return !error;
+    return !error;
 }
 
-void DeviceManagerThread::DetachDeviceManager()
-{
-    Lock::Locker devMgrLock(&DevMgrLock);
+void DeviceManagerThread::DetachDeviceManager() {
+    boost::mutex::scoped_lock mtxWaitLock(lock);
     pDeviceMgr = NULL;
 }
 
 } // namespace Posix
 
-
-//-------------------------------------------------------------------------------------
-// ***** Creation
-
-
 // Creates a new DeviceManager and initializes OVR.
-DeviceManager* DeviceManager::Create()
-{
-
-    if (!System::IsInitialized())
-    {
+DeviceManager* DeviceManager::Create() {
+    if (!System::IsInitialized()) {
         // Use custom message, since Log is not yet installed.
         OVR_DEBUG_STATEMENT(Log::GetDefaultLog()->
-            LogMessage(Log_Debug, "DeviceManager::Create failed - OVR::System not initialized"); );
+                LogMessage(Log_Debug, "DeviceManager::Create failed - OVR::System not initialized"); );
         return 0;
     }
 
     Ptr<Posix::DeviceManager> manager = *new Posix::DeviceManager;
 
-    if (manager)
-    {
-        if (manager->Initialize(0))
-        {
+    if (manager) {
+        if (manager->Initialize(0)) {
             manager->AddFactory(&SensorDeviceFactory::Instance);
             manager->AddFactory(&LatencyTestDeviceFactory::Instance);
             manager->AddFactory(&Posix::HMDDeviceFactory::Instance);
-
             manager->AddRef();
-        }
-        else
-        {
+        } else {
             manager.Clear();
         }
-
     }
 
     return manager.GetPtr();
 }
-
 
 } // namespace OVR
 

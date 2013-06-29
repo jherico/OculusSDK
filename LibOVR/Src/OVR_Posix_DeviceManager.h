@@ -20,7 +20,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "OVR_Posix_DeviceStatus.h"
 #define HANDLE long
 #include "Kernel/OVR_Timer.h"
-
+#include <boost/thread.hpp>
 
 namespace OVR { namespace Posix {
 
@@ -62,7 +62,7 @@ class DeviceManagerThread : public Thread, public ThreadCommandQueue, public Dev
     enum { ThreadStackSize = 32 * 1024 };
 public:
     DeviceManagerThread(DeviceManager* pdevMgr);
-    ~DeviceManagerThread();
+    virtual ~DeviceManagerThread();
 
     virtual int Run();
 
@@ -107,12 +107,9 @@ public:
     void DetachDeviceManager();
 
 private:
-
-    Lock                    DevMgrLock;
-    // pDeviceMgr should be accessed under DevMgrLock
-    DeviceManager*          pDeviceMgr; // back ptr, no addref.
-    // Event used to wake us up thread commands are enqueued.
-    HANDLE                  hCommandEvent;
+    //boost::condition        signal;
+    boost::mutex            lock;
+    DeviceManager*          pDeviceMgr;
 
     // Event notifications for devices whose OVERLAPPED I/O we service.
     // This list is modified through AddDeviceOverlappedEvent.

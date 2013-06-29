@@ -1,26 +1,31 @@
 /************************************************************************************
 
-Filename    :   OVR_Posix_HIDDevice.h
-Content     :   Posix HID device implementation.
-Created     :   February 22, 2013
-Authors     :   Lee Cooper
+ Filename    :   OVR_Posix_HIDDevice.h
+ Content     :   Posix HID device implementation.
+ Created     :   February 22, 2013
+ Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+ Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
+ Use of this software is subject to the terms of the Oculus license
+ agreement provided at the time of installation or download, or which
+ otherwise accompanies this software in either electronic or hard copy form.
 
-*************************************************************************************/
+ *************************************************************************************/
 
 #ifndef OVR_Posix_HIDDevice_h
 #define OVR_Posix_HIDDevice_h
 
 #include "OVR_HIDDevice.h"
 #include "OVR_Posix_DeviceManager.h"
+#include <map>
+#include <list>
+#include <string>
+#include <libudev.h>
+#include <boost/shared_ptr.hpp>
 
-
-namespace OVR { namespace Posix {
+namespace OVR {
+namespace Posix {
 
 class HIDDeviceManager;
 class DeviceManager;
@@ -28,21 +33,14 @@ class DeviceManager;
 //-------------------------------------------------------------------------------------
 // ***** Posix HIDDevice
 
-class HIDDevice : public OVR::HIDDevice, public DeviceManagerThread::Notifier
-{
+class HIDDevice: public OVR::HIDDevice, public DeviceManagerThread::Notifier {
 public:
-
-    HIDDevice(HIDDeviceManager* manager);
-
-    ~HIDDevice();
-
-    bool HIDInitialize(const String& path);
-    void HIDShutdown();
+    HIDDevice(HIDDeviceManager& manager, const std::string & path);
+    virtual ~HIDDevice();
 
     // OVR::HIDDevice
-	bool SetFeatureReport(UByte* data, UInt32 length);
-	bool GetFeatureReport(UByte* data, UInt32 length);
-
+    bool SetFeatureReport(UByte* data, UInt32 length);
+    bool GetFeatureReport(UByte* data, UInt32 length);
 
     // DeviceManagerThread::Notifier
     void OnOverlappedEvent(HANDLE hevent);
@@ -50,6 +48,7 @@ public:
     bool OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error);
 
 private:
+    friend class HIDDeviceManager;
     bool openDevice();
     bool initInfo();
     bool initializeRead();
@@ -57,52 +56,44 @@ private:
     void closeDevice();
     void closeDeviceOnIOError();
 
-    bool                inMinimalMode;
-    HIDDeviceManager*   HIDManager;
-	HANDLE              Device;
-    HIDDeviceDesc       DevDesc;
+    std::string Path;
+    int FileDescriptor;
+    HIDDeviceManager& HIDManager;
+    HIDDeviceDesc DevDesc;
+    bool ReadRequested;
 
-    //OVERLAPPED          ReadOverlapped;
-    bool                ReadRequested;
+    enum {
+        ReadBufferSize = 96
+    };
+    UByte ReadBuffer[ReadBufferSize];
 
-    enum { ReadBufferSize = 96 };
-    UByte               ReadBuffer[ReadBufferSize];
-
-    UInt16              InputReportBufferLength;
-    UInt16              OutputReportBufferLength;
-    UInt16              FeatureReportBufferLength;
+    UInt16 InputReportBufferLength;
+    UInt16 OutputReportBufferLength;
+    UInt16 FeatureReportBufferLength;
 };
 
 //-------------------------------------------------------------------------------------
 // ***** Posix HIDDeviceManager
 
-class HIDDeviceManager : public OVR::HIDDeviceManager
-{
-	friend class HIDDevice;
+typedef boost::shared_ptr<HIDDevice> HidDevicePtr;
+typedef std::list<HidDevicePtr> HidDeviceList;
+typedef boost::shared_ptr<udev> UdevPtr;
+
+class HIDDeviceManager: public OVR::HIDDeviceManager {
+    friend class HIDDevice;
 public:
 
-	HIDDeviceManager(DeviceManager* manager);
+    HIDDeviceManager(DeviceManager* manager);
     virtual ~HIDDeviceManager();
-
-    virtual bool Initialize();
-    virtual void Shutdown();
-
     virtual bool Enumerate(HIDEnumerateVisitor* enumVisitor);
     virtual OVR::HIDDevice* Open(const String& path);
-
-    // Fills HIDDeviceDesc by using the path.
-    // Returns 'true' if successful, 'false' otherwise.
-    bool GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const;
-
-    //GUID GetHIDGuid() { return HidGuid; }
-
-    static HIDDeviceManager* CreateInternal(DeviceManager* manager);
-
 private:
-
-    DeviceManager* Manager;     // Back pointer can just be a raw pointer.
+    DeviceManager*      Manager;
+    UdevPtr             Udev;
+    HidDeviceList       Devices;
 };
 
-}} // namespace OVR::Posix
+}
+} // namespace OVR::Posix
 
 #endif // OVR_Posix_HIDDevice_h

@@ -102,7 +102,6 @@ InputTestApp::InputTestApp()
     : pRender(0), CurrentView(View_Perspective),
       LastUpdate(0), LastTitleUpdate(0), pAxes(0), pBox(0)
 {
-
 }
 
 
@@ -117,7 +116,6 @@ void UseCase()
     Ptr<HMDDevice>     pHMD = 0;
     Ptr<SensorDevice>  pSensor = 0;
     SensorFusion       FusionResult;
-
 
     // *** Initialization - Create the first available HMD Device
     pManager = *DeviceManager::Create();
@@ -457,7 +455,7 @@ void InputTestApp::OnIdle()
     double curtime = pPlatform->GetAppTime();
  //   float  dt      = float(LastUpdate - curtime);
     LastUpdate     = curtime;
-    printf("%f\n", (float)curtime);
+
     if (pBox)
     {
         Quatf q = SFusion.GetOrientation();
@@ -498,6 +496,7 @@ void InputTestApp::OnDisplay() {
     pPlatform->GetWindowSize(&w, &h);
 
     pRender->SetViewport(0, 0, w, h);
+
     pRender->Clear();
     pRender->BeginScene();
 
@@ -505,8 +504,9 @@ void InputTestApp::OnDisplay() {
     pRender->SetDepthMode(1,1);
 
     Sc.Render(pRender, View);
-    printf("t\n");
+
     pRender->Present();
+
 }
 
 OVR_PLATFORM_APP(InputTestApp);

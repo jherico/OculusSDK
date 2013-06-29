@@ -41,7 +41,7 @@ public:
 	};
 
 	DeviceStatus(Notifier* const pClient);
-	~DeviceStatus();
+	virtual ~DeviceStatus();
 
 	void operator = (const DeviceStatus&);	// No assignment implementation.
 

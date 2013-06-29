@@ -18,6 +18,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 //#include "OVR_Device.h"
 #include "OVR_DeviceImpl.h"
+#include "OVR_HIDDeviceImpl.h"
 
 namespace OVR {
 
@@ -45,7 +46,7 @@ class HIDDeviceImpl : public DeviceImpl<B>, public HIDDevice::HIDHandler
 {
 public:
     HIDDeviceImpl(HIDDeviceCreateDesc* createDesc, DeviceBase* parent)
-     :  DeviceImpl<B>(createDesc, parent)        
+     :  DeviceImpl<B>(createDesc, parent)
     {
     }
 
@@ -82,11 +83,11 @@ public:
             case Message_DeviceAdded:
                 manager->CallOnDeviceAdded(this->pCreateDesc);
                 break;
-                
+
             case Message_DeviceRemoved:
                 manager->CallOnDeviceRemoved(this->pCreateDesc);
                 break;
-                
+
             default:;
         }
     }
@@ -114,7 +115,7 @@ public:
     }
 
     virtual void Shutdown()
-    {   
+    {
         InternalDevice->SetHandler(NULL);
 
         // Remove the handler, if any.
@@ -148,7 +149,7 @@ public:
     };
 
     bool SetFeatureReport(UByte* data, UInt32 length)
-    { 
+    {
         WriteData writeData(data, length);
 
         // Push call with wait.
@@ -167,7 +168,7 @@ public:
     }
 
     bool GetFeatureReport(UByte* data, UInt32 length)
-    { 
+    {
         bool result = false;
 
 		ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
