@@ -24,7 +24,14 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <boost/lexical_cast.hpp>
+#include <fcntl.h>
+#include <errno.h>
+
+#include <boost/system/linux_error.hpp>
 
 
 namespace OVR {
@@ -33,7 +40,6 @@ namespace Posix {
 using namespace std;
 using namespace boost;
 
-typedef HidDeviceList::iterator HidDeviceItr;
 
 HIDDeviceManager::HIDDeviceManager(DeviceManager* manager) :
         Manager(manager), Udev(udev_new(), ptr_fun(udev_unref)) {
@@ -64,15 +70,12 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor) {
 }
 
 OVR::HIDDevice* HIDDeviceManager::Open(const String& path) {
-    printf(path);
-    printf("\n");
     for( HidDeviceItr it = Devices.begin(); it != Devices.end(); ++it) {
         HidDevicePtr device = *it;
-        if (String(device->Path.c_str()) == path && device->openDevice()) {
+        if (device->DevDesc.Path == path && device->openDevice()) {
             return device.get();
         }
     }
-
     return NULL;
 }
 
@@ -89,15 +92,17 @@ inline T2 lexical_cast2(const T1 &in) {
 }
 
 HIDDevice::HIDDevice(HIDDeviceManager& manager, const std::string & path) :
-        HIDManager(manager), Path(path), ReadRequested(false), FileDescriptor(-1) {
+	HIDManager(manager), timer(manager.Manager->GetAsyncService()), readBuffer(21)
+{
     udev_device * hid_dev = udev_device_new_from_syspath(manager.Udev.get(), path.c_str());
+    DevDesc.Path = udev_device_get_devnode(hid_dev);
+
     shared_ptr<udev_device> usb_dev(udev_device_get_parent_with_subsystem_devtype(hid_dev, "usb", "usb_device"),
             ptr_fun(udev_device_unref));
 
     if (!usb_dev.get()) {
         throw "bad usb device";
     }
-
     DevDesc.Manufacturer = udev_device_get_sysattr_value(usb_dev.get(), "manufacturer");
     DevDesc.Product = udev_device_get_sysattr_value(usb_dev.get(), "product");
     DevDesc.SerialNumber = udev_device_get_sysattr_value(usb_dev.get(), "serial");
@@ -105,31 +110,13 @@ HIDDevice::HIDDevice(HIDDeviceManager& manager, const std::string & path) :
     string productId = string("0x") + string(udev_device_get_sysattr_value(usb_dev.get(), "idProduct"));
     DevDesc.VendorId = lexical_cast2<short>(vendorId);
     DevDesc.ProductId = lexical_cast2<short>(productId);
+    DeviceManager::Svc & svc = GetAsyncService();
+    fd = FdPtr(new boost::asio::posix::stream_descriptor(svc, open(DevDesc.Path, O_RDWR)));
 }
 
 HIDDevice::~HIDDevice() {
+	fd->close();
 }
-
-//bool HIDDevice::open()
-//{
-//    //    HIDManager->Manager->pThread->AddTicksNotifier(this);
-//    //    HIDManager->Manager->pThread->AddMessageNotifier(this);
-//
-//    DevDesc.Path = path;
-//
-//    if (!openDevice())
-//    {
-//        return false;
-//    }
-//
-//    LogText("OVR::Posix::HIDDevice - Opened '%s'\n"
-//        "                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'\n",
-//        DevDesc.Path.ToCStr(),
-//        DevDesc.Manufacturer.ToCStr(), DevDesc.Product.ToCStr(),
-//        DevDesc.SerialNumber.ToCStr());
-//
-//    return true;
-//}
 
 bool HIDDevice::initInfo() {
     // Device must have been successfully opened.
@@ -138,20 +125,63 @@ bool HIDDevice::initInfo() {
     return true;
 }
 
+DeviceManager::Svc & HIDDevice::GetAsyncService() {
+	return HIDManager.Manager->GetAsyncService();
+}
+
+
+void HIDDevice::setKeepAlive(unsigned short milliseconds) {
+	static unsigned char*IO_BUF = new unsigned char[16];
+	/* Set Feature */
+    memset(IO_BUF, 0, 5);
+    IO_BUF[0] = 0x8; /* Report Number */
+    memcpy(IO_BUF + 3, &milliseconds, 2);
+    SetFeatureReport(IO_BUF, 5);
+}
+
 bool HIDDevice::openDevice() {
+	onTimer(boost::system::error_code());
+    initializeRead();
     return true;
 }
 
-bool HIDDevice::initializeRead() {
-    return true;
+
+void HIDDevice::onTimer(const boost::system::error_code& error) {
+	GetAsyncService().post( boost::bind( &HIDDevice::setKeepAlive, this, 10000 ) );
+    timer.expires_from_now( boost::posix_time::seconds( 3 ) );
+	timer.async_wait( boost::bind( &HIDDevice::onTimer, this, _1));
 }
 
-bool HIDDevice::processReadResult() {
-    return false;
+void HIDDevice::initializeRead() {
+	boost::asio::async_read(*fd, readBuffer,
+		boost::bind(
+			&HIDDevice::processReadResult, this,
+			boost::asio::placeholders::error,
+			boost::asio::placeholders::bytes_transferred
+		)
+	);
+}
+
+void HIDDevice::processReadResult(const boost::system::error_code& error, std::size_t length) {
+	if (error) {
+		closeDeviceOnIOError();
+		return;
+    }
+	cout << "Got tracker data" << endl;
+
+	if (length) {
+		const unsigned char* p1 = boost::asio::buffer_cast<const unsigned char*>(readBuffer.data());
+		readBuffer.consume(length);
+		// We've got data.
+		if (Handler) {
+			Handler->OnInputReport(p1, length);
+		}
+	}
+	initializeRead();
 }
 
 void HIDDevice::closeDevice() {
-    close(FileDescriptor);
+    fd->close();
 }
 
 void HIDDevice::closeDeviceOnIOError() {
@@ -160,16 +190,16 @@ void HIDDevice::closeDeviceOnIOError() {
 }
 
 bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length) {
-    int res = ioctl(FileDescriptor, HIDIOCSFEATURE(length), data);
+    int res = ioctl(fd->native(), HIDIOCSFEATURE(length), data);
     return res >= 0;
 }
 
 bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length) {
-    int res = ioctl(FileDescriptor, HIDIOCGFEATURE(length), data);
+    int res = ioctl(fd->native(), HIDIOCGFEATURE(length), data);
     return res >= 0;
 }
 
-void HIDDevice::OnOverlappedEvent(HANDLE hevent)
+void HIDDevice::OnOverlappedEvent()
 {
 //    OVR_UNUSED(hevent);
 //    OVR_ASSERT(hevent == ReadOverlapped.hEvent);
@@ -186,64 +216,8 @@ UInt64 HIDDevice::OnTicks(UInt64 ticksMks) {
         return Handler->OnTicks(ticksMks);
     }
 
-    return DeviceManagerThread::Notifier::OnTicks(ticksMks);
+    return 0; // DeviceManagerThread::Notifier::OnTicks(ticksMks);
 }
-
-bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error) {
-
-    // Is this the correct device?
-    if (DevDesc.Path.CompareNoCase(devicePath) != 0) {
-        return false;
-    }
-
-    if (messageType == DeviceMessage_DeviceAdded && FileDescriptor < 0) {
-        // A closed device has been re-added. Try to reopen.
-        if (!openDevice()) {
-            LogError("OVR::Posix::HIDDevice - Failed to reopen a device '%s' that was re-added.\n",
-                    devicePath.ToCStr());
-            *error = true;
-            return true;
-        }
-
-        LogText("OVR::Posix::HIDDevice - Reopened device '%s'\n", devicePath.ToCStr());
-    }
-
-    HIDHandler::HIDDeviceMessageType handlerMessageType = HIDHandler::HIDDeviceMessage_DeviceAdded;
-    if (messageType == DeviceMessage_DeviceAdded) {
-    } else if (messageType == DeviceMessage_DeviceRemoved) {
-        handlerMessageType = HIDHandler::HIDDeviceMessage_DeviceRemoved;
-    } else {
-        OVR_ASSERT(0);
-    }
-
-    if (Handler) {
-        Handler->OnDeviceMessage(handlerMessageType);
-    }
-
-    *error = false;
-    return true;
-}
-
-//HIDDeviceManager* HIDDeviceManager::CreateInternal(Posix::DeviceManager* devManager) {
-//    if (!System::IsInitialized()) {
-//        // Use custom message, since Log is not yet installed.
-//        OVR_DEBUG_STATEMENT(Log::GetDefaultLog()->
-//                LogMessage(Log_Debug, "HIDDeviceManager::Create failed - OVR::System not initialized"); );
-//        return 0;
-//    }
-//
-//    Ptr<Posix::HIDDeviceManager> manager = *new Posix::HIDDeviceManager(devManager);
-//
-//    if (manager) {
-//        if (manager->Initialize()) {
-//            manager->AddRef();
-//        } else {
-//            manager.Clear();
-//        }
-//    }
-//
-//    return manager.GetPtr();
-//}
 
 } // namespace Posix
 

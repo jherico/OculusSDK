@@ -162,7 +162,7 @@ InputTestApp::~InputTestApp()
 
 int InputTestApp::OnStartup(int argc, char** argv)
 {
-    if (!pPlatform->SetupWindow(1200,800))
+    if (!pPlatform->SetupWindow(400,300))
         return 1;
 
 

@@ -55,6 +55,7 @@ void PlatformCore::idleFunc() {
 
 void PlatformCore::timerFunc(int value) {
     INSTANCE->pApp->OnIdle();
+    glutPostRedisplay();
     glutTimerFunc(100, timerFunc, 0);
 }
 

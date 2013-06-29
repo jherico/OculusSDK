@@ -2,8 +2,7 @@
 
 Filename    :   OVR_Posix_DeviceManager.h
 Content     :   Posix-specific DeviceManager header.
-Created     :   September 21, 2012
-Authors     :   Michael Antonov
+Authors     :   Brad Davis
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -17,116 +16,43 @@ otherwise accompanies this software in either electronic or hard copy form.
 #define OVR_Posix_DeviceManager_h
 
 #include "OVR_DeviceImpl.h"
-#include "OVR_Posix_DeviceStatus.h"
-#define HANDLE long
 #include "Kernel/OVR_Timer.h"
 #include <boost/thread.hpp>
+#include <boost/asio.hpp>
 
 namespace OVR { namespace Posix {
-
-class DeviceManagerThread;
-
-//-------------------------------------------------------------------------------------
-// ***** Posix DeviceManager
 
 class DeviceManager : public DeviceManagerImpl
 {
 public:
+    typedef boost::asio::io_service	Svc;
+    typedef boost::shared_ptr<Svc> SvcPtr;
+
     DeviceManager();
     ~DeviceManager();
 
     // Initialize/Shutdowncreate and shutdown manger thread.
     virtual bool Initialize(DeviceBase* parent);
+    void Run();
     virtual void Shutdown();
+    virtual void OnPushNonEmpty_Locked();
+    virtual void OnPopEmpty_Locked();
+    void OnCommand();
+    Svc & GetAsyncService();
 
     virtual ThreadCommandQueue* GetThreadQueue();
     virtual ThreadId GetThreadId() const;
-
     virtual DeviceEnumerator<> EnumerateDevicesEx(const DeviceEnumerationArgs& args);
-
-    virtual bool  GetDeviceInfo(DeviceInfo* info) const;
-
-    // Fills HIDDeviceDesc by using the path.
-    // Returns 'true' if successful, 'false' otherwise.
-    bool GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const;
-
-    Ptr<DeviceManagerThread> pThread;
-};
-
-//-------------------------------------------------------------------------------------
-// ***** Device Manager Background Thread
-
-class DeviceManagerThread : public Thread, public ThreadCommandQueue, public DeviceStatus::Notifier
-{
-    friend class DeviceManager;
-    enum { ThreadStackSize = 32 * 1024 };
-public:
-    DeviceManagerThread(DeviceManager* pdevMgr);
-    virtual ~DeviceManagerThread();
-
-    virtual int Run();
-
-    // ThreadCommandQueue notifications for CommandEvent handling.
-    virtual void OnPushNonEmpty_Locked() {
-//        ::SetEvent(hCommandEvent);
-    }
-    virtual void OnPopEmpty_Locked()     {
-//        ::ResetEvent(hCommandEvent);
-    }
-
-
-    // Notifier used for different updates (EVENT or regular timing or messages).
-    class Notifier
-    {
-    public:
-		// Called when overlapped I/O handle is signaled.
-        virtual void    OnOverlappedEvent(HANDLE hevent) { OVR_UNUSED1(hevent); }
-
-        // Called when timing ticks are updated.
-        // Returns the largest number of microseconds this function can
-        // wait till next call.
-        virtual UInt64  OnTicks(UInt64 ticksMks)
-        { OVR_UNUSED1(ticksMks);  return Timer::MksPerSecond * 1000; }
-
-		enum DeviceMessageType
-		{
-			DeviceMessage_DeviceAdded     = 0,
-			DeviceMessage_DeviceRemoved   = 1,
-		};
-
-		// Called to notify device object.
-		virtual bool    OnDeviceMessage(DeviceMessageType messageType,
-										const String& devicePath,
-										bool* error)
-        { OVR_UNUSED3(messageType, devicePath, error); return false; }
-    };
-
-    // DeviceStatus::Notifier interface.
-	bool OnMessage(MessageType type, const String& devicePath);
-
-    void DetachDeviceManager();
+    virtual bool GetDeviceInfo(DeviceInfo* info) const;
 
 private:
-    //boost::condition        signal;
-    boost::mutex            lock;
-    DeviceManager*          pDeviceMgr;
-
-    // Event notifications for devices whose OVERLAPPED I/O we service.
-    // This list is modified through AddDeviceOverlappedEvent.
-    // WaitHandles[0] always == hCommandEvent, with null device.
-    Array<HANDLE>           WaitHandles;
-    Array<Notifier*>        WaitNotifiers;
-
-    // Ticks notifiers - used for time-dependent events such as keep-alive.
-    Array<Notifier*>        TicksNotifiers;
-
-	// Message notifiers.
-    Array<Notifier*>        MessageNotifiers;
-
-	// Object that manages notifications originating from Windows messages.
-	Ptr<DeviceStatus>		pStatusObject;
+    boost::mutex            	lock;
+    SvcPtr						svc;
+    Svc::work 					work;
+	boost::thread				workerThread;
+	bool						queuedCommands;
 };
 
-}} // namespace Posix::OVR
+}}
 
 #endif // OVR_Posix_DeviceManager_h

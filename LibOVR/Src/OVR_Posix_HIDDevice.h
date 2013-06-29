@@ -30,10 +30,14 @@ namespace Posix {
 class HIDDeviceManager;
 class DeviceManager;
 
-//-------------------------------------------------------------------------------------
-// ***** Posix HIDDevice
 
-class HIDDevice: public OVR::HIDDevice, public DeviceManagerThread::Notifier {
+class HIDDevice : public OVR::HIDDevice {
+	typedef boost::asio::posix::stream_descriptor 	Fd;
+	typedef boost::shared_ptr<Fd> 					FdPtr;
+	typedef boost::asio::deadline_timer 			Timer;
+	typedef boost::asio::streambuf					Buffer;
+	typedef boost::shared_ptr<Timer> 				TimerPtr;
+
 public:
     HIDDevice(HIDDeviceManager& manager, const std::string & path);
     virtual ~HIDDevice();
@@ -43,33 +47,28 @@ public:
     bool GetFeatureReport(UByte* data, UInt32 length);
 
     // DeviceManagerThread::Notifier
-    void OnOverlappedEvent(HANDLE hevent);
+    void OnOverlappedEvent();
     UInt64 OnTicks(UInt64 ticksMks);
-    bool OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error);
+//    bool OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error);
 
 private:
     friend class HIDDeviceManager;
     bool openDevice();
     bool initInfo();
-    bool initializeRead();
-    bool processReadResult();
+    void onTimer(const boost::system::error_code& error);
+    void initializeRead();
+    void processReadResult(const boost::system::error_code& error, std::size_t length);
     void closeDevice();
     void closeDeviceOnIOError();
+    void setKeepAlive(unsigned short milliseconds);
 
-    std::string Path;
-    int FileDescriptor;
-    HIDDeviceManager& HIDManager;
-    HIDDeviceDesc DevDesc;
-    bool ReadRequested;
+    DeviceManager::Svc & GetAsyncService();
 
-    enum {
-        ReadBufferSize = 96
-    };
-    UByte ReadBuffer[ReadBufferSize];
-
-    UInt16 InputReportBufferLength;
-    UInt16 OutputReportBufferLength;
-    UInt16 FeatureReportBufferLength;
+    FdPtr				fd;
+    HIDDeviceManager& 	HIDManager;
+    HIDDeviceDesc 		DevDesc;
+	Buffer 				readBuffer;
+	Timer	 			timer;
 };
 
 //-------------------------------------------------------------------------------------
@@ -78,6 +77,8 @@ private:
 typedef boost::shared_ptr<HIDDevice> HidDevicePtr;
 typedef std::list<HidDevicePtr> HidDeviceList;
 typedef boost::shared_ptr<udev> UdevPtr;
+typedef HidDeviceList::iterator HidDeviceItr;
+
 
 class HIDDeviceManager: public OVR::HIDDeviceManager {
     friend class HIDDevice;
