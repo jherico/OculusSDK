@@ -28,12 +28,10 @@ namespace OVR {
 namespace Posix {
 
 DeviceManager::DeviceManager() :
-	svc(new Svc()),
-	work(*svc),
-	workerThread( boost::bind(&DeviceManager::Run, this) ),
-	queuedCommands(false)
-{
-    HidDeviceManager = new HIDDeviceManager(this);
+        svc(new Svc()), work(*svc), timer(*svc),
+                workerThread(boost::bind(&DeviceManager::Run, this)),
+                queuedCommands(false) {
+    HidDeviceManager = new HIDDeviceManager(*this);
 }
 
 DeviceManager::~DeviceManager() {
@@ -43,31 +41,30 @@ DeviceManager::~DeviceManager() {
     OVR_ASSERT(svc->stopped());
 }
 
-
 void DeviceManager::Run() {
     while (!IsExiting() && !svc->stopped()) {
-    	svc->run();
+        svc->run();
     }
 }
 
 void DeviceManager::OnPushNonEmpty_Locked() {
-	queuedCommands = true;
-	svc->post(boost::bind(&DeviceManager::OnCommand, this));
+    queuedCommands = true;
+    svc->post(boost::bind(&DeviceManager::OnCommand, this));
 }
 
 void DeviceManager::OnPopEmpty_Locked() {
-	queuedCommands = false;
+    queuedCommands = false;
 }
 
 void DeviceManager::OnCommand() {
     ThreadCommand::PopBuffer command;
-	if (PopCommand(&command)) {
-		command.Execute();
-	}
+    if (PopCommand(&command)) {
+        command.Execute();
+    }
 
-	if (queuedCommands) {
-		svc->post(boost::bind(&DeviceManager::OnCommand, this));
-	}
+    if (queuedCommands) {
+        svc->post(boost::bind(&DeviceManager::OnCommand, this));
+    }
 }
 
 bool DeviceManager::Initialize(DeviceBase*) {
@@ -95,8 +92,12 @@ DeviceManager::Svc& DeviceManager::GetAsyncService() {
     return *svc;
 }
 
+DeviceManager::Timer& DeviceManager::GetTimer() {
+    return timer;
+}
+
 ThreadId DeviceManager::GetThreadId() const {
-    return (void*)-1;
+    return (void*) -1;
 }
 
 bool DeviceManager::GetDeviceInfo(DeviceInfo* info) const {
@@ -111,7 +112,7 @@ bool DeviceManager::GetDeviceInfo(DeviceInfo* info) const {
 }
 
 DeviceEnumerator<> DeviceManager::EnumerateDevicesEx(const DeviceEnumerationArgs& args) {
-	DeviceManager::EnumerateAllFactoryDevices();
+    DeviceManager::EnumerateAllFactoryDevices();
     return DeviceManagerImpl::EnumerateDevicesEx(args);
 }
 

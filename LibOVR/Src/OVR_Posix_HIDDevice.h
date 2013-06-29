@@ -30,13 +30,10 @@ namespace Posix {
 class HIDDeviceManager;
 class DeviceManager;
 
-
-class HIDDevice : public OVR::HIDDevice {
-	typedef boost::asio::posix::stream_descriptor 	Fd;
-	typedef boost::shared_ptr<Fd> 					FdPtr;
-	typedef boost::asio::deadline_timer 			Timer;
-	typedef boost::asio::streambuf					Buffer;
-	typedef boost::shared_ptr<Timer> 				TimerPtr;
+class HIDDevice: public OVR::HIDDevice {
+    typedef boost::asio::posix::stream_descriptor Fd;
+    typedef boost::shared_ptr<Fd> FdPtr;
+    typedef boost::asio::streambuf Buffer;
 
 public:
     HIDDevice(HIDDeviceManager& manager, const std::string & path);
@@ -46,15 +43,9 @@ public:
     bool SetFeatureReport(UByte* data, UInt32 length);
     bool GetFeatureReport(UByte* data, UInt32 length);
 
-    // DeviceManagerThread::Notifier
-    void OnOverlappedEvent();
-    UInt64 OnTicks(UInt64 ticksMks);
-//    bool OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error);
-
 private:
     friend class HIDDeviceManager;
     bool openDevice();
-    bool initInfo();
     void onTimer(const boost::system::error_code& error);
     void initializeRead();
     void processReadResult(const boost::system::error_code& error, std::size_t length);
@@ -62,13 +53,15 @@ private:
     void closeDeviceOnIOError();
     void setKeepAlive(unsigned short milliseconds);
 
-    DeviceManager::Svc & GetAsyncService();
+    UInt64 OnTicks(UInt64 ticksMks);
 
-    FdPtr				fd;
-    HIDDeviceManager& 	HIDManager;
-    HIDDeviceDesc 		DevDesc;
-	Buffer 				readBuffer;
-	Timer	 			timer;
+    DeviceManager::Svc & GetAsyncService();
+    DeviceManager::Timer & GetTimer();
+
+    FdPtr fd;
+    HIDDeviceManager& HIDManager;
+    HIDDeviceDesc DevDesc;
+    Buffer readBuffer;
 };
 
 //-------------------------------------------------------------------------------------
@@ -79,19 +72,24 @@ typedef std::list<HidDevicePtr> HidDeviceList;
 typedef boost::shared_ptr<udev> UdevPtr;
 typedef HidDeviceList::iterator HidDeviceItr;
 
-
 class HIDDeviceManager: public OVR::HIDDeviceManager {
     friend class HIDDevice;
 public:
 
-    HIDDeviceManager(DeviceManager* manager);
+    HIDDeviceManager(DeviceManager& manager);
     virtual ~HIDDeviceManager();
     virtual bool Enumerate(HIDEnumerateVisitor* enumVisitor);
     virtual OVR::HIDDevice* Open(const String& path);
+
+
 private:
-    DeviceManager*      Manager;
-    UdevPtr             Udev;
-    HidDeviceList       Devices;
+    DeviceManager::Svc & GetAsyncService();
+    DeviceManager::Timer & GetTimer();
+
+private:
+    DeviceManager& Manager;
+    UdevPtr Udev;
+    HidDeviceList Devices;
 };
 
 }

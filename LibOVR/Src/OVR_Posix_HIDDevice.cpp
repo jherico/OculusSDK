@@ -33,54 +33,12 @@
 
 #include <boost/system/linux_error.hpp>
 
-
 namespace OVR {
 namespace Posix {
 
 using namespace std;
 using namespace boost;
 
-
-HIDDeviceManager::HIDDeviceManager(DeviceManager* manager) :
-        Manager(manager), Udev(udev_new(), ptr_fun(udev_unref)) {
-    // List all the HID devices
-    shared_ptr<udev_enumerate> enumerate(udev_enumerate_new(Udev.get()), ptr_fun(udev_enumerate_unref));
-    udev_enumerate_add_match_subsystem(enumerate.get(), "hidraw");
-    udev_enumerate_scan_devices(enumerate.get());
-
-    udev_list_entry * entry;
-    udev_list_entry_foreach(entry, udev_enumerate_get_list_entry(enumerate.get())) {
-        string hid_path(udev_list_entry_get_name(entry));
-        Devices.push_back(HidDevicePtr(new HIDDevice(*this, hid_path)));
-    }
-}
-
-HIDDeviceManager::~HIDDeviceManager() {
-    Devices.clear();
-}
-
-bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor) {
-    for( HidDeviceItr it = Devices.begin(); it != Devices.end(); ++it) {
-        HidDevicePtr device = *it;
-        if (enumVisitor->MatchVendorProduct(device->DevDesc.VendorId, device->DevDesc.ProductId)) {
-            enumVisitor->Visit(*(device.get()), device->DevDesc);
-        }
-    }
-    return true;
-}
-
-OVR::HIDDevice* HIDDeviceManager::Open(const String& path) {
-    for( HidDeviceItr it = Devices.begin(); it != Devices.end(); ++it) {
-        HidDevicePtr device = *it;
-        if (device->DevDesc.Path == path && device->openDevice()) {
-            return device.get();
-        }
-    }
-    return NULL;
-}
-
-//-------------------------------------------------------------------------------------
-// **** Posix::HIDDevice
 
 template<typename T2, typename T1>
 inline T2 lexical_cast2(const T1 &in) {
@@ -91,9 +49,67 @@ inline T2 lexical_cast2(const T1 &in) {
     return out;
 }
 
+long timems() {
+    static timeval tv;
+    int ms = -1;
+    if (gettimeofday(&tv, NULL) == 0)
+    {
+        ms  = ((tv.tv_sec % 86400) * 1000 + tv.tv_usec / 1000);
+    }
+    return ms;
+}
+
+
+HIDDeviceManager::HIDDeviceManager(DeviceManager& manager) :
+        Manager(manager), Udev(udev_new(), ptr_fun(udev_unref)) {
+
+    // List all the HID devices
+    shared_ptr<udev_enumerate> enumerate(udev_enumerate_new(Udev.get()), ptr_fun(udev_enumerate_unref));
+    udev_enumerate_add_match_subsystem(enumerate.get(), "hidraw");
+    udev_enumerate_scan_devices(enumerate.get());
+
+    udev_list_entry * entry;
+    udev_list_entry_foreach(entry, udev_enumerate_get_list_entry(enumerate.get()))
+    {
+        string hid_path(udev_list_entry_get_name(entry));
+        Devices.push_back(HidDevicePtr(new HIDDevice(*this, hid_path)));
+    }
+}
+
+HIDDeviceManager::~HIDDeviceManager() {
+    Devices.clear();
+}
+
+DeviceManager::Svc & HIDDeviceManager::GetAsyncService() {
+    return Manager.GetAsyncService();
+}
+
+DeviceManager::Timer & HIDDeviceManager::GetTimer() {
+    return Manager.GetTimer();
+}
+
+bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor) {
+    for (HidDeviceItr it = Devices.begin(); it != Devices.end(); ++it) {
+        HidDevicePtr device = *it;
+        if (enumVisitor->MatchVendorProduct(device->DevDesc.VendorId, device->DevDesc.ProductId)) {
+            enumVisitor->Visit(*(device.get()), device->DevDesc);
+        }
+    }
+    return true;
+}
+
+OVR::HIDDevice* HIDDeviceManager::Open(const String& path) {
+    for (HidDeviceItr it = Devices.begin(); it != Devices.end(); ++it) {
+        HidDevicePtr device = *it;
+        if (device->DevDesc.Path == path && device->openDevice()) {
+            return device.get();
+        }
+    }
+    return NULL;
+}
+
 HIDDevice::HIDDevice(HIDDeviceManager& manager, const std::string & path) :
-	HIDManager(manager), timer(manager.Manager->GetAsyncService()), readBuffer(21)
-{
+        HIDManager(manager), readBuffer(62) {
     udev_device * hid_dev = udev_device_new_from_syspath(manager.Udev.get(), path.c_str());
     DevDesc.Path = udev_device_get_devnode(hid_dev);
 
@@ -115,69 +131,49 @@ HIDDevice::HIDDevice(HIDDeviceManager& manager, const std::string & path) :
 }
 
 HIDDevice::~HIDDevice() {
-	fd->close();
-}
-
-bool HIDDevice::initInfo() {
-    // Device must have been successfully opened.
-    OVR_ASSERT(Device);
-
-    return true;
+    fd->close();
 }
 
 DeviceManager::Svc & HIDDevice::GetAsyncService() {
-	return HIDManager.Manager->GetAsyncService();
+    return HIDManager.GetAsyncService();
 }
 
-
-void HIDDevice::setKeepAlive(unsigned short milliseconds) {
-	static unsigned char*IO_BUF = new unsigned char[16];
-	/* Set Feature */
-    memset(IO_BUF, 0, 5);
-    IO_BUF[0] = 0x8; /* Report Number */
-    memcpy(IO_BUF + 3, &milliseconds, 2);
-    SetFeatureReport(IO_BUF, 5);
+DeviceManager::Timer & HIDDevice::GetTimer() {
+    return HIDManager.GetTimer();
 }
 
 bool HIDDevice::openDevice() {
-	onTimer(boost::system::error_code());
+    onTimer(boost::system::error_code());
     initializeRead();
     return true;
 }
 
-
 void HIDDevice::onTimer(const boost::system::error_code& error) {
-	GetAsyncService().post( boost::bind( &HIDDevice::setKeepAlive, this, 10000 ) );
-    timer.expires_from_now( boost::posix_time::seconds( 3 ) );
-	timer.async_wait( boost::bind( &HIDDevice::onTimer, this, _1));
+    long nextTicks = this->OnTicks(Timer::GetTicks());
+    GetTimer().expires_from_now(boost::posix_time::microseconds(nextTicks));
+    GetTimer().async_wait(boost::bind(&HIDDevice::onTimer, this, _1));
 }
 
 void HIDDevice::initializeRead() {
-	boost::asio::async_read(*fd, readBuffer,
-		boost::bind(
-			&HIDDevice::processReadResult, this,
-			boost::asio::placeholders::error,
-			boost::asio::placeholders::bytes_transferred
-		)
-	);
+    boost::asio::async_read(*fd, readBuffer,
+            boost::bind(&HIDDevice::processReadResult, this, boost::asio::placeholders::error,
+                    boost::asio::placeholders::bytes_transferred));
 }
 
 void HIDDevice::processReadResult(const boost::system::error_code& error, std::size_t length) {
-	if (error) {
-		closeDeviceOnIOError();
-		return;
+    if (error) {
+        closeDeviceOnIOError();
+        return;
     }
-	cout << "Got tracker data" << endl;
-
-	if (length) {
-		const unsigned char* p1 = boost::asio::buffer_cast<const unsigned char*>(readBuffer.data());
-		readBuffer.consume(length);
-		// We've got data.
-		if (Handler) {
-			Handler->OnInputReport(p1, length);
-		}
-	}
-	initializeRead();
+    if (length) {
+        const unsigned char* p1 = boost::asio::buffer_cast<const unsigned char*>(readBuffer.data());
+        readBuffer.consume(length);
+        // We've got data.
+        if (Handler) {
+            Handler->OnInputReport(p1, length);
+        }
+    }
+    initializeRead();
 }
 
 void HIDDevice::closeDevice() {
@@ -199,30 +195,16 @@ bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length) {
     return res >= 0;
 }
 
-void HIDDevice::OnOverlappedEvent()
-{
-//    OVR_UNUSED(hevent);
-//    OVR_ASSERT(hevent == ReadOverlapped.hEvent);
-//
-//    if (processReadResult())
-//    {
-//        // Proceed to read again.
-//        initializeRead();
-//    }
-}
-
 UInt64 HIDDevice::OnTicks(UInt64 ticksMks) {
+    UInt64 result = Timer::MksPerSecond;
     if (Handler) {
-        return Handler->OnTicks(ticksMks);
+        result = Handler->OnTicks(ticksMks);
     }
 
-    return 0; // DeviceManagerThread::Notifier::OnTicks(ticksMks);
+    return result;
 }
 
 } // namespace Posix
-
-//-------------------------------------------------------------------------------------
-// ***** Creation
 
 // Creates a new HIDDeviceManager and initializes OVR.
 HIDDeviceManager* HIDDeviceManager::Create() {
@@ -235,7 +217,7 @@ HIDDeviceManager* HIDDeviceManager::Create() {
         return 0;
     }
 
-    return new Posix::HIDDeviceManager(NULL);
+    return NULL; // new Posix::HIDDeviceManager(NULL);
 }
 
 } // namespace OVR
