@@ -2,7 +2,7 @@
 
 Filename    :   OVR_Posix_HMDDevice.h
 Content     :   Posix HMDDevice implementation
-Created     :   September 21, 2012
+Created     :   June 25, 2013
 Authors     :   Michael Antonov
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
@@ -62,7 +62,7 @@ protected:
     float       DistortionK[4];
 
 public:
-    HMDDeviceCreateDesc(DeviceFactory* factory, 
+    HMDDeviceCreateDesc(DeviceFactory* factory,
                         const String& deviceId, const String& displayDeviceName);
     HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other);
 
@@ -110,7 +110,7 @@ public:
 
 // HMDDevice represents an Oculus HMD device unit. An instance of this class
 // is typically created from the DeviceManager.
-//  After HMD device is created, we its sensor data can be obtained by 
+//  After HMD device is created, we its sensor data can be obtained by
 //  first creating a Sensor object and then wrappig it in SensorFusion.
 
 class HMDDevice : public DeviceImpl<OVR::HMDDevice>
@@ -123,7 +123,7 @@ public:
     virtual void Shutdown();
 
     // Query associated sensor.
-    virtual OVR::SensorDevice* GetSensor();  
+    virtual OVR::SensorDevice* GetSensor();
 };
 
 

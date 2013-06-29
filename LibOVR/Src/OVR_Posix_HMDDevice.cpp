@@ -2,7 +2,7 @@
 
 Filename    :   OVR_Posix_HMDDevice.cpp
 Content     :   Posix Interface to HMD - detects HMD display
-Created     :   September 21, 2012
+Created     :   June 25, 2013
 Authors     :   Michael Antonov
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.

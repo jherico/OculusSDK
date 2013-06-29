@@ -2,8 +2,8 @@
 
  Filename    :   OVR_Posix_HIDDevice.h
  Content     :   Posix HID device implementation.
- Created     :   February 22, 2013
- Authors     :   Lee Cooper
+ Created     :   June 25, 2013
+ Authors     :   Lee Cooper, Brad Davis <bdavis@saintandreas.org>
 
  Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 

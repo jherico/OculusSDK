@@ -2,8 +2,8 @@
 
  Filename    :   OVR_Posix_DeviceManager.cpp
  Content     :   Posix implementation of DeviceManager.
- Created     :   September 21, 2012
- Authors     :   Brad Davis
+ Created     :   June 25, 2013
+ Authors     :   Michael Antonov, Brad Davis <bdavis@saintandreas.org>
 
  Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 

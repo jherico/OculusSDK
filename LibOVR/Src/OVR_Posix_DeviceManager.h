@@ -2,7 +2,8 @@
 
  Filename    :   OVR_Posix_DeviceManager.h
  Content     :   Posix-specific DeviceManager header.
- Authors     :   Brad Davis
+ Created     :   June 25, 2013
+ Authors     :   Michael Antonov, Brad Davis <bdavis@saintandreas.org>
 
  Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
