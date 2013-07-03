@@ -1820,11 +1820,25 @@ void RenderDevice::FillRect(float left, float top, float right, float bottom, Co
     Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
+void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm)
+{
+    Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
+    OVR::Render::RenderDevice::FillGradientRect(left, top, right, bottom, col_top, col_btm);
+    Context->OMSetBlendState(NULL, NULL, 0xffffffff);
+}
+
 void RenderDevice::RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c)
 {
 	Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
 	OVR::Render::RenderDevice::RenderText(font, str, x, y, size, c);
 	Context->OMSetBlendState(NULL, NULL, 0xffffffff);
+}
+
+void RenderDevice::RenderImage(float left, float top, float right, float bottom, ShaderFill* image)
+{
+    Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
+    OVR::Render::RenderDevice::RenderImage(left, top, right, bottom, image);
+    Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
 }}}

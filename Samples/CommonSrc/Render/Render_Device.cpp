@@ -685,6 +685,88 @@ void RenderDevice::FillRect(float left, float top, float right, float bottom, Co
     Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
 }
 
+void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm)
+{
+    if(!pTextVertexBuffer)
+    {
+        pTextVertexBuffer = *CreateBuffer();
+        if(!pTextVertexBuffer)
+        {
+            return;
+        }
+    }
+
+    // Get!!
+    Fill* fill = CreateSimpleFill();
+
+    pTextVertexBuffer->Data(Buffer_Vertex, NULL, 6 * sizeof(Vertex));
+    Vertex* vertices = (Vertex*)pTextVertexBuffer->Map(0, 6 * sizeof(Vertex), Map_Discard);
+    if(!vertices)
+    {
+        return;
+    }
+
+    vertices[0] = Vertex(Vector3f(left,  top, 0.0f),    col_top);
+    vertices[1] = Vertex(Vector3f(right, top, 0),    col_top);
+    vertices[2] = Vertex(Vector3f(left,  bottom, 0), col_btm);
+    vertices[3] = Vertex(Vector3f(left,  bottom, 0), col_btm);
+    vertices[4] = Vertex(Vector3f(right, top, 0),    col_top);
+    vertices[5] = Vertex(Vector3f(right, bottom, 0), col_btm);
+
+    pTextVertexBuffer->Unmap(vertices);
+
+    Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
+}
+
+void RenderDevice::RenderImage(float left,
+                               float top,
+                               float right,
+                               float bottom,
+                               ShaderFill* image,
+                               unsigned char alpha)
+{
+    /*
+    if(!pTextVertexBuffer)
+    {
+        pTextVertexBuffer = *CreateBuffer();
+        if(!pTextVertexBuffer)
+        {
+            return;
+        }
+    }
+
+    pTextVertexBuffer->Data(Buffer_Vertex, NULL, 6 * sizeof(Vertex));
+    Vertex* vertices = (Vertex*)pTextVertexBuffer->Map(0, 6 * sizeof(Vertex), Map_Discard);
+    if(!vertices)
+    {
+        return;
+    }
+
+    vertices[0] = Vertex(Vector3f(left,  top, 0.0f), Color(255, 255, 255, 255));
+    vertices[1] = Vertex(Vector3f(right, top, 0), Color(255, 255, 255, 255));
+    vertices[2] = Vertex(Vector3f(left,  bottom, 0), Color(255, 255, 255, 255));
+    vertices[3] = Vertex(Vector3f(left,  bottom, 0), Color(255, 255, 255, 255));
+    vertices[4] = Vertex(Vector3f(right, top, 0), Color(255, 255, 255, 255));
+    vertices[5] = Vertex(Vector3f(right, bottom, 0), Color(255, 255, 255, 255));
+
+    pTextVertexBuffer->Unmap(vertices);
+
+    Render(image, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
+    */
+    
+    Color c = Color(255, 255, 255, alpha);
+    Ptr<Model> m = *new Model(Prim_Triangles);
+    m->AddVertex(left,  bottom,  0.0f, c, 0.0f, 0.0f);
+    m->AddVertex(right, bottom,  0.0f, c, 1.0f, 0.0f);
+    m->AddVertex(right, top,     0.0f, c, 1.0f, 1.0f);
+    m->AddVertex(left,  top,     0.0f, c, 0.0f, 1.0f);
+    m->AddTriangle(2,1,0);
+    m->AddTriangle(0,3,2);
+    m->Fill = image;
+
+    Render(Matrix4f(), m);
+}
+
 /*
 void RenderDevice::GetStereoViewports(const Viewport& in, Viewport* out) const
 {

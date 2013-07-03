@@ -20,7 +20,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ************************************************************************************/
-
 #ifndef OVR_Render_Device_h
 #define OVR_Render_Device_h
 
@@ -37,6 +36,7 @@ namespace OVR { namespace Render {
 using namespace OVR::Util::Render;
 
 class RenderDevice;
+struct Font;
 
 //-----------------------------------------------------------------------------------
 
@@ -65,6 +65,7 @@ public:
     virtual void Unset() const {}
 
     virtual void SetTexture(int i, class Texture* tex) { OVR_UNUSED2(i,tex); }
+    virtual Texture* GetTexture(int i) { OVR_UNUSED(i); return 0; }
 };
 
 enum ShaderStage
@@ -210,7 +211,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).
+    // (unless a buffer is used, then each buffer is independent).     
     virtual bool SetUniform(const char* name, int n, const float* v)
     {
         bool result = 0;
@@ -272,13 +273,14 @@ public:
     ShaderSet* GetShaders() { return Shaders; }
 
     virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
+    virtual Texture* GetTexture(int i) { if (i < 8) return Textures[i]; else return 0; }
 };
 
 /* Buffer for vertex or index data. Some renderers require separate buffers, so that
    is recommended. Some renderers cannot have high-performance buffers which are readable,
    so reading in Map should not be relied on.
 
-   Constraints on buffers, such as ReadOnly, are not enforced by the api but may result in
+   Constraints on buffers, such as ReadOnly, are not enforced by the api but may result in 
    rendering-system dependent undesirable behavior, such as terrible performance or unreported failure.
 
    Use of a buffer inconsistent with usage is also not checked by the api, but it may result in bad
@@ -369,11 +371,11 @@ public:
     void  SetMatrix(const Matrix4f& m)
     {
         MatCurrent = true;
-        Mat = m;
+        Mat = m;        
     }
 
 
-    const Matrix4f&  GetMatrix() const
+    const Matrix4f&  GetMatrix() const 
     {
         if (!MatCurrent)
         {
@@ -395,7 +397,7 @@ struct Vertex
 	float     U2, V2;
     Vector3f  Norm;
 
-    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255),
+    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255), 
             float u = 0, float v = 0, Vector3f n = Vector3f(1,0,0))
       : Pos(p), C(c), U(u), V(v), Norm(n), U2(u), V2(v) {}
     Vertex(float x, float y, float z, const Color& c = Color(64,0,0,255),
@@ -524,7 +526,7 @@ public:
     static Model* CreateAxisFaceColorBox(float x1, float x2, Color xcolor,
                                          float y1, float y2, Color ycolor,
                                          float z1, float z2, Color zcolor);
-
+   
 
 
     // Uses texture coordinates for exactly covering each surface once.
@@ -561,6 +563,7 @@ public:
 
     void Add(Node *n) { Nodes.PushBack(n); }
 	void Add(Model *n, class Fill *f) { n->Fill = f; Nodes.PushBack(n); }
+    void RemoveLast() { Nodes.PopBack(); }
 	void Clear() { Nodes.Clear(); }
 
 	bool               CollideChildren;
@@ -634,24 +637,24 @@ enum DisplayMode
     Display_Fullscreen = 1,
     Display_FakeFullscreen
 };
-
+    
 struct DisplayId
 {
     // Windows
     String MonitorName; // Monitor name for fullscreen mode
-
+    
     // MacOS
     long   CgDisplayId; // CGDirectDisplayID
-
+    
     DisplayId() : CgDisplayId(0) {}
     DisplayId(long id) : CgDisplayId(id) {}
     DisplayId(String m, long id=0) : MonitorName(m), CgDisplayId(id) {}
-
+    
     operator bool () const
     {
         return MonitorName.GetLength() || CgDisplayId;
     }
-
+    
     bool operator== (const DisplayId& b) const
     {
         return CgDisplayId == b.CgDisplayId &&
@@ -667,7 +670,7 @@ struct RendererParams
     DisplayId Display;
 
     RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
-
+    
     bool IsDisplaySet() const
     {
         return Display;
@@ -730,7 +733,7 @@ public:
 
     const RendererParams& GetParams() const { return Params; }
 
-
+    
     // StereoParams apply Viewport, Projection and Distortion simultaneously,
     // doing full configuration for one eye.
     void        ApplyStereoParams(const StereoEyeParams& params)
@@ -778,7 +781,7 @@ public:
     virtual Buffer*  CreateBuffer() { return NULL; }
     virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount=1)
     { OVR_UNUSED5(format,width,height,data, mipcount); return NULL; }
-
+   
     virtual bool     GetSamplePositions(Render::Texture*, Vector3f* pos) { pos[0] = Vector3f(0); return 1; }
 
     virtual ShaderSet* CreateShaderSet() { return new ShaderSetMatrixTranspose; }
@@ -820,10 +823,12 @@ public:
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) = 0;
 
     // Returns width of text in same units as drawing. If strsize is not null, stores width and height.
-    float        MeasureText(const struct Font* font, const char* str, float size, float* strsize = NULL);
-    virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
+    float        MeasureText(const Font* font, const char* str, float size, float* strsize = NULL);
+    virtual void RenderText(const Font* font, const char* str, float x, float y, float size, Color c);
 
     virtual void FillRect(float left, float top, float right, float bottom, Color c);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255);
 
     virtual Fill *CreateSimpleFill(int flags = Fill::F_Solid) = 0;
     Fill *        CreateTextureFill(Texture* tex, bool useAlpha = false);
@@ -873,7 +878,7 @@ public:
 protected:
     // Stereo & post-processing
     virtual bool  initPostProcessSupport(PostProcessType pptype);
-
+    
     virtual Shader* CreateStereoShader(PrimitiveType prim, Shader* vs)
     { OVR_UNUSED2(prim, vs); return NULL; }
 
@@ -889,7 +894,7 @@ int GetTextureSize(int format, int w, int h);
 // Image size must be a power of 2.
 void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest);
 
-Texture* LoadTextureTga(RenderDevice* ren, File* f);
+Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha = 255);
 Texture* LoadTextureDDS(RenderDevice* ren, File* f);
 
 }}

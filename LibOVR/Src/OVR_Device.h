@@ -28,6 +28,11 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 namespace OVR {
 
+// Declared externally
+class Profile;
+class ProfileManager; // << Should be renamed for consistency
+
+// Forward declarations
 class SensorDevice;
 class DeviceCommon;
 class DeviceManager;
@@ -230,6 +235,10 @@ public:
     virtual DeviceType      GetType() const     { return Device_Manager; }
     virtual DeviceManager*  GetManager() const  { return const_cast<DeviceManager*>(this); }
 
+    // Every DeviceManager has an associated profile manager, which us used to store
+    // user settings that may affect device behavior. 
+    virtual ProfileManager* GetProfileManager() const = 0;
+
 
     // EnumerateDevices enumerates all of the available devices of the specified class,
     // returning an enumerator that references the first device. An empty enumerator is
@@ -253,15 +262,17 @@ public:
     // End users should call DeumerateDevices<>() instead.
     virtual DeviceEnumerator<> EnumerateDevicesEx(const DeviceEnumerationArgs& args) = 0;
 
-    // Adds a device (DeviceCreateDesc*) into Devices. Returns NULL, 
-    // if unsuccessful or device is already in the list.
-    virtual Ptr<DeviceCreateDesc> AddDevice_NeedsLock(const DeviceCreateDesc& createDesc) = 0;
-
     // Creates a new DeviceManager. Only one instance of DeviceManager should be created at a time.
     static   DeviceManager* Create();
 
     // Static constant for this device type, used in template cast type checks.
     enum { EnumDeviceType = Device_Manager };
+
+
+
+    // Adds a device (DeviceCreateDesc*) into Devices. Returns NULL, 
+    // if unsuccessful or device is already in the list.
+    virtual Ptr<DeviceCreateDesc> AddDevice_NeedsLock(const DeviceCreateDesc& createDesc) = 0;
 
 protected:
     DeviceEnumerator<> enumeratorFromHandle(const DeviceHandle& h, const DeviceEnumerationArgs& args)
@@ -401,18 +412,29 @@ public:
     // Static constant for this device type, used in template cast type checks.
     enum { EnumDeviceType = Device_HMD };
 
-    virtual DeviceType      GetType() const   { return Device_HMD; }    
+    virtual DeviceType      GetType() const   { return Device_HMD; }  
 
     // Creates a sensor associated with this HMD.
     virtual SensorDevice*   GetSensor() = 0;
 
+
+    // Requests the currently used profile. This profile affects the
+    // settings reported by HMDInfo. 
+    virtual Profile*    GetProfile() const = 0;
+    // Obtains the currently used profile name. This is initialized to the default
+    // profile name, if any; it can then be changed per-device by SetProfileName.    
+    virtual const char* GetProfileName() const = 0;
+    // Sets the profile user name, changing the data returned by GetProfileInfo.
+    virtual bool        SetProfileName(const char* name) = 0;
+
+
     // Disconnects from real HMD device. This HMDDevice remains as 'fake' HMD.
     // SensorDevice ptr is used to restore the 'fake' HMD (can be NULL).
-    HMDDevice* Disconnect(SensorDevice*);
+    HMDDevice*  Disconnect(SensorDevice*);
     
     // Returns 'true' if HMD device is a 'fake' HMD (was created this way or 
     // 'Disconnect' method was called).
-    bool IsDisconnected() const;
+    bool        IsDisconnected() const;
 };
 
 
@@ -541,34 +563,6 @@ struct LatencyTestConfiguration
 };
 
 //-------------------------------------------------------------------------------------
-// ***** LatencyTestCalibrate
-// LatencyTestCalibrate specifies colors used for Latency Tester calibration.
-struct LatencyTestCalibrate
-{
-    LatencyTestCalibrate(const Color& value)
-        : Value(value)
-    {
-    }
-
-    // The color being calibrated to.
-    Color   Value;
-};
-
-//-------------------------------------------------------------------------------------
-// ***** LatencyTestStartTest
-// LatencyTestStartTest specifies values used when starting the Latency Tester test.
-struct LatencyTestStartTest
-{
-    LatencyTestStartTest(const Color& targetValue)
-        : TargetValue(targetValue)
-    {
-    }
-
-    // The color value that the display is being set to.
-    Color    TargetValue;
-};
-
-//-------------------------------------------------------------------------------------
 // ***** LatencyTestDisplay
 // LatencyTestDisplay sets the mode and contents of the Latency Tester LED display.
 // See the 'Latency Tester Specification' document for more details.
@@ -605,16 +599,14 @@ public:
     // Get configuration information from device.
     virtual bool GetConfiguration(LatencyTestConfiguration* configuration) = 0;
 
-    // Used to calibrate the latency tester at the start of a test. Calibration information is lost
+    // Used to calibrate the latency tester at the start of a test. Display the specified color on the screen
+    // beneath the latency tester and then call this method. Calibration information is lost
     // when power is removed from the device.
-    virtual bool SetCalibrate(const LatencyTestCalibrate& calibrate, bool waitFlag = false) = 0;
-
-    // Get calibration information from device.
-    virtual bool GetCalibrate(LatencyTestCalibrate* calibrate) = 0;
+    virtual bool SetCalibrate(const Color& calibrationColor, bool waitFlag = false) = 0;
 
     // Triggers the start of a measurement. This starts the millisecond timer on the device and 
     // causes it to respond with the 'MessageLatencyTestStarted' message.
-    virtual bool SetStartTest(const LatencyTestStartTest& start, bool waitFlag = false) = 0;
+    virtual bool SetStartTest(const Color& targetColor, bool waitFlag = false) = 0;
 
     // Used to set the value displayed on the LED display panel.
     virtual bool SetDisplay(const LatencyTestDisplay& display, bool waitFlag = false) = 0;

@@ -85,6 +85,10 @@ bool LatencyTest::SetDevice(LatencyTestDevice* device)
             // Set trigger threshold.
             LatencyTestConfiguration configuration(SENSOR_DETECT_THRESHOLD, false);     // No samples streaming.
             Device->SetConfiguration(configuration, true);
+
+            // Set display to intial (3 dashes).
+            LatencyTestDisplay ltd(2, 0x40400040);
+            Device->SetDisplay(ltd);
         }
     }
 
@@ -139,8 +143,7 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
         if (State == State_WaitingForSettlePreCalibrationColorBlack)
         {
             // Send calibrate message to device and wait a while.
-            LatencyTestCalibrate calibrate(CALIBRATE_BLACK);
-            Device->SetCalibrate(calibrate);
+            Device->SetCalibrate(CALIBRATE_BLACK);
 
             State = State_WaitingForSettlePostCalibrationColorBlack;
             OVR_DEBUG_LOG(("State_WaitingForSettlePreCalibrationColorBlack -> State_WaitingForSettlePostCalibrationColorBlack."));
@@ -160,8 +163,7 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
         else if (State == State_WaitingForSettlePreCalibrationColorWhite)
         {
             // Send calibrate message to device and wait a while.
-            LatencyTestCalibrate calibrate(CALIBRATE_WHITE);
-            Device->SetCalibrate(calibrate);
+            Device->SetCalibrate(CALIBRATE_WHITE);
 
             State = State_WaitingForSettlePostCalibrationColorWhite;
             OVR_DEBUG_LOG(("State_WaitingForSettlePreCalibrationColorWhite -> State_WaitingForSettlePostCalibrationColorWhite."));
@@ -240,13 +242,15 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
             // Record time so we can determine usb roundtrip time.
             getActiveResult()->StartTestTicksMicroS = Timer::GetTicks();
 
-            LatencyTestStartTest startTest(RenderColor);
-            Device->SetStartTest(startTest);
+            Device->SetStartTest(RenderColor);
 
             State = State_WaitingForTestStarted;
             OVR_DEBUG_LOG(("State_WaitingToTakeMeasurement -> State_WaitingForTestStarted."));
 
             setTimer(TIMEOUT_WAITING_FOR_TEST_STARTED);
+
+            LatencyTestDisplay ltd(2, 0x40090040);
+            Device->SetDisplay(ltd);
         }
     }
     else if (msg.Type == Message_LatencyTestButton)
@@ -293,6 +297,9 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
 
                 UInt32 waitTime = TIME_TO_WAIT_FOR_SETTLE_POST_MEASUREMENT + getRandomComponent(TIME_TO_WAIT_FOR_SETTLE_POST_MEASUREMENT_RANDOMNESS);
                 setTimer(waitTime);
+
+                LatencyTestDisplay ltd(2, 0x40400040);
+                Device->SetDisplay(ltd);
             }
         }
     }
@@ -519,6 +526,10 @@ void LatencyTest::processResults()
                 minTime2To1, averageTime2To1, maxTime2To1,
                 minUSBTripMilliS, averageUSBTripMilliS, maxUSBTripMilliS,
                 DEFAULT_NUMBER_OF_SAMPLES*2, count - measurementsCount);
+    
+    // Display result on latency tester display.
+    LatencyTestDisplay ltd(1, (int)finalResult);
+    Device->SetDisplay(ltd);
 }
 
 void LatencyTest::updateForTimeouts()

@@ -334,7 +334,9 @@ public:
 
     // Overrident to apply proper blend state.
     virtual void FillRect(float left, float top, float right, float bottom, Color c);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
 	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image);
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,

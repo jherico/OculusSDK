@@ -24,7 +24,7 @@ limitations under the License.
 #ifndef OVR_Gamepad_h
 #define OVR_Gamepad_h
 
-#include "OVR.h"
+#include <OVR.h>
 
 namespace OVR { namespace Platform {
 

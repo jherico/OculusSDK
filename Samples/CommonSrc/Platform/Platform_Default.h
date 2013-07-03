@@ -27,7 +27,14 @@ limitations under the License.
 // This should select proper header file for the platform/compiler.
 #include <Kernel/OVR_Types.h>
 
-#if defined(OVR_OS_WIN32) && !defined(OVR_USE_GLUT)
+#if defined(OVR_USE_GLUT)
+  #include "GLUT_Platform.h"
+  #include "../Render/Render_GL_GLUT_Device.h"
+
+  #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
+    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::GLUT::RenderDevice::CreateDevice)
+
+#elif defined(OVR_OS_WIN32)
   #include "Win32_Platform.h"
 
   #include "../Render/Render_D3D11_Device.h"
@@ -41,22 +48,21 @@ limitations under the License.
         SetupGraphicsDeviceSet("D3D11", &OVR::Render::D3D11::RenderDevice::CreateDevice,       \
         SetupGraphicsDeviceSet("D3D10", &OVR::Render::D3D10::RenderDevice::CreateDevice) )
 
-#elif defined(OVR_OS_MAC) && !defined(OVR_MAC_X11) && !defined(OVR_USE_GLUT)
+#elif defined(OVR_OS_MAC) && !defined(OVR_MAC_X11)
   #include "OSX_Platform.h"
 
   #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
     SetupGraphicsDeviceSet("GL", &OVR::Render::GL::OSX::RenderDevice::CreateDevice)
-#elif defined(OVR_LINUX_X11)
+#elif defined(OVR_OS_LINUX)
 
-  #error "Not implemented yet"
+  #include "Linux_Platform.h"
+
+  #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
+    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::Linux::RenderDevice::CreateDevice)
 
 #else
 
-  #include "GLUT_Platform.h"
-  #include "../Render/Render_GL_GLUT_Device.h"
-
-  #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
-    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::GLUT::RenderDevice::CreateDevice)
+  #error "Not implemented yet"
 
 #endif
 

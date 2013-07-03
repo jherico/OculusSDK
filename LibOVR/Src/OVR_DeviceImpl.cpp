@@ -20,6 +20,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_DeviceImpl.h"
 #include "OVR_SensorImpl.h"
+#include "OVR_Profile.h"
 
 namespace OVR {
 
@@ -65,7 +66,7 @@ Lock* SharedLock::GetLockAddRef()
 void SharedLock::ReleaseLock(Lock* plock)
 {
     OVR_UNUSED(plock);
-    OVR_ASSERT((plock = toLock()) != 0);
+    OVR_ASSERT(plock == toLock());
 
     int oldUseCount;
 
@@ -327,6 +328,9 @@ bool DeviceManagerImpl::Initialize(DeviceBase* parent)
     OVR_UNUSED(parent);
     if (!pCreateDesc || !pCreateDesc->pLock)
 		return false;
+
+    pProfileManager = *ProfileManager::Create();
+
     return true;
 }
 
@@ -352,6 +356,8 @@ void DeviceManagerImpl::Shutdown()
     // These must've been cleared by caller.
     OVR_ASSERT(pCreateDesc->pDevice == 0);
     OVR_ASSERT(pCreateDesc->pLock->pManager == 0);
+
+    pProfileManager.Clear();
 }
 
 

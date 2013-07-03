@@ -37,6 +37,11 @@ namespace OVR {
 
 class SensorFusion : public NewOverrideBase
 {
+    enum
+    {
+        MagMaxReferences = 80
+    };
+
 public:
     SensorFusion(SensorDevice* sensor = 0);
     ~SensorFusion();
@@ -47,55 +52,35 @@ public:
     bool        AttachToSensor(SensorDevice* sensor);
 
     // Returns true if this Sensor fusion object is attached to a sensor.
-    bool        IsAttachedToSensor() const { return Handler.IsHandlerInstalled(); }
+    bool        IsAttachedToSensor() const              { return Handler.IsHandlerInstalled(); }
 
-    void        SetGravityEnabled(bool enableGravity) { EnableGravity = enableGravity; }
+    void        SetGravityEnabled(bool enableGravity)   { EnableGravity = enableGravity; }
    
-    bool        IsGravityEnabled() const { return EnableGravity;}
+    bool        IsGravityEnabled() const                { return EnableGravity;}
 
 	void        SetYawCorrectionEnabled(bool enableYawCorrection) { EnableYawCorrection = enableYawCorrection; }
    
     // Yaw correction is set up to work
-    bool        IsYawCorrectionEnabled() const { return EnableYawCorrection;}
+    bool        IsYawCorrectionEnabled() const          { return EnableYawCorrection;}
 
     // Yaw correction is currently working (forcing a corrective yaw rotation)
-    bool        IsYawCorrectionInProgress() const { return YawCorrectionInProgress;}
+    bool        IsYawCorrectionInProgress() const       { return YawCorrectionInProgress;}
 
     // Store the calibration matrix for the magnetometer
     void        SetMagCalibration(const Matrix4f& m)
     {
         MagCalibrationMatrix = m;
         MagCalibrated = true;
-		if (MagReferenced)
-			MagReady = true;
     }
 
     // True only if the mag has calibration values stored
-    bool        HasMagCalibration() const { return MagCalibrated;}
-    
+    bool        HasMagCalibration() const        { return MagCalibrated;}
+  
     // Force the mag into the uncalibrated state
-    void        ClearMagCalibration() 
-    { 
-        MagCalibrated = false;
-        MagReady = false;
-    }
+    void        ClearMagCalibration()            { MagCalibrated = false; }
 
-    // Set the magnetometer's reference orientation for use in yaw correction
-    // The supplied mag is an uncalibrated value
-    void        SetMagReference(const Quatf& q, const Vector3f& rawMag);
-    // Default to current HMD orientation
-    void        SetMagReference() { SetMagReference(Q, RawMag); }
-
-    bool        HasMagReference() const { return MagReferenced; }
-
-    void        ClearMagReference() 
-    { 
-        MagReferenced = false; 
-        MagReady = false;
-    }
-
-    bool        IsMagReady() const { return MagReady; }
-
+	// These refer to reference points that associate mag readings with orientations
+	void        ClearMagReferences()             { MagNumReferences = 0; }
     void        SetMagRefDistance(const float d) { MagRefDistance = d; }
 
     // Notifies SensorFusion object about a new BodyFrame message from a sensor.
@@ -114,7 +99,8 @@ public:
     }    
 
     // Use a predictive filter to estimate the future orientation
-    Quatf       GetPredictedOrientation();
+	Quatf       GetPredictedOrientation(float pdt); // Specify lookahead time in ms
+	Quatf       GetPredictedOrientation() { return GetPredictedOrientation(PredictionDT); }
 
     // Obtain the last absolute acceleration reading, in m/s^2.
     Vector3f    GetAcceleration() const
@@ -164,14 +150,7 @@ public:
     //Vector3f    GetGravity() const;
 
     // Resets the current orientation
-    void        Reset()
-    {
-        Lock::Locker lockScope(Handler.GetHandlerLock());
-        Q  = Quatf();
-        QUncorrected = Quatf();
-
-        Stage = 0;
-    }
+    void        Reset();
 
     // Configuration
 
@@ -197,19 +176,19 @@ public:
 	void		SetPredictionEnabled(bool enable = true)    { EnablePrediction = enable; }    
 	bool		IsPredictionEnabled()                       { return EnablePrediction; }
 
-    // Methods for magnetometer calibration
-    static float       AngleDifference(float theta1, float theta2);
-    static Vector3f    CalculateSphereCenter(Vector3f p1, Vector3f p2,
-                                             Vector3f p3, Vector3f p4);
-
-
 private:
     SensorFusion* getThis()  { return this; }
 
     // Internal handler for messages; bypasses error checking.
     void handleMessage(const MessageBodyFrame& msg);
 
-    class BodyFrameHandler : public MessageHandler
+    // Set the magnetometer's reference orientation for use in yaw correction
+    // The supplied mag is an uncalibrated value
+    void        SetMagReference(const Quatf& q, const Vector3f& rawMag);
+    // Default to current HMD orientation
+    void        SetMagReference()                { SetMagReference(Q, RawMag); }
+
+	class BodyFrameHandler : public MessageHandler
     {
         SensorFusion* pFusion;
     public:
@@ -227,6 +206,7 @@ private:
     Vector3f          CalMag;
     Vector3f          RawMag;
     unsigned int      Stage;
+	float             RunningTime;
 	float             DeltaT;
     BodyFrameHandler  Handler;
     MessageHandler*   pDelegate;
@@ -236,6 +216,7 @@ private:
 
     bool              EnablePrediction;
     float             PredictionDT;
+	float             PredictionTimeIncrement;
 
     SensorFilter      FRawMag;
     SensorFilter      FAccW;
@@ -249,12 +230,15 @@ private:
     Matrix4f          MagCalibrationMatrix;
     bool              MagCalibrated;
     int               MagCondCount;
-    bool              MagReferenced;
     float             MagRefDistance;
-    bool              MagReady;
     Quatf             MagRefQ;
     Vector3f          MagRefM;
     float             MagRefYaw;
+    bool              MagHasNearbyReference;
+    Quatf             MagRefTableQ[MagMaxReferences];
+    Vector3f          MagRefTableM[MagMaxReferences];
+    float             MagRefTableYaw[MagMaxReferences];
+    int               MagNumReferences;
     float             YawErrorAngle;
     int               YawErrorCount;
     bool              YawCorrectionInProgress;
