@@ -4,7 +4,7 @@ PublicHeader:   None
 Filename    :   OVR_Threads.h
 Content     :   Contains thread-related (safe) functionality
 Created     :   September 19, 2012
-Notes       :
+Notes       : 
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -20,7 +20,6 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "OVR_Atomic.h"
 #include "OVR_RefCount.h"
 #include "OVR_Array.h"
-#include <boost/thread/mutex.hpp>
 
 // Defines the infinite wait delay timeout
 #define OVR_WAIT_INFINITE 0xFFFFFFFF
@@ -35,6 +34,7 @@ namespace OVR {
 // ****** Declared classes
 
 // Declared with thread support only
+class   Mutex;
 class   WaitCondition;
 class   Event;
 // Implementation forward declarations
@@ -46,40 +46,32 @@ class WaitConditionImpl;
 //-----------------------------------------------------------------------------------
 // ***** Mutex
 
-// Mutex class represents a system Mutex synchronization object that provides access
-// serialization between different threads, allowing one thread mutually exclusive access
+// Mutex class represents a system Mutex synchronization object that provides access 
+// serialization between different threads, allowing one thread mutually exclusive access 
 // to a resource. Mutex is more heavy-weight then Lock, but supports WaitCondition.
 
 class Mutex
 {
-    boost::mutex mutex;
+    friend class WaitConditionImpl;    
+    friend class MutexImpl;
+
+    MutexImpl  *pImpl; 
+
 public:
     // Constructor/destructor
     Mutex(bool recursive = 1);
     ~Mutex();
 
     // Locking functions
-    void  DoLock() {
-        mutex.lock();
-    }
-    bool  TryLock() {
-        return mutex.try_lock();
-    }
-    void  Unlock() {
-        mutex.unlock();
-    }
+    void  DoLock();
+    bool  TryLock();
+    void  Unlock();
 
     // Returns 1 if the mutes is currently locked by another thread
-    // Returns 0 if the mutex is not locked by another thread, and can therefore be acquired.
-    bool  IsLockedByAnotherThread() {
-        if (mutex.try_lock()) {
-            mutex.unlock();
-            return true;
-        }
-        return false;
-    }
-
-    // Locker class; Used for automatic locking of a mutex withing scope
+    // Returns 0 if the mutex is not locked by another thread, and can therefore be acquired. 
+    bool  IsLockedByAnotherThread();
+    
+    // Locker class; Used for automatic locking of a mutex withing scope    
     class Locker
     {
     public:
@@ -91,6 +83,7 @@ public:
     };
 };
 
+
 //-----------------------------------------------------------------------------------
 // ***** WaitCondition
 
@@ -99,7 +92,7 @@ public:
     Dependent threads wait on a wait condition by calling Wait(), and get woken up by other threads that
     call Notify() or NotifyAll().
 
-    The unique feature of this class is that it provides an atomic way of first releasing a Mutex, and then
+    The unique feature of this class is that it provides an atomic way of first releasing a Mutex, and then 
     starting a wait on a wait condition. If both the mutex and the wait condition are associated with the same
     resource, this ensures that any condition checked for while the mutex was locked does not change before
     the wait on the condition is actually initiated.
@@ -136,59 +129,35 @@ public:
 
 class Event
 {
-    bool signaled;
-    boost::mutex mutex;
-    boost::condition_variable event;
+    // Event state, its mutex and the wait condition
+    volatile bool   State;
+    volatile bool   Temporary;  
+    mutable Mutex   StateMutex;
+    WaitCondition   StateWaitCondition;
 
-public:
-    Event(bool setInitially = 0) {
-        if (setInitially) {
-            event.notify_all();
-        }
-    }
+    void updateState(bool newState, bool newTemp, bool mustNotify);
 
+public:    
+    Event(bool setInitially = 0) : State(setInitially), Temporary(false) { }
     ~Event() { }
 
     // Wait on an event condition until it is set
     // Delay is specified in milliseconds (1/1000 of a second).
-    bool  Wait(unsigned delay = OVR_WAIT_INFINITE) {
-        boost::mutex::scoped_lock lock(mutex);
-
-        // The windows API used a manual reset event, so
-        // waits don't automatically reset the event
-        if (signaled) {
-            return true;
-        }
-
-        // Do the correct amount of waiting
-        if (delay == OVR_WAIT_INFINITE) {
-            event.wait(lock);
-            return true;
-        }
-
-        return event.timed_wait(lock,
-                boost::posix_time::milliseconds(delay));
-    }
-
+    bool  Wait(unsigned delay = OVR_WAIT_INFINITE);
+    
     // Set an event, releasing objects waiting on it
-    void  SetEvent() {
-        boost::mutex::scoped_lock lock(mutex);
-        signaled = true;
-        event.notify_all();
-    }
+    void  SetEvent()
+    { updateState(true, false, true); }
 
     // Reset an event, un-signaling it
-    void  ResetEvent() {
-        boost::mutex::scoped_lock lock(mutex);
-        signaled = false;
-    }
+    void  ResetEvent()
+    { updateState(false, false, false); }
 
     // Set and then reset an event once a waiter is released.
     // If threads are already waiting, they will be notified and released
     // If threads are not waiting, the event is set until the first thread comes in
-    void  PulseEvent() {
-        event.notify_one();
-    }
+    void  PulseEvent()
+    { updateState(true, true, true); }
 };
 
 
@@ -215,19 +184,19 @@ typedef void* ThreadId;
 
 
 class Thread : public RefCountBase<Thread>
-{ // NOTE: Waitable must be the first base since it implements RefCountImpl.
+{ // NOTE: Waitable must be the first base since it implements RefCountImpl.    
 
 public:
 
     // *** Callback functions, can be used instead of overriding Run
 
-    // Run function prototypes.
+    // Run function prototypes.    
     // Thread function and user handle passed to it, executed by the default
     // Thread::Run implementation if not null.
     typedef int (*ThreadFn)(Thread *pthread, void* h);
-
+    
     // Thread ThreadFunction1 is executed if not 0, otherwise ThreadFunction2 is tried
-    ThreadFn    ThreadFunction;
+    ThreadFn    ThreadFunction;    
     // User handle passes to a thread
     void*       UserHandle;
 
@@ -254,15 +223,15 @@ public:
     // Thread constructor parameters
     struct CreateParams
     {
-        CreateParams(ThreadFn func = 0, void* hand = 0, UPInt ssize = 128 * 1024,
+        CreateParams(ThreadFn func = 0, void* hand = 0, UPInt ssize = 128 * 1024, 
                      int proc = -1, ThreadState state = NotRunning, ThreadPriority prior = NormalPriority)
-                     : threadFunction(func), userHandle(hand), stackSize(ssize),
+                     : threadFunction(func), userHandle(hand), stackSize(ssize), 
                        processor(proc), initialState(state), priority(prior) {}
         ThreadFn       threadFunction;   // Thread function
         void*          userHandle;       // User handle passes to a thread
         UPInt          stackSize;        // Thread stack size
         int            processor;        // Thread hardware processor
-        ThreadState    initialState;     //
+        ThreadState    initialState;     // 
         ThreadPriority priority;         // Thread priority
     };
 
@@ -270,12 +239,12 @@ public:
 
     // A default constructor always creates a thread in NotRunning state, because
     // the derived class has not yet been initialized. The derived class can call Start explicitly.
-    // "processor" parameter specifies which hardware processor this thread will be run on.
+    // "processor" parameter specifies which hardware processor this thread will be run on. 
     // -1 means OS decides this. Implemented only on Win32
     Thread(UPInt stackSize = 128 * 1024, int processor = -1);
     // Constructors that initialize the thread with a pointer to function.
     // An option to start a thread is available, but it should not be used if classes are derived from Thread.
-    // "processor" parameter specifies which hardware processor this thread will be run on.
+    // "processor" parameter specifies which hardware processor this thread will be run on. 
     // -1 means OS decides this. Implemented only on Win32
     Thread(ThreadFn threadFunction, void*  userHandle = 0, UPInt stackSize = 128 * 1024,
            int processor = -1, ThreadState initialState = NotRunning);
@@ -294,7 +263,7 @@ public:
     // *** Overridable Run function for thread processing
 
     // - returning from this method will end the execution of the thread
-    // - return value is usually 0 for success
+    // - return value is usually 0 for success 
     virtual int   Run();
     // Called after return/exit function
     virtual void  OnExit();
@@ -334,13 +303,13 @@ public:
     // Returns current thread state
     ThreadState   GetThreadState() const;
 
-    // Returns the number of available CPUs on the system
+    // Returns the number of available CPUs on the system 
     static int    GetCPUCount();
 
     // Returns the thread exit code. Exit code is initialized to 0,
     // and set to the return value if Run function after the thread is finished.
     inline int    GetExitCode() const { return ExitCode; }
-    // Returns an OS handle
+    // Returns an OS handle 
 #if defined(OVR_OS_WIN32)
     void*          GetOSHandle() const { return ThreadHandle; }
 #else
@@ -380,7 +349,7 @@ private:
     static pthread_attr_t Attr;
 #endif
 
-protected:
+protected:    
     // Thread state flags
     AtomicInt<UInt32>   ThreadFlags;
     AtomicInt<SInt32>   SuspendCount;
@@ -405,7 +374,7 @@ protected:
     int                 ExitCode;
 
     // Internal run function.
-    int                 PRun();
+    int                 PRun();    
     // Finishes the thread and releases internal reference to it.
     void                FinishAndRelease();
 

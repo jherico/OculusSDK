@@ -469,8 +469,8 @@ void LatencyTest::processResults()
                     {
                         UInt32 elapsed = pCurr->DeviceMeasuredElapsedMilliS;
 
-                        minTime1To2 = std::min(elapsed, minTime1To2);
-                        maxTime1To2 = std::max(elapsed, maxTime1To2);
+                        minTime1To2 = Alg::Min(elapsed, minTime1To2);
+                        maxTime1To2 = Alg::Max(elapsed, maxTime1To2);
 
                         averageTime1To2 += (float) elapsed;
                     }
@@ -483,16 +483,16 @@ void LatencyTest::processResults()
                     {
                         UInt32 elapsed = pCurr->DeviceMeasuredElapsedMilliS;
 
-                        minTime2To1 = std::min(elapsed, minTime2To1);
-                        maxTime2To1 = std::max(elapsed, maxTime2To1);
+                        minTime2To1 = Alg::Min(elapsed, minTime2To1);
+                        maxTime2To1 = Alg::Max(elapsed, maxTime2To1);
 
                         averageTime2To1 += (float) elapsed;
                     }
                 }
 
                 float usbRountripElapsedMilliS = 0.001f * (float) (pCurr->TestStartedTicksMicroS - pCurr->StartTestTicksMicroS);
-                minUSBTripMilliS = std::min(usbRountripElapsedMilliS, minUSBTripMilliS);
-                maxUSBTripMilliS = std::max(usbRountripElapsedMilliS, maxUSBTripMilliS);
+                minUSBTripMilliS = Alg::Min(usbRountripElapsedMilliS, minUSBTripMilliS);
+                maxUSBTripMilliS = Alg::Max(usbRountripElapsedMilliS, maxUSBTripMilliS);
                 averageUSBTripMilliS += usbRountripElapsedMilliS;
                 countUSBTripTime++;
             }
@@ -550,7 +550,7 @@ void LatencyTest::updateForTimeouts()
     }
     OldTime = newTime;
 
-    elapsedMilliS = std::min(elapsedMilliS, (UInt32) 100);   // Clamp at 100mS in case we're not being called very often.
+    elapsedMilliS = Alg::Min(elapsedMilliS, (UInt32) 100);   // Clamp at 100mS in case we're not being called very often.
 
 
     if (ActiveTimerMilliS == 0)

@@ -4,7 +4,7 @@ PublicHeader:   OVR.h
 Filename    :   OVR_Array.h
 Content     :   Template implementation for Array
 Created     :   September 19, 2012
-Notes       :
+Notes       : 
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -24,9 +24,9 @@ namespace OVR {
 //-----------------------------------------------------------------------------------
 // ***** ArrayDefaultPolicy
 //
-// Default resize behavior. No minimal capacity, Granularity=4,
-// Shrinking as needed. ArrayConstPolicy actually is the same as
-// ArrayDefaultPolicy, but parametrized with constants.
+// Default resize behavior. No minimal capacity, Granularity=4, 
+// Shrinking as needed. ArrayConstPolicy actually is the same as 
+// ArrayDefaultPolicy, but parametrized with constants. 
 // This struct is used only in order to reduce the template "matroska".
 struct ArrayDefaultPolicy
 {
@@ -43,6 +43,29 @@ private:
     UPInt Capacity;
 };
 
+
+//-----------------------------------------------------------------------------------
+// ***** ArrayConstPolicy
+//
+// Statically parametrized resizing behavior:
+// MinCapacity, Granularity, and Shrinking flag.
+template<int MinCapacity=0, int Granularity=4, bool NeverShrink=false>
+struct ArrayConstPolicy
+{
+    typedef ArrayConstPolicy<MinCapacity, Granularity, NeverShrink> SelfType;
+
+    ArrayConstPolicy() : Capacity(0) {}
+    ArrayConstPolicy(const SelfType&) : Capacity(0) {}
+
+    UPInt GetMinCapacity() const { return MinCapacity; }
+    UPInt GetGranularity() const { return Granularity; }
+    bool  NeverShrinking() const { return NeverShrink; }
+
+    UPInt GetCapacity()    const      { return Capacity; }
+    void  SetCapacity(UPInt capacity) { Capacity = capacity; }
+private:
+    UPInt Capacity;
+};
 
 //-----------------------------------------------------------------------------------
 // ***** ArrayDataBase
@@ -63,15 +86,15 @@ struct ArrayDataBase
     ArrayDataBase(const SizePolicy& p)
         : Data(0), Size(0), Policy(p) {}
 
-    ~ArrayDataBase()
+    ~ArrayDataBase() 
     {
         Allocator::DestructArray(Data, Size);
         Allocator::Free(Data);
     }
 
-    UPInt GetCapacity() const
-    {
-        return Policy.GetCapacity();
+    UPInt GetCapacity() const 
+    { 
+        return Policy.GetCapacity(); 
     }
 
     void ClearAndRelease()
@@ -140,7 +163,7 @@ struct ArrayDataBase
     }
 
     // This version of Resize DOES NOT construct the elements.
-    // It's done to optimize PushBack, which uses a copy constructor
+    // It's done to optimize PushBack, which uses a copy constructor 
     // instead of the default constructor and assignment
     void ResizeNoConstruct(UPInt newSize)
     {
@@ -159,7 +182,7 @@ struct ArrayDataBase
             Reserve(newSize + (newSize >> 2));
         }
         //! IMPORTANT to modify Size only after Reserve completes, because garbage collectable
-        // array may use this array and may traverse it during Reserve (in the case, if
+        // array may use this array and may traverse it during Reserve (in the case, if 
         // collection occurs because of heap limit exceeded).
         Size = newSize;
     }
@@ -296,14 +319,14 @@ struct ArrayDataCC : ArrayDataBase<T, Allocator, SizePolicy>
 //-----------------------------------------------------------------------------------
 // ***** ArrayBase
 //
-// Resizable array. The behavior can be POD (suffix _POD) and
+// Resizable array. The behavior can be POD (suffix _POD) and 
 // Movable (no suffix) depending on the allocator policy.
 // In case of _POD the constructors and destructors are not called.
-//
-// Arrays can't handle non-movable objects! Don't put anything in here
-// that can't be moved around by bitwise copy.
-//
-// The addresses of elements are not persistent! Don't keep the address
+// 
+// Arrays can't handle non-movable objects! Don't put anything in here 
+// that can't be moved around by bitwise copy. 
+// 
+// The addresses of elements are not persistent! Don't keep the address 
 // of an element; the array contents will move around as it gets resized.
 template<class ArrayData>
 class ArrayBase
@@ -334,7 +357,7 @@ public:
         : Data(defval) {}
     ArrayBase(const ValueType& defval, int size)
         : Data(defval, size) {}
-
+  
     SizePolicyType* GetSizePolicy() const                  { return Data.Policy; }
     void            SetSizePolicy(const SizePolicyType& p) { Data.Policy = p; }
 
@@ -349,40 +372,40 @@ public:
     void    Resize(UPInt newSize)       { Data.Resize(newSize); }
 
     // Reserve can only increase the capacity
-    void    Reserve(UPInt newCapacity)
-    {
+    void    Reserve(UPInt newCapacity)  
+    { 
         if (newCapacity > Data.GetCapacity())
-            Data.Reserve(newCapacity);
+            Data.Reserve(newCapacity); 
     }
 
     // Basic access.
     ValueType& At(UPInt index)
     {
         OVR_ASSERT(index < Data.Size);
-        return Data.Data[index];
+        return Data.Data[index]; 
     }
     const ValueType& At(UPInt index) const
     {
         OVR_ASSERT(index < Data.Size);
-        return Data.Data[index];
+        return Data.Data[index]; 
     }
 
     ValueType ValueAt(UPInt index) const
     {
         OVR_ASSERT(index < Data.Size);
-        return Data.Data[index];
+        return Data.Data[index]; 
     }
 
     // Basic access.
     ValueType& operator [] (UPInt index)
     {
         OVR_ASSERT(index < Data.Size);
-        return Data.Data[index];
+        return Data.Data[index]; 
     }
     const ValueType& operator [] (UPInt index) const
     {
         OVR_ASSERT(index < Data.Size);
-        return Data.Data[index];
+        return Data.Data[index]; 
     }
 
     // Raw pointer to the data. Use with caution!
@@ -435,7 +458,7 @@ public:
     const ValueType&    Back() const    { return At(Data.Size - 1); }
 
     // Array copy.  Copies the contents of a into this array.
-    const SelfType& operator = (const SelfType& a)
+    const SelfType& operator = (const SelfType& a)   
     {
         Resize(a.GetSize());
         for (UPInt i = 0; i < Data.Size; i++) {
@@ -456,7 +479,7 @@ public:
         {
             AllocatorType::DestructArray(Data.Data + index, num);
             AllocatorType::CopyArrayForward(
-                Data.Data + index,
+                Data.Data + index, 
                 Data.Data + index + num,
                 Data.Size - num - index);
             Data.Size -= num;
@@ -476,7 +499,7 @@ public:
         {
             AllocatorType::Destruct(Data.Data + index);
             AllocatorType::CopyArrayForward(
-                Data.Data + index,
+                Data.Data + index, 
                 Data.Data + index + 1,
                 Data.Size - 1 - index);
             --Data.Size;
@@ -492,8 +515,8 @@ public:
         if (index < Data.Size - 1)
         {
             AllocatorType::CopyArrayBackward(
-                Data.Data + index + 1,
-                Data.Data + index,
+                Data.Data + index + 1, 
+                Data.Data + index, 
                 Data.Size - 1 - index);
         }
         AllocatorType::Construct(Data.Data + index, val);
@@ -678,7 +701,7 @@ protected:
 //-----------------------------------------------------------------------------------
 // ***** Array
 //
-// General purpose array for movable objects that require explicit
+// General purpose array for movable objects that require explicit 
 // construction/destruction.
 template<class T, class SizePolicy=ArrayDefaultPolicy>
 class Array : public ArrayBase<ArrayData<T, ContainerAllocator<T>, SizePolicy> >
@@ -699,8 +722,8 @@ public:
 
 // ***** ArrayPOD
 //
-// General purpose array for movable objects that DOES NOT require
-// construction/destruction. Constructors and destructors are not called!
+// General purpose array for movable objects that DOES NOT require  
+// construction/destruction. Constructors and destructors are not called! 
 // Global heap is in use.
 template<class T, class SizePolicy=ArrayDefaultPolicy>
 class ArrayPOD : public ArrayBase<ArrayData<T, ContainerAllocator_POD<T>, SizePolicy> >
@@ -745,7 +768,7 @@ public:
 // ***** ArrayCC
 //
 // A modification of the array that uses the given default value to
-// construct the elements. The constructors and destructors are
+// construct the elements. The constructors and destructors are 
 // properly called, the objects must be movable.
 
 template<class T, class SizePolicy=ArrayDefaultPolicy>

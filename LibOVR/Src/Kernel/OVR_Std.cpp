@@ -76,12 +76,12 @@ wchar_t* OVR_CDECL OVR_wcsncpy(wchar_t* dest, UPInt destsize, const wchar_t* src
     return dest;
 #else
     UPInt srclen = OVR_wcslen(src);
-    UPInt l = std::min(srclen, count);
+    UPInt l = Alg::Min(srclen, count);
     l = (l < destsize) ? l : destsize;
     memcpy(dest, src, l * sizeof(wchar_t));
     if (count > srclen)
     {
-        UPInt remLen = std::min(destsize - l, (count - srclen));
+        UPInt remLen = Alg::Min(destsize - l, (count - srclen));
         memset(&dest[l], 0, sizeof(wchar_t)*remLen);
     }
     else if (l < destsize)
