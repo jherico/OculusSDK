@@ -115,7 +115,7 @@ public:
     class HIDHandler
     {
     public:
-        virtual void OnInputReport(UByte* pData, UInt32 length)
+        virtual void OnInputReport(const UByte* pData, UInt32 length)
         { OVR_UNUSED2(pData, length); }
 
         virtual UInt64 OnTicks(UInt64 ticksMks)

@@ -62,7 +62,7 @@ COMMONSRCPATH = ../CommonSrc
 3RDPARTYPATH  = ../../3rdParty
 INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
 OBJPATH       = ./Obj/Linux/$(RELEASETYPE)/$(SYSARCH)
-LFLAGS        = -Wl -O1 -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
+LFLAGS        = -O1 -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
 LIBS          = $(SUBLIBS) -lovr -ludev -lpthread -lGL -lX11 -lXinerama
 CXX_BUILD     = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 

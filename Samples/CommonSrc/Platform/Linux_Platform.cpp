@@ -156,7 +156,7 @@ void PlatformCore::SetWindowTitle(const char* title)
 {
     XStoreName(Disp, Win, title);
 }
-    
+
 void PlatformCore::ShowWindow(bool show)
 {
     if (show)
@@ -227,12 +227,12 @@ static KeyCode MapXKToKeyCode(unsigned vk)
     {
         key = vk - XK_F1 + Key_F1;
     }
-    else 
+    else
     {
         for (unsigned i = 0; i< (sizeof(KeyMap) / sizeof(KeyMap[1])); i++)
         {
             if (vk == KeyMap[i][0])
-            {                
+            {
                 key = KeyMap[i][1];
                 break;
             }
@@ -311,7 +311,7 @@ void PlatformCore::processEvent(XEvent& event)
 
     case MapNotify:
         if (MMode == Mouse_Relative)
-        {            
+        {
             XWarpPointer(Disp, Win, Win, 0,0,Width,Height, Width/2, Height/2);
             showCursor(false);
         }
@@ -323,7 +323,7 @@ void PlatformCore::processEvent(XEvent& event)
             //grab
 
             if (MMode == Mouse_RelativeEscaped)
-            {            
+            {
                 XWarpPointer(Disp, Win, Win, 0,0,Width,Height, Width/2, Height/2);
                 showCursor(false);
                 MMode = Mouse_Relative;
@@ -333,7 +333,7 @@ void PlatformCore::processEvent(XEvent& event)
 
     case FocusOut:
         if (MMode == Mouse_Relative)
-        {            
+        {
             MMode = Mouse_RelativeEscaped;
             showCursor(true);
         }
@@ -476,11 +476,11 @@ RenderDevice* PlatformCore::SetupGraphics(const SetupGraphicsDeviceSet& setupGra
 {
     const SetupGraphicsDeviceSet* setupDesc = setupGraphicsDesc.PickSetupDevice(type);
     OVR_ASSERT(setupDesc);
-        
+
     pRender = *setupDesc->pCreateDevice(rp, this);
     if (pRender)
         pRender->SetWindowSize(Width, Height);
-        
+
     return pRender.GetPtr();
 }
 
@@ -540,7 +540,7 @@ void RenderDevice::Shutdown()
 }}}}
 
 
-int main(int argc, const char* argv[])
+int main(int argc, char** argv)
 {
     using namespace OVR;
     using namespace OVR::Platform;

@@ -325,15 +325,17 @@ void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
 
 void RenderDevice::SetRealViewport(const Viewport& vp)
 {
-    int wh;
-    if (CurRenderTarget)
-        wh = CurRenderTarget->Height;
-    else
-        wh = WindowHeight;
-    glViewport(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
-
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
+//    int wh;
+//    if (CurRenderTarget)
+//        wh = CurRenderTarget->Height;
+//    else
+//        wh = WindowHeight;
+//
+//    glViewport(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
+//
+//    glEnable(GL_SCISSOR_TEST);
+//    glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
+    glViewport(vp.x, vp.y, vp.w, vp.h);
 }
 
 void RenderDevice::Clear(float r, float g, float b, float a, float depth)
@@ -531,7 +533,7 @@ void* Buffer::Map(size_t start, size_t size, int flags)
     int mode = GL_WRITE_ONLY;
     //if (flags & Map_Unsynchronized)
     //    mode |= GL_MAP_UNSYNCHRONIZED;
-    
+
     glBindBuffer(Use, GLBuffer);
     void* v = glMapBuffer(Use, mode);
     glBindBuffer(Use, 0);
@@ -775,7 +777,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     Texture* NewTex = new Texture(this, width, height);
     glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
     glGetError();
-    
+
     if (format & Texture_Compressed)
     {
         const unsigned char* level = (const unsigned char*)data;
