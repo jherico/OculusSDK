@@ -64,7 +64,7 @@ float DistortionConfig::DistortionFnInverse(float r)
 StereoConfig::StereoConfig(StereoMode mode, const Viewport& vp)
     : Mode(mode),
       InterpupillaryDistance(0.064f), AspectMultiplier(1.0f),
-      FullView(vp), DirtyFlag(true),
+      FullView(vp), DirtyFlag(true), IPDOverride(false),
       YFov(0), Aspect(vp.w / float(vp.h)), ProjectionCenterOffset(0),
       OrthoPixelOffset(0)
 {
@@ -112,6 +112,9 @@ void StereoConfig::SetHMDInfo(const HMDInfo& hmd)
 
     Distortion.SetChromaticAberration(hmd.ChromaAbCorrection[0], hmd.ChromaAbCorrection[1],
                                       hmd.ChromaAbCorrection[2], hmd.ChromaAbCorrection[3]);
+
+    if (!IPDOverride)
+        InterpupillaryDistance = HMD.InterpupillaryDistance;
 
     DirtyFlag = true;
 }

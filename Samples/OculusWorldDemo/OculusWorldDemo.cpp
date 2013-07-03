@@ -24,17 +24,17 @@ limitations under the License.
 
 #include "OVR.h"
 
-#include "Player.h"
-
 #include "../CommonSrc/Platform/Platform_Default.h"
 #include "../CommonSrc/Render/Render_Device.h"
-#include "../CommonSrc/Render/Render_XMLSceneLoader.h"
+#include "../CommonSrc/Render/Render_XmlSceneLoader.h"
 #include "../CommonSrc/Render/Render_FontEmbed_DejaVu48.h"
 #include "../CommonSrc/Platform/Gamepad.h"
 
 #include <Kernel/OVR_SysFile.h>
 #include <Kernel/OVR_Log.h>
 #include <Kernel/OVR_Timer.h>
+
+#include "Player.h"
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
@@ -94,7 +94,7 @@ public:
     virtual void OnIdle();
 
     virtual void OnMouseMove(int x, int y, int modifiers);
-    virtual void OnKey(KeyCode key, int chr, bool down, int modifiers);
+    virtual void OnKey(OVR::KeyCode key, int chr, bool down, int modifiers);
     virtual void OnResize(int width, int height);
 
     virtual void OnMessage(const Message& msg);
@@ -145,8 +145,9 @@ protected:
     Ptr<DeviceManager>  pManager;
     Ptr<SensorDevice>   pSensor;
     Ptr<HMDDevice>      pHMD;
+    Ptr<Profile>        pUserProfile;
     SensorFusion        SFusion;
-    HMDInfo             HMDInfo;
+    HMDInfo             TheHMDInfo;
 
     Ptr<LatencyTestDevice>  pLatencyTester;
     Util::LatencyTest   LatencyUtil;
@@ -169,7 +170,7 @@ protected:
     };
 
 	// Player
-	Player				Player;
+    Player				ThePlayer;
     Matrix4f            View;
     Scene               MainScene;
     Scene               LoadingScene;
@@ -254,7 +255,9 @@ protected:
     void GamepadStateChanged(const GamepadState& pad);
 
 	// Variable used by UpdateManualCalibration
-    float FirstMagYaw;
+    Anglef FirstMagYaw;
+	int ManualMagCalStage;
+	int ManualMagFailures;
 };
 
 //-------------------------------------------------------------------------------------
@@ -318,9 +321,10 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 
     // We'll handle it's messages in this case.
     pManager->SetMessageHandler(this);
+    
 
-    pHMD     = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
-    if(pHMD)
+    pHMD = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
+    if (pHMD)
     {
         pSensor = *pHMD->GetSensor();
 
@@ -328,10 +332,18 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
         // screen size and other variables needed for correct projection.
         // We pass HMD DisplayDeviceName into the renderer to select the
         // correct monitor in full-screen mode.
-        if(pHMD->GetDeviceInfo(&HMDInfo))
+        if(pHMD->GetDeviceInfo(&TheHMDInfo))
         {
             //RenderParams.MonitorName = hmd.DisplayDeviceName;
-            SConfig.SetHMDInfo(HMDInfo);
+            SConfig.SetHMDInfo(TheHMDInfo);
+        }
+
+        // Retrieve relevant profile settings. 
+        pUserProfile = pHMD->GetProfile();
+        if (pUserProfile)
+        {
+            ThePlayer.EyeHeight = pUserProfile->GetEyeHeight();
+            ThePlayer.EyePos.y = ThePlayer.EyeHeight;
         }
     }
     else
@@ -341,7 +353,7 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
         // a shipping app.
         pSensor = *pManager->EnumerateDevices<SensorDevice>().CreateDevice();
     }
-
+        
     // Create the Latency Tester device and assign it to the LatencyTesterUtil object.
     pLatencyTester = *pManager->EnumerateDevices<LatencyTestDevice>().CreateDevice();
     if (pLatencyTester)
@@ -372,10 +384,10 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     SetAdjustMessageTimeout(10.0f);
 
 
-    if(HMDInfo.HResolution > 0)
+    if(TheHMDInfo.HResolution > 0)
     {
-        Width  = HMDInfo.HResolution;
-        Height = HMDInfo.VResolution;
+        Width  = TheHMDInfo.HResolution;
+        Height = TheHMDInfo.VResolution;
     }
 
     if(!pPlatform->SetupWindow(Width, Height))
@@ -384,10 +396,10 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     }
 
     String Title = "Oculus World Demo";
-    if(HMDInfo.ProductName[0])
+    if(TheHMDInfo.ProductName[0])
     {
         Title += " : ";
-        Title += HMDInfo.ProductName;
+        Title += TheHMDInfo.ProductName;
     }
     pPlatform->SetWindowTitle(Title);
 
@@ -440,16 +452,16 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     // For 7" screen, fit to touch left side of the view, leaving a bit of
     // invisible screen on the top (saves on rendering cost).
     // For smaller screens (5.5"), fit to the top.
-    if (HMDInfo.HScreenSize > 0.0f)
+    if (TheHMDInfo.HScreenSize > 0.0f)
     {
-        if (HMDInfo.HScreenSize > 0.140f)  // 7"
+        if (TheHMDInfo.HScreenSize > 0.140f)  // 7"
             SConfig.SetDistortionFitPointVP(-1.0f, 0.0f);        
         else        
             SConfig.SetDistortionFitPointVP(0.0f, 1.0f);        
     }
 
     pRender->SetSceneRenderScale(SConfig.GetDistortionScale());
-    //pRender->SetSceneRenderScale(0.8f);
+    //pRender->SetSceneRenderScale(1.0f);
 
     SConfig.Set2DAreaFov(DegreeToRad(85.0f));
 
@@ -486,7 +498,7 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 
     LastUpdate = pPlatform->GetAppTime();
 	//pPlatform->PlayMusicFile(L"Loop.wav");
-
+    
     return 0;
 }
 
@@ -539,26 +551,26 @@ void OculusWorldDemoApp::OnMouseMove(int x, int y, int modifiers)
 
         // Apply to rotation. Subtract for right body frame rotation,
         // since yaw rotation is positive CCW when looking down on XZ plane.
-        Player.EyeYaw   -= (Sensitivity * dx) / 360.0f;
+        ThePlayer.EyeYaw   -= (Sensitivity * dx) / 360.0f;
 
         if(!pSensor)
         {
-            Player.EyePitch -= (Sensitivity * dy) / 360.0f;
+            ThePlayer.EyePitch -= (Sensitivity * dy) / 360.0f;
 
-            if(Player.EyePitch > maxPitch)
+            if(ThePlayer.EyePitch > maxPitch)
             {
-                Player.EyePitch = maxPitch;
+                ThePlayer.EyePitch = maxPitch;
             }
-            if(Player.EyePitch < -maxPitch)
+            if(ThePlayer.EyePitch < -maxPitch)
             {
-                Player.EyePitch = -maxPitch;
+                ThePlayer.EyePitch = -maxPitch;
             }
         }
     }
 }
 
 
-void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
+void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifiers)
 {
     OVR_UNUSED(chr);
 
@@ -575,28 +587,28 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
         // We just update movement state here, while the actual translation is done in OnIdle()
         // based on time.
     case Key_W:
-        Player.MoveForward = down ? (Player.MoveForward | 1) : (Player.MoveForward & ~1);
+        ThePlayer.MoveForward = down ? (ThePlayer.MoveForward | 1) : (ThePlayer.MoveForward & ~1);
         break;
     case Key_S:
-        Player.MoveBack    = down ? (Player.MoveBack    | 1) : (Player.MoveBack    & ~1);
+        ThePlayer.MoveBack    = down ? (ThePlayer.MoveBack    | 1) : (ThePlayer.MoveBack    & ~1);
         break;
     case Key_A:
-        Player.MoveLeft    = down ? (Player.MoveLeft    | 1) : (Player.MoveLeft    & ~1);
+        ThePlayer.MoveLeft    = down ? (ThePlayer.MoveLeft    | 1) : (ThePlayer.MoveLeft    & ~1);
         break;
     case Key_D:
-        Player.MoveRight   = down ? (Player.MoveRight   | 1) : (Player.MoveRight   & ~1);
+        ThePlayer.MoveRight   = down ? (ThePlayer.MoveRight   | 1) : (ThePlayer.MoveRight   & ~1);
         break;
     case Key_Up:
-        Player.MoveForward = down ? (Player.MoveForward | 2) : (Player.MoveForward & ~2);
+        ThePlayer.MoveForward = down ? (ThePlayer.MoveForward | 2) : (ThePlayer.MoveForward & ~2);
         break;
     case Key_Down:
-        Player.MoveBack    = down ? (Player.MoveBack    | 2) : (Player.MoveBack    & ~2);
+        ThePlayer.MoveBack    = down ? (ThePlayer.MoveBack    | 2) : (ThePlayer.MoveBack    & ~2);
         break;
     case Key_Left:
-        Player.MoveLeft    = down ? (Player.MoveLeft    | 2) : (Player.MoveLeft    & ~2);
+        ThePlayer.MoveLeft    = down ? (ThePlayer.MoveLeft    | 2) : (ThePlayer.MoveLeft    & ~2);
         break;
     case Key_Right:
-        Player.MoveRight   = down ? (Player.MoveRight   | 2) : (Player.MoveRight   & ~2);
+        ThePlayer.MoveRight   = down ? (ThePlayer.MoveRight   | 2) : (ThePlayer.MoveRight   & ~2);
         break;
 
     case Key_Minus:
@@ -667,6 +679,9 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
 
     case Key_R:
         SFusion.Reset();
+		if (MagCal.IsAutoCalibrating() || MagCal.IsManuallyCalibrating())
+	        MagCal.AbortCalibration();
+
         SetAdjustMessage("Sensor Fusion Reset");
         break;
 
@@ -694,12 +709,13 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
         }
         break;
     case Key_F9:
+#ifndef OVR_OS_LINUX    // On Linux F9 does the same as F11.
         if (!down)
         {
             CycleDisplay();
         }
         break;
-
+#endif
 #ifdef OVR_OS_MAC
     case Key_F10:  // F11 is reserved on Mac
 #else
@@ -726,11 +742,19 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
     case Key_Escape:
         if(!down)
         {
-            // switch to primary screen windowed mode
-            pPlatform->SetFullscreen(RenderParams, Display_Window);
-            RenderParams.Display = pPlatform->GetDisplay(0);
-            pRender->SetParams(RenderParams);
-            Screen = 0;
+			if (MagCal.IsAutoCalibrating() || MagCal.IsManuallyCalibrating())
+			{
+				MagCal.AbortCalibration();
+				SetAdjustMessage("Aborting Magnetometer Calibration");
+			}
+			else 
+			{
+                // switch to primary screen windowed mode
+                pPlatform->SetFullscreen(RenderParams, Display_Window);
+                RenderParams.Display = pPlatform->GetDisplay(0);
+                pRender->SetParams(RenderParams);
+                Screen = 0;
+			}
         }
         break;
 
@@ -798,7 +822,6 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
         AdjustDirection = 1;
         break;
 
-
     case Key_Tab:
         if (down)
         {
@@ -812,36 +835,57 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
 
             if(SavedK0 > 0.0f)
             {
-                SConfig.SetDistortionK(0, SavedK0);
-                SConfig.SetDistortionK(1, SavedK1);
-                SConfig.SetDistortionK(2, SavedK2);
-                SConfig.SetDistortionK(3, SavedK3);
-                SConfig.SetEyeToScreenDistance(SavedESD);
-                SConfig.SetAspectMultiplier(SavedAspect);
-                SConfig.SetIPD(SavedEyeDistance);
+				SConfig.SetDistortionK(0, SavedK0);
+				SConfig.SetDistortionK(1, SavedK1);
+				SConfig.SetDistortionK(2, SavedK2);
+				SConfig.SetDistortionK(3, SavedK3);
+				SConfig.SetEyeToScreenDistance(SavedESD);
+				SConfig.SetAspectMultiplier(SavedAspect);
+				SConfig.SetIPD(SavedEyeDistance);
 
-                SetAdjustMessage("Restored:\n"
-                                 "ESD:\t120 %.3f\t350 Eye:\t490 %.3f\n"
-                                 "K0: \t120 %.4f\t350 K2: \t490 %.4f\n"
-                                 "K1: \t120 %.4f\t350 K3: \t490 %.4f",
-                                 SavedESD, SavedEyeDistance,
-                                 SavedK0, SavedK2,
-                                 SavedK1, SavedK3);
+				if ( ShiftDown )
+				{
+					// Swap saved and current values. Good for doing direct comparisons.
+					SetAdjustMessage("Swapped current and saved. New settings:\n"
+									 "ESD:\t120 %.3f\t350 Eye:\t490 %.3f\n"
+									 "K0: \t120 %.4f\t350 K2: \t490 %.4f\n"
+									 "K1: \t120 %.4f\t350 K3: \t490 %.4f\n",
+									 SavedESD, SavedEyeDistance,
+									 SavedK0, SavedK2,
+									 SavedK1, SavedK3);
+					SavedK0 = t0;
+					SavedK1 = t1;
+					SavedK2 = t2;
+					SavedK3 = t3;
+					SavedESD = tESD;
+					SavedAspect = taspect;
+					SavedEyeDistance = tipd;
+				}
+				else
+				{
+					SetAdjustMessage("Restored:\n"
+									 "ESD:\t120 %.3f\t350 Eye:\t490 %.3f\n"
+									 "K0: \t120 %.4f\t350 K2: \t490 %.4f\n"
+									 "K1: \t120 %.4f\t350 K3: \t490 %.4f\n",
+									 SavedESD, SavedEyeDistance,
+									 SavedK0, SavedK2,
+									 SavedK1, SavedK3);
+				}
             }
             else
             {
                 SetAdjustMessage("Setting Saved");
+				SavedK0 = t0;
+				SavedK1 = t1;
+				SavedK2 = t2;
+				SavedK3 = t3;
+				SavedESD = tESD;
+				SavedAspect = taspect;
+				SavedEyeDistance = tipd;
             }
 
-            SavedK0 = t0;
-            SavedK1 = t1;
-            SavedK2 = t2;
-            SavedK3 = t3;
-            SavedESD = tESD;
-            SavedAspect = taspect;
-            SavedEyeDistance = tipd;
         }
-        break;
+        break; 
  
     case Key_G:
         if (down)
@@ -871,7 +915,7 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
 
         // Reset the camera position in case we get stuck
     case Key_T:
-        Player.EyePos = Vector3f(10.0f, 1.6f, 10.0f);
+        ThePlayer.EyePos = Vector3f(10.0f, 1.6f, 10.0f);
         break;
 
     case Key_F5:
@@ -912,6 +956,7 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
 	case Key_Z:
 		if (down) 
 		{
+			ManualMagCalStage = 0;
 			if (MagCal.IsManuallyCalibrating())
 				MagAwaitingForwardLook = false;
 			else
@@ -927,17 +972,6 @@ void OculusWorldDemoApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
 		{
             MagCal.BeginAutoCalibration(SFusion);
             SetAdjustMessage("Starting Auto Mag Calibration");
-		}
-        break;
-
-        // Set the magnetometer reference point
-    case Key_Semicolon:
-        if (down)
-        {
-            SFusion.SetMagReference();
-            SetAdjustMessage("Magnetometer Reference Set");
-            if (SFusion.IsMagReady())
-                SFusion.SetYawCorrectionEnabled(true);
 		}
         break;
 
@@ -1090,7 +1124,7 @@ void OculusWorldDemoApp::OnIdle()
                         desc.Handle.GetDeviceInfo(&info);
                         // if strlen(info.DisplayDeviceName) == 0 then
                         // this HMD is 'fake' (created using sensor).
-                        if (strlen(info.DisplayDeviceName) > 0 && (!pHMD || !info.IsSameDisplay(HMDInfo)))
+                        if (strlen(info.DisplayDeviceName) > 0 && (!pHMD || !info.IsSameDisplay(TheHMDInfo)))
                         {
                             SetAdjustMessage("------------------------\n"
                                              "HMD connected\n"
@@ -1098,10 +1132,10 @@ void OculusWorldDemoApp::OnIdle()
                             if (!pHMD || !desc.Handle.IsDevice(pHMD))
                                 pHMD = *desc.Handle.CreateDeviceTyped<HMDDevice>();
                             // update stereo config with new HMDInfo
-                            if (pHMD && pHMD->GetDeviceInfo(&HMDInfo))
+                            if (pHMD && pHMD->GetDeviceInfo(&TheHMDInfo))
                             {
                                 //RenderParams.MonitorName = hmd.DisplayDeviceName;
-                                SConfig.SetHMDInfo(HMDInfo);
+                                SConfig.SetHMDInfo(TheHMDInfo);
                             }
                             LogText("HMD device added.\n");
                         }
@@ -1141,14 +1175,14 @@ void OculusWorldDemoApp::OnIdle()
                         // (can be NULL).
                         pHMD = pHMD->Disconnect(pSensor);
 
-                        // This will initialize HMDInfo with information about configured IPD,
+                        // This will initialize TheHMDInfo with information about configured IPD,
                         // screen size and other variables needed for correct projection.
                         // We pass HMD DisplayDeviceName into the renderer to select the
                         // correct monitor in full-screen mode.
-                        if (pHMD && pHMD->GetDeviceInfo(&HMDInfo))
+                        if (pHMD && pHMD->GetDeviceInfo(&TheHMDInfo))
                         {
                             //RenderParams.MonitorName = hmd.DisplayDeviceName;
-                            SConfig.SetHMDInfo(HMDInfo);
+                            SConfig.SetHMDInfo(TheHMDInfo);
                         }
                         LogText("HMD device removed.\n");
                     }
@@ -1182,10 +1216,14 @@ void OculusWorldDemoApp::OnIdle()
     if (MagCal.IsAutoCalibrating()) 
     {
         MagCal.UpdateAutoCalibration(SFusion);
+		int n = MagCal.NumberOfSamples();
+	    if (n == 1)
+	        SetAdjustMessage("   Magnetometer Calibration Has 1 Sample   \n   %d Remaining - Please Keep Looking Around   ",4-n);
+		else if (n < 4)
+			SetAdjustMessage("   Magnetometer Calibration Has %d Samples   \n   %d Remaining - Please Keep Looking Around   ",n,4-n);
         if (MagCal.IsCalibrated())
         {
-            if (SFusion.IsMagReady())
-                SFusion.SetYawCorrectionEnabled(true);
+            SFusion.SetYawCorrectionEnabled(true);
             Vector3f mc = MagCal.GetMagCenter();
             SetAdjustMessage("   Magnetometer Calibration Complete   \nCenter: %f %f %f",mc.x,mc.y,mc.z);
         }
@@ -1199,10 +1237,10 @@ void OculusWorldDemoApp::OnIdle()
         Quatf    hmdOrient = SFusion.GetPredictedOrientation();
 
         float    yaw = 0.0f;
-        hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&yaw, &Player.EyePitch, &Player.EyeRoll);
+        hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&yaw, &ThePlayer.EyePitch, &ThePlayer.EyeRoll);
 
-        Player.EyeYaw += (yaw - Player.LastSensorYaw);
-        Player.LastSensorYaw = yaw;
+        ThePlayer.EyeYaw += (yaw - ThePlayer.LastSensorYaw);
+        ThePlayer.LastSensorYaw = yaw;
 
         // NOTE: We can get a matrix from orientation as follows:
         // Matrix4f hmdMat(hmdOrient);
@@ -1236,28 +1274,28 @@ void OculusWorldDemoApp::OnIdle()
         ConsecutiveLowFPSFrames = 0;
     }
 
-    Player.EyeYaw -= Player.GamepadRotate.x * dt;
-	Player.HandleCollision(dt, &CollisionModels, &GroundCollisionModels, ShiftDown);
+    ThePlayer.EyeYaw -= ThePlayer.GamepadRotate.x * dt;
+    ThePlayer.HandleCollision(dt, &CollisionModels, &GroundCollisionModels, ShiftDown);
 
     if(!pSensor)
     {
-        Player.EyePitch -= Player.GamepadRotate.y * dt;
+        ThePlayer.EyePitch -= ThePlayer.GamepadRotate.y * dt;
 
         const float maxPitch = ((3.1415f / 2) * 0.98f);
-        if(Player.EyePitch > maxPitch)
+        if(ThePlayer.EyePitch > maxPitch)
         {
-            Player.EyePitch = maxPitch;
+            ThePlayer.EyePitch = maxPitch;
         }
-        if(Player.EyePitch < -maxPitch)
+        if(ThePlayer.EyePitch < -maxPitch)
         {
-            Player.EyePitch = -maxPitch;
+            ThePlayer.EyePitch = -maxPitch;
         }
     }
 
     // Rotate and position View Camera, using YawPitchRoll in BodyFrame coordinates.
     //
-    Matrix4f rollPitchYaw = Matrix4f::RotationY(Player.EyeYaw) * Matrix4f::RotationX(Player.EyePitch) *
-                            Matrix4f::RotationZ(Player.EyeRoll);
+    Matrix4f rollPitchYaw = Matrix4f::RotationY(ThePlayer.EyeYaw) * Matrix4f::RotationX(ThePlayer.EyePitch) *
+                            Matrix4f::RotationZ(ThePlayer.EyeRoll);
     Vector3f up      = rollPitchYaw.Transform(UpVector);
     Vector3f forward = rollPitchYaw.Transform(ForwardVector);
 
@@ -1267,7 +1305,7 @@ void OculusWorldDemoApp::OnIdle()
     float headBaseToEyeProtrusion = 0.09f;  // Distance forward of eye from base of head
 
     Vector3f eyeCenterInHeadFrame(0.0f, headBaseToEyeHeight, -headBaseToEyeProtrusion);
-    Vector3f shiftedEyePos = Player.EyePos + rollPitchYaw.Transform(eyeCenterInHeadFrame);
+    Vector3f shiftedEyePos = ThePlayer.EyePos + rollPitchYaw.Transform(eyeCenterInHeadFrame);
     shiftedEyePos.y -= eyeCenterInHeadFrame.y; // Bring the head back down to original height
     View = Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + forward, up);
 
@@ -1301,19 +1339,19 @@ void OculusWorldDemoApp::OnIdle()
 }
 
 
-
 void OculusWorldDemoApp::UpdateManualMagCalibration() 
 {
-    float tyaw,yaw, pitch, roll;
+    float tyaw, pitch, roll;
+	Anglef yaw;
     Quatf hmdOrient = SFusion.GetOrientation();
-	// Note that yaw and pitch are used from two different Euler angle combinations.  This
-	// is done so that pitch (looking "up" or "down") is not dependent on yaw angle
-    hmdOrient.GetEulerAngles<Axis_X, Axis_Z, Axis_Y>(&pitch, &roll, &yaw);
-    hmdOrient.GetEulerAngles<Axis_Y, Axis_Z, Axis_X>(&tyaw, &roll, &pitch);
+    hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&tyaw, &pitch, &roll);
     Vector3f mag = SFusion.GetMagnetometer();
     float dtr = Math<float>::DegreeToRadFactor;
+	yaw.Set(tyaw); // Using Angle class to handle angle wraparound arithmetic
 
-    switch(MagCal.NumberOfSamples())
+	const int timeout = 100;
+
+	switch(ManualMagCalStage)
     {
         case 0:
 			if (MagAwaitingForwardLook)
@@ -1324,51 +1362,99 @@ void OculusWorldDemoApp::UpdateManualMagCalibration()
                     MagCal.InsertIfAcceptable(hmdOrient, mag);
 				    FirstMagYaw = yaw;
 					MagAwaitingForwardLook = false;
-                    SFusion.SetMagReference();
+					if (MagCal.NumberOfSamples() == 1)
+					{
+						ManualMagCalStage = 1;
+						ManualMagFailures = 0;
+					}   
 			    }
+				else
+					MagAwaitingForwardLook = true;
             break;
         case 1:
             SetAdjustMessage("Magnetometer Calibration\n** Step 2: Please Look Up **");
 			yaw -= FirstMagYaw;
-			if (yaw < -Math<float>::Pi)
-				yaw += Math<float>::TwoPi;
-			if (yaw > Math<float>::Pi)
-				yaw -= Math<float>::TwoPi;
-            if ((pitch > 50.0f*dtr) && (fabs(yaw) < 20.0f*dtr))
+            if ((pitch > 50.0f*dtr) && (yaw.Abs() < 20.0f*dtr))
+			{
 			    MagCal.InsertIfAcceptable(hmdOrient, mag);
+			    ManualMagFailures++;
+	            if ((MagCal.NumberOfSamples() == 2)||(ManualMagFailures > timeout))
+				{
+	   		        ManualMagCalStage = 2;
+					ManualMagFailures = 0;
+				}
+			}
             break;
         case 2:
             SetAdjustMessage("Magnetometer Calibration\n** Step 3: Please Look Left **");
 			yaw -= FirstMagYaw;
-			if (yaw < -Math<float>::Pi)
-				yaw += Math<float>::TwoPi;
-			if (yaw > Math<float>::Pi)
-				yaw -= Math<float>::TwoPi;
-            if (yaw > 60.0f*dtr) 
+            if (yaw.Get() > 60.0f*dtr) 
+			{
                 MagCal.InsertIfAcceptable(hmdOrient, mag);
+			    ManualMagFailures++;
+	            if ((MagCal.NumberOfSamples() == 3)||(ManualMagFailures > timeout))
+				{
+	   		        ManualMagCalStage = 3;
+					ManualMagFailures = 0;
+				}
+			}
             break;
         case 3:
             SetAdjustMessage("Magnetometer Calibration\n** Step 4: Please Look Right **");
 			yaw -= FirstMagYaw;
-			if (yaw < -Math<float>::Pi)
-				yaw += Math<float>::TwoPi;
-			if (yaw > Math<float>::Pi)
-				yaw -= Math<float>::TwoPi;
-		    if (yaw < -60.0f*dtr)
+			if (yaw.Get() < -60.0f*dtr)
+			{
                 MagCal.InsertIfAcceptable(hmdOrient, mag);
+			    ManualMagFailures++;
+	            if (MagCal.NumberOfSamples() == 4)
+	   		        ManualMagCalStage = 6;
+				else
+				{
+					if (ManualMagFailures > timeout)
+				    {
+					    ManualMagCalStage = 4;
+					    ManualMagFailures = 0;
+				    }
+				}
+			}
             break;
         case 4:
+            SetAdjustMessage("Magnetometer Calibration\n** Step 5: Please Look Upper Right **");
+			yaw -= FirstMagYaw;
+			if ((yaw.Get() < -50.0f*dtr) && (pitch > 40.0f*dtr)) 
+			{
+                MagCal.InsertIfAcceptable(hmdOrient, mag);
+	            if (MagCal.NumberOfSamples() == 4)
+	   		        ManualMagCalStage = 6;
+				else 
+				{
+					if (ManualMagFailures > timeout)
+				    {
+					    ManualMagCalStage = 5;
+					    ManualMagFailures = 0;
+				    }
+				    else
+					    ManualMagFailures++;
+				}
+			}
+            break;
+        case 5:
+            SetAdjustMessage("Calibration Failed\n** Try Again From Another Location **");
+			MagCal.AbortCalibration();
+			break;
+		case 6:
             if (!MagCal.IsCalibrated()) 
             {
                 MagCal.SetCalibration(SFusion);
-                if (SFusion.IsMagReady())
-                    SFusion.SetYawCorrectionEnabled(true);
+                SFusion.SetYawCorrectionEnabled(true);
                 Vector3f mc = MagCal.GetMagCenter();
-                SetAdjustMessage("   Magnetometer Calibration and Activation   \nCenter: %f %f %f\nReference Yaw: %f",
-					mc.x,mc.y,mc.z,SFusion.GetMagRefYaw());
+                SetAdjustMessage("   Magnetometer Calibration and Activation   \nCenter: %f %f %f",
+					mc.x,mc.y,mc.z);
             }
     }
 }
+
+
 
 static const char* HelpText =
     "F1         \t100 NoStereo                   \t420 Z    \t520 Manual Mag Calib\n"
@@ -1431,7 +1517,7 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
     if (SceneMode == Scene_YawView)
     {
         Matrix4f calView = Matrix4f();
-        float viewYaw = -Player.LastSensorYaw + SFusion.GetMagRefYaw();
+        float viewYaw = -ThePlayer.LastSensorYaw + SFusion.GetMagRefYaw();
         calView.M[0][0] = calView.M[2][2] = cos(viewYaw);
         calView.M[0][2] = sin(viewYaw);
         calView.M[2][0] = -sin(viewYaw);
@@ -1442,7 +1528,7 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
         else
             YawMarkRedScene.Render(pRender, stereo.ViewAdjust);
 
-        if (fabs(Player.EyePitch) < Math<float>::Pi * 0.33)
+        if (fabs(ThePlayer.EyePitch) < Math<float>::Pi * 0.33)
         YawLinesScene.Render(pRender, stereo.ViewAdjust * calView);
     }
 
@@ -1471,7 +1557,7 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
         LoadingState = LoadingState_DoLoad;
     }
 
-    if(AdjustMessageTimeout > pPlatform->GetAppTime())
+    if(!AdjustMessage.IsEmpty() && AdjustMessageTimeout > pPlatform->GetAppTime())
     {
         DrawTextBox(pRender,0.0f,0.4f, textHeight, AdjustMessage.ToCStr(), DrawText_HCenter);
     }
@@ -1485,8 +1571,8 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
                     " Yaw:%4.0f  Pitch:%4.0f  Roll:%4.0f \n"
                     " FPS: %d  Frame: %d \n Pos: %3.2f, %3.2f, %3.2f \n"
                     " EyeHeight: %3.2f",
-                    RadToDegree(Player.EyeYaw), RadToDegree(Player.EyePitch), RadToDegree(Player.EyeRoll),
-                    FPS, FrameCounter, Player.EyePos.x, Player.EyePos.y, Player.EyePos.z, Player.EyePos.y);
+                    RadToDegree(ThePlayer.EyeYaw), RadToDegree(ThePlayer.EyePitch), RadToDegree(ThePlayer.EyeRoll),
+                    FPS, FrameCounter, ThePlayer.EyePos.x, ThePlayer.EyePos.y, ThePlayer.EyePos.z, ThePlayer.EyePos.y);
         size_t texMemInMB = pRender->GetTotalTextureMemoryUsage() / 1058576;
         if (texMemInMB)
         {
@@ -1594,10 +1680,10 @@ void OculusWorldDemoApp::AdjustEyeHeight(float dt)
 {
     float dist = 0.5f * dt;
 
-    Player.EyeHeight += dist;
-    Player.EyePos.y += dist;
+    ThePlayer.EyeHeight += dist;
+    ThePlayer.EyePos.y += dist;
 
-    SetAdjustMessage("EyeHeight: %4.2f", Player.EyeHeight);
+    SetAdjustMessage("EyeHeight: %4.2f", ThePlayer.EyeHeight);
 }
 
 void OculusWorldDemoApp::AdjustMotionPrediction(float dt)
@@ -1824,10 +1910,10 @@ void OculusWorldDemoApp::CycleDisplay()
 
 void OculusWorldDemoApp::GamepadStateChanged(const GamepadState& pad)
 {
-    Player.GamepadMove   = Vector3f(pad.LX * pad.LX * (pad.LX > 0 ? 1 : -1),
+    ThePlayer.GamepadMove   = Vector3f(pad.LX * pad.LX * (pad.LX > 0 ? 1 : -1),
                              0,
                              pad.LY * pad.LY * (pad.LY > 0 ? -1 : 1));
-    Player.GamepadRotate = Vector3f(2 * pad.RX, -2 * pad.RY, 0);
+    ThePlayer.GamepadRotate = Vector3f(2 * pad.RX, -2 * pad.RY, 0);
 }
 
 

@@ -19,7 +19,7 @@ namespace OVR { namespace Util {
 
 void MagCalibration::BeginAutoCalibration(SensorFusion& sf)
 {
-    Status = Mag_AutoCalibrating;
+    Stat = Mag_AutoCalibrating;
     // This is a "hard" reset of the mag, so need to clear stored values
     sf.ClearMagCalibration();
     SampleCount = 0;
@@ -27,24 +27,24 @@ void MagCalibration::BeginAutoCalibration(SensorFusion& sf)
 
 unsigned MagCalibration::UpdateAutoCalibration(SensorFusion& sf)
 {
-    if (Status != Mag_AutoCalibrating)
-        return Status;
+    if (Stat != Mag_AutoCalibrating)
+        return Stat;
 
     Quatf q = sf.GetOrientation();
     Vector3f m = sf.GetMagnetometer();
 
     InsertIfAcceptable(q, m);
 
-    if ((SampleCount == 4) && (Status == Mag_AutoCalibrating))
+    if ((SampleCount == 4) && (Stat == Mag_AutoCalibrating))
         SetCalibration(sf);
 
-    return Status;
+    return Stat;
 
 }
 
 void MagCalibration::BeginManualCalibration(SensorFusion& sf)
 {
-    Status = Mag_ManuallyCalibrating;
+    Stat = Mag_ManuallyCalibrating;
     sf.ClearMagCalibration();
     SampleCount = 0;
 }
@@ -106,7 +106,7 @@ bool MagCalibration::SetCalibration(SensorFusion& sf)
     calMat.M[1][3] = -MagCenter.y;
     calMat.M[2][3] = -MagCenter.z;
     sf.SetMagCalibration(calMat);
-    Status = Mag_Calibrated;
+    Stat = Mag_Calibrated;
     //LogText("MagCenter: %f %f %f\n",MagCenter.x,MagCenter.y,MagCenter.z);
 
     return true;

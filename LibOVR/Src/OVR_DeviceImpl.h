@@ -41,6 +41,7 @@ enum
 class SharedLock
 {    
 public:
+    SharedLock() : UseCount(0) {}
 
     Lock* GetLockAddRef();
     void  ReleaseLock(Lock* plock);
@@ -132,8 +133,8 @@ public:
             RemoveNode();
     }
 
-    DeviceManagerImpl* GetManagerImpl() { return pLock->pManager; }
-    Lock*              GetLock() const  { return &pLock->CreateLock; }
+    DeviceManagerImpl* GetManagerImpl() const { return pLock->pManager; }
+    Lock*              GetLock() const        { return &pLock->CreateLock; }
 
     // DeviceCreateDesc reference counting is tied to Devices list management,
     // see comments for HandleCount.
@@ -348,6 +349,11 @@ public:
     virtual bool Initialize(DeviceBase* parent);
     virtual void Shutdown();
 
+
+    // Every DeviceManager has an associated profile manager, which us used to store
+    // user settings that may affect device behavior. 
+    virtual ProfileManager* GetProfileManager() const { return pProfileManager.GetPtr(); }
+
     // Override to return ThreadCommandQueue implementation used to post commands
     // to the background device manager thread (that must be created by Initialize).
     virtual ThreadCommandQueue* GetThreadQueue() = 0;
@@ -417,6 +423,7 @@ public:
 
 protected:
     Ptr<HIDDeviceManager>   HidDeviceManager;
+    Ptr<ProfileManager>     pProfileManager;
 };
 
 

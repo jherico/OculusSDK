@@ -128,12 +128,20 @@ bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other,
         }
         DeviceId          = s2.DeviceId;
         DisplayDeviceName = s2.DisplayDeviceName;
+        DesktopX          = s2.DesktopX;
+        DesktopY          = s2.DesktopY;
         if (newDeviceFlag) *newDeviceFlag = true;
     }
     else if (DeviceId.IsEmpty())
     {
         DeviceId          = s2.DeviceId;
         DisplayDeviceName = s2.DisplayDeviceName;
+        DesktopX          = s2.DesktopX;
+        DesktopY          = s2.DesktopY;
+
+		// ScreenSize and Resolution are NOT assigned here, since they may have
+		// come from a sensor DisplayInfo (which has precedence over HDMI).
+
         if (newDeviceFlag) *newDeviceFlag = true;
     }
     else
@@ -275,16 +283,24 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
                 }
 
                 HMDDeviceCreateDesc hmdCreateDesc(this, deviceId, displayDeviceName);
+				
+				if (wcsstr(ddm.DeviceID, L"OVR0002"))
+				{
+					hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12096f, 0.06804f);
+				}
+				else
+				{
+					if (hmdCreateDesc.Is7Inch())
+					{
+						// Physical dimension of SLA screen.
+						hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.14976f, 0.0936f);
+					}
+					else
+					{
+						hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.12096f, 0.0756f);
+					}
+				}
 
-                if (hmdCreateDesc.Is7Inch())
-                {
-                    // Physical dimension of SLA screen.
-                    hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.14976f, 0.0936f);
-                }
-                else
-                {
-                    hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.12096f, 0.0756f);
-                }
 
                 OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %s\n",
                                     deviceId.ToCStr(), displayDeviceName.ToCStr()));
@@ -319,6 +335,21 @@ bool HMDDeviceCreateDesc::Is7Inch() const
     return (strstr(DeviceId.ToCStr(), "OVR0001") != 0) || (Contents & Contents_7Inch);
 }
 
+Profile* HMDDeviceCreateDesc::GetProfileAddRef() const
+{
+    // Create device may override profile name, so get it from there is possible.
+    ProfileManager* profileManager = GetManagerImpl()->GetProfileManager();
+    ProfileType     profileType    = GetProfileType();
+    const char *    profileName    = pDevice ?
+                        ((HMDDevice*)pDevice)->GetProfileName() :
+                        profileManager->GetDefaultProfileName(profileType);
+    
+    return profileName ? 
+        profileManager->LoadProfile(profileType, profileName) :
+        profileManager->GetDeviceDefaultProfile(profileType);
+}
+
+
 bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
 {
     if ((info->InfoClassType != Device_HMD) &&
@@ -328,7 +359,8 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
     bool is7Inch = Is7Inch();
 
     OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength,
-               is7Inch ? "Oculus Rift DK1" : "Oculus Rift DK1-Prototype");
+               is7Inch ? "Oculus Rift DK1" :
+			   ((HResolution >= 1920) ? "Oculus Rift DK HD" : "Oculus Rift DK1-Prototype") );
     OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, "Oculus VR");
     info->Type    = Device_HMD;
     info->Version = 0;
@@ -348,32 +380,45 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
         hmdInfo->InterpupillaryDistance = 0.064f;  // Default IPD; should be configurable.
         hmdInfo->LensSeparationDistance = 0.0635f;
 
+        // Obtain IPD from profile.
+        Ptr<Profile> profile = *GetProfileAddRef();
+
+        if (profile)
+        {
+            hmdInfo->InterpupillaryDistance = profile->GetIPD();
+            // TBD: Switch on EyeCup type.
+        }
+
         if (Contents & Contents_Distortion)
         {
             memcpy(hmdInfo->DistortionK, DistortionK, sizeof(float)*4);
         }
         else
-        {
-            if (is7Inch)
+        {						
+			if (is7Inch)
             {
                 // 7" screen.
                 hmdInfo->DistortionK[0]      = 1.0f;
                 hmdInfo->DistortionK[1]      = 0.22f;
                 hmdInfo->DistortionK[2]      = 0.24f;
                 hmdInfo->EyeToScreenDistance = 0.041f;
-
-                hmdInfo->ChromaAbCorrection[0] = 0.996f;
-                hmdInfo->ChromaAbCorrection[1] = -0.004f;
-                hmdInfo->ChromaAbCorrection[2] = 1.014f;
-                hmdInfo->ChromaAbCorrection[3] = 0.0f;
             }
             else
             {
                 hmdInfo->DistortionK[0]      = 1.0f;
                 hmdInfo->DistortionK[1]      = 0.18f;
                 hmdInfo->DistortionK[2]      = 0.115f;
-                hmdInfo->EyeToScreenDistance = 0.0387f;
+
+				if (HResolution == 1920)
+					hmdInfo->EyeToScreenDistance = 0.040f;
+				else
+					hmdInfo->EyeToScreenDistance = 0.0387f;
             }
+
+			hmdInfo->ChromaAbCorrection[0] = 0.996f;
+			hmdInfo->ChromaAbCorrection[1] = -0.004f;
+			hmdInfo->ChromaAbCorrection[2] = 1.014f;
+			hmdInfo->ChromaAbCorrection[3] = 0.0f;
         }
 
         OVR_strcpy(hmdInfo->DisplayDeviceName, sizeof(hmdInfo->DisplayDeviceName),
@@ -397,11 +442,46 @@ HMDDevice::~HMDDevice()
 bool HMDDevice::Initialize(DeviceBase* parent)
 {
     pParent = parent;
+
+    // Initialize user profile to default for device.
+    ProfileManager* profileManager = GetManager()->GetProfileManager();    
+    ProfileName = profileManager->GetDefaultProfileName(getDesc()->GetProfileType());
+
     return true;
 }
 void HMDDevice::Shutdown()
 {
+    ProfileName.Clear();
+    pCachedProfile.Clear();
     pParent.Clear();
+}
+
+Profile* HMDDevice::GetProfile() const
+{    
+    if (!pCachedProfile)
+        pCachedProfile = *getDesc()->GetProfileAddRef();
+    return pCachedProfile.GetPtr();
+}
+
+const char* HMDDevice::GetProfileName() const
+{
+    return ProfileName.ToCStr();
+}
+
+bool HMDDevice::SetProfileName(const char* name)
+{
+    pCachedProfile.Clear();
+    if (!name)
+    {
+        ProfileName.Clear();
+        return 0;
+    }
+    if (GetManager()->GetProfileManager()->HasProfile(getDesc()->GetProfileType(), name))
+    {
+        ProfileName = name;
+        return true;
+    }
+    return false;
 }
 
 OVR::SensorDevice* HMDDevice::GetSensor()

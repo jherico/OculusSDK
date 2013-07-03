@@ -24,15 +24,15 @@ namespace OVR {
 
 SensorFusion::SensorFusion(SensorDevice* sensor)
   : Handler(getThis()), pDelegate(0),
-    Gain(0.05f), YawMult(1), EnableGravity(true), Stage(0), DeltaT(0.001f),
-	EnablePrediction(false), PredictionDT(0.03f),
+    Gain(0.05f), YawMult(1), EnableGravity(true), Stage(0), RunningTime(0), DeltaT(0.001f),
+	EnablePrediction(true), PredictionDT(0.03f), PredictionTimeIncrement(0.001f),
     FRawMag(10), FAccW(20), FAngV(20),
     TiltCondCount(0), TiltErrorAngle(0), 
     TiltErrorAxis(0,1,0),
-    MagCondCount(0), MagReady(false), MagCalibrated(false), MagReferenced(false), 
-    MagRefQ(0, 0, 0, 1), MagRefM(0), MagRefYaw(0), YawErrorAngle(0), MagRefDistance(0.15f),
+    MagCondCount(0), MagCalibrated(false), MagRefQ(0, 0, 0, 1), 
+	MagRefM(0), MagRefYaw(0), YawErrorAngle(0), MagRefDistance(0.5f),
     YawErrorCount(0), YawCorrectionActivated(false), YawCorrectionInProgress(false), 
-	EnableYawCorrection(false)
+	EnableYawCorrection(false), MagNumReferences(0), MagHasNearbyReference(false)
 {
    if (sensor)
        AttachToSensor(sensor);
@@ -80,6 +80,17 @@ bool SensorFusion::AttachToSensor(SensorDevice* sensor)
 }
 
 
+    // Resets the current orientation
+void SensorFusion::Reset()
+{
+    Lock::Locker lockScope(Handler.GetHandlerLock());
+    Q                     = Quatf();
+    QUncorrected          = Quatf();
+    Stage                 = 0;
+	RunningTime           = 0;
+	MagNumReferences      = 0;
+	MagHasNearbyReference = false;
+}
 
 
 void SensorFusion::handleMessage(const MessageBodyFrame& msg)
@@ -122,7 +133,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 
     // Keep track of time
     Stage++;
-    float currentTime  = Stage * DeltaT; // Assumes uniform time spacing
+    RunningTime += DeltaT;
 
     // Insert current sensor data into filter history
     FRawMag.AddElement(RawMag);
@@ -161,7 +172,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
         // Correcting for tilt error by using accelerometer data
         const float  gravityEpsilon = 0.4f;
         const float  angVelEpsilon  = 0.1f; // Relatively slow rotation
-        const int    tiltPeriod     = 50;   // Req'd time steps of stability
+        const int    tiltPeriod     = 50;   // Required time steps of stability
         const float  maxTiltError   = 0.05f;
         const float  minTiltError   = 0.01f;
 
@@ -179,7 +190,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
         if (TiltCondCount >= tiltPeriod)
         {   // Update TiltErrorEstimate
             TiltCondCount = 0;
-            // Use an average value to reduce noice (could alternatively use an LPF)
+            // Use an average value to reduce noise (could alternatively use an LPF)
             Vector3f accWMean = FAccW.Mean();
             // Project the acceleration vector into the XZ plane
             Vector3f xzAcc = Vector3f(accWMean.x, 0.0f, accWMean.z);
@@ -199,7 +210,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
         // This part performs the actual tilt correction as needed
         if (TiltErrorAngle > minTiltError) 
         {
-            if ((TiltErrorAngle > 0.4f)&&(Stage < 8000))
+            if ((TiltErrorAngle > 0.4f)&&(RunningTime < 8.0f))
             {   // Tilt completely to correct orientation
                 Q = Quatf(TiltErrorAxis, -TiltErrorAngle) * Q;
                 TiltErrorAngle = 0.0f;
@@ -209,9 +220,9 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
                 //LogText("Performing tilt correction  -  Angle: %f   Axis: %f %f %f\n",
                 //        TiltErrorAngle,TiltErrorAxis.x,TiltErrorAxis.y,TiltErrorAxis.z);
                 //float deltaTiltAngle = -Gain*TiltErrorAngle*0.005f;
-                // This uses agressive correction steps while your head is moving fast
+                // This uses aggressive correction steps while your head is moving fast
                 float deltaTiltAngle = -Gain*TiltErrorAngle*0.005f*(5.0f*angVelLength+1.0f);
-                // Incrementally "untilt" by a small step size
+                // Incrementally "un-tilt" by a small step size
                 Q = Quatf(TiltErrorAxis, deltaTiltAngle) * Q;
                 TiltErrorAngle += deltaTiltAngle;
             }
@@ -234,82 +245,128 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     else
         MagCondCount = 0;
 
+	// Find, create, and utilize reference points for the magnetometer
+	// Need to be careful not to set reference points while there is significant tilt error
+    if ((EnableYawCorrection && MagCalibrated)&&(RunningTime > 10.0f)&&(TiltErrorAngle < 0.2f))
+	{
+	  if (MagNumReferences == 0)
+      {
+		  SetMagReference(); // Use the current direction
+      }
+	  else if (Q.Distance(MagRefQ) > MagRefDistance) 
+      {
+		  MagHasNearbyReference = false;
+          float bestDist = 100000.0f;
+          int bestNdx = 0;
+          float dist;
+          for (int i = 0; i < MagNumReferences; i++)
+          {
+              dist = Q.Distance(MagRefTableQ[i]);
+              if (dist < bestDist)
+              {
+                  bestNdx = i;
+                  bestDist = dist;
+              }
+          }
+
+          if (bestDist < MagRefDistance)
+          {
+              MagHasNearbyReference = true;
+              MagRefQ   = MagRefTableQ[bestNdx];
+              MagRefM   = MagRefTableM[bestNdx];
+              MagRefYaw = MagRefTableYaw[bestNdx];
+              //LogText("Using reference %d\n",bestNdx);
+          }
+          else if (MagNumReferences < MagMaxReferences)
+              SetMagReference();
+	  }
+	}
+
 	YawCorrectionInProgress = false;
-    if (EnableYawCorrection && MagReady && (currentTime > 2.0f) && (MagCondCount >= magWindow) &&
-        (Q.Distance(MagRefQ) < MagRefDistance))
+    if (EnableYawCorrection && MagCalibrated && (RunningTime > 2.0f) && (MagCondCount >= magWindow) &&
+        MagHasNearbyReference)
     {
         // Use rotational invariance to bring reference mag value into global frame
         Vector3f grefmag = MagRefQ.Rotate(GetCalibratedMagValue(MagRefM));
         // Bring current (averaged) mag reading into global frame
         Vector3f gmag = Q.Rotate(GetCalibratedMagValue(FRawMag.Mean()));
         // Calculate the reference yaw in the global frame
-        float gryaw = atan2(grefmag.x,grefmag.z);
+        Anglef gryaw = Anglef(atan2(grefmag.x,grefmag.z));
         // Calculate the current yaw in the global frame
-        float gyaw = atan2(gmag.x,gmag.z);
-        //LogText("Yaw error estimate: %f\n",YawErrorAngle);
+        Anglef gyaw = Anglef(atan2(gmag.x,gmag.z));
         // The difference between reference and current yaws is the perceived error
-        YawErrorAngle = AngleDifference(gyaw,gryaw);
+        Anglef YawErrorAngle = gyaw - gryaw;
+
+        //LogText("Yaw error estimate: %f\n",YawErrorAngle.Get());
         // If the perceived error is large, keep count
-        if ((fabs(YawErrorAngle) > yawErrorMax) && (!YawCorrectionActivated))
+        if ((YawErrorAngle.Abs() > yawErrorMax) && (!YawCorrectionActivated))
             YawErrorCount++;
         // After enough iterations of high perceived error, start the correction process
         if (YawErrorCount > yawErrorCountLimit)
             YawCorrectionActivated = true;
         // If the perceived error becomes small, turn off the yaw correction
-        if ((fabs(YawErrorAngle) < yawErrorMin) && YawCorrectionActivated) 
+        if ((YawErrorAngle.Abs() < yawErrorMin) && YawCorrectionActivated) 
         {
             YawCorrectionActivated = false;
             YawErrorCount = 0;
         }
+        
         // Perform the actual yaw correction, due to previously detected, large yaw error
         if (YawCorrectionActivated) 
         {
 			YawCorrectionInProgress = true;
-            int sign = (YawErrorAngle > 0.0f) ? 1 : -1;
             // Incrementally "unyaw" by a small step size
-            Q = Quatf(Vector3f(0.0f,1.0f,0.0f), -yawRotationStep * sign) * Q;
+            Q = Quatf(Vector3f(0.0f,1.0f,0.0f), -yawRotationStep * YawErrorAngle.Sign()) * Q;
         }
     }
 }
 
-
-        // This is a simple predictive filter based only on extrapolating the smoothed, current angular velocity.
-        // Note that both QP (the predicted future orientation) and Q (the current orientation) are both maintained.
-Quatf       SensorFusion::GetPredictedOrientation()
+ 
+//  Simple predictive filters based on extrapolating the smoothed, current angular velocity
+// or using smooth time derivative information.  The argument is the amount of time into
+// the future to predict.
+Quatf SensorFusion::GetPredictedOrientation(float pdt)
 {		
 	Lock::Locker lockScope(Handler.GetHandlerLock());
-	Quatf qP = QUncorrected;
-	if (EnablePrediction) {
+	Quatf        qP = QUncorrected;
+	
+    if (EnablePrediction)
+    {
 #if 1
+		// This method assumes a constant angular velocity
 	    Vector3f angVelF  = FAngV.SavitzkyGolaySmooth8();
         float    angVelFL = angVelF.Length();
             
         if (angVelFL > 0.001f)
         {
             Vector3f    rotAxisP      = angVelF / angVelFL;  
-            float       halfRotAngleP = angVelFL * PredictionDT * 0.5f;
+            float       halfRotAngleP = angVelFL * pdt * 0.5f;
             float       sinaHRAP      = sin(halfRotAngleP);
 		    Quatf       deltaQP(rotAxisP.x*sinaHRAP, rotAxisP.y*sinaHRAP,
                                 rotAxisP.z*sinaHRAP, cos(halfRotAngleP));
             qP = QUncorrected * deltaQP;
         }
 #else
-        Quatd qpd = Quatd(Q.x,Q.y,Q.z,Q.w);
-        int predictionStages = (int)(PredictionDT / DeltaT);
-        Vector3f  aa = FAngV.SavitzkyGolayDerivative12();
-        Vector3d  aad     = Vector3d(aa.x,aa.y,aa.z);
-        Vector3f angVelF  = FAngV.SavitzkyGolaySmooth8();
-        Vector3d  avkd    = Vector3d(angVelF.x,angVelF.y,angVelF.z);
+		// This method estimates angular acceleration, conservatively
+		OVR_ASSERT(pdt >= 0);
+        int       predictionStages = (int)(pdt / PredictionTimeIncrement + 0.5f);
+        Quatd     qpd        = Quatd(Q.x,Q.y,Q.z,Q.w);
+        Vector3f  aa         = FAngV.SavitzkyGolayDerivative12();
+        Vector3d  aad        = Vector3d(aa.x,aa.y,aa.z);
+        Vector3f  angVelF    = FAngV.SavitzkyGolaySmooth8();
+        Vector3d  avkd       = Vector3d(angVelF.x,angVelF.y,angVelF.z);
+		Vector3d  rotAxisd   = Vector3d(0,1,0);
         for (int i = 0; i < predictionStages; i++)
         {
-            double angVelLengthd = avkd.Length();
-            Vector3d rotAxisd      = avkd / angVelLengthd;
-            double halfRotAngled = angVelLengthd * DeltaT * 0.5;
-            double sinHRAd       = sin(halfRotAngled);
-            Quatd  deltaQd       = Quatd(rotAxisd.x*sinHRAd, rotAxisd.y*sinHRAd, rotAxisd.z*sinHRAd,
-                                         cos(halfRotAngled));
-            qpd =  qpd * deltaQd;
-            // Update vel
+            double   angVelLengthd = avkd.Length();
+			if (angVelLengthd > 0)
+                rotAxisd = avkd / angVelLengthd;
+            double   halfRotAngled = angVelLengthd * PredictionTimeIncrement * 0.5;
+            double   sinHRAd       = sin(halfRotAngled);
+            Quatd    deltaQd       = Quatd(rotAxisd.x*sinHRAd, rotAxisd.y*sinHRAd, rotAxisd.z*sinHRAd,
+                                           cos(halfRotAngled));
+            qpd = qpd * deltaQd;
+            // Update angular velocity by using the angular acceleration estimate
             avkd += aad;
         }
         qP = Quatf((float)qpd.x,(float)qpd.y,(float)qpd.z,(float)qpd.w);
@@ -319,7 +376,7 @@ Quatf       SensorFusion::GetPredictedOrientation()
 }    
 
 
-Vector3f    SensorFusion::GetCalibratedMagValue(const Vector3f& rawMag) const
+Vector3f SensorFusion::GetCalibratedMagValue(const Vector3f& rawMag) const
 {
     Vector3f mag = rawMag;
     OVR_ASSERT(HasMagCalibration());
@@ -332,26 +389,26 @@ Vector3f    SensorFusion::GetCalibratedMagValue(const Vector3f& rawMag) const
 
 void SensorFusion::SetMagReference(const Quatf& q, const Vector3f& rawMag) 
 {
-        MagRefQ = q;
-        MagRefM = rawMag;
+    if (MagNumReferences < MagMaxReferences)
+    {
+        MagRefTableQ[MagNumReferences] = q;
+        MagRefTableM[MagNumReferences] = rawMag; //FRawMag.Mean();
+
+		//LogText("Inserting reference %d\n",MagNumReferences);
+        
+		MagRefQ   = q;
+        MagRefM   = rawMag;
 
         float pitch, roll, yaw;
-        Q.GetEulerAngles<Axis_X, Axis_Z, Axis_Y>(&pitch, &roll, &yaw);
-        MagRefYaw = yaw;
-		MagReferenced = true;
-        if (MagCalibrated)
-            MagReady = true;
-}
+		Quatf q2 = q;
+        q2.GetEulerAngles<Axis_X, Axis_Z, Axis_Y>(&pitch, &roll, &yaw);
+        MagRefTableYaw[MagNumReferences] = yaw;
+		MagRefYaw = yaw;
 
+        MagNumReferences++;
 
-float SensorFusion::AngleDifference(float theta1, float theta2)
-{
-    float x = theta1 - theta2;
-    if (x > Math<float>::Pi)
-        return x - Math<float>::TwoPi;
-    if (x < -Math<float>::Pi)
-        return x + Math<float>::TwoPi;
-    return x;
+        MagHasNearbyReference = true;
+    }
 }
 
 

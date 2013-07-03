@@ -101,10 +101,9 @@ public:
     virtual bool SetConfiguration(const OVR::LatencyTestConfiguration& configuration, bool waitFlag = false);
     virtual bool GetConfiguration(OVR::LatencyTestConfiguration* configuration);
 
-    virtual bool SetCalibrate(const OVR::LatencyTestCalibrate& calibrate, bool waitFlag = false);
-    virtual bool GetCalibrate(OVR::LatencyTestCalibrate* calibrate);
+    virtual bool SetCalibrate(const Color& calibrationColor, bool waitFlag = false);
 
-    virtual bool SetStartTest(const OVR::LatencyTestStartTest& start, bool waitFlag = false);
+    virtual bool SetStartTest(const Color& targetColor, bool waitFlag = false);
     virtual bool SetDisplay(const LatencyTestDisplay& display, bool waitFlag = false);
 
 protected:
@@ -117,9 +116,8 @@ protected:
 
     bool    setConfiguration(const OVR::LatencyTestConfiguration& configuration);
     bool    getConfiguration(OVR::LatencyTestConfiguration* configuration);
-    bool    setCalibrate(const OVR::LatencyTestCalibrate& calibrate);
-    bool    getCalibrate(OVR::LatencyTestCalibrate* calibrate);
-    bool    setStartTest(const OVR::LatencyTestStartTest& start);
+    bool    setCalibrate(const Color& calibrationColor);
+    bool    setStartTest(const Color& targetColor);
     bool    setDisplay(const OVR::LatencyTestDisplay& display);
 
     // Called for decoded messages

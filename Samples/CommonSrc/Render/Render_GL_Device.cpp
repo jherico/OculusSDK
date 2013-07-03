@@ -831,6 +831,12 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     return NewTex;
 }
 
+bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
+{
+    Params.Fullscreen = fullscreen;
+    return true;
+}
+
 RBuffer::RBuffer(GLenum format, GLint w, GLint h)
 {
     Width = w;

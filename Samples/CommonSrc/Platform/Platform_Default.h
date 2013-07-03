@@ -49,10 +49,10 @@ limitations under the License.
 
 #else
 
-  #include "X11_Platform.h"
+  #include "Linux_Platform.h"
 
   #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
-    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::X11::RenderDevice::CreateDevice)
+    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::Linux::RenderDevice::CreateDevice)
 
 #endif
 

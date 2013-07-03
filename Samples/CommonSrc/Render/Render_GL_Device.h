@@ -186,7 +186,6 @@ class RenderDevice : public Render::RenderDevice
 
     const LightingParams*    Lighting;
     
-
 public:
     RenderDevice(const RendererParams& p);
 
@@ -223,6 +222,8 @@ public:
     virtual Shader *LoadBuiltinShader(ShaderStage stage, int shader);
 
     void SetTexture(Render::ShaderStage, int slot, const Texture* t);
+
+    virtual bool SetFullscreen(DisplayMode fullscreen);
 };
 
 }}}

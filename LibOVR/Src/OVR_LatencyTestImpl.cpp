@@ -302,10 +302,10 @@ struct LatencyTestCalibrateImpl
     enum  { PacketSize = 4 };
     UByte   Buffer[PacketSize];
 
-    OVR::LatencyTestCalibrate  Calibrate;
-
-    LatencyTestCalibrateImpl(const OVR::LatencyTestCalibrate& calibrate)
-        : Calibrate(calibrate)
+    Color CalibrationColor;
+    
+    LatencyTestCalibrateImpl(const Color& calibrationColor)
+        : CalibrationColor(calibrationColor)
     {
         Pack();
     }
@@ -313,16 +313,16 @@ struct LatencyTestCalibrateImpl
     void Pack()
     {
         Buffer[0] = 7;
-		Buffer[1] = Calibrate.Value.R;
-		Buffer[2] = Calibrate.Value.G;
-		Buffer[3] = Calibrate.Value.B;
+		Buffer[1] = CalibrationColor.R;
+		Buffer[2] = CalibrationColor.G;
+		Buffer[3] = CalibrationColor.B;
     }
 
     void Unpack()
     {
-        Calibrate.Value.R = Buffer[1];
-        Calibrate.Value.G = Buffer[2];
-        Calibrate.Value.B = Buffer[3];
+        CalibrationColor.R = Buffer[1];
+        CalibrationColor.G = Buffer[2];
+        CalibrationColor.B = Buffer[3];
     }
 };
 
@@ -331,10 +331,10 @@ struct LatencyTestStartTestImpl
     enum  { PacketSize = 6 };
     UByte   Buffer[PacketSize];
 
-    OVR::LatencyTestStartTest  StartTest;
+    Color TargetColor;
 
-    LatencyTestStartTestImpl(const OVR::LatencyTestStartTest& startTest)
-        : StartTest(startTest)
+    LatencyTestStartTestImpl(const Color& targetColor)
+        : TargetColor(targetColor)
     {
         Pack();
     }
@@ -346,17 +346,17 @@ struct LatencyTestStartTestImpl
         Buffer[0] = 8;
 		Buffer[1] = UByte(commandID  & 0xFF);
 		Buffer[2] = UByte(commandID >> 8);
-		Buffer[3] = StartTest.TargetValue.R;
-		Buffer[4] = StartTest.TargetValue.G;
-		Buffer[5] = StartTest.TargetValue.B;
+		Buffer[3] = TargetColor.R;
+		Buffer[4] = TargetColor.G;
+		Buffer[5] = TargetColor.B;
     }
 
     void Unpack()
     {
 //      UInt16 commandID = Buffer[1] | (UInt16(Buffer[2]) << 8);
-        StartTest.TargetValue.R = Buffer[3];
-        StartTest.TargetValue.G = Buffer[4];
-        StartTest.TargetValue.B = Buffer[5];
+        TargetColor.R = Buffer[3];
+        TargetColor.G = Buffer[4];
+        TargetColor.B = Buffer[5];
     }
 };
 
@@ -609,20 +609,20 @@ bool LatencyTestDeviceImpl::getConfiguration(OVR::LatencyTestConfiguration* conf
     return false;
 }
 
-bool LatencyTestDeviceImpl::SetCalibrate(const OVR::LatencyTestCalibrate& calibrate, bool waitFlag)
+bool LatencyTestDeviceImpl::SetCalibrate(const Color& calibrationColor, bool waitFlag)
 {
     bool                result = false;
     ThreadCommandQueue* queue = GetManagerImpl()->GetThreadQueue();
 
     if (!waitFlag)
     {
-        return queue->PushCall(this, &LatencyTestDeviceImpl::setCalibrate, calibrate);
+        return queue->PushCall(this, &LatencyTestDeviceImpl::setCalibrate, calibrationColor);
     }
 
     if (!queue->PushCallAndWaitResult(  this, 
                                         &LatencyTestDeviceImpl::setCalibrate,
                                         &result, 
-                                        calibrate))
+                                        calibrationColor))
     {
         return false;
     }
@@ -630,50 +630,26 @@ bool LatencyTestDeviceImpl::SetCalibrate(const OVR::LatencyTestCalibrate& calibr
     return result;
 }
 
-bool LatencyTestDeviceImpl::setCalibrate(const OVR::LatencyTestCalibrate& calibrate)
+bool LatencyTestDeviceImpl::setCalibrate(const Color& calibrationColor)
 {
-    LatencyTestCalibrateImpl ltc(calibrate);
+    LatencyTestCalibrateImpl ltc(calibrationColor);
     return GetInternalDevice()->SetFeatureReport(ltc.Buffer, LatencyTestCalibrateImpl::PacketSize);
 }
 
-bool LatencyTestDeviceImpl::GetCalibrate(OVR::LatencyTestCalibrate* calibrate)
-{  
-    bool result = false;
-
-	ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
-    if (!pQueue->PushCallAndWaitResult(this, &LatencyTestDeviceImpl::getCalibrate, &result, calibrate))
-        return false;
-
-    return result;
-}
-
-bool LatencyTestDeviceImpl::getCalibrate(OVR::LatencyTestCalibrate* calibrate)
-{
-    LatencyTestCalibrateImpl ltc(*calibrate);
-    if (GetInternalDevice()->GetFeatureReport(ltc.Buffer, LatencyTestCalibrateImpl::PacketSize))
-    {
-        ltc.Unpack();
-        *calibrate = ltc.Calibrate;
-        return true;
-    }
-
-    return false;
-}
-
-bool LatencyTestDeviceImpl::SetStartTest(const OVR::LatencyTestStartTest& start, bool waitFlag)
+bool LatencyTestDeviceImpl::SetStartTest(const Color& targetColor, bool waitFlag)
 {
     bool                result = false;
     ThreadCommandQueue* queue = GetManagerImpl()->GetThreadQueue();
 
     if (!waitFlag)
     {
-        return queue->PushCall(this, &LatencyTestDeviceImpl::setStartTest, start);
+        return queue->PushCall(this, &LatencyTestDeviceImpl::setStartTest, targetColor);
     }
 
     if (!queue->PushCallAndWaitResult(  this, 
                                         &LatencyTestDeviceImpl::setStartTest,
                                         &result, 
-                                        start))
+                                        targetColor))
     {
         return false;
     }
@@ -681,9 +657,9 @@ bool LatencyTestDeviceImpl::SetStartTest(const OVR::LatencyTestStartTest& start,
     return result;
 }
 
-bool LatencyTestDeviceImpl::setStartTest(const OVR::LatencyTestStartTest& start)
+bool LatencyTestDeviceImpl::setStartTest(const Color& targetColor)
 {
-    LatencyTestStartTestImpl ltst(start);
+    LatencyTestStartTestImpl ltst(targetColor);
     return GetInternalDevice()->SetFeatureReport(ltst.Buffer, LatencyTestStartTestImpl::PacketSize);
 }
 

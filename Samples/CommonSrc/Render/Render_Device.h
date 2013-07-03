@@ -20,7 +20,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ************************************************************************************/
-
 #ifndef OVR_Render_Device_h
 #define OVR_Render_Device_h
 
@@ -37,6 +36,7 @@ namespace OVR { namespace Render {
 using namespace OVR::Util::Render;
 
 class RenderDevice;
+struct Font;
 
 //-----------------------------------------------------------------------------------
 
@@ -65,6 +65,7 @@ public:
     virtual void Unset() const {}
 
     virtual void SetTexture(int i, class Texture* tex) { OVR_UNUSED2(i,tex); }
+    virtual Texture* GetTexture(int i) { OVR_UNUSED(i); return 0; }
 };
 
 enum ShaderStage
@@ -272,6 +273,7 @@ public:
     ShaderSet* GetShaders() { return Shaders; }
 
     virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
+    virtual Texture* GetTexture(int i) { if (i < 8) return Textures[i]; else return 0; }
 };
 
 /* Buffer for vertex or index data. Some renderers require separate buffers, so that
@@ -561,6 +563,7 @@ public:
 
     void Add(Node *n) { Nodes.PushBack(n); }
 	void Add(Model *n, class Fill *f) { n->Fill = f; Nodes.PushBack(n); }
+    void RemoveLast() { Nodes.PopBack(); }
 	void Clear() { Nodes.Clear(); }
 
 	bool               CollideChildren;
@@ -820,10 +823,12 @@ public:
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) = 0;
 
     // Returns width of text in same units as drawing. If strsize is not null, stores width and height.
-    float        MeasureText(const struct Font* font, const char* str, float size, float* strsize = NULL);
-    virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
+    float        MeasureText(const Font* font, const char* str, float size, float* strsize = NULL);
+    virtual void RenderText(const Font* font, const char* str, float x, float y, float size, Color c);
 
     virtual void FillRect(float left, float top, float right, float bottom, Color c);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255);
 
     virtual Fill *CreateSimpleFill(int flags = Fill::F_Solid) = 0;
     Fill *        CreateTextureFill(Texture* tex, bool useAlpha = false);
@@ -889,7 +894,7 @@ int GetTextureSize(int format, int w, int h);
 // Image size must be a power of 2.
 void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest);
 
-Texture* LoadTextureTga(RenderDevice* ren, File* f);
+Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha = 255);
 Texture* LoadTextureDDS(RenderDevice* ren, File* f);
 
 }}

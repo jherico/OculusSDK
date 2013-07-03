@@ -26,8 +26,10 @@ limitations under the License.
 
 namespace OVR { namespace Render {
 
-Texture* LoadTextureTga(RenderDevice* ren, File* f)
+Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
 {
+    f->SeekToBegin();
+    
     int desclen = f->ReadUByte();
     int palette = f->ReadUByte();
     OVR_UNUSED(palette);
@@ -61,7 +63,7 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f)
                     imgdata[y*bpl+x*4+0] = buf[2];
                     imgdata[y*bpl+x*4+1] = buf[1];
                     imgdata[y*bpl+x*4+2] = buf[0];
-                    imgdata[y*bpl+x*4+3] = 255;
+                    imgdata[y*bpl+x*4+3] = alpha;
                 }
             break;
         case 32:
@@ -72,6 +74,9 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f)
                     imgdata[y*bpl+x*4+0] = buf[2];
                     imgdata[y*bpl+x*4+1] = buf[1];
                     imgdata[y*bpl+x*4+2] = buf[0];
+                    if (buf[3] == 255)
+                        imgdata[y*bpl+x*4+3] = alpha;
+                    else
                     imgdata[y*bpl+x*4+3] = buf[3];
                 }
             break;
