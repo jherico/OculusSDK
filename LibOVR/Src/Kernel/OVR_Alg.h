@@ -4,7 +4,7 @@ PublicHeader:   OVR.h
 Filename    :   OVR_Alg.h
 Content     :   Simple general purpose algorithms: Sort, Binary Search, etc.
 Created     :   September 19, 2012
-Notes       : 
+Notes       :
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -19,55 +19,28 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_Types.h"
 #include <string.h>
+#include <algorithm>
+
+#if _MSC_VER == 1200
+// ***** min/max are not implemented in Visual Studio 6 standard STL
+namespace std {
+
+template <typename T> OVR_FORCE_INLINE const T min(const T a, const T b)
+{ return (a < b) ? a : b; }
+
+template <typename T> OVR_FORCE_INLINE const T max(const T a, const T b)
+{ return (b < a) ? a : b; }
+
+}
+}
+#endif
 
 namespace OVR { namespace Alg {
-
 
 //-----------------------------------------------------------------------------------
 // ***** Operator extensions
 
-template <typename T> OVR_FORCE_INLINE void Swap(T &a, T &b) 
-{  T temp(a); a = b; b = temp; }
-
-
-// ***** min/max are not implemented in Visual Studio 6 standard STL
-
-template <typename T> OVR_FORCE_INLINE const T Min(const T a, const T b)
-{ return (a < b) ? a : b; }
-
-template <typename T> OVR_FORCE_INLINE const T Max(const T a, const T b)
-{ return (b < a) ? a : b; }
-
-template <typename T> OVR_FORCE_INLINE const T Clamp(const T v, const T minVal, const T maxVal)
-{ return Max<T>(minVal, Min<T>(v, maxVal)); }
-
-template <typename T> OVR_FORCE_INLINE int     Chop(T f)
-{ return (int)f; }
-
-template <typename T> OVR_FORCE_INLINE T       Lerp(T a, T b, T f) 
-{ return (b - a) * f + a; }
-
-
-// These functions stand to fix a stupid VC++ warning (with /Wp64 on):
-// "warning C4267: 'argument' : conversion from 'size_t' to 'const unsigned', possible loss of data"
-// Use these functions instead of gmin/gmax if the argument has size
-// of the pointer to avoid the warning. Though, functionally they are
-// absolutelly the same as regular gmin/gmax.
-template <typename T>   OVR_FORCE_INLINE const T PMin(const T a, const T b)
-{
-    OVR_COMPILER_ASSERT(sizeof(T) == sizeof(UPInt));
-    return (a < b) ? a : b;
-}
-template <typename T>   OVR_FORCE_INLINE const T PMax(const T a, const T b)
-{
-    OVR_COMPILER_ASSERT(sizeof(T) == sizeof(UPInt));
-    return (b < a) ? a : b;
-}
-
-
-template <typename T>   OVR_FORCE_INLINE const T Abs(const T v)
-{ return (v>=0) ? v : -v; }
-
+#define Swap std::swap
 
 //-----------------------------------------------------------------------------------
 // ***** OperatorLess
@@ -87,10 +60,10 @@ template<class T> struct OperatorLess
 // Sort any part of any array: plain, Array, ArrayPaged, ArrayUnsafe.
 // The range is specified with start, end, where "end" is exclusive!
 // The comparison predicate must be specified.
-template<class Array, class Less> 
+template<class Array, class Less>
 void QuickSortSliced(Array& arr, UPInt start, UPInt end, Less less)
 {
-    enum 
+    enum
     {
         Threshold = 9
     };
@@ -98,7 +71,7 @@ void QuickSortSliced(Array& arr, UPInt start, UPInt end, Less less)
     if(end - start <  2) return;
 
     SPInt  stack[80];
-    SPInt* top   = stack; 
+    SPInt* top   = stack;
     SPInt  base  = (SPInt)start;
     SPInt  limit = (SPInt)end;
 
@@ -116,7 +89,7 @@ void QuickSortSliced(Array& arr, UPInt start, UPInt end, Less less)
             i = base + 1;
             j = limit - 1;
 
-            // now ensure that *i <= *base <= *j 
+            // now ensure that *i <= *base <= *j
             if(less(arr[j],    arr[i])) Swap(arr[j],    arr[i]);
             if(less(arr[base], arr[i])) Swap(arr[base], arr[i]);
             if(less(arr[j], arr[base])) Swap(arr[j], arr[base]);
@@ -189,7 +162,7 @@ void QuickSortSliced(Array& arr, UPInt start, UPInt end, Less less)
 // Sort any part of any array: plain, Array, ArrayPaged, ArrayUnsafe.
 // The range is specified with start, end, where "end" is exclusive!
 // The data type must have a defined "<" operator.
-template<class Array> 
+template<class Array>
 void QuickSortSliced(Array& arr, UPInt start, UPInt end)
 {
     typedef typename Array::ValueType ValueType;
@@ -198,10 +171,10 @@ void QuickSortSliced(Array& arr, UPInt start, UPInt end)
 
 // Same as corresponding G_QuickSortSliced but with checking array limits to avoid
 // crash in the case of wrong comparator functor.
-template<class Array, class Less> 
+template<class Array, class Less>
 bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end, Less less)
 {
-    enum 
+    enum
     {
         Threshold = 9
     };
@@ -209,7 +182,7 @@ bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end, Less less)
     if(end - start <  2) return true;
 
     SPInt  stack[80];
-    SPInt* top   = stack; 
+    SPInt* top   = stack;
     SPInt  base  = (SPInt)start;
     SPInt  limit = (SPInt)end;
 
@@ -227,22 +200,22 @@ bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end, Less less)
             i = base + 1;
             j = limit - 1;
 
-            // now ensure that *i <= *base <= *j 
+            // now ensure that *i <= *base <= *j
             if(less(arr[j],    arr[i])) Swap(arr[j],    arr[i]);
             if(less(arr[base], arr[i])) Swap(arr[base], arr[i]);
             if(less(arr[j], arr[base])) Swap(arr[j], arr[base]);
 
             for(;;)
             {
-                do 
-                {   
-                    i++; 
+                do
+                {
+                    i++;
                     if (i >= limit)
                         return false;
                 } while( less(arr[i], arr[base]) );
-                do 
+                do
                 {
-                    j--; 
+                    j--;
                     if (j < 0)
                         return false;
                 } while( less(arr[base], arr[j]) );
@@ -304,7 +277,7 @@ bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end, Less less)
     return true;
 }
 
-template<class Array> 
+template<class Array>
 bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end)
 {
     typedef typename Array::ValueType ValueType;
@@ -317,14 +290,14 @@ bool QuickSortSlicedSafe(Array& arr, UPInt start, UPInt end)
 // Sort an array Array, ArrayPaged, ArrayUnsafe.
 // The array must have GetSize() function.
 // The comparison predicate must be specified.
-template<class Array, class Less> 
+template<class Array, class Less>
 void QuickSort(Array& arr, Less less)
 {
     QuickSortSliced(arr, 0, arr.GetSize(), less);
 }
 
 // checks for boundaries
-template<class Array, class Less> 
+template<class Array, class Less>
 bool QuickSortSafe(Array& arr, Less less)
 {
     return QuickSortSlicedSafe(arr, 0, arr.GetSize(), less);
@@ -337,14 +310,14 @@ bool QuickSortSafe(Array& arr, Less less)
 // Sort an array Array, ArrayPaged, ArrayUnsafe.
 // The array must have GetSize() function.
 // The data type must have a defined "<" operator.
-template<class Array> 
+template<class Array>
 void QuickSort(Array& arr)
 {
     typedef typename Array::ValueType ValueType;
     QuickSortSliced(arr, 0, arr.GetSize(), OperatorLess<ValueType>::Compare);
 }
 
-template<class Array> 
+template<class Array>
 bool QuickSortSafe(Array& arr)
 {
     typedef typename Array::ValueType ValueType;
@@ -357,12 +330,12 @@ bool QuickSortSafe(Array& arr)
 // Sort any part of any array: plain, Array, ArrayPaged, ArrayUnsafe.
 // The range is specified with start, end, where "end" is exclusive!
 // The comparison predicate must be specified.
-// Unlike Quick Sort, the Insertion Sort works much slower in average, 
+// Unlike Quick Sort, the Insertion Sort works much slower in average,
 // but may be much faster on almost sorted arrays. Besides, it guarantees
-// that the elements will not be swapped if not necessary. For example, 
-// an array with all equal elements will remain "untouched", while 
+// that the elements will not be swapped if not necessary. For example,
+// an array with all equal elements will remain "untouched", while
 // Quick Sort will considerably shuffle the elements in this case.
-template<class Array, class Less> 
+template<class Array, class Less>
 void InsertionSortSliced(Array& arr, UPInt start, UPInt end, Less less)
 {
     UPInt j = start;
@@ -389,7 +362,7 @@ void InsertionSortSliced(Array& arr, UPInt start, UPInt end, Less less)
 // Sort any part of any array: plain, Array, ArrayPaged, ArrayUnsafe.
 // The range is specified with start, end, where "end" is exclusive!
 // The data type must have a defined "<" operator.
-template<class Array> 
+template<class Array>
 void InsertionSortSliced(Array& arr, UPInt start, UPInt end)
 {
     typedef typename Array::ValueType ValueType;
@@ -403,7 +376,7 @@ void InsertionSortSliced(Array& arr, UPInt start, UPInt end)
 // The array must have GetSize() function.
 // The comparison predicate must be specified.
 
-template<class Array, class Less> 
+template<class Array, class Less>
 void InsertionSort(Array& arr, Less less)
 {
     InsertionSortSliced(arr, 0, arr.GetSize(), less);
@@ -415,7 +388,7 @@ void InsertionSort(Array& arr, Less less)
 // Sort an array Array, ArrayPaged, ArrayUnsafe.
 // The array must have GetSize() function.
 // The data type must have a defined "<" operator.
-template<class Array> 
+template<class Array>
 void InsertionSort(Array& arr)
 {
     typedef typename Array::ValueType ValueType;
@@ -434,12 +407,12 @@ UPInt LowerBoundSliced(const Array& arr, UPInt start, UPInt end, const Value& va
     SPInt len   = (SPInt)(end - start);
     SPInt half;
     SPInt middle;
-    
-    while(len > 0) 
+
+    while(len > 0)
     {
         half = len >> 1;
         middle = first + half;
-        if(less(arr[middle], val)) 
+        if(less(arr[middle], val))
         {
             first = middle + 1;
             len   = len - half - 1;
@@ -502,8 +475,8 @@ UPInt UpperBoundSliced(const Array& arr, UPInt start, UPInt end, const Value& va
     SPInt len   = (SPInt)(end - start);
     SPInt half;
     SPInt middle;
-    
-    while(len > 0) 
+
+    while(len > 0)
     {
         half = len >> 1;
         middle = first + half;
@@ -511,7 +484,7 @@ UPInt UpperBoundSliced(const Array& arr, UPInt start, UPInt end, const Value& va
         {
             len = half;
         }
-        else 
+        else
         {
             first = middle + 1;
             len   = len - half - 1;
@@ -579,18 +552,18 @@ template<class Array> void ReverseArray(Array& arr)
 
 // ***** AppendArray
 //
-template<class CDst, class CSrc> 
+template<class CDst, class CSrc>
 void AppendArray(CDst& dst, const CSrc& src)
 {
     UPInt i;
-    for(i = 0; i < src.GetSize(); i++) 
+    for(i = 0; i < src.GetSize(); i++)
         dst.PushBack(src[i]);
 }
 
 //-----------------------------------------------------------------------------------
 // ***** ArrayAdaptor
 //
-// A simple adapter that provides the GetSize() method and overloads 
+// A simple adapter that provides the GetSize() method and overloads
 // operator []. Used to wrap plain arrays in QuickSort and such.
 template<class T> class ArrayAdaptor
 {
@@ -610,7 +583,7 @@ private:
 //-----------------------------------------------------------------------------------
 // ***** GConstArrayAdaptor
 //
-// A simple const adapter that provides the GetSize() method and overloads 
+// A simple const adapter that provides the GetSize() method and overloads
 // operator []. Used to wrap plain arrays in LowerBound and such.
 template<class T> class ConstArrayAdaptor
 {
@@ -640,8 +613,8 @@ inline UByte UpperBit(UPInt val)
 
     if (val & 0xFFFF0000)
     {
-        return (val & 0xFF000000) ? 
-            UpperBitTable[(val >> 24)       ] + 24: 
+        return (val & 0xFF000000) ?
+            UpperBitTable[(val >> 24)       ] + 24:
             UpperBitTable[(val >> 16) & 0xFF] + 16;
     }
     return (val & 0xFF00) ?
@@ -655,7 +628,7 @@ inline UByte UpperBit(UPInt val)
         if (val & 0xFFFF000000000000)
         {
             return (val & 0xFF00000000000000) ?
-                UpperBitTable[(val >> 56)       ] + 56: 
+                UpperBitTable[(val >> 56)       ] + 56:
                 UpperBitTable[(val >> 48) & 0xFF] + 48;
         }
         return (val & 0xFF0000000000) ?
@@ -666,8 +639,8 @@ inline UByte UpperBit(UPInt val)
     {
         if (val & 0xFFFF0000)
         {
-            return (val & 0xFF000000) ? 
-                UpperBitTable[(val >> 24)       ] + 24: 
+            return (val & 0xFF000000) ?
+                UpperBitTable[(val >> 24)       ] + 24:
                 UpperBitTable[(val >> 16) & 0xFF] + 16;
         }
         return (val & 0xFF00) ?
@@ -730,19 +703,19 @@ inline UByte LowerBit(UPInt val)
 class MemUtil
 {
 public:
-                                    
+
     // Memory compare
     static int      Cmp  (const void* p1, const void* p2, UPInt byteCount)      { return memcmp(p1, p2, byteCount); }
     static int      Cmp16(const void* p1, const void* p2, UPInt int16Count);
     static int      Cmp32(const void* p1, const void* p2, UPInt int32Count);
-    static int      Cmp64(const void* p1, const void* p2, UPInt int64Count); 
+    static int      Cmp64(const void* p1, const void* p2, UPInt int64Count);
 };
 
 // ** Inline Implementation
 
 inline int MemUtil::Cmp16(const void* p1, const void* p2, UPInt int16Count)
 {
-    SInt16*  pa  = (SInt16*)p1; 
+    SInt16*  pa  = (SInt16*)p1;
     SInt16*  pb  = (SInt16*)p2;
     unsigned ic  = 0;
     if (int16Count == 0)
@@ -792,10 +765,10 @@ namespace ByteUtil {
         UByte*  pb = (UByte*)pv;
         UByte   temp;
         for (int i = 0; i < size>>1; i++)
-        { 
+        {
             temp            = pb[size-1-i];
             pb[size-1-i]    = pb[i];
-            pb[i]           = temp; 
+            pb[i]           = temp;
         }
     }
 
@@ -807,7 +780,7 @@ namespace ByteUtil {
     inline UInt32   SwapOrder(UInt32 v)     { return (v>>24)|((v&0x00FF0000)>>8)|((v&0x0000FF00)<<8)|(v<<24); }
     inline SInt32   SwapOrder(SInt32 p)     { return (SInt32)SwapOrder(UInt32(p)); }
     inline UInt64   SwapOrder(UInt64 v)
-    { 
+    {
         return   (v>>56) |
                  ((v&UInt64(0x00FF000000000000))>>40) |
                  ((v&UInt64(0x0000FF0000000000))>>24) |
@@ -815,11 +788,11 @@ namespace ByteUtil {
                  ((v&UInt64(0x00000000FF000000))<<8)  |
                  ((v&UInt64(0x0000000000FF0000))<<24) |
                  ((v&UInt64(0x000000000000FF00))<<40) |
-                 (v<<56); 
+                 (v<<56);
     }
     inline SInt64   SwapOrder(SInt64 v)     { return (SInt64)SwapOrder(UInt64(v)); }
-    inline float    SwapOrder(float p)      
-    { 
+    inline float    SwapOrder(float p)
+    {
         union {
             float p;
             UInt32 v;
@@ -830,7 +803,7 @@ namespace ByteUtil {
     }
 
     inline double   SwapOrder(double p)
-    { 
+    {
         union {
             double p;
             UInt64 v;
@@ -839,7 +812,7 @@ namespace ByteUtil {
         u.v = SwapOrder(u.v);
         return u.p;
     }
-    
+
     // *** Byte-order conversion
 
 #if (OVR_BYTE_ORDER == OVR_LITTLE_ENDIAN)
@@ -877,7 +850,7 @@ namespace ByteUtil {
     inline UInt64   SystemToLE(UInt64 v)    { return v; }
     inline SInt64   SystemToLE(SInt64 v)    { return v; }
     inline float    SystemToLE(float  v)    { return v; }
-    inline double   SystemToLE(double v)    { return v; }   
+    inline double   SystemToLE(double v)    { return v; }
 
     // System (LE) to Big Endian
     inline UByte    SystemToBE(UByte  v)    { return SwapOrder(v); }

@@ -6,7 +6,7 @@ Content     :   Contains atomic operations and inline fastest locking
                 functionality. Will contain #ifdefs for OS efficiency.
                 Have non-thread-safe implementaion if not available.
 Created     :   September 19, 2012
-Notes       : 
+Notes       :
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -20,13 +20,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_Types.h"
 
-// Include System thread functionality.
-#if defined(OVR_OS_WIN32)
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
-
+#include <boost/thread/mutex.hpp>
 
 namespace OVR {
 
@@ -39,7 +33,7 @@ template<class C> class AtomicOps;
 template<class T> class AtomicInt;
 template<class T> class AtomicPtr;
 
-class   Lock;
+typedef boost::mutex Lock;
 
 
 //-----------------------------------------------------------------------------------
@@ -62,16 +56,16 @@ class   Lock;
 
 // *** AtomicOpsRaw
 
-// AtomicOpsRaw is a specialized template that provides atomic operations 
+// AtomicOpsRaw is a specialized template that provides atomic operations
 // used by AtomicOps. This class has two fundamental qualities: (1) it
 // defines a type T of correct size, and (2) provides operations that work
 // atomically, such as Exchange_Sync and CompareAndSet_Release.
 
 // AtomicOpsRawBase class contains shared constants/classes for AtomicOpsRaw.
 // The primary thing is does is define sync class objects, whose destructor and
-// constructor provide places to insert appropriate synchronization calls, on 
+// constructor provide places to insert appropriate synchronization calls, on
 // systems where such calls are necessary. So far, the breakdown is as follows:
-// 
+//
 //  - X86 systems don't need custom syncs, since their exchange/atomic
 //    instructions are implicitly synchronized.
 //  - PowerPC requires lwsync/isync instructions that can use this mechanism.
@@ -119,7 +113,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 #if !defined(OVR_ENABLE_THREADS)
 
     // Provide a type for no-thread-support cases. Used by AtomicOpsRaw_DefImpl.
-    typedef UInt32 T;   
+    typedef UInt32 T;
 
     // *** Thread - Safe Atomic Versions.
 
@@ -127,7 +121,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 
     // Use special defined for VC6, where volatile is not used and
     // InterlockedCompareExchange is declared incorrectly.
-    typedef LONG T;      
+    typedef LONG T;
 #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC < 1300)
     typedef T* InterlockTPtr;
     typedef LPVOID ET;
@@ -381,7 +375,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 // 8-Byte raw data data atomic op implementation class.
 // Currently implementation is provided only on systems with 64-bit pointers.
 struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
-{    
+{
 #if !defined(OVR_64BIT_POINTERS) || !defined(OVR_ENABLE_THREADS)
 
     // Provide a type for no-thread-support cases. Used by AtomicOpsRaw_DefImpl.
@@ -392,13 +386,13 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
 
     // This is only for 64-bit systems.
     typedef LONG64      T;
-    typedef volatile T* InterlockTPtr;    
+    typedef volatile T* InterlockTPtr;
     inline static T     Exchange_NoSync(volatile T* p, T val)            { return InterlockedExchange64((InterlockTPtr)p, val); }
     inline static T     ExchangeAdd_NoSync(volatile T* p, T val)         { return InterlockedExchangeAdd64((InterlockTPtr)p, val); }
     inline static bool  CompareAndSet_NoSync(volatile T* p, T c, T val)  { return InterlockedCompareExchange64((InterlockTPtr)p, val, c) == c; }
 
 #elif defined(OVR_CPU_PPC64)
- 
+
     typedef UInt64 T;
 
     static inline UInt64   Exchange_NoSync(volatile UInt64 *i, UInt64 j)
@@ -506,7 +500,7 @@ struct AtomicOpsRaw_DefImpl : public O
     // "AtomicOpsRaw_DefImpl<O>::" prefix in calls below.
     inline static O_T   Exchange_Sync(volatile O_T* p, O_T val)                { O_FullSync    sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::Exchange_NoSync(p, val); }
     inline static O_T   Exchange_Release(volatile O_T* p, O_T val)             { O_ReleaseSync sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::Exchange_NoSync(p, val); }
-    inline static O_T   Exchange_Acquire(volatile O_T* p, O_T val)             { O_AcquireSync sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::Exchange_NoSync(p, val); }  
+    inline static O_T   Exchange_Acquire(volatile O_T* p, O_T val)             { O_AcquireSync sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::Exchange_NoSync(p, val); }
     inline static O_T   ExchangeAdd_Sync(volatile O_T* p, O_T val)             { O_FullSync    sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::ExchangeAdd_NoSync(p, val); }
     inline static O_T   ExchangeAdd_Release(volatile O_T* p, O_T val)          { O_ReleaseSync sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::ExchangeAdd_NoSync(p, val); }
     inline static O_T   ExchangeAdd_Acquire(volatile O_T* p, O_T val)          { O_AcquireSync sync; OVR_UNUSED(sync); return AtomicOpsRaw_DefImpl<O>::ExchangeAdd_NoSync(p, val); }
@@ -531,7 +525,7 @@ struct AtomicOpsRaw : public AtomicOpsRawBase { };
 
 template<>
 struct AtomicOpsRaw<4> : public AtomicOpsRaw_DefImpl<AtomicOpsRaw_4ByteImpl>
-{   
+{
     // Ensure that assigned type size is correct.
     AtomicOpsRaw()
     { OVR_COMPILER_ASSERT(sizeof(AtomicOpsRaw_DefImpl<AtomicOpsRaw_4ByteImpl>::T) == 4); }
@@ -561,7 +555,7 @@ class AtomicOps
     union C2T_union { C c; T t; };
 
 public:
-    // General purpose implementation for standard syncs.    
+    // General purpose implementation for standard syncs.
     inline static C     Exchange_Sync(volatile C* p, C val)             { C2T_union u; u.c = val; u.t = Ops::Exchange_Sync((PT)p, u.t); return u.c; }
     inline static C     Exchange_Release(volatile C* p, C val)          { C2T_union u; u.c = val; u.t = Ops::Exchange_Release((PT)p, u.t); return u.c; }
     inline static C     Exchange_Acquire(volatile C* p, C val)          { C2T_union u; u.c = val; u.t = Ops::Exchange_Acquire((PT)p, u.t); return u.c; }
@@ -574,8 +568,8 @@ public:
     inline static bool  CompareAndSet_Release(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Release((PT)p, cu.t, u.t); }
     inline static bool  CompareAndSet_Relse(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Acquire((PT)p, cu.t, u.t); }
     inline static bool  CompareAndSet_NoSync(volatile C* p, C c, C val) { C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_NoSync((PT)p, cu.t, u.t); }
-    // Loads and stores with memory fence. These have only the relevant versions.    
-    inline static void  Store_Release(volatile C* p, C val)             { C2T_union u; u.c = val; Ops::Store_Release((PT)p, u.t); }    
+    // Loads and stores with memory fence. These have only the relevant versions.
+    inline static void  Store_Release(volatile C* p, C val)             { C2T_union u; u.c = val; Ops::Store_Release((PT)p, u.t); }
     inline static C     Load_Acquire(const volatile C* p)               { C2T_union u; u.t = Ops::Load_Acquire((PT)p); return u.c; }
 };
 
@@ -595,7 +589,7 @@ public:
     explicit inline AtomicValueBase(T val)    { Ops::Store_Release(&Value, val); }
 
     // Most libraries (TBB and Joshua Scholar's) library do not do Load_Acquire
-    // here, since most algorithms do not require atomic loads. Needs some research.    
+    // here, since most algorithms do not require atomic loads. Needs some research.
     inline operator T() const { return Value; }
 
     // *** Standard Atomic inlines
@@ -627,7 +621,7 @@ public:
     // Initialize pointer value to 0 by default; use Store_Release only with explicit constructor.
     inline AtomicPtr() : AtomicValueBase<T*>()                     { this->Value = 0; }
     explicit inline AtomicPtr(T* val) : AtomicValueBase<T*>(val)   { }
-        
+
     // Pointer access.
     inline T* operator -> () const     { return this->Load_Acquire(); }
 
@@ -667,7 +661,7 @@ public:
 
 // ***** AtomicInt - Atomic integer template
 
-// Implements an atomic integer type; the exact type to use is provided 
+// Implements an atomic integer type; the exact type to use is provided
 // as an argument. Supports atomic Acquire / Release semantics, atomic
 // arithmetic operations, and atomic conditional compare + set.
 
@@ -681,7 +675,7 @@ public:
     explicit inline AtomicInt(T val) : AtomicValueBase<T>(val)    { }
 
 
-    // *** Standard Atomic inlines (applicable to int)   
+    // *** Standard Atomic inlines (applicable to int)
     inline T     ExchangeAdd_Sync(T val)            { return Ops::ExchangeAdd_Sync(&this->Value, val); }
     inline T     ExchangeAdd_Release(T val)         { return Ops::ExchangeAdd_Release(&this->Value, val); }
     inline T     ExchangeAdd_Acquire(T val)         { return Ops::ExchangeAdd_Acquire(&this->Value, val); }
@@ -689,7 +683,7 @@ public:
     // These increments could be more efficient because they don't return a value.
     inline void  Increment_Sync()                   { ExchangeAdd_Sync((T)1); }
     inline void  Increment_Release()                { ExchangeAdd_Release((T)1); }
-    inline void  Increment_Acquire()                { ExchangeAdd_Acquire((T)1); }    
+    inline void  Increment_Acquire()                { ExchangeAdd_Acquire((T)1); }
     inline void  Increment_NoSync()                 { ExchangeAdd_NoSync((T)1); }
 
     // *** Atomic Operators
@@ -776,81 +770,6 @@ public:
 };
 
 
-
-//-----------------------------------------------------------------------------------
-// ***** Lock
-
-// Lock is a simplest and most efficient mutual-exclusion lock class.
-// Unlike Mutex, it cannot be waited on.
-
-class Lock
-{
-    // NOTE: Locks are not allocatable and they themselves should not allocate 
-    // memory by standard means. This is the case because StandardAllocator
-    // relies on this class.
-    // Make 'delete' private. Don't do this for 'new' since it can be redefined.  
-    void    operator delete(void*) {}
-
-
-    // *** Lock implementation for various platforms.
-    
-#if !defined(OVR_ENABLE_THREADS)
-
-public:
-    // With no thread support, lock does nothing.
-    inline Lock() { }
-    inline Lock(unsigned) { }
-    inline ~Lock() { }    
-    inline void DoLock() { }
-    inline void Unlock() { }
-
-   // Windows.   
-#elif defined(OVR_OS_WIN32)
-
-    CRITICAL_SECTION cs;
-public:   
-    Lock(unsigned spinCount = 0);      
-    ~Lock();
-    // Locking functions.
-    inline void DoLock()    { ::EnterCriticalSection(&cs); }
-    inline void Unlock()    { ::LeaveCriticalSection(&cs); }
-
-#else
-    pthread_mutex_t mutex;
-
-public:
-    static pthread_mutexattr_t RecursiveAttr;
-    static bool                RecursiveAttrInit;
-
-    Lock (unsigned dummy = 0)
-    {
-        if (!RecursiveAttrInit)
-        {
-            pthread_mutexattr_init(&RecursiveAttr);
-            pthread_mutexattr_settype(&RecursiveAttr, PTHREAD_MUTEX_RECURSIVE);
-            RecursiveAttrInit = 1;
-        }
-        pthread_mutex_init(&mutex,&RecursiveAttr);
-    }
-    ~Lock ()                { pthread_mutex_destroy(&mutex); }
-    inline void DoLock()    { pthread_mutex_lock(&mutex); }
-    inline void Unlock()    { pthread_mutex_unlock(&mutex); }
-
-#endif // OVR_ENABLE_THREDS
-
-
-public:
-    // Locker class, used for automatic locking
-    class Locker
-    {
-    public:     
-        Lock *pLock;
-        inline Locker(Lock *plock)
-        { pLock = plock; pLock->DoLock(); }
-        inline ~Locker()
-        { pLock->Unlock();  }
-    };
-};
 
 
 
