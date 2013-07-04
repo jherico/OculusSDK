@@ -262,6 +262,51 @@ void HMDDevice::Shutdown()
     pParent.Clear();
 }
 
+
+bool HMDDevice::Initialize(DeviceBase* parent)
+{
+    pParent = parent;
+
+    // Initialize user profile to default for device.
+    ProfileManager* profileManager = GetManager()->GetProfileManager();    
+    ProfileName = profileManager->GetDefaultProfileName(getDesc()->GetProfileType());
+
+    return true;
+}
+void HMDDevice::Shutdown()
+{
+    ProfileName.Clear();
+    pCachedProfile.Clear();
+    pParent.Clear();
+}
+
+Profile* HMDDevice::GetProfile() const
+{    
+    if (!pCachedProfile)
+        pCachedProfile = *getDesc()->GetProfileAddRef();
+    return pCachedProfile.GetPtr();
+}
+
+const char* HMDDevice::GetProfileName() const
+{
+    return ProfileName.ToCStr();
+}
+
+bool HMDDevice::SetProfileName(const char* name)
+{
+    pCachedProfile.Clear();
+    if (!name)
+    {
+        ProfileName.Clear();
+        return 0;
+    }
+    if (GetManager()->GetProfileManager()->HasProfile(getDesc()->GetProfileType(), name))
+    {
+        ProfileName = name;
+        return true;
+    }
+    return false;
+}
 OVR::SensorDevice* HMDDevice::GetSensor()
 {
     // Just return first sensor found since we have no way to match it yet.

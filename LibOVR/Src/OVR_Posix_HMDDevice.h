@@ -124,6 +124,11 @@ public:
 
     // Query associated sensor.
     virtual OVR::SensorDevice* GetSensor();
+
+private:
+    // User name for the profile used with this device.
+    String               ProfileName;
+    mutable Ptr<Profile> pCachedProfile;
 };
 
 

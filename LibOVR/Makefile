@@ -44,7 +44,7 @@ DELETEFILE    = rm -f
 
 ####### Detect debug or release
 
-DEBUG         = 0
+DEBUG         = 1
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g
 	RELEASETYPE   = Debug
