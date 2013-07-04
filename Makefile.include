@@ -34,32 +34,22 @@
 #
 #############################################################################
 
-include Makefile.config
-include Makefile.include 
+
+####### Detect system architecture
+
+SYSARCH       = i386
+ifeq ($(shell uname -m),x86_64)
+SYSARCH       = x86_64
+endif
+
+####### Detect debug or release
+
+ifeq ($(DEBUG), 1)
+	RELEASETYPE   = Debug
+else
+	RELEASETYPE   = Release
+endif
 
 ####### Paths
 
-LIBOVRPATH    = ./LibOVR
-DEMOPATH      = ./Samples/OculusWorldDemo
-
-LIBOVRTARGET_PATH  = $(LIBOVRPATH)/Lib/Linux/$(CUSTOM_PATH)
-DEMOTARGET_PATH    = $(DEMOPATH)/Release/OculusWorldDemo/$(CUSTOM_PATH)
-
-####### Files
-
-LIBOVRTARGET  = $(LIBOVRTARGET_PATH)/libovr.a
-
-####### Rules
-
-all:    $(LIBOVRTARGET) $(DEMOTARGET)
-
-$(DEMOTARGET): $(DEMOPATH)/Makefile
-	$(MAKE) -C $(DEMOPATH) 
-
-$(LIBOVRTARGET): $(LIBOVRPATH)/Makefile
-	$(MAKE) -C $(LIBOVRPATH)
-
-clean:
-	$(MAKE) -C $(LIBOVRPATH) clean 
-	$(MAKE) -C $(DEMOPATH) clean 
-
+CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
