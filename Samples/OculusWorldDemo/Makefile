@@ -29,14 +29,9 @@
 #
 #############################################################################
 
-####### Detect system architecture
 
-SYSARCH       = i386
-ifeq ($(shell uname -m),x86_64)
-SYSARCH       = x86_64
-endif
-
-####### Compiler, tools and options
+include ../../Makefile.config
+include ../../Makefile.include
 
 CXX           = g++
 LINK          = g++
@@ -46,18 +41,16 @@ DEFINES       = -DQT_WEBKIT -DGL_GLEXT_PROTOTYPES
 
 ####### Detect debug or release
 
-DEBUG         = 0
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g $(DEFINES)
-	RELEASETYPE   = Debug
 else
 	CXXFLAGS      = -pipe -O2 $(DEFINES)
-	RELEASETYPE   = Release
 endif
 
 ####### Compiler, tools and options
 
 LIBOVRPATH    = ../../LibOVR
+SRCPATH		  = .
 COMMONSRCPATH = ../CommonSrc
 3RDPARTYPATH  = ../../3rdParty
 INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
@@ -68,58 +61,50 @@ CXX_BUILD     = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 
 ####### Files
 
-OBJECTS       = $(OBJPATH)/OculusWorldDemo.o \
-		$(OBJPATH)/Player.o \
-		$(OBJPATH)/Platform.o \
-		$(OBJPATH)/Linux_Platform.o \
-		$(OBJPATH)/Linux_Gamepad.o \
-		$(OBJPATH)/Render_Device.o \
-		$(OBJPATH)/Render_GL_Device.o \
-		$(OBJPATH)/Render_LoadTextureDDS.o \
-		$(OBJPATH)/Render_LoadTextureTGA.o \
-		$(OBJPATH)/Render_XmlSceneLoader.o 
+# Filter out Windows and OSX files
+COMMON_SRCPATH = ./Common
+
+ALL_SRCS := $(shell find ${COMMONSRCPATH} -name "*.cpp")
+ALL_SRCS += $(shell find . -name "*.cpp") 
+
+CPP_SRCS = $(filter-out \
+       $(COMMONSRCPATH)/Render/Render_D3D%.cpp \
+       $(COMMONSRCPATH)/Render/Render_GL_GLUT%.cpp \
+       $(COMMONSRCPATH)/Render/Render_GL_Win32%.cpp \
+       $(COMMONSRCPATH)/Render/Render_SDL%.cpp \
+       $(COMMONSRCPATH)/Platform/OSX_%.cpp \
+       $(COMMONSRCPATH)/Platform/Win32_%.cpp \
+       $(COMMONSRCPATH)/Platform/SDL_%.cpp \
+       $(COMMONSRCPATH)/Platform/GLUT_%.cpp \
+       , $(ALL_SRCS))
+
+OBJECTS_1 = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${CPP_SRCS})
+OBJECTS = $(patsubst ${COMMONSRCPATH}/%.cpp, ${OBJPATH}/%.o, ${OBJECTS_1})
+
+DIRS = $(subst /,/,$(sort $(dir $(OBJECTS))))
+
+####### Files
+
 
 TARGET        = ./Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 
 ####### Rules
 
-all:    $(TARGET)
+all: $(TARGET)
 
-$(TARGET):  $(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
-	$(MAKE) -C $(LIBOVRPATH) DEBUG=$(DEBUG)
+#$(TARGET):  $(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
+#	$(shell echo ${OBJECTS}) 
+#	$(MAKE) -C $(LIBOVRPATH) DEBUG=$(DEBUG)
 
 $(TARGET):  $(OBJECTS)
 	$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(LIBS)
 
-$(OBJPATH)/OculusWorldDemo.o: OculusWorldDemo.cpp 
-	$(CXX_BUILD)OculusWorldDemo.o OculusWorldDemo.cpp
+$(OBJPATH)/%.o: $(COMMONSRCPATH)/%.cpp
+	mkdir -p $(DIRS)
+	$(CXX_BUILD) -o "$@" "$<" 
 
-$(OBJPATH)/Player.o: Player.cpp 
-	$(CXX_BUILD)Player.o Player.cpp
-
-$(OBJPATH)/Platform.o: ../../Samples/CommonSrc/Platform/Platform.cpp 
-	$(CXX_BUILD)Platform.o ../../Samples/CommonSrc/Platform/Platform.cpp
-
-$(OBJPATH)/Linux_Platform.o: ../../Samples/CommonSrc/Platform/Linux_Platform.cpp 
-	$(CXX_BUILD)Linux_Platform.o ../../Samples/CommonSrc/Platform/Linux_Platform.cpp
-
-$(OBJPATH)/Linux_Gamepad.o: ../../Samples/CommonSrc/Platform/Linux_Gamepad.cpp 
-	$(CXX_BUILD)Linux_Gamepad.o ../../Samples/CommonSrc/Platform/Linux_Gamepad.cpp
-
-$(OBJPATH)/Render_Device.o: ../../Samples/CommonSrc/Render/Render_Device.cpp $
-	$(CXX_BUILD)Render_Device.o ../../Samples/CommonSrc/Render/Render_Device.cpp
-
-$(OBJPATH)/Render_GL_Device.o: ../../Samples/CommonSrc/Render/Render_GL_Device.cpp 
-	$(CXX_BUILD)Render_GL_Device.o ../../Samples/CommonSrc/Render/Render_GL_Device.cpp
-
-$(OBJPATH)/Render_LoadTextureDDS.o: ../../Samples/CommonSrc/Render/Render_LoadTextureDDS.cpp 
-	$(CXX_BUILD)Render_LoadTextureDDS.o ../../Samples/CommonSrc/Render/Render_LoadTextureDDS.cpp
-
-$(OBJPATH)/Render_LoadTextureTGA.o: ../../Samples/CommonSrc/Render/Render_LoadTextureTGA.cpp 
-	$(CXX_BUILD)Render_LoadTextureTGA.o ../../Samples/CommonSrc/Render/Render_LoadTextureTGA.cpp
-
-$(OBJPATH)/Render_XmlSceneLoader.o: ../../Samples/CommonSrc/Render/Render_XmlSceneLoader.cpp 
-	$(CXX_BUILD)Render_XmlSceneLoader.o ../../Samples/CommonSrc/Render/Render_XmlSceneLoader.cpp
+$(OBJPATH)/%.o: $(SRCPATH)/%.cpp 
+	$(CXX_BUILD) -o "$@" "$<"
 
 clean:
 	-$(DELETEFILE) $(OBJECTS)

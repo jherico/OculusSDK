@@ -1,0 +1,10 @@
+LibOVR/Lib
+LibOVR/Obj
+Samples/**/Obj
+Samples/**/Release
+Samples/**/Debug
+Samples/OculusWorldDemo/Assets
+Mac_OculusWorldDemo.app/Contents/Resources
+Doc
+Tools
+.*
