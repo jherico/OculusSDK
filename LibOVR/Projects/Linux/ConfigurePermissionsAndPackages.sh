@@ -11,23 +11,26 @@
 # Instruction : Ensure that the install.sh has execute permissions.
 #               Navigate to a command shell, enter:
 #               
-#               ./install.sh
+#               sudo ./install.sh
 #
-#		Enter the administrator password for sudo access.
+#		Enter the administrator password for access.
 #
 #############################################################################
 
+if [ "$(id -u)" != "0" ]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+
 echo "Installing OculusVR Rift udev rules file..."
-sudo cp ./LibOVR/90-oculus.rules /lib/udev/rules.d
+cp 90-oculus.rules /lib/udev/rules.d
 echo "Installing libudev..."
-sudo apt-get install libudev-dev
+apt-get install libudev-dev
 echo "Installing libext..."
-sudo apt-get install libext-dev
-echo "Installing mesa-common..."
-sudo apt-get install mesa-common-dev
+apt-get install libext-dev
 echo "Installing freeglut3..."
-sudo apt-get install freeglut3-dev
+apt-get install freeglut3-dev
 echo "Installing Xinerama..."
-sudo apt-get install libxinerama-dev
+apt-get install libxinerama-dev
 echo "Installation complete"
 
