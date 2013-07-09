@@ -81,7 +81,7 @@ CPP_SRCS = $(filter-out \
 OBJECTS_1 = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${CPP_SRCS})
 OBJECTS = $(patsubst ${COMMONSRCPATH}/%.cpp, ${OBJPATH}/%.o, ${OBJECTS_1})
 
-DIRS = $(subst /,/,$(sort $(dir $(OBJECTS))))
+DIRS = $(subst /,/,$(sort $(dir $(OBJECTS)))) ./Release
 
 ####### Files
 
@@ -92,11 +92,8 @@ TARGET        = ./Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 
 all: $(TARGET)
 
-#$(TARGET):  $(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
-#	$(shell echo ${OBJECTS}) 
-#	$(MAKE) -C $(LIBOVRPATH) DEBUG=$(DEBUG)
-
 $(TARGET):  $(OBJECTS)
+	mkdir -p $(DIRS)
 	$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(LIBS)
 
 $(OBJPATH)/%.o: $(COMMONSRCPATH)/%.cpp
@@ -104,6 +101,7 @@ $(OBJPATH)/%.o: $(COMMONSRCPATH)/%.cpp
 	$(CXX_BUILD) -o "$@" "$<" 
 
 $(OBJPATH)/%.o: $(SRCPATH)/%.cpp 
+	mkdir -p $(DIRS)
 	$(CXX_BUILD) -o "$@" "$<"
 
 clean:
