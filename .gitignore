@@ -1,8 +1,11 @@
-LibOVR/Lib
-LibOVR/Obj
-Samples/**/Obj
-Samples/**/Release
-Samples/**/Debug
+**/Obj
+**/Lib
+**/Release
+**/Debug
+*/**/Obj
+*/**/Lib
+*/**/Release
+*/**/Debug
 Samples/OculusWorldDemo/Assets
 Mac_OculusWorldDemo.app/Contents/Resources
 Doc
