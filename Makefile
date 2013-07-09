@@ -72,10 +72,10 @@ all:    $(LIBOVRTARGET) $(DEMOTARGET)
 $(DEMOTARGET): $(DEMOPATH)/Makefile
 	$(MAKE) -C $(DEMOPATH) 
 
-$(LIBOVRTARGET): $(LIBOVRPATH)/Makefile
-	$(MAKE) -C $(LIBOVRPATH)
+$(LIBOVRTARGET): $(LIBOVRPATH)/Projects/Linux/Makefile
+	$(MAKE) -C $(LIBOVRPATH)/Projects/Linux
 
 clean:
-	$(MAKE) -C $(LIBOVRPATH) clean 
+	$(MAKE) -C $(LIBOVRPATH)/Projects/Linux clean 
 	$(MAKE) -C $(DEMOPATH) clean 
 
