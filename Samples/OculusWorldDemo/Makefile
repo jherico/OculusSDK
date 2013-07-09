@@ -29,28 +29,45 @@
 #
 #############################################################################
 
+##### Build flags
 
-include ../../Makefile.config
-include ../../Makefile.include
+DEBUG         = 0
+
+####### Compiler, tools and options
 
 CXX           = g++
 LINK          = g++
 MAKE          = make
 DELETEFILE    = rm -f
 DEFINES       = -DQT_WEBKIT -DGL_GLEXT_PROTOTYPES
+MD            = mkdir
+
+####### Detect system architecture
+
+SYSARCH       = i386
+ifeq ($(shell uname -m),x86_64)
+SYSARCH       = x86_64
+endif
+
+####### Paths
+
+CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
+
 
 ####### Detect debug or release
 
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g $(DEFINES)
+	RELEASETYPE   = Debug
 else
 	CXXFLAGS      = -pipe -O2 $(DEFINES)
+	RELEASETYPE   = Release
 endif
 
 ####### Compiler, tools and options
 
 LIBOVRPATH    = ../../LibOVR
-SRCPATH		  = .
+SRCPATH	      = .
 COMMONSRCPATH = ../CommonSrc
 3RDPARTYPATH  = ../../3rdParty
 INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
@@ -84,7 +101,6 @@ OBJECTS = $(patsubst ${COMMONSRCPATH}/%.cpp, ${OBJPATH}/%.o, ${OBJECTS_1})
 DIRS = $(subst /,/,$(sort $(dir $(OBJECTS)))) ./Release
 
 ####### Files
-
 
 TARGET        = ./Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 

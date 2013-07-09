@@ -29,8 +29,36 @@
 #
 #############################################################################
 
-include ../Makefile.config
-include ../Makefile.include
+##### Build flags
+
+DEBUG         = 0
+
+####### Compiler, tools and options
+
+CXX           = g++
+LINK          = ar rvs
+DELETEFILE    = rm -f
+MD            = mkdir
+
+####### Detect system architecture
+
+SYSARCH       = i386
+ifeq ($(shell uname -m),x86_64)
+SYSARCH       = x86_64
+endif
+
+####### Detect debug or release
+
+ifeq ($(DEBUG), 1)
+	RELEASETYPE   = Debug
+else
+	RELEASETYPE   = Release
+endif
+
+####### Paths
+
+CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
+
 
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g

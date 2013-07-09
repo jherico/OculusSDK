@@ -34,8 +34,26 @@
 #
 #############################################################################
 
-include Makefile.config
-include Makefile.include 
+DEBUG=0
+
+####### Detect system architecture
+
+SYSARCH       = i386
+ifeq ($(shell uname -m),x86_64)
+SYSARCH       = x86_64
+endif
+
+####### Detect debug or release
+
+ifeq ($(DEBUG), 1)
+	RELEASETYPE   = Debug
+else
+	RELEASETYPE   = Release
+endif
+
+####### Paths
+
+CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
 
 ####### Paths
 
