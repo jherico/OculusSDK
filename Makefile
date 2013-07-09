@@ -34,6 +34,8 @@
 #
 #############################################################################
 
+DEBUG=0
+
 ####### Detect system architecture
 
 SYSARCH       = i386
@@ -41,15 +43,8 @@ ifeq ($(shell uname -m),x86_64)
 SYSARCH       = x86_64
 endif
 
-####### Compiler, tools and options
-
-CXX           = g++
-LINK          = ar rvs
-DELETEFILE    = rm -f
-
 ####### Detect debug or release
 
-DEBUG         = 0
 ifeq ($(DEBUG), 1)
 	RELEASETYPE   = Debug
 else
@@ -58,25 +53,29 @@ endif
 
 ####### Paths
 
+CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
+
+####### Paths
+
 LIBOVRPATH    = ./LibOVR
 DEMOPATH      = ./Samples/OculusWorldDemo
 
 ####### Files
 
-LIBOVRTARGET  = $(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
-DEMOTARGET    = $(DEMOPATH)/Release/OculusWorldDemo_$(RELEASETYPE)/$(SYSARCH)
+LIBOVRTARGET  = $(LIBOVRPATH)/Lib/Linux/$(CUSTOM_PATH)/libovr.a
+DEMOTARGET    = $(DEMOPATH)/Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 
 ####### Rules
 
 all:    $(LIBOVRTARGET) $(DEMOTARGET)
 
 $(DEMOTARGET): $(DEMOPATH)/Makefile
-	$(MAKE) -C $(DEMOPATH) DEBUG=$(DEBUG)
+	$(MAKE) -C $(DEMOPATH) 
 
-$(LIBOVRTARGET): $(LIBOVRPATH)/Makefile
-	$(MAKE) -C $(LIBOVRPATH) DEBUG=$(DEBUG)
+$(LIBOVRTARGET): $(LIBOVRPATH)/Projects/Linux/Makefile
+	$(MAKE) -C $(LIBOVRPATH)/Projects/Linux
 
 clean:
-	$(MAKE) -C $(LIBOVRPATH) clean DEBUG=$(DEBUG)
-	$(MAKE) -C $(DEMOPATH) clean DEBUG=$(DEBUG)
+	$(MAKE) -C $(LIBOVRPATH)/Projects/Linux clean 
+	$(MAKE) -C $(DEMOPATH) clean 
 
