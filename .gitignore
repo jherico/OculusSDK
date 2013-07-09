@@ -6,6 +6,7 @@
 */**/Lib
 */**/Release
 */**/Debug
+**/Build
 Samples/OculusWorldDemo/Assets
 Mac_OculusWorldDemo.app/Contents/Resources
 Doc

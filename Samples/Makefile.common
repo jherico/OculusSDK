@@ -1,0 +1,6 @@
+SAMPLEPATH    		= $(OVR_ROOT)/Samples
+SAMPLEBUILDPATH    	= $(SAMPLEPATH)/Build/Linux
+OBJPATH      		= $(SAMPLEBUILDPATH)/Obj/$(SAMPLE_NAME)/$(CUSTOM_PATH)
+TARGETPATH    		= $(SAMPLEBUILDPATH)/$(CUSTOM_PATH)
+COMMONPATH			= $(SAMPLEPATH)/CommonSrc
+LIBS          		= -lovr -lCommonSrc -ludev -lpthread -lGL -lX11 -lXinerama -ltinyxml2

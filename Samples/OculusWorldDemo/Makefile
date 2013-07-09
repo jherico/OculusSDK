@@ -32,77 +32,30 @@
 ##### Build flags
 
 DEBUG         = 0
-
-####### Compiler, tools and options
-
-CXX           = g++
-LINK          = g++
-MAKE          = make
-DELETEFILE    = rm -f
+OVR_ROOT      = ../..
+SAMPLE_NAME	  = OculusWorldDemo
 DEFINES       = -DQT_WEBKIT -DGL_GLEXT_PROTOTYPES
-MD            = mkdir
 
-####### Detect system architecture
-
-SYSARCH       = i386
-ifeq ($(shell uname -m),x86_64)
-SYSARCH       = x86_64
-endif
-
-####### Paths
-
-CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
-
-
-####### Detect debug or release
-
-ifeq ($(DEBUG), 1)
-	CXXFLAGS      = -pipe -DDEBUG -g $(DEFINES)
-	RELEASETYPE   = Debug
-else
-	CXXFLAGS      = -pipe -O2 $(DEFINES)
-	RELEASETYPE   = Release
-endif
+include $(OVR_ROOT)/LibOVR/Projects/Linux/Makefile.common
+include $(OVR_ROOT)/Samples/Makefile.common
 
 ####### Compiler, tools and options
 
-LIBOVRPATH    = ../../LibOVR
+LINK          = $(LINK_EXE)
 SRCPATH	      = .
-COMMONSRCPATH = ../CommonSrc
-3RDPARTYPATH  = ../../3rdParty
-INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
-OBJPATH       = ./Obj/Linux/$(RELEASETYPE)/$(SYSARCH)
-LFLAGS        = -O1 -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
-LIBS          = $(SUBLIBS) -lovr -ludev -lpthread -lGL -lX11 -lXinerama
-CXX_BUILD     = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
+INCPATH       = -I$(COMMONPATH) $(LIBOVRINCPATH)
+LFLAGS        = -O1 -L$(TARGETPATH) -L$(LIBOVRLIBPATH) 
+CXXBUILD      = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 
 ####### Files
 
-# Filter out Windows and OSX files
-COMMON_SRCPATH = ./Common
-
-ALL_SRCS := $(shell find ${COMMONSRCPATH} -name "*.cpp")
-ALL_SRCS += $(shell find . -name "*.cpp") 
-
-CPP_SRCS = $(filter-out \
-       $(COMMONSRCPATH)/Render/Render_D3D%.cpp \
-       $(COMMONSRCPATH)/Render/Render_GL_GLUT%.cpp \
-       $(COMMONSRCPATH)/Render/Render_GL_Win32%.cpp \
-       $(COMMONSRCPATH)/Render/Render_SDL%.cpp \
-       $(COMMONSRCPATH)/Platform/OSX_%.cpp \
-       $(COMMONSRCPATH)/Platform/Win32_%.cpp \
-       $(COMMONSRCPATH)/Platform/SDL_%.cpp \
-       $(COMMONSRCPATH)/Platform/GLUT_%.cpp \
-       , $(ALL_SRCS))
-
-OBJECTS_1 = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${CPP_SRCS})
-OBJECTS = $(patsubst ${COMMONSRCPATH}/%.cpp, ${OBJPATH}/%.o, ${OBJECTS_1})
-
-DIRS = $(subst /,/,$(sort $(dir $(OBJECTS)))) ./Release
+CPP_SRCS = $(shell find . -name "*.cpp")
+OBJECTS = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${CPP_SRCS})
+DIRS = $(subst /,/,$(sort $(dir $(OBJECTS)))) $(TARGETPATH)
 
 ####### Files
 
-TARGET        = ./Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
+TARGET        = $(TARGETPATH)/OculusWorldDemo
 
 ####### Rules
 
@@ -112,13 +65,9 @@ $(TARGET):  $(OBJECTS)
 	mkdir -p $(DIRS)
 	$(LINK) $(LFLAGS) -o $(TARGET) $(OBJECTS) $(LIBS)
 
-$(OBJPATH)/%.o: $(COMMONSRCPATH)/%.cpp
-	mkdir -p $(DIRS)
-	$(CXX_BUILD) -o "$@" "$<" 
-
 $(OBJPATH)/%.o: $(SRCPATH)/%.cpp 
 	mkdir -p $(DIRS)
-	$(CXX_BUILD) -o "$@" "$<"
+	$(CXXBUILD) -o "$@" "$<"
 
 clean:
 	-$(DELETEFILE) $(OBJECTS)
