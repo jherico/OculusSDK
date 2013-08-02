@@ -39,7 +39,7 @@ include $(OVR_ROOT)/LibOVR/Projects/Linux/Makefile.common
 LINK		  = $(LINK_ARCHIVE)
 INCPATH       = $(LIBOVRINCPATH)
 SRCPATH       = $(LIBOVRPATH)/Src
-OBJPATH       = $(OVR_ROOT)../Build//$(CUSTOM_PATH)
+OBJPATH       = ../../Build/$(CUSTOM_PATH)
 CXXBUILD      = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 TARGETPATH    = $(LIBOVRPATH)/Lib/Linux/$(CUSTOM_PATH)
 TARGET        = $(TARGETPATH)/libovr.a

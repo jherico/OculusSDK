@@ -25,7 +25,8 @@ SRCS = $(shell find . -name "*.cpp")
 OBJS = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${SRCS})
 DEPS = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.d, ${SRCS})
 DIRS = $(subst /,/,$(sort $(dir $(OBJECTS)))) $(TARGETPATH)
-PCH = OVR.h.gch
+PCH = OculusVR.h
+PCH_TARGET = $(PCH).gch
 LIBS =  -ljson  -lboost_thread  -lboost_system
 
 CPP_COMPILE = g++ -I$(OBJPATH) $(CXXFLAGS) -Wall -c -fmessage-length=0 -fPIC
@@ -37,14 +38,14 @@ foo:
 	@echo $(SRCS)
 
 # Tool invocations
-$(TARGET): $(OBJS) $(PCH)
+$(TARGET): $(OBJS) $(PCH_TARGET)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
 	g++ -shared -o $(TARGET) $(OBJS) $(LIBS) 
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-$(OBJPATH)/%.o: ${SRCPATH}/%.cpp $(PCH)
+$(OBJPATH)/%.o: ${SRCPATH}/%.cpp $(PCH_TARGET)
 	$(MD) -p $(DIRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C++ Compiler'
@@ -52,9 +53,9 @@ $(OBJPATH)/%.o: ${SRCPATH}/%.cpp $(PCH)
 	@echo 'Finished building: $<'
 	@echo ' '
 
-$(PCH): OVR.h
+$(PCH_TARGET): $(PCH)
 	$(MD) -p $(DIRS)
-	$(CPP_COMPILE) -o $(PCH) OVR.h
+	$(CPP_COMPILE) $(PCH)
 
 # Other Targets
 clean:
