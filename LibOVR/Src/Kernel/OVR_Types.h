@@ -4,7 +4,7 @@ PublicHeader:   OVR.h
 Filename    :   OVR_Types.h
 Content     :   Standard library defines and simple types
 Created     :   September 19, 2012
-Notes       : 
+Notes       :
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -215,7 +215,7 @@ typedef unsigned long   UInt32;
 typedef __int64         SInt64; // 64 bit Integer (QWord)
 typedef unsigned __int64 UInt64;
 
- 
+
 #elif defined(OVR_OS_MAC) || defined(OVR_OS_IPHONE) || defined(OVR_CC_GNU)
 
 typedef int             SByte  __attribute__((__mode__ (__QI__)));
@@ -276,7 +276,7 @@ namespace BaseTypes
 //  OVR_FORCE_INLINE    - Forces inline expansion of function
 //  OVR_ASM             - Assembly language prefix
 //  OVR_STR             - Prefixes string with L"" if building unicode
-// 
+//
 //  OVR_STDCALL         - Use stdcall calling convention (Pascal arg order)
 //  OVR_CDECL           - Use cdecl calling convention (C argument order)
 //  OVR_FASTCALL        - Use fastcall calling convention (registers)
@@ -291,14 +291,14 @@ namespace BaseTypes
 #if defined(OVR_CC_MSVC)
 #  define OVR_FORCE_INLINE  __forceinline
 #elif defined(OVR_CC_GNU)
-#  define OVR_FORCE_INLINE  __attribute__((always_inline))
+#  define OVR_FORCE_INLINE  __attribute__((always_inline)) inline
 #else
 #  define OVR_FORCE_INLINE  inline
 #endif  // OVR_CC_MSVC
 
 
 #if defined(OVR_OS_WIN32)
-    
+
     // ***** Win32
 
     // Byte order
@@ -340,12 +340,12 @@ namespace BaseTypes
     #else
     #  define OVR_BYTE_ORDER    OVR_LITTLE_ENDIAN
     #endif
-    
+
     // Assembly macros
     #define OVR_ASM                  __asm__
     #define OVR_ASM_PROC(procname)   OVR_ASM
     #define OVR_ASM_END              OVR_ASM
-    
+
     // Calling convention - goes after function return type but before function name
     #define OVR_FASTCALL
     #define OVR_STDCALL
@@ -364,7 +364,7 @@ namespace BaseTypes
 #  define OVR_DEBUG_BREAK  ((void)0)
 #  define OVR_ASSERT(p)    ((void)0)
 
-#else 
+#else
 
 // Microsoft Win32 specific debugging support
 #if defined(OVR_OS_WIN32)
