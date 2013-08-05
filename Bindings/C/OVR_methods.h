@@ -18,33 +18,34 @@ otherwise accompanies this software in either electronic or hard copy form.
 extern "C" {
 #endif
 
+// TODO more comprehensive Rift location and opening, support for multiple rifts
+//OVR_HANDLE ovrOpenRift(char * riftId);
+//// Search for connected Oculus Rift devices, and populate the passed OvrRiftInfo
+//// with the information for the first found rift
+//void ovrFindFirstRift(OvrRiftInfo * out);
+//void ovrFindNextRift(OvrRiftInfo * out);
+// TODO setting and getting range
+//// Sets maximum range settings for the sensor described by SensorRange.
+//// The function will fail if you try to pass values outside maximum supported
+//// by the HW, as described by ovrGetTrackerMaxRange.
+//// Pass waitFlag == true to wait for command completion. For waitFlag == true,
+//// returns true if the range was applied successfully (no HW error).
+//// For waitFlag = false, return 'true' means that command was enqueued successfully.
+//void ovrSetTrackerRange(OVR_HANDLE device, const OvrTrackerRange * in);
+//
+//// Return the current sensor range settings for the device. These may not exactly
+//// match the values applied through SetRange.
+//void ovrGetTrackerRange(OVR_HANDLE device, OvrTrackerRange * out);
+//
+//// Return the maximum sensor range settings for the device.
+//void ovrGetTrackerMaxRange(OVR_HANDLE device, OvrTrackerRange * out);
 
-// Search for connected Oculus Rift devices, and populate the passed OvrRiftInfo
-// with the information for the first found rift
-void ovrFindFirstRift(OvrRiftInfo * out);
-void ovrFindNextRift(OvrRiftInfo * out);
 
 // A convenience method to open the first connected Rift.  This will iterate across all
 // of the rift devices until it finds one it can open.
 OVR_HANDLE ovrOpenFirstAvailableRift();
-OVR_HANDLE ovrOpenRift(char * riftId);
 OVR_HANDLE ovrOpenRiftRecording(char * recordingFile);
 void ovrCloseRift(OVR_HANDLE device);
-
-// Sets maximum range settings for the sensor described by SensorRange.
-// The function will fail if you try to pass values outside maximum supported
-// by the HW, as described by ovrGetTrackerMaxRange.
-// Pass waitFlag == true to wait for command completion. For waitFlag == true,
-// returns true if the range was applied successfully (no HW error).
-// For waitFlag = false, return 'true' means that command was enqueued successfully.
-void ovrSetTrackerRange(OVR_HANDLE device, const OvrTrackerRange * in);
-
-// Return the current sensor range settings for the device. These may not exactly
-// match the values applied through SetRange.
-void ovrGetTrackerRange(OVR_HANDLE device, OvrTrackerRange * out);
-
-// Return the maximum sensor range settings for the device.
-void ovrGetTrackerMaxRange(OVR_HANDLE device, OvrTrackerRange * out);
 
 // Sets report rate (in Hz) of OvrTrackerMessage messages
 // Currently supported maximum rate is 1000Hz.
