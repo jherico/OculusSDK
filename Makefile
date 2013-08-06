@@ -70,6 +70,7 @@ DEMOTARGET    = $(DEMOPATH)/Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 all:    $(LIBOVRTARGET) $(DEMOTARGET)
 
 $(DEMOTARGET): $(DEMOPATH)/Makefile
+	$(MAKE) -C $(DEMOPATH)/../CommonSrc
 	$(MAKE) -C $(DEMOPATH) 
 
 $(LIBOVRTARGET): $(LIBOVRPATH)/Projects/Linux/Makefile
@@ -77,5 +78,6 @@ $(LIBOVRTARGET): $(LIBOVRPATH)/Projects/Linux/Makefile
 
 clean:
 	$(MAKE) -C $(LIBOVRPATH)/Projects/Linux clean 
+	$(MAKE) -C $(DEMOPATH)/../CommonSrc clean
 	$(MAKE) -C $(DEMOPATH) clean 
 
