@@ -23,9 +23,10 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 echo "Installing OculusVR Rift udev rules file..."
-cp 90-oculus.rules /lib/udev/rules.d
+DIR=$(dirname "$0")
+cp "$DIR"/90-oculus.rules /lib/udev/rules.d
 echo "Installing tinyxml2..."
-libtinyxml2-dev
+apt-get install libtinyxml2-dev
 echo "Installing libudev..."
 apt-get install libudev-dev
 echo "Installing libext..."
