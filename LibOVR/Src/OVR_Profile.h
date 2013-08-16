@@ -181,6 +181,9 @@ protected:
     friend class ProfileManager;
 };
 
+
+String GetBaseOVRPath(bool create_dir);
+
 }
 
 #endif // OVR_Profile_h
