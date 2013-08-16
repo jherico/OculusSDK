@@ -32,52 +32,21 @@
 ##### Build flags
 
 DEBUG         = 0
-
-####### Compiler, tools and options
-
-CXX           = g++
-LINK          = ar rvs
-DELETEFILE    = rm -f
-MD            = mkdir
-
-####### Detect system architecture
-
-SYSARCH       = i386
-ifeq ($(shell uname -m),x86_64)
-SYSARCH       = x86_64
-endif
-
-####### Detect debug or release
-
-ifeq ($(DEBUG), 1)
-	RELEASETYPE   = Debug
-else
-	RELEASETYPE   = Release
-endif
-
-####### Paths
-
-CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
-
-
-ifeq ($(DEBUG), 1)
-	CXXFLAGS      = -pipe -DDEBUG -g
-else
-	CXXFLAGS      = -pipe -O2
-endif
-
-####### Paths
-
 OVR_ROOT      = ../../..
-LIBOVRPATH    = $(OVR_ROOT)/LibOVR
-3RDPARTYPATH  = $(OVR_ROOT)/3rdParty
-INCPATH       = -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
+
+include $(OVR_ROOT)/LibOVR/Projects/Linux/Makefile.common
+
+LINK          = $(LINK_ARCHIVE)
+INCPATH       = $(LIBOVRINCPATH)
 SRCPATH       = $(LIBOVRPATH)/Src
 OBJPATH       = $(LIBOVRPATH)/Obj/Linux/$(CUSTOM_PATH)
+TARGETPATH    = $(LIBOVRPATH)/Lib/Linux/$(CUSTOM_PATH)
+
 CXXBUILD      = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 
-TARGET_PATH   = $(LIBOVRPATH)/Lib/Linux/$(CUSTOM_PATH)
+####### Files
 
+TARGET        = $(TARGETPATH)/libovr.a
 
 # Filter out Windows and OSX files
 CPP_SRCS = $(filter-out \
@@ -87,27 +56,24 @@ CPP_SRCS = $(filter-out \
        ${SRCPATH}/Kernel/OVR_ThreadsWinAPI.cpp \
        , $(shell find ${SRCPATH} -name *.cpp)) \
 
-####### Files
-
-TARGET        = $(TARGET_PATH)/libovr.a
 
 OBJECTS = $(patsubst ${SRCPATH}/%.cpp, ${OBJPATH}/%.o, ${CPP_SRCS}) $(OBJPATH)/tinyxml2.o
-DIRS = $(subst /,/,$(sort $(dir $(OBJECTS))))
+
+DIRS = $(subst /,/,$(sort $(dir $(OBJECTS))))  $(TARGETPATH)
 
 ####### Rules
 
 all:    $(TARGET)
 
 $(TARGET):  $(TARGET_PATH) $(OBJECTS) $(LIBOVRTARGET_PATH)
+	$(MD) -p $(DIRS)
 	$(LINK) $(TARGET) $(OBJECTS)
-
-$(TARGET_PATH): $(OBJPATH)
-	$(MD) -p $(TARGET_PATH)
 
 $(OBJPATH):
 	$(MD) -p $(DIRS)
 
 $(OBJPATH)/%.o: $(SRCPATH)/%.cpp
+	$(MD) -p $(DIRS)
 	$(CXXBUILD) -o "$@" "$<"
 
 $(OBJPATH)/tinyxml2.o: $(3RDPARTYPATH)/TinyXml/tinyxml2.cpp 
