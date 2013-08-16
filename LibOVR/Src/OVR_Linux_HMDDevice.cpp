@@ -176,7 +176,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     bool foundHMD = false;
 
     Display* display = XOpenDisplay(NULL);
-    if (display)
+    if (display && XineramaIsActive(display))
     {
         int numberOfScreens;
         XineramaScreenInfo* screens = XineramaQueryScreens(display, &numberOfScreens);

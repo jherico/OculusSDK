@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -50,7 +50,9 @@
     <ClInclude Include="..\..\Src\OVR_HIDDevice.h" />
     <ClInclude Include="..\..\Src\OVR_HIDDeviceBase.h" />
     <ClInclude Include="..\..\Src\OVR_HIDDeviceImpl.h" />
+    <ClInclude Include="..\..\Src\OVR_JSON.h" />
     <ClInclude Include="..\..\Src\OVR_LatencyTestImpl.h" />
+    <ClInclude Include="..\..\Src\OVR_Profile.h" />
     <ClInclude Include="..\..\Src\OVR_SensorFilter.h" />
     <ClInclude Include="..\..\Src\Util\Util_LatencyTest.h" />
     <ClInclude Include="..\..\Src\OVR_SensorFusion.h" />
@@ -84,7 +86,9 @@
     <ClCompile Include="..\..\Src\Kernel\OVR_UTF8Util.cpp" />
     <ClCompile Include="..\..\Src\OVR_DeviceHandle.cpp" />
     <ClCompile Include="..\..\Src\OVR_DeviceImpl.cpp" />
+    <ClCompile Include="..\..\Src\OVR_JSON.cpp" />
     <ClCompile Include="..\..\Src\OVR_LatencyTestImpl.cpp" />
+    <ClCompile Include="..\..\Src\OVR_Profile.cpp" />
     <ClCompile Include="..\..\Src\OVR_SensorFilter.cpp" />
     <ClCompile Include="..\..\Src\OVR_SensorFusion.cpp" />
     <ClCompile Include="..\..\Src\OVR_SensorImpl.cpp" />
@@ -234,6 +238,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -258,6 +263,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

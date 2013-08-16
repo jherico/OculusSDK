@@ -258,7 +258,7 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
             udev_device_unref(hid);
             entry = udev_list_entry_get_next(entry);
         }
-	}
+    }
 
 	// Free the enumerator and udev objects
     udev_enumerate_unref(devices);

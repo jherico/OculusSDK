@@ -879,7 +879,7 @@ public:
     }
 
     // Sets this quaternion to the one rotates in the opposite direction.
-    void        Invert() const
+    void        Invert()
     {
         *this = Quat(-x, -y, -z, w);
     }

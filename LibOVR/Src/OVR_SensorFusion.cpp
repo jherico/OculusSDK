@@ -16,6 +16,8 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "OVR_SensorFusion.h"
 #include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
+#include "OVR_JSON.h"
+#include "OVR_Profile.h"
 
 namespace OVR {
 
@@ -32,7 +34,8 @@ SensorFusion::SensorFusion(SensorDevice* sensor)
     MagCondCount(0), MagCalibrated(false), MagRefQ(0, 0, 0, 1), 
 	MagRefM(0), MagRefYaw(0), YawErrorAngle(0), MagRefDistance(0.5f),
     YawErrorCount(0), YawCorrectionActivated(false), YawCorrectionInProgress(false), 
-	EnableYawCorrection(false), MagNumReferences(0), MagHasNearbyReference(false)
+	EnableYawCorrection(false), MagNumReferences(0), MagHasNearbyReference(false),
+    MotionTrackingEnabled(true)
 {
    if (sensor)
        AttachToSensor(sensor);
@@ -47,6 +50,7 @@ SensorFusion::~SensorFusion()
 bool SensorFusion::AttachToSensor(SensorDevice* sensor)
 {
     
+    pSensor = sensor;
     if (sensor != NULL)
     {
         MessageHandler* pCurrentHandler = sensor->GetMessageHandler();
@@ -63,6 +67,9 @@ bool SensorFusion::AttachToSensor(SensorDevice* sensor)
                 ("SensorFusion::AttachToSensor failed - sensor %p already has handler", sensor));
             return false;
         }
+
+        // Automatically load the default mag calibration for this sensor
+        LoadMagCalibration();        
     }
 
     if (Handler.IsHandlerInstalled())
@@ -95,7 +102,7 @@ void SensorFusion::Reset()
 
 void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 {
-    if (msg.Type != Message_BodyFrame)
+    if (msg.Type != Message_BodyFrame || !IsMotionTrackingEnabled())
         return;
   
     // Put the sensor readings into convenient local variables
@@ -251,7 +258,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 	{
 	  if (MagNumReferences == 0)
       {
-		  SetMagReference(); // Use the current direction
+		  setMagReference(); // Use the current direction
       }
 	  else if (Q.Distance(MagRefQ) > MagRefDistance) 
       {
@@ -278,7 +285,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
               //LogText("Using reference %d\n",bestNdx);
           }
           else if (MagNumReferences < MagMaxReferences)
-              SetMagReference();
+              setMagReference();
 	  }
 	}
 
@@ -322,9 +329,7 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 }
 
  
-//  Simple predictive filters based on extrapolating the smoothed, current angular velocity
-// or using smooth time derivative information.  The argument is the amount of time into
-// the future to predict.
+//  A predictive filter based on extrapolating the smoothed, current angular velocity
 Quatf SensorFusion::GetPredictedOrientation(float pdt)
 {		
 	Lock::Locker lockScope(Handler.GetHandlerLock());
@@ -332,45 +337,32 @@ Quatf SensorFusion::GetPredictedOrientation(float pdt)
 	
     if (EnablePrediction)
     {
-#if 1
 		// This method assumes a constant angular velocity
 	    Vector3f angVelF  = FAngV.SavitzkyGolaySmooth8();
         float    angVelFL = angVelF.Length();
-            
+
+		// Force back to raw measurement
+        angVelF  = AngV;
+		angVelFL = AngV.Length();
+
+		// Dynamic prediction interval: Based on angular velocity to reduce vibration
+		const float minPdt   = 0.001f;
+		const float slopePdt = 0.1f;
+		float       newpdt   = pdt;
+		float       tpdt     = minPdt + slopePdt * angVelFL;
+		if (tpdt < pdt)
+			newpdt = tpdt;
+		//LogText("PredictonDTs: %d\n",(int)(newpdt / PredictionTimeIncrement + 0.5f));
+
         if (angVelFL > 0.001f)
         {
             Vector3f    rotAxisP      = angVelF / angVelFL;  
-            float       halfRotAngleP = angVelFL * pdt * 0.5f;
+            float       halfRotAngleP = angVelFL * newpdt * 0.5f;
             float       sinaHRAP      = sin(halfRotAngleP);
 		    Quatf       deltaQP(rotAxisP.x*sinaHRAP, rotAxisP.y*sinaHRAP,
                                 rotAxisP.z*sinaHRAP, cos(halfRotAngleP));
             qP = QUncorrected * deltaQP;
-        }
-#else
-		// This method estimates angular acceleration, conservatively
-		OVR_ASSERT(pdt >= 0);
-        int       predictionStages = (int)(pdt / PredictionTimeIncrement + 0.5f);
-        Quatd     qpd        = Quatd(Q.x,Q.y,Q.z,Q.w);
-        Vector3f  aa         = FAngV.SavitzkyGolayDerivative12();
-        Vector3d  aad        = Vector3d(aa.x,aa.y,aa.z);
-        Vector3f  angVelF    = FAngV.SavitzkyGolaySmooth8();
-        Vector3d  avkd       = Vector3d(angVelF.x,angVelF.y,angVelF.z);
-		Vector3d  rotAxisd   = Vector3d(0,1,0);
-        for (int i = 0; i < predictionStages; i++)
-        {
-            double   angVelLengthd = avkd.Length();
-			if (angVelLengthd > 0)
-                rotAxisd = avkd / angVelLengthd;
-            double   halfRotAngled = angVelLengthd * PredictionTimeIncrement * 0.5;
-            double   sinHRAd       = sin(halfRotAngled);
-            Quatd    deltaQd       = Quatd(rotAxisd.x*sinHRAd, rotAxisd.y*sinHRAd, rotAxisd.z*sinHRAd,
-                                           cos(halfRotAngled));
-            qpd = qpd * deltaQd;
-            // Update angular velocity by using the angular acceleration estimate
-            avkd += aad;
-        }
-        qP = Quatf((float)qpd.x,(float)qpd.y,(float)qpd.z,(float)qpd.w);
-#endif
+		}
 	}
     return qP;
 }    
@@ -387,7 +379,7 @@ Vector3f SensorFusion::GetCalibratedMagValue(const Vector3f& rawMag) const
 }
 
 
-void SensorFusion::SetMagReference(const Quatf& q, const Vector3f& rawMag) 
+void SensorFusion::setMagReference(const Quatf& q, const Vector3f& rawMag) 
 {
     if (MagNumReferences < MagMaxReferences)
     {
@@ -429,6 +421,274 @@ bool SensorFusion::BodyFrameHandler::SupportsMessageType(MessageType type) const
 {
     return (type == Message_BodyFrame);
 }
+
+// Writes the current calibration for a particular device to a device profile file
+// sensor - the sensor that was calibrated
+// cal_name - an optional name for the calibration or default if cal_name == NULL
+bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
+{
+    if (pSensor == NULL || !HasMagCalibration())
+        return false;
+    
+    // A named calibration may be specified for calibration in different
+    // environments, otherwise the default calibration is used
+    if (calibrationName == NULL)
+        calibrationName = "default";
+    
+    SensorInfo sinfo;
+    pSensor->GetDeviceInfo(&sinfo);
+
+    // Generate a mag calibration event
+    JSON* calibration = JSON::CreateObject();
+    // (hardcoded for now) the measurement and representation method 
+    calibration->AddStringItem("Version", "1.0");   
+    calibration->AddStringItem("Name", "default");
+
+    // time stamp the calibration
+    char time_str[64];
+   
+#ifdef OVR_OS_WIN32
+    struct tm caltime;
+    localtime_s(&caltime, &MagCalibrationTime);
+    strftime(time_str, 64, "%Y-%m-%d %H:%M:%S", &caltime);
+#else
+    struct tm* caltime;
+    caltime = localtime(&MagCalibrationTime);
+    strftime(time_str, 64, "%Y-%m-%d %H:%M:%S", caltime);
+#endif
+   
+    calibration->AddStringItem("Time", time_str);
+
+    // write the full calibration matrix
+    Matrix4f calmat = GetMagCalibration();
+    char matrix[128];
+    int pos = 0;
+    for (int r=0; r<4; r++)
+    {
+        for (int c=0; c<4; c++)
+        {
+            pos += (int)OVR_sprintf(matrix+pos, 128, "%g ", calmat.M[r][c]);
+        }
+    }
+    calibration->AddStringItem("Calibration", matrix);
+
+    
+    String path = GetBaseOVRPath(true);
+    path += "/Devices.json";
+
+    // Look for a prexisting device file to edit
+    Ptr<JSON> root = *JSON::Load(path);
+    if (root)
+    {   // Quick sanity check of the file type and format before we parse it
+        JSON* version = root->GetFirstItem();
+        if (version && version->Name == "Oculus Device Profile Version")
+        {   // In the future I may need to check versioning to determine parse method
+        }
+        else
+        {
+            root->Release();
+            root = NULL;
+        }
+    }
+
+    JSON* device = NULL;
+    if (root)
+    {
+        device = root->GetFirstItem();   // skip the header
+        device = root->GetNextItem(device);
+        while (device)
+        {   // Search for a previous calibration with the same name for this device
+            // and remove it before adding the new one
+            if (device->Name == "Device")
+            {   
+                JSON* item = device->GetItemByName("Serial");
+                if (item && item->Value == sinfo.SerialNumber)
+                {   // found an entry for this device
+                    item = device->GetNextItem(item);
+                    while (item)
+                    {
+                        if (item->Name == "MagCalibration")
+                        {   
+                            JSON* name = item->GetItemByName("Name");
+                            if (name && name->Value == calibrationName)
+                            {   // found a calibration of the same name
+                                item->RemoveNode();
+                                item->Release();
+                                break;
+                            } 
+                        }
+                        item = device->GetNextItem(item);
+                    }
+
+                    // update the auto-mag flag
+                    item = device->GetItemByName("EnableYawCorrection");
+                    if (item)
+                        item->dValue = (double)EnableYawCorrection;
+                    else
+                        device->AddBoolItem("EnableYawCorrection", EnableYawCorrection);
+
+                    break;
+                }
+            }
+
+            device = root->GetNextItem(device);
+        }
+    }
+    else
+    {   // Create a new device root
+        root = *JSON::CreateObject();
+        root->AddStringItem("Oculus Device Profile Version", "1.0");
+    }
+
+    if (device == NULL)
+    {
+        device = JSON::CreateObject();
+        device->AddStringItem("Product", sinfo.ProductName);
+        device->AddNumberItem("ProductID", sinfo.ProductId);
+        device->AddStringItem("Serial", sinfo.SerialNumber);
+        device->AddBoolItem("EnableYawCorrection", EnableYawCorrection);
+
+        root->AddItem("Device", device);
+    }
+
+    // Create and the add the new calibration event to the device
+    device->AddItem("MagCalibration", calibration);
+
+    return root->Save(path);
+}
+
+// Loads a saved calibration for the specified device from the device profile file
+// sensor - the sensor that the calibration was saved for
+// cal_name - an optional name for the calibration or the default if cal_name == NULL
+bool SensorFusion::LoadMagCalibration(const char* calibrationName)
+{
+    if (pSensor == NULL)
+        return false;
+
+    // A named calibration may be specified for calibration in different
+    // environments, otherwise the default calibration is used
+    if (calibrationName == NULL)
+        calibrationName = "default";
+    
+    SensorInfo sinfo;
+    pSensor->GetDeviceInfo(&sinfo);
+
+    String path = GetBaseOVRPath(true);
+    path += "/Devices.json";
+
+    // Load the device profiles
+    Ptr<JSON> root = *JSON::Load(path);
+    if (root == NULL)
+        return false;
+
+    // Quick sanity check of the file type and format before we parse it
+    JSON* version = root->GetFirstItem();
+    if (version && version->Name == "Oculus Device Profile Version")
+    {   // In the future I may need to check versioning to determine parse method
+    }
+    else
+    {
+        return false;
+    }
+
+    bool autoEnableCorrection = false;    
+
+    JSON* device = root->GetNextItem(version);
+    while (device)
+    {   // Search for a previous calibration with the same name for this device
+        // and remove it before adding the new one
+        if (device->Name == "Device")
+        {   
+            JSON* item = device->GetItemByName("Serial");
+            if (item && item->Value == sinfo.SerialNumber)
+            {   // found an entry for this device
+
+                JSON* autoyaw = device->GetItemByName("EnableYawCorrection");
+                if (autoyaw)
+                    autoEnableCorrection = (autoyaw->dValue != 0);
+
+                item = device->GetNextItem(item);
+                while (item)
+                {
+                    if (item->Name == "MagCalibration")
+                    {   
+                        JSON* calibration = item;
+                        JSON* name = calibration->GetItemByName("Name");
+                        if (name && name->Value == calibrationName)
+                        {   // found a calibration with this name
+                            
+                            time_t now;
+                            time(&now);
+
+                            // parse the calibration time
+                            time_t calibration_time = now;
+                            JSON* caltime = calibration->GetItemByName("Time");
+                            if (caltime)
+                            {
+                                const char* caltime_str = caltime->Value.ToCStr();
+
+                                tm ct;
+                                memset(&ct, 0, sizeof(tm));
+                            
+#ifdef OVR_OS_WIN32
+                                struct tm nowtime;
+                                localtime_s(&nowtime, &now);
+                                ct.tm_isdst = nowtime.tm_isdst;
+                                sscanf_s(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                    &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                    &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+#else
+                                struct tm* nowtime = localtime(&now);
+                                ct.tm_isdst = nowtime->tm_isdst;
+                                sscanf(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                    &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                    &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+#endif
+                                ct.tm_year -= 1900;
+                                ct.tm_mon--;
+                                calibration_time = mktime(&ct);
+                            }
+                                                        
+                            // parse the calibration matrix
+                            JSON* cal = calibration->GetItemByName("Calibration");
+                            if (cal)
+                            {
+                                const char* data_str = cal->Value.ToCStr();
+                                Matrix4f calmat;
+                                for (int r=0; r<4; r++)
+                                {
+                                    for (int c=0; c<4; c++)
+                                    {
+                                        calmat.M[r][c] = (float)atof(data_str);
+                                        while (data_str && *data_str != ' ')
+                                            data_str++;
+
+                                        if (data_str)
+                                            data_str++;
+                                    }
+                                }
+
+                                SetMagCalibration(calmat);
+                                MagCalibrationTime  = calibration_time;
+                                EnableYawCorrection = autoEnableCorrection;
+
+                                return true;
+                            }
+                        } 
+                    }
+                    item = device->GetNextItem(item);
+                }
+
+                break;
+            }
+        }
+
+        device = root->GetNextItem(device);
+    }
+    
+    return false;
+}
+
 
 
 } // namespace OVR
