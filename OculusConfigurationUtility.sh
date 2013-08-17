@@ -19,7 +19,7 @@
 
 MACHINE_TYPE=`uname -m`
 if [ ${MACHINE_TYPE} == 'x86_64' ]; then
-  ./Tools/OculusConfigUtil/RiftConfigUtil_x86_64
+  ./Tools/OculusConfigUtil/OculusConfigUtil_x86_64
 else
   echo "The Oculus Configuration Utility is currently only supported on 64-bit Linux."
 fi

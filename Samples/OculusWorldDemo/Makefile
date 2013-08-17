@@ -58,13 +58,15 @@ CUSTOM_PATH   = $(RELEASETYPE)/$(SYSARCH)
 
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g $(DEFINES)
+	LFLAGS        = 
 	RELEASETYPE   = Debug
 else
 	CXXFLAGS      = -pipe -O2 $(DEFINES)
+	LFLAGS        = -O1
 	RELEASETYPE   = Release
 endif
 
-####### Compiler, tools and options
+####### Paths
 
 LIBOVRPATH    = ../../LibOVR
 SRCPATH	      = .
@@ -72,14 +74,32 @@ COMMONSRCPATH = ../CommonSrc
 3RDPARTYPATH  = ../../3rdParty
 INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
 OBJPATH       = ./Obj/Linux/$(RELEASETYPE)/$(SYSARCH)
-LFLAGS        = -O1 -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
-LIBS          = $(SUBLIBS) -lovr -ludev -lpthread -lGL -lX11 -lXinerama
 CXX_BUILD     = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 
 ####### Files
 
-# Filter out Windows and OSX files
-COMMON_SRCPATH = ./Common
+LIBS          = -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH) \
+		-lovr \
+		-ludev \
+		-lpthread \
+		-lGL \
+		-lX11 \
+		-lXinerama
+
+OBJECTS       = $(OBJPATH)/OculusWorldDemo.o \
+		$(OBJPATH)/Player.o \
+		$(OBJPATH)/Platform.o \
+		$(OBJPATH)/Linux_Platform.o \
+		$(OBJPATH)/Linux_Gamepad.o \
+		$(OBJPATH)/Render_Device.o \
+		$(OBJPATH)/Render_GL_Device.o \
+		$(OBJPATH)/Render_LoadTextureDDS.o \
+		$(OBJPATH)/Render_LoadTextureTGA.o \
+		$(OBJPATH)/Render_XmlSceneLoader.o 
+
+TARGET        = ./Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
+
+####### Rules
 
 ALL_SRCS := $(shell find ${COMMONSRCPATH} -name "*.cpp")
 ALL_SRCS += $(shell find . -name "*.cpp") 
