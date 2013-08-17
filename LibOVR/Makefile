@@ -46,10 +46,10 @@ DELETEFILE    = rm -f
 
 DEBUG         = 0
 ifeq ($(DEBUG), 1)
-	CXXFLAGS      = -pipe -DDEBUG -g
+	CXXFLAGS      = -pipe -fPIC -DDEBUG -g
 	RELEASETYPE   = Debug
 else
-	CXXFLAGS      = -pipe -O2
+	CXXFLAGS      = -pipe -fPIC -O2
 	RELEASETYPE   = Release
 endif
 

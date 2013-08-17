@@ -49,24 +49,32 @@ DEFINES       = -DQT_WEBKIT -DGL_GLEXT_PROTOTYPES
 DEBUG         = 0
 ifeq ($(DEBUG), 1)
 	CXXFLAGS      = -pipe -DDEBUG -g $(DEFINES)
+	LFLAGS        = 
 	RELEASETYPE   = Debug
 else
 	CXXFLAGS      = -pipe -O2 $(DEFINES)
+	LFLAGS        = -O1
 	RELEASETYPE   = Release
 endif
 
-####### Compiler, tools and options
+####### Paths
 
 LIBOVRPATH    = ../../LibOVR
 COMMONSRCPATH = ../CommonSrc
 3RDPARTYPATH  = ../../3rdParty
 INCPATH       = -I. -I.. -I$(COMMONSRCPATH) -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
 OBJPATH       = ./Obj/Linux/$(RELEASETYPE)/$(SYSARCH)
-LFLAGS        = -Wl -O1 -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
-LIBS          = $(SUBLIBS) -lovr -ludev -lpthread -lGL -lX11 -lXinerama
 CXX_BUILD     = $(CXX) -c $(CXXFLAGS) $(INCPATH) -o $(OBJPATH)/
 
 ####### Files
+
+LIBS          = -L$(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH) \
+		-lovr \
+		-ludev \
+		-lpthread \
+		-lGL \
+		-lX11 \
+		-lXinerama
 
 OBJECTS       = $(OBJPATH)/OculusWorldDemo.o \
 		$(OBJPATH)/Player.o \

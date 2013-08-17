@@ -21,8 +21,8 @@ echo "Installing OculusVR Rift udev rules file..."
 sudo cp ./LibOVR/90-oculus.rules /lib/udev/rules.d
 echo "Installing libudev..."
 sudo apt-get install libudev-dev
-echo "Installing libext..."
-sudo apt-get install libext-dev
+echo "Installing libxext..."
+sudo apt-get install libxext-dev
 echo "Installing mesa-common..."
 sudo apt-get install mesa-common-dev
 echo "Installing freeglut3..."
