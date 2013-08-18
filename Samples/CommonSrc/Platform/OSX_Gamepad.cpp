@@ -204,6 +204,7 @@ void GamepadManager::onDeviceValueChanged(IOHIDValueRef value)
 
     int vendorID = getIntDeviceProperty(device, CFSTR(kIOHIDVendorIDKey));
     int productID = getIntDeviceProperty(device, CFSTR(kIOHIDProductIDKey));
+    OVR_UNUSED(productID);
     
     uint32_t usagePage = IOHIDElementGetUsagePage(element);
     uint32_t usage = IOHIDElementGetUsage(element);
