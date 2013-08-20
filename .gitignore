@@ -1,11 +1,24 @@
+# Hidden files
+.*
+
+# Build tool noise
 LibOVR/Lib
 LibOVR/Obj
 Samples/**/Obj
 Samples/**/Release
 Samples/**/Debug
+Samples/build
+Samples/*/MacOS
+
+# User-specific build tool data
+Samples/**/xcuserdata
+*.xcuserdatad
+
+# Copyrighted information
 Samples/OculusWorldDemo/Assets
 Mac_OculusWorldDemo.app/Contents/Resources
+
+# Misc
 Doc
 Tools
-.*
 OculusWorldDemo.app
