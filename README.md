@@ -10,6 +10,10 @@ terms of the Oculus SDK license, included in this kit as LICENSE.TXT and
 available online at https://developer.oculusvr.com/license and is Copyright 2013
 Oculus VR, Inc.
 
+Please note that the assets for the OculusWorldDemo are excluded from this
+repository.  Please download the official SDK from Oculus VR's developer site
+and copy the assets from that into your working copy.
+
 Currently the 'linux' branch contains modifications to the SDK that allow the 
 SensorBox sample to function with my local Ubuntu 13.04 distribution.  It is 
 currently a work in progress and no guarantee is made that you will be able to 
