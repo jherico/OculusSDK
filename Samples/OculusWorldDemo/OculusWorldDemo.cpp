@@ -1029,6 +1029,21 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
             }
         }
         break;
+	case Key_Backslash:
+		if (down)
+		{
+			// Swap eye positions.
+			SConfig.SetIPD(SConfig.GetIPD() * -1);
+			if (SConfig.GetIPD() > 0)
+			{
+				SetAdjustMessage("Eye positions set for Rift\naka parallel viewing");
+			}
+			else
+			{
+				SetAdjustMessage("Eye positions set for cross-eyed viewing");
+			}
+		}
+		break;
      default:
         break;
     }
