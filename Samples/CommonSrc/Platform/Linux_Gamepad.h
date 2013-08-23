@@ -3,7 +3,7 @@
 Filename    :   Linux_Gamepad.h
 Content     :   Linux implementation of Gamepad functionality.
 Created     :   May 6, 2013
-Authors     :   Lee Cooper
+Authors     :   Lee Cooper, Simon Hallam
 
 Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
@@ -28,22 +28,54 @@ limitations under the License.
 
 namespace OVR { namespace Platform { namespace Linux {
 
+class Gamepad;  // forward declaration for readability
+
 class GamepadManager : public Platform::GamepadManager
 {
 public:
+
     GamepadManager();
     ~GamepadManager();
 
-    virtual UInt32  GetGamepadCount();
-    virtual bool    GetGamepadState(UInt32 index, GamepadState* pState);
+    virtual UInt32      GetGamepadCount();
+    virtual bool        GetGamepadState(UInt32 index, GamepadState *pState);
 
 private:
-    // Dynamically ink to XInput to simplify projects.
-    //HMODULE             hXInputModule;
-    //typedef DWORD (WINAPI *PFn_XInputGetState)(DWORD dwUserIndex, XINPUT_STATE* pState);
-    //PFn_XInputGetState  pXInputGetState;
 
-    //UInt32              LastPadPacketNo;
+    Gamepad *pDevice;
+};
+
+class Gamepad
+{
+public:
+
+    Gamepad();
+    virtual ~Gamepad();
+
+    bool                 Open(const String& devicePathName);
+    bool                 Close();
+    bool                 IsSupportedType();
+    const String&        GetIdentifier();
+    void                 UpdateState();
+    const GamepadState*  GetState();
+
+private:
+
+    void                 SetStateAxis(GamepadState *pState, UInt32 axis, SInt32 value);
+    void                 SetStateButton(GamepadState *pState, UInt32 button, SInt32 value);
+
+    enum GamepadType
+    {
+        UNDEFINED,
+        XBOX360GAMEPADWIRELESS,
+        XBOX360GAMEPADWIRED
+    };
+
+    UInt32               FileDescriptor;
+    bool                 IsInitialized; 
+    String               Name;
+    GamepadType          Type;
+    GamepadState         State;
 };
 
 }}}

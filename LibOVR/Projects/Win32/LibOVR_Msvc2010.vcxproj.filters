@@ -73,6 +73,8 @@
       <Filter>Util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Src\OVR_SensorFilter.cpp" />
+    <ClCompile Include="..\..\Src\OVR_JSON.cpp" />
+    <ClCompile Include="..\..\Src\OVR_Profile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Src\OVR_DeviceImpl.h" />
@@ -171,6 +173,8 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\OVR_SensorFilter.h" />
+    <ClInclude Include="..\..\Src\OVR_JSON.h" />
+    <ClInclude Include="..\..\Src\OVR_Profile.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Kernel">

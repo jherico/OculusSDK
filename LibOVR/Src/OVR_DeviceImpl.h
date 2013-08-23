@@ -350,7 +350,7 @@ public:
     virtual void Shutdown();
 
 
-    // Every DeviceManager has an associated profile manager, which us used to store
+    // Every DeviceManager has an associated profile manager, which is used to store
     // user settings that may affect device behavior. 
     virtual ProfileManager* GetProfileManager() const { return pProfileManager.GetPtr(); }
 

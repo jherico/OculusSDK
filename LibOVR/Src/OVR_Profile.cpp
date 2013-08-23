@@ -46,16 +46,15 @@ namespace OVR {
 
 //-----------------------------------------------------------------------------
 // Returns the pathname of the JSON file containing the stored profiles
-String GetProfilePath(bool create_dir)
+String GetBaseOVRPath(bool create_dir)
 {
     String path;
 
 #if defined(OVR_OS_WIN32)
-    
-    PWSTR data_path = NULL;
-    SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &data_path);
+
+    TCHAR data_path[MAX_PATH];
+    SHGetFolderPath(0, CSIDL_LOCAL_APPDATA, NULL, 0, data_path);
     path = String(data_path);
-    CoTaskMemFree(data_path);
     
     path += "/Oculus";
 
@@ -113,10 +112,15 @@ String GetProfilePath(bool create_dir)
 
 #endif
 
-    path += "/Profiles.json";
     return path;
 }
 
+String GetProfilePath(bool create_dir)
+{
+    String path = GetBaseOVRPath(create_dir);
+    path += "/Profiles.json";
+    return path;
+}
 
 //-----------------------------------------------------------------------------
 // ***** ProfileManager
@@ -232,22 +236,25 @@ void ProfileManager::LoadCache(ProfileType device)
         Ptr<Profile>  profile     = *CreateProfileObject(profileName, device, &deviceName);
 
         // Read the base profile fields.
-        while (item = profileItem->GetNextItem(item), item)
+        if (profile)
         {
-            if (item->Type != JSON_Object)
+            while (item = profileItem->GetNextItem(item), item)
             {
-                profile->ParseProperty(item->Name, item->Value);
-            }
-            else
-            {   // Search for the matching device to get device specific fields
-                if (!deviceFound && OVR_strcmp(item->Name, deviceName) == 0)
+                if (item->Type != JSON_Object)
                 {
-                    deviceFound = true;
-
-                    for (JSON* deviceItem = item->GetFirstItem(); deviceItem;
-                         deviceItem = item->GetNextItem(deviceItem))
+                    profile->ParseProperty(item->Name, item->Value);
+                }
+                else
+                {   // Search for the matching device to get device specific fields
+                    if (!deviceFound && OVR_strcmp(item->Name, deviceName) == 0)
                     {
-                        profile->ParseProperty(deviceItem->Name, deviceItem->Value);
+                        deviceFound = true;
+
+                        for (JSON* deviceItem = item->GetFirstItem(); deviceItem;
+                             deviceItem = item->GetNextItem(deviceItem))
+                        {
+                            profile->ParseProperty(deviceItem->Name, deviceItem->Value);
+                        }
                     }
                 }
             }
