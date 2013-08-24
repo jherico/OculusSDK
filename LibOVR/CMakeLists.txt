@@ -70,8 +70,8 @@ elseif(APPLE)
     # FIXME ???
 else()
     # FIXME switch to pkg-config for this?
-    SET(OculusVR_EXTRA_LIBS pthread udev X11 Xrandr)
+    SET(OculusVR_EXTRA_LIBS EDID pthread udev X11 Xrandr)
 endif()
 
 add_library(OculusVR STATIC ${SOURCE_FILES})
-target_link_libraries(OculusVR EDID ${OculusVR_EXTRA_LIBS})
+target_link_libraries(OculusVR ${OculusVR_EXTRA_LIBS})

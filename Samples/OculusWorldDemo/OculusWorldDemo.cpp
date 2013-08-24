@@ -45,19 +45,20 @@ limitations under the License.
 #define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
 // This path allows the shortcut to work.
 #define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH4 "../../../Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH5 "../Samples/OculusWorldDemo/Assets/Tuscany/"
 
-static std::vector<std::string> ASSET_PATHS = {
-   // Relative from the cmake Build directory
-   "../Samples/OculusWorldDemo/Assets/Tuscany/",
-   // Relative from the cmake OculusWorldDemo location
-   "../../../Samples/OculusWorldDemo/Assets/Tuscany/",
-   // Relative from the app
-   "Assets/Tuscany/",
-   // Relative from Release/Debug locations via VS
-   "../Assets/Tuscany/",
-   // Relative from The link file in the root of the SDK
-   "Samples/OculusWorldDemo/Assets/Tuscany/",
+const char * ASSET_PATHS[] = {
+    // Relative from the cmake Build directory
+    "../Samples/OculusWorldDemo/Assets/Tuscany/",
+    // Relative from the cmake OculusWorldDemo location
+    "../../../Samples/OculusWorldDemo/Assets/Tuscany/",
+    // Relative from the app
+    "Assets/Tuscany/",
+    // Relative from Release/Debug locations via VS
+    "../Assets/Tuscany/",
+    // Relative from The link file in the root of the SDK
+    "Samples/OculusWorldDemo/Assets/Tuscany/"
 };
 
 using namespace OVR;

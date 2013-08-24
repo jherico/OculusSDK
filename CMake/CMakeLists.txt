@@ -19,11 +19,13 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 if(WIN32)
-	add_definitions(-DUNICODE -D_UNICODE)
+    add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
 # Used by the SDK to read the EDID of the monitors
-add_subdirectory(../3rdParty/EDID "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/EDID")
+if(UNIX AND NOT(APPLE) AND NOT(CYGWIN))
+    add_subdirectory(../3rdParty/EDID "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/EDID")
+endif()
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(../LibOVR "${CMAKE_CURRENT_BINARY_DIR}/LibOVR")

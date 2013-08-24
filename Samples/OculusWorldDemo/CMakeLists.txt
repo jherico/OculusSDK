@@ -1,27 +1,37 @@
 project(SAMPLE_OculusWorldDemo)
 
-add_executable(OculusWorldDemo 
-    OculusWorldDemo.cpp
-    Player.cpp
-)
-
 set(EXTRA_LIBS 
 	OculusVR
 	CommonSrc
 	TinyXML2
 )
 
-
-
-FILE(GLOB RES_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Tuscany/*")
-INSTALL(FILES ${RES_FILES} 
-    DESTINATION share/oculus_vr/OculusWorldDemo/Assets/Tuscany
+if (WIN32)
+add_executable(OculusWorldDemo WIN32
+    OculusWorldDemo.cpp
+    Player.cpp
 )
-
-INSTALL(TARGETS OculusWorldDemo 
-  RUNTIME DESTINATION share/oculus_vr/OculusWorldDemo
-)
-
+elseif (APPLE) 
+       FIND_LIBRARY(COCOA_LIBRARY Cocoa)
+       FIND_LIBRARY(GLUT_LIBRARY GLUT)
+       FIND_LIBRARY(OpenGL_LIBRARY OpenGL)
+       find_library(IOKIT_LIBRARY IOKit)
+       list(APPEND EXTRA_LIBS
+       		   ${COCOA_LIBRARY}
+       		   ${IOKIT_LIBRARY}
+		   ${GLUT_LIBRARY}
+		   ${OpenGL_LIBRARY}
+       )
+       add_executable(OculusWorldDemo MACOSX_BUNDLE
+           OculusWorldDemo.cpp
+	   Player.cpp
+       )
+else()
+    add_executable(OculusWorldDemo
+         OculusWorldDemo.cpp
+         Player.cpp
+    )
+endif()
 
 
 target_link_libraries(OculusWorldDemo ${EXTRA_LIBS})
