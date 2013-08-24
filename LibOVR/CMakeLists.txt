@@ -61,7 +61,7 @@ else()
     list(APPEND EXTRA_LIBS
         EDID
     )
-    include_directories(${EDID_LIB_SOURCE_DIR})
+    include_directories(${LIB_EDID_SOURCE_DIR})
 endif()
 
 if(WIN32)

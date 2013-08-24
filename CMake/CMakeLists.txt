@@ -34,12 +34,12 @@ add_subdirectory(../LibOVR "${CMAKE_CURRENT_BINARY_DIR}/LibOVR")
 #
 
 # Make sure to set up the OVR include paths
-include_directories(${OculusVR_LIB_SOURCE_DIR}/Include)
-include_directories(${OculusVR_LIB_SOURCE_DIR}/Src)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Include)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Src)
 
 # Used by the sample code to read the tuscany resources
 add_subdirectory(../3rdParty/TinyXml "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/TinyXml" )
-include_directories(${TinyXML2_LIB_SOURCE_DIR})
+include_directories(${LIB_TinyXML2_SOURCE_DIR})
 
 add_definitions( -DGL_GLEXT_PROTOTYPES )
 
