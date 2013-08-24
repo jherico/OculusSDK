@@ -13,6 +13,8 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 *************************************************************************************/
 
+#pragma comment(lib, "setupapi.lib")
+
 #include "OVR_Win32_HIDDevice.h"
 #include "OVR_Win32_DeviceManager.h"
 
@@ -20,6 +22,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "Kernel/OVR_Log.h"
 
 namespace OVR { namespace Win32 {
+
 
 //-------------------------------------------------------------------------------------
 // HIDDevicePathWrapper is a simple class used to extract HID device file path

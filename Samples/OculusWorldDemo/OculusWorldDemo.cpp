@@ -36,13 +36,29 @@ limitations under the License.
 
 #include "Player.h"
 
+#include <vector>
+#include <string>
+
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
 #define WORLDDEMO_ASSET_PATH1 "Assets/Tuscany/"
 #define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
 // This path allows the shortcut to work.
 #define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
 
+static std::vector<std::string> ASSET_PATHS = {
+   // Relative from the cmake Build directory
+   "../Samples/OculusWorldDemo/Assets/Tuscany/",
+   // Relative from the cmake OculusWorldDemo location
+   "../../../Samples/OculusWorldDemo/Assets/Tuscany/",
+   // Relative from the app
+   "Assets/Tuscany/",
+   // Relative from Release/Debug locations via VS
+   "../Assets/Tuscany/",
+   // Relative from The link file in the root of the SDK
+   "Samples/OculusWorldDemo/Assets/Tuscany/",
+};
 
 using namespace OVR;
 using namespace OVR::Platform;
@@ -483,15 +499,14 @@ int OculusWorldDemoApp::OnStartup(int argc, char** argv)
     // Try to modify path for correctness in case specified file is not found.
     if (!SysFile(MainFilePath).IsValid())
     {
-        String prefixPath1(pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1),
-               prefixPath2(WORLDDEMO_ASSET_PATH2),
-               prefixPath3(WORLDDEMO_ASSET_PATH3);
-        if (SysFile(prefixPath1 + MainFilePath).IsValid())
-            MainFilePath = prefixPath1 + MainFilePath;
-        else if (SysFile(prefixPath2 + MainFilePath).IsValid())
-            MainFilePath = prefixPath2 + MainFilePath;
-        else if (SysFile(prefixPath3 + MainFilePath).IsValid())
-            MainFilePath = prefixPath3 + MainFilePath;
+        for (const std::string & path : ASSET_PATHS) {
+            String newPath(String(path.c_str()) + MainFilePath);
+            printf((const char *)newPath); printf("\n");
+            if (SysFile(newPath).IsValid()) {
+                MainFilePath = newPath;
+                break;
+            }
+        }
     }
 
     PopulatePreloadScene();

@@ -1,10 +1,8 @@
-project (OculusVR_LIB)
+project (CORE_OculusVR)
 
 include_directories(Include)
-include_directories(C)
 
 set(SOURCE_FILES
-    C/OVR_impl.cpp
     Src/Kernel/OVR_Alg.cpp
     Src/Kernel/OVR_Allocator.cpp
     Src/Kernel/OVR_Atomic.cpp
@@ -60,13 +58,20 @@ else()
         Src/OVR_Linux_HMDDevice.cpp
         Src/OVR_Linux_SensorDevice.cpp
     )
+    list(APPEND EXTRA_LIBS
+        EDID
+    )
+    include_directories(${EDID_LIB_SOURCE_DIR})
 endif()
 
-add_library(OculusVR SHARED ${SOURCE_FILES})
-add_library(OculusVR_static STATIC ${SOURCE_FILES})
+if(WIN32)
+    SET(OculusVR_EXTRA_LIBS setupapi winmm)
+elseif(APPLE)
+    # FIXME ???
+else()
+    # FIXME switch to pkg-config for this?
+    SET(OculusVR_EXTRA_LIBS pthread udev X11 Xrandr)
+endif()
 
-install(TARGETS OculusVR
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
-)
+add_library(OculusVR STATIC ${SOURCE_FILES})
+target_link_libraries(OculusVR EDID ${OculusVR_EXTRA_LIBS})

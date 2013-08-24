@@ -1,5 +1,3 @@
-project (TinyXML2_LIB)
+project (LIB_TinyXML2)
 
-add_library(TinyXML2_embedded STATIC
-    ../../3rdParty/TinyXml/tinyxml2.cpp
-)
+add_library(TinyXML2 STATIC tinyxml2.cpp)
