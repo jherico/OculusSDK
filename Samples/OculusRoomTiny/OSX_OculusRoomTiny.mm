@@ -382,6 +382,11 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
             if (down)
                 SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
             break;
+        case Key_Backslash:
+            if (down)
+                // Swap eye positions.
+                SConfig.SetIPD(SConfig.GetIPD() * -1);
+            break;
             
             // Holding down Shift key accelerates adjustment velocity.
         case Key_Shift:
