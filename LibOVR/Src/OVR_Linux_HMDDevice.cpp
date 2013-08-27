@@ -223,7 +223,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 					// Four chars: '.', two digits, and the null-terminator
 					StringLen += 4;
 				}
-				snprintf( FullDisplayName, StringLen, "%s.%d\0", FullDisplayName, i );
+				snprintf( FullDisplayName, StringLen, "%s.%d\0", DisplayName, i );
 				display = XOpenDisplay( FullDisplayName );
 
 				XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
