@@ -3,3 +3,6 @@ Samples/OculusWorldDemo/Assets
 OculusWorldDemo.app
 Doc
 Tools
+
+# Vim temporary files
+*.swp
