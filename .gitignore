@@ -6,3 +6,4 @@ Tools
 
 # Vim temporary files
 *.swp
+*.vim

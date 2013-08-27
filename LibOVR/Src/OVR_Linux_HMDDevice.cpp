@@ -21,6 +21,8 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "edid.h"
 
+#include <dirent.h>
+
 namespace OVR { namespace Linux {
 
 //-------------------------------------------------------------------------------------
@@ -174,50 +176,111 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
     bool foundHMD = false;
     RRCrtc crtcId = 0;
-    Display* display = XOpenDisplay(NULL);
-    XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
-    for (int iscres = screen->noutput - 1; iscres >= 0; --iscres) {
-        RROutput output = screen->outputs[iscres];
-        MonitorInfo * mi = read_edid_data(display, output);
-        if (mi == NULL) {
-            continue;
-        }
-
-        XRROutputInfo * info = XRRGetOutputInfo (display, screen, output);
-        if (0 == memcmp(mi->manufacturer_code, "OVR", 3)) {
-            int x = -1, y = -1, w = -1, h = -1;
-            if (info->connection == RR_Connected && info->crtc) {
-                XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
-                x = crtc_info->x;
-                y = crtc_info->y;
-                w = crtc_info->width;
-                h = crtc_info->height;
-                XRRFreeCrtcInfo(crtc_info);
-            }
-            HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
-            hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
-            // Notify caller about detected device. This will call EnumerateAddDevice
-            // if the this is the first time device was detected.
-            visitor.Visit(hmdCreateDesc);
-            foundHMD = true;
-            break;
-        } // if
-
-        OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
-                            mi->dsc_product_name, screen->outputs[iscres]));
-        XRRFreeOutputInfo (info);
-        delete mi;
-    } // for
-    XRRFreeScreenResources(screen);
-
-    // Real HMD device is not found; however, we still may have a 'fake' HMD
-    // device created via SensorDeviceImpl::EnumerateHMDFromSensorDisplayInfo.
-    // Need to find it and set 'Enumerated' to true to avoid Removal notification.
-    if (!foundHMD) {
+	// Enumerate the screens for each display and find out if any of them are the Rift
+	// This will only work on X11
+	DIR *pXDirectory = opendir( "/tmp/.X11-unix" );
+	if( pXDirectory == NULL )
+	{
+		// Assume there is no way to acquire the HMD
         Ptr<DeviceCreateDesc> hmdDevDesc = getManager()->FindDevice("", Device_HMD);
         if (hmdDevDesc)
             hmdDevDesc->Enumerated = true;
-    }
+
+		return;
+	}
+
+	struct dirent *pXEntry;
+    Display* display = NULL;
+
+	while( ( pXEntry = readdir( pXDirectory ) ) != NULL )
+	{
+		if( pXEntry->d_name[ 0 ] != 'X' )
+		{
+			continue;
+		}
+
+		char DisplayName[ 64 ] = ":";
+		strcat( DisplayName, pXEntry->d_name + 1 );
+
+		// Open the display to enumerate the screens from
+		Display *pRootDisplay = XOpenDisplay( DisplayName );
+
+		if( pRootDisplay != NULL )
+		{
+			int Screens = XScreenCount( pRootDisplay );
+
+			for( int i = 0; i < Screens; ++i )
+			{
+				char FullDisplayName[ 64 ] = "\0";
+				size_t StringLen = strlen( DisplayName );
+				if( i < 10 )
+				{
+					// Three chars: '.', one digit, and the null-terminator
+					StringLen += 3;
+				}
+				else
+				{
+					// Four chars: '.', two digits, and the null-terminator
+					StringLen += 4;
+				}
+				snprintf( FullDisplayName, StringLen, "%s.%d\0", FullDisplayName, i );
+				display = XOpenDisplay( FullDisplayName );
+
+				XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
+				for (int iscres = screen->noutput - 1; iscres >= 0; --iscres) {
+					RROutput output = screen->outputs[iscres];
+					MonitorInfo * mi = read_edid_data(display, output);
+					if (mi == NULL) {
+						continue;
+					}
+
+					XRROutputInfo * info = XRRGetOutputInfo (display, screen, output);
+					if (0 == memcmp(mi->manufacturer_code, "OVR", 3)) {
+						int x = -1, y = -1, w = -1, h = -1;
+						if (info->connection == RR_Connected && info->crtc) {
+							XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
+							x = crtc_info->x;
+							y = crtc_info->y;
+							w = crtc_info->width;
+							h = crtc_info->height;
+							XRRFreeCrtcInfo(crtc_info);
+						}
+						HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
+						hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
+						// Notify caller about detected device. This will call EnumerateAddDevice
+						// if the this is the first time device was detected.
+						visitor.Visit(hmdCreateDesc);
+						foundHMD = true;
+						OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
+							mi->dsc_product_name, screen->outputs[iscres]));
+					} // if
+
+					XRRFreeOutputInfo (info);
+					delete mi;
+
+					if( foundHMD )
+					{
+						break;
+					}
+				} // for
+				XRRFreeScreenResources(screen);
+				XCloseDisplay( display );
+			}
+		}
+
+		XCloseDisplay( pRootDisplay );
+	}
+
+	closedir( pXDirectory );
+
+	// Real HMD device is not found; however, we still may have a 'fake' HMD
+	// device created via SensorDeviceImpl::EnumerateHMDFromSensorDisplayInfo.
+	// Need to find it and set 'Enumerated' to true to avoid Removal notification.
+	if (!foundHMD) {
+		Ptr<DeviceCreateDesc> hmdDevDesc = getManager()->FindDevice("", Device_HMD);
+		if (hmdDevDesc)
+			hmdDevDesc->Enumerated = true;
+	}
 }
 
 DeviceBase* HMDDeviceCreateDesc::NewDeviceInstance()
