@@ -199,72 +199,94 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 			continue;
 		}
 
-		char DisplayName[ 64 ] = ":";
+		char DisplayName[ 32 ] = ":";
 		strcat( DisplayName, pXEntry->d_name + 1 );
 
 		// Open the display to enumerate the screens from
 		Display *pRootDisplay = XOpenDisplay( DisplayName );
 
+
 		if( pRootDisplay != NULL )
 		{
-			int Screens = XScreenCount( pRootDisplay );
+			// Attempt to use Xrandr.  If this should fail, use Xinerama
+			int XRREvent, XRRError;
 
-			for( int i = 0; i < Screens; ++i )
+			Bool XRRSupported = XRRQueryExtension( pRootDisplay, &XRREvent,
+				&XRRError );
+
+			if( XRRSupported )
 			{
-				char FullDisplayName[ 64 ] = "\0";
-				size_t StringLen = strlen( DisplayName );
-				if( i < 10 )
+				int Screens = XScreenCount( pRootDisplay );
+
+				for( int i = 0; i < Screens; ++i )
 				{
-					// Three chars: '.', one digit, and the null-terminator
-					StringLen += 3;
-				}
-				else
-				{
-					// Four chars: '.', two digits, and the null-terminator
-					StringLen += 4;
-				}
-				snprintf( FullDisplayName, StringLen, "%s.%d\0", DisplayName, i );
-				display = XOpenDisplay( FullDisplayName );
+					char FullDisplayName[ 32 ] = "\0";
+					size_t StringLen = strlen( DisplayName );
 
-				XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
-				for (int iscres = screen->noutput - 1; iscres >= 0; --iscres) {
-					RROutput output = screen->outputs[iscres];
-					MonitorInfo * mi = read_edid_data(display, output);
-					if (mi == NULL) {
-						continue;
-					}
-
-					XRROutputInfo * info = XRRGetOutputInfo (display, screen, output);
-					if (0 == memcmp(mi->manufacturer_code, "OVR", 3)) {
-						int x = -1, y = -1, w = -1, h = -1;
-						if (info->connection == RR_Connected && info->crtc) {
-							XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
-							x = crtc_info->x;
-							y = crtc_info->y;
-							w = crtc_info->width;
-							h = crtc_info->height;
-							XRRFreeCrtcInfo(crtc_info);
-						}
-						HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
-						hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
-						// Notify caller about detected device. This will call EnumerateAddDevice
-						// if the this is the first time device was detected.
-						visitor.Visit(hmdCreateDesc);
-						foundHMD = true;
-						OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
-							mi->dsc_product_name, screen->outputs[iscres]));
-					} // if
-
-					XRRFreeOutputInfo (info);
-					delete mi;
-
-					if( foundHMD )
+					if( i < 10 )
 					{
-						break;
+						// Three chars: '.', one digit, and the null-terminator
+						StringLen += 3;
 					}
-				} // for
-				XRRFreeScreenResources(screen);
-				XCloseDisplay( display );
+					else
+					{
+						// Four chars: '.', two digits, and the null-terminator
+						StringLen += 4;
+					}
+
+					snprintf( FullDisplayName, StringLen, "%s.%d\0", DisplayName, i );
+					display = XOpenDisplay( FullDisplayName );
+
+					XRRScreenResources *screen =
+						XRRGetScreenResources(display, DefaultRootWindow(display));
+
+					for (int iscres = screen->noutput - 1; iscres >= 0; --iscres)
+					{
+						RROutput output = screen->outputs[iscres];
+						MonitorInfo * mi = read_edid_data(display, output);
+						if (mi == NULL)
+						{
+							continue;
+						}
+
+						XRROutputInfo * info = XRRGetOutputInfo (display, screen, output);
+						if (0 == memcmp(mi->manufacturer_code, "OVR", 3))
+						{
+							int x = -1, y = -1, w = -1, h = -1;
+							if (info->connection == RR_Connected && info->crtc)
+							{
+								XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
+								x = crtc_info->x;
+								y = crtc_info->y;
+								w = crtc_info->width;
+								h = crtc_info->height;
+								XRRFreeCrtcInfo(crtc_info);
+							}
+							HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
+							hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
+							// Notify caller about detected device. This will
+							// call EnumerateAddDevice if the this is the first
+							// time device was detected.
+							visitor.Visit(hmdCreateDesc);
+							foundHMD = true;
+							OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
+								mi->dsc_product_name, screen->outputs[iscres]));
+						} // if
+
+						XRRFreeOutputInfo (info);
+						delete mi;
+
+						if( foundHMD )
+						{
+							break;
+						}
+					} // for
+					XRRFreeScreenResources(screen);
+					XCloseDisplay( display );
+				}
+			}
+			else
+			{
 			}
 		}
 
