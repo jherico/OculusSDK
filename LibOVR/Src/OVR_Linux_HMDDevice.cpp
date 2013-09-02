@@ -193,7 +193,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 	struct dirent *pXEntry;
     Display* display = NULL;
 
-	while( ( pXEntry = readdir( pXDirectory ) ) != NULL )
+	while( ( ( pXEntry = readdir( pXDirectory ) ) != NULL ) && ( foundHMD == false ) )
 	{
 		if( pXEntry->d_name[ 0 ] != 'X' )
 		{
