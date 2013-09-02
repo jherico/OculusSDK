@@ -22,6 +22,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "edid.h"
 
 #include <dirent.h>
+#include <X11/extensions/Xinerama.h>
 
 namespace OVR { namespace Linux {
 
@@ -287,6 +288,35 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 			}
 			else
 			{
+				if ( pRootDisplay && XineramaIsActive(pRootDisplay))
+				{
+					int numberOfScreens;
+					XineramaScreenInfo* screens = XineramaQueryScreens(pRootDisplay, &numberOfScreens);
+
+					for (int i = 0; i < numberOfScreens; i++)
+					{
+						XineramaScreenInfo screenInfo = screens[i];
+
+						if (screenInfo.width == 1280 && screenInfo.height == 800)
+						{
+							String deviceName = "OVR0001";
+
+							HMDDeviceCreateDesc hmdCreateDesc(this, deviceName, i);
+							hmdCreateDesc.SetScreenParameters(screenInfo.x_org, screenInfo.y_org, 1280, 800, 0.14976f, 0.0936f);
+
+							OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
+												deviceName.ToCStr(), i));
+
+							// Notify caller about detected device. This will call EnumerateAddDevice
+							// if the this is the first time device was detected.
+							visitor.Visit(hmdCreateDesc);
+							foundHMD = true;
+							break;
+						}
+					}
+
+					XFree(screens);
+				}
 			}
 		}
 

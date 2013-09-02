@@ -59,6 +59,7 @@ else()
         Src/OVR_Linux_SensorDevice.cpp
     )
     list(APPEND EXTRA_LIBS
+		# Should this be applied to all platforms?
         EDID
     )
     include_directories(${EDID_LIB_SOURCE_DIR})
@@ -70,7 +71,7 @@ elseif(APPLE)
     # FIXME ???
 else()
     # FIXME switch to pkg-config for this?
-    SET(OculusVR_EXTRA_LIBS pthread udev X11 Xrandr)
+    SET(OculusVR_EXTRA_LIBS pthread udev X11 Xrandr Xinerama)
 endif()
 
 add_library(OculusVR STATIC ${SOURCE_FILES})
