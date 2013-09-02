@@ -25,6 +25,11 @@ endif()
 # Used by the SDK to read the EDID of the monitors
 add_subdirectory(../3rdParty/EDID "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/EDID")
 
+# LibOVR requires knowledge on the whereabouts of the EDID header
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+include_directories(${LIB_EDID_SOURCE_DIR})
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(../LibOVR "${CMAKE_CURRENT_BINARY_DIR}/LibOVR")
 
@@ -34,17 +39,15 @@ add_subdirectory(../LibOVR "${CMAKE_CURRENT_BINARY_DIR}/LibOVR")
 #
 
 # Make sure to set up the OVR include paths
-include_directories(${OculusVR_LIB_SOURCE_DIR}/Include)
-include_directories(${OculusVR_LIB_SOURCE_DIR}/Src)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Include)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Src)
 
 # Used by the sample code to read the tuscany resources
 add_subdirectory(../3rdParty/TinyXml "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/TinyXml" )
-include_directories(${TinyXML2_LIB_SOURCE_DIR})
+include_directories(${LIB_TinyXML2_SOURCE_DIR})
 
 add_definitions( -DGL_GLEXT_PROTOTYPES )
 
 add_subdirectory (../Samples/CommonSrc "${CMAKE_CURRENT_BINARY_DIR}/Samples/CommonSrc")
 add_subdirectory (../Samples/OculusWorldDemo "${CMAKE_CURRENT_BINARY_DIR}/Samples/OculusWorldDemo")
-#add_subdirectory (../Samples/OculusRoomTiny)
-
 
