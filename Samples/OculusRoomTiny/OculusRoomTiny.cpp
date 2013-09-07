@@ -123,6 +123,38 @@ int OculusRoomTinyApp::OnStartup(const char* args)
 //            if (detectionResult == IDCANCEL)
 //                return 1;
 //        }
+
+//
+//        if (detectionMessage)
+//        {
+//            String messageText(detectionMessage);
+//            messageText += "\n\n"
+//            "Press 'Try Again' to run retry detection.\n"
+//            "Press 'Continue' to run full-screen anyway.";
+//
+//            CFStringRef headerStrRef  = CFStringCreateWithCString(NULL, "Oculus Rift Detection", kCFStringEncodingMacRoman);
+//            CFStringRef messageStrRef = CFStringCreateWithCString(NULL, messageText, kCFStringEncodingMacRoman);
+//
+//            //launch the message box
+//            CFUserNotificationDisplayAlert(0,
+//                                           kCFUserNotificationNoteAlertLevel,
+//                                           NULL, NULL, NULL,
+//                                           headerStrRef, // header text
+//                                           messageStrRef, // message text
+//                                           CFSTR("Try again"),
+//                                           CFSTR("Continue"),
+//                                           CFSTR("Cancel"),
+//                                           &detectionResult);
+//
+//            //Clean up the strings
+//            CFRelease(headerStrRef);
+//            CFRelease(messageStrRef);
+//
+//            if (detectionResult == kCFUserNotificationCancelResponse ||
+//                detectionResult == kCFUserNotificationOtherResponse)
+//                return 1;
+//        }
+
     }
 
     if (HMDInfo.HResolution > 0)
@@ -310,6 +342,12 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
     case Key_Delete:
         if (down)
             SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
+        break;
+
+    case Key_Backslash:
+        if (down)
+            // Swap eye positions.
+            SConfig.SetIPD(SConfig.GetIPD() * -1);
         break;
 
     // Holding down Shift key accelerates adjustment velocity.
