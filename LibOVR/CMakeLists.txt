@@ -105,7 +105,6 @@ elseif(APPLE)
         Src/OVR_OSX_DeviceManager.h
         Src/OVR_OSX_HIDDevice.h
         Src/OVR_OSX_HMDDevice.h
-        Src/OVR_OSX_SensorDevice.h
     )
 else()
     list(APPEND SOURCE_FILES 
@@ -119,7 +118,6 @@ else()
         Src/OVR_Linux_DeviceManager.h
         Src/OVR_Linux_HIDDevice.h
         Src/OVR_Linux_HMDDevice.h
-        Src/OVR_Linux_SensorDevice.h
     )
     list(APPEND EXTRA_LIBS
         EDID

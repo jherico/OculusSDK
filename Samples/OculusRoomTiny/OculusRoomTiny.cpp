@@ -23,7 +23,7 @@ limitations under the License.
 
 #include "OculusRoomTiny.h"
 #include "RenderTiny_Device.h"
-
+#include "OVR_KeyCodes.h"
 //-------------------------------------------------------------------------------------
 // ***** OculusRoomTiny Class
 
@@ -244,30 +244,30 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
 {
     switch (vk)
     {
-    case 'Q':
+    case Key_Q:
         if (down && ControlDown)
             Quit = true;
         break;
-//    case VK_ESCAPE:
-//        if (!down)
-//            Quit = true;
-//        break;
+    case Key_Escape:
+        if (!down)
+            Quit = true;
+        break;
 
     // Handle player movement keys.
     // We just update movement state here, while the actual translation is done in OnIdle()
     // based on time.
-    case 'W':      MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); break;
-    case 'S':      MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); break;
-    case 'A':      MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); break;
-    case 'D':      MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); break;
-//    case VK_UP:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); break;
-//    case VK_DOWN:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); break;
+    case Key_W:      MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); break;
+    case Key_S:      MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); break;
+    case Key_A:      MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); break;
+    case Key_D:      MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); break;
+    case Key_Up:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); break;
+    case Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); break;
 
-    case 'R':
+    case Key_R:
         SFusion.Reset();
         break;
 
-    case 'P':
+    case Key_P:
         if (down)
         {
             // Toggle chromatic aberration correction on/off.
@@ -286,39 +286,39 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
         }
         break;
 
-//    // Switch rendering modes/distortion.
-//    case VK_F1:
-//        SConfig.SetStereoMode(Stereo_None);
-//        PostProcess = PostProcess_None;
-//        break;
-//    case VK_F2:
-//        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-//        PostProcess = PostProcess_None;
-//        break;
-//    case VK_F3:
-//        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-//        PostProcess = PostProcess_Distortion;
-//        break;
-//
-//    // Stereo IPD adjustments, in meter (default IPD is 64mm).
-//    case VK_OEM_PLUS:
-//    case VK_INSERT:
-//        if (down)
-//            SConfig.SetIPD(SConfig.GetIPD() + 0.0005f * (ShiftDown ? 5.0f : 1.0f));
-//        break;
-//    case VK_OEM_MINUS:
-//    case VK_DELETE:
-//        if (down)
-//            SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
-//        break;
-//
-//    // Holding down Shift key accelerates adjustment velocity.
-//    case VK_SHIFT:
-//        ShiftDown = down;
-//        break;
-//    case VK_CONTROL:
-//        ControlDown = down;
-//        break;
+    // Switch rendering modes/distortion.
+    case Key_F1:
+        SConfig.SetStereoMode(Stereo_None);
+        PostProcess = PostProcess_None;
+        break;
+    case Key_F2:
+        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
+        PostProcess = PostProcess_None;
+        break;
+    case Key_F3:
+        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
+        PostProcess = PostProcess_Distortion;
+        break;
+
+    // Stereo IPD adjustments, in meter (default IPD is 64mm).
+    case Key_KP_Add:
+    case Key_Insert:
+        if (down)
+            SConfig.SetIPD(SConfig.GetIPD() + 0.0005f * (ShiftDown ? 5.0f : 1.0f));
+        break;
+    case Key_KP_Subtract:
+    case Key_Delete:
+        if (down)
+            SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
+        break;
+
+    // Holding down Shift key accelerates adjustment velocity.
+    case Key_Shift:
+        ShiftDown = down;
+        break;
+    case Key_Control:
+        ControlDown = down;
+        break;
     }
 }
 

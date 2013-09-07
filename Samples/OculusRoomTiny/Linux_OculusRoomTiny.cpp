@@ -27,12 +27,16 @@ limitations under the License.
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <X11/extensions/Xrandr.h>
+#include <X11/keysymdef.h>
+#include <X11/XF86keysym.h>
+#include "OVR_KeyCodes.h"
 
 Display* x_display = XOpenDisplay(NULL);
 Window x_root = DefaultRootWindow(x_display);
 
 //-------------------------------------------------------------------------------------
 // ***** Win32-Specific Logic
+
 typedef struct MotifHints {
     unsigned long flags;
     unsigned long functions;
@@ -43,11 +47,9 @@ typedef struct MotifHints {
 
 bool OculusRoomTinyApp::setupWindow()
 {
-
     XSetWindowAttributes swa;
-    swa.event_mask = ExposureMask | StructureNotifyMask | PointerMotionMask | KeyPressMask;
-    // FIXME don't hardcode the dimensions
-    hWnd = XCreateWindow(x_display, x_root, 0, 0, 1280, 800, 0,
+    swa.event_mask = ExposureMask | StructureNotifyMask | PointerMotionMask | KeyPressMask | KeyReleaseMask;
+    hWnd = XCreateWindow(x_display, x_root, 0, 0, HMDInfo.HResolution, HMDInfo.VResolution, 0,
             CopyFromParent, InputOutput, CopyFromParent, CWEventMask, &swa);
 
     XSetWindowAttributes xattr;
@@ -61,19 +63,19 @@ bool OculusRoomTinyApp::setupWindow()
         XSetWMHints(x_display, hWnd, &hints);
     }
 
-//    {
-//        //code to remove decoration
-//        MotifHints hints;
-//        hints.flags = 2;
-//        hints.decorations = 0;
-//        Atom property = XInternAtom(x_display, "_MOTIF_WM_HINTS", true);
-//        XChangeProperty(x_display, win, property, property, 32, PropModeReplace, (unsigned char *) &hints, 5);
-//    }
+    {
+        //code to remove decoration
+        MotifHints hints;
+        hints.flags = 2;
+        hints.decorations = 0;
+        Atom property = XInternAtom(x_display, "_MOTIF_WM_HINTS", true);
+        XChangeProperty(x_display, hWnd, property, property, 32, PropModeReplace, (unsigned char *) &hints, 5);
+    }
 
     // make the window visible on the screen
     XMapWindow(x_display, hWnd);
     XStoreName(x_display, hWnd, "OculusRoomTiny");
-    XMoveWindow(x_display, hWnd, 0, 0);
+    XMoveWindow(x_display, hWnd, HMDInfo.DesktopX, HMDInfo.DesktopY);
 
     // get identifiers for the provided atom name strings
     Atom wm_state = XInternAtom(x_display, "_NET_WM_STATE", 0);
@@ -103,6 +105,64 @@ void OculusRoomTinyApp::destroyWindow()
     }
 }
 
+unsigned int ovrKeyForX11Key(KeySym key) {
+    if (key >= XK_A && key <= XK_Z) {
+        int offset = (key - XK_A);
+        return Key_A + offset;
+    }
+    if (key >= XK_a && key <= XK_z) {
+        int offset = (key - XK_a);
+        return Key_A + offset;
+    }
+
+    if (key >= XK_0 && key <= XK_9) {
+        return Key_Num0 + (key - XK_0);
+    }
+    if (key >= XK_F1 && key <= XK_F12) {
+        return Key_F1 + (key - XK_F1);
+    }
+    if (key >= XK_Left && key <= XK_Down) {
+        return Key_Left + (key - XK_Left);
+    }
+
+    switch (key) {
+    case XK_Escape:
+        return Key_Escape;
+
+    case XK_Shift_L:
+    case XK_Shift_R:
+        return Key_Shift;
+
+    case XK_Control_L:
+    case XK_Control_R:
+        return Key_Shift;
+
+    case XK_KP_Add:
+        return Key_KP_Add;
+
+    case XK_KP_Subtract:
+        return Key_KP_Subtract;
+
+    case XK_Page_Up:
+    case XK_KP_Page_Up:
+        return Key_PageUp;
+
+    case XK_Page_Down:
+    case XK_KP_Page_Down:
+        return Key_PageUp;
+
+    case XK_Home:
+        return Key_Home;
+    case XK_End:
+        return Key_End;
+    case XK_Delete:
+        return Key_Delete;
+    case XK_Insert:
+        return Key_Insert;
+    }
+    return Key_None;
+}
+
 bool OculusRoomTinyApp::processXEvents() {
     bool exit = false;
 
@@ -110,14 +170,11 @@ bool OculusRoomTinyApp::processXEvents() {
     while (XPending(x_display)) {
         XEvent xev;
         XNextEvent(x_display, &xev);
-        if (xev.type == KeyPress) {
-            KeySym key;
-            char text;
-            if (XLookupString(&xev.xkey, &text, 1, &key, 0) == 1) {
-//                if (!keys(text, 0, 0)) {
-//                    exit = true;
-//                }
-            }
+        if (xev.type == KeyPress || xev.type == KeyRelease) {
+            KeySym key = XLookupKeysym(&xev.xkey, 0);
+            // Convert the platform key code to the OVR keycode
+            unsigned int ovrKey = ovrKeyForX11Key(key);
+            OnKey(ovrKey, xev.type == KeyPress);
         }
         if (xev.type == DestroyNotify)
             exit = true;
@@ -125,94 +182,10 @@ bool OculusRoomTinyApp::processXEvents() {
     return !exit;
 }
 
-//LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
-//{
-//    switch (msg)
-//    {
-//    case WM_MOUSEMOVE:
-//        {
-//            if (MouseCaptured)
-//            {
-//                // Convert mouse motion to be relative (report the offset and re-center).
-//                POINT newPos = { LOWORD(lp), HIWORD(lp) };
-//                ::ClientToScreen(hWnd, &newPos);
-//                if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
-//                    break;
-//                ::SetCursorPos(WindowCenter.x, WindowCenter.y);
-//
-//                LONG dx = newPos.x - WindowCenter.x;
-//                LONG dy = newPos.y - WindowCenter.y;
-//                pApp->OnMouseMove(dx, dy, 0);
-//            }
-//        }
-//        break;
-//
-//    case WM_MOVE:
-//        {
-//            RECT r;
-//            GetClientRect(hWnd, &r);
-//            WindowCenter.x = r.right/2;
-//            WindowCenter.y = r.bottom/2;
-//            ::ClientToScreen(hWnd, &WindowCenter);
-//        }
-//        break;
-//
-//    case WM_KEYDOWN:
-//        OnKey((unsigned)wp, true);
-//        break;
-//    case WM_KEYUP:
-//        OnKey((unsigned)wp, false);
-//        break;
-//
-//    case WM_SETFOCUS:
-//        giveUsFocus(true);
-//        break;
-//
-//    case WM_KILLFOCUS:
-//        giveUsFocus(false);
-//        break;
-//
-//    case WM_CREATE:
-//        // Hack to position mouse in fullscreen window shortly after startup.
-//        SetTimer(hWnd, 0, 100, NULL);
-//        break;
-//
-//    case WM_TIMER:
-//        KillTimer(hWnd, 0);
-//        giveUsFocus(true);
-//        break;
-//
-//    case WM_QUIT:
-//    case WM_CLOSE:
-//        Quit = true;
-//        return 0;
-//    }
-//
-//    return DefWindowProc(hWnd, msg, wp, lp);
-//}
-
-static inline float GamepadStick(short in)
-{
-    float v;
-    if (abs(in) < 9000)
-        return 0;
-    else if (in > 9000)
-        v = (float) in - 9000;
-    else
-        v = (float) in + 9000;
-    return v / (32767 - 9000);
-}
-
-//static inline float GamepadTrigger(BYTE in)
-//{
-//    return (in < 30) ? 0.0f : (float(in-30) / 225);
-//}
-
-
 int OculusRoomTinyApp::Run()
 {
-    pRender->SetWindowSize(1280, 800);
-    pRender->SetViewport(0, 0, 1280, 800);
+    pRender->SetWindowSize(HMDInfo.HResolution, HMDInfo.VResolution);
+    pRender->SetViewport(0, 0, HMDInfo.HResolution, HMDInfo.VResolution);
     while (!Quit) {
         processXEvents();
         pApp->OnIdle();

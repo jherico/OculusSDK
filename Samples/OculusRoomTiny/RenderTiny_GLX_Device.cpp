@@ -7,6 +7,13 @@ extern Display * x_display;
 
 namespace OVR { namespace RenderTiny { namespace GL {
 
+
+void RenderDevice::Present() {
+    glXSwapBuffers(x_display, (Window)oswnd);
+}
+
+} // Namespace GL
+
 // Implement static initializer function to create this class.
 RenderTiny::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
 {
@@ -28,14 +35,11 @@ RenderTiny::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, v
         return NULL;
     }
 
-    return new RenderDevice(rp, oswnd);
+    return new GL::RenderDevice(rp, oswnd);
 }
 
-void RenderDevice::Present() {
-    glXSwapBuffers(x_display, (Window)oswnd);
-}
-
-}}}
+} // Namespace RenderTiny
+} // Namespace OVR
 
 //
 //
