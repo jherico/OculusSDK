@@ -20,7 +20,7 @@ if (WIN32)
 	)
 
     list(APPEND SOURCE_FILES 
-        OculusRoomTiny_Win32.cpp
+        Win32_OculusRoomTiny.cpp
         RenderTiny_D3D1X_Device.cpp
     )
 
@@ -33,7 +33,7 @@ else()
     )
 
     list(APPEND SOURCE_FILES 
-        OculusRoomTiny_Linux.cpp
+        Linux_OculusRoomTiny.cpp
         RenderTiny_GL_Device.cpp
         RenderTiny_GLX_Device.cpp
     )

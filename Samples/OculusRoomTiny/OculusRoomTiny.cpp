@@ -22,7 +22,7 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OculusRoomTiny.h"
-#include "RenderTiny_GL_Device.h"
+#include "RenderTiny_Device.h"
 
 //-------------------------------------------------------------------------------------
 // ***** OculusRoomTiny Class

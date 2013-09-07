@@ -23,6 +23,18 @@ limitations under the License.
 
 #include "OculusRoomTiny.h"
 #include <Xinput.h>
+
+// *** Win32 System Variables
+POINT WindowCenter;
+bool  MouseCaptured;
+void  giveUsFocus(bool setFocus, HWND hWnd);
+
+// Dynamically ink to XInput to simplify projects.
+typedef DWORD (WINAPI *PFn_XInputGetState)(DWORD dwUserIndex, XINPUT_STATE* pState);
+PFn_XInputGetState  pXInputGetState;
+HMODULE             hXInputModule;
+UInt32              LastPadPacketNo;
+
 //-------------------------------------------------------------------------------------
 // ***** Win32-Specific Logic
 
@@ -49,7 +61,7 @@ bool OculusRoomTinyApp::setupWindow()
     // Initialize Window center in screen coordinates
     POINT center = { Width / 2, Height / 2 };
     ::ClientToScreen(hWnd, &center);
-//    WindowCenter = center;
+    WindowCenter = center;
 
 
     return (hWnd != NULL);
@@ -77,8 +89,7 @@ LRESULT CALLBACK OculusRoomTinyApp::systemWindowProc(HWND hwnd, UINT msg, WPARAM
     return pApp->windowProc(msg, wp, lp);
 }
 
-/*
-void OculusRoomTinyApp::giveUsFocus(bool setFocus)
+void giveUsFocus(bool setFocus, HWND hWnd)
 {
 	if (setFocus)
     {
@@ -96,7 +107,6 @@ void OculusRoomTinyApp::giveUsFocus(bool setFocus)
         ::ShowCursor(TRUE);
     }
 }
-*/
 
 LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -104,29 +114,29 @@ LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
     {
     case WM_MOUSEMOVE:
         {
-            //if (MouseCaptured)
-            //{
-            //    // Convert mouse motion to be relative (report the offset and re-center).
-            //    POINT newPos = { LOWORD(lp), HIWORD(lp) };
-            //    ::ClientToScreen(hWnd, &newPos);
-            //    if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
-            //        break;
-            //    ::SetCursorPos(WindowCenter.x, WindowCenter.y);
+            if (MouseCaptured)
+            {
+                // Convert mouse motion to be relative (report the offset and re-center).
+                POINT newPos = { LOWORD(lp), HIWORD(lp) };
+                ::ClientToScreen(hWnd, &newPos);
+                if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
+                    break;
+                ::SetCursorPos(WindowCenter.x, WindowCenter.y);
 
-            //    LONG dx = newPos.x - WindowCenter.x;
-            //    LONG dy = newPos.y - WindowCenter.y;
-            //    pApp->OnMouseMove(dx, dy, 0);
-            //}
+                LONG dx = newPos.x - WindowCenter.x;
+                LONG dy = newPos.y - WindowCenter.y;
+                pApp->OnMouseMove(dx, dy, 0);
+            }
         }
         break;
 
     case WM_MOVE:
         {
-            //RECT r;
-            //GetClientRect(hWnd, &r);
-            //WindowCenter.x = r.right/2;
-            //WindowCenter.y = r.bottom/2;
-            //::ClientToScreen(hWnd, &WindowCenter);
+            RECT r;
+            GetClientRect(hWnd, &r);
+            WindowCenter.x = r.right/2;
+            WindowCenter.y = r.bottom/2;
+            ::ClientToScreen(hWnd, &WindowCenter);
         }
         break;
 
@@ -137,23 +147,23 @@ LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
         OnKey((unsigned)wp, false);
         break;
 
-    //case WM_SETFOCUS:
-    //    giveUsFocus(true);
-    //    break;
+    case WM_SETFOCUS:
+        giveUsFocus(true, hWnd);
+        break;
 
-    //case WM_KILLFOCUS:
-    //    giveUsFocus(false);
-    //    break;
+    case WM_KILLFOCUS:
+        giveUsFocus(false, hWnd);
+        break;
 
-    //case WM_CREATE:
-    //    // Hack to position mouse in fullscreen window shortly after startup.
-    //    SetTimer(hWnd, 0, 100, NULL);
-    //    break;
+    case WM_CREATE:
+        // Hack to position mouse in fullscreen window shortly after startup.
+        SetTimer(hWnd, 0, 100, NULL);
+        break;
 
-    //case WM_TIMER:
-    //    KillTimer(hWnd, 0);
-    //    giveUsFocus(true);
-    //    break;
+    case WM_TIMER:
+        KillTimer(hWnd, 0);
+        giveUsFocus(true, hWnd);
+        break;
 
     case WM_QUIT:
     case WM_CLOSE:
@@ -197,19 +207,19 @@ int OculusRoomTinyApp::Run()
         }
         else
         {
-            //// Read game-pad.
-            //XINPUT_STATE xis;
+            // Read game-pad.
+            XINPUT_STATE xis;
 
-            //if (pXInputGetState && !pXInputGetState(0, &xis) &&
-            //    (xis.dwPacketNumber != LastPadPacketNo))
-            //{
-            //    OnGamepad(GamepadStick(xis.Gamepad.sThumbLX),
-            //              GamepadStick(xis.Gamepad.sThumbLY),
-            //              GamepadStick(xis.Gamepad.sThumbRX),
-            //              GamepadStick(xis.Gamepad.sThumbRY));
-            //    //pad.LT = GamepadTrigger(xis.Gamepad.bLeftTrigger);
-            //    LastPadPacketNo = xis.dwPacketNumber;
-            //}
+            if (pXInputGetState && !pXInputGetState(0, &xis) &&
+                (xis.dwPacketNumber != LastPadPacketNo))
+            {
+                OnGamepad(GamepadStick(xis.Gamepad.sThumbLX),
+                          GamepadStick(xis.Gamepad.sThumbLY),
+                          GamepadStick(xis.Gamepad.sThumbRX),
+                          GamepadStick(xis.Gamepad.sThumbRY));
+                //pad.LT = GamepadTrigger(xis.Gamepad.bLeftTrigger);
+                LastPadPacketNo = xis.dwPacketNumber;
+            }
 
             pApp->OnIdle();
 

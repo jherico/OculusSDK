@@ -44,7 +44,7 @@ typedef Window OVR_TINY_WINDOW;
 
 //#include "Util/Util_Render_Stereo.h"
 #include <Kernel/OVR_Timer.h>
-#include "RenderTiny_GL_Device.h"
+#include "RenderTiny_Device.h"
 
 using namespace OVR;
 using namespace OVR::Util::Render;
