@@ -10,7 +10,6 @@ set(SOURCE_FILES
 )
 
 if(WIN32)
-
     list(APPEND SOURCE_FILES 
         Platform/Win32_Platform.cpp
         Platform/Win32_Gamepad.cpp
@@ -27,7 +26,6 @@ if(WIN32)
 	)
 
 elseif(APPLE)
-
     list(APPEND SOURCE_FILES 
         Platform/OSX_Platform.mm
         Platform/OSX_Gamepad.cpp
@@ -36,9 +34,7 @@ elseif(APPLE)
     )
 
     # FIXME ??? need to add libraries here
-    
 else()
-
     list(APPEND SOURCE_FILES 
         Platform/Linux_Platform.cpp
         Platform/Linux_Gamepad.cpp
@@ -46,7 +42,6 @@ else()
     )
 
     list(APPEND CommonSrc_EXTRA_LIBS GL GLU glut) 
-
 endif()
 
 add_library (CommonSrc STATIC ${SOURCE_FILES})

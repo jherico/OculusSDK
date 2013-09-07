@@ -231,8 +231,9 @@ static const char* FShaderSrcs[FShader_Count] =
 
 
 
-RenderDevice::RenderDevice(const RendererParams& p)
+RenderDevice::RenderDevice(const RendererParams& p, void * oswnd) : oswnd(oswnd)
 {
+
     for (int i = 0; i < VShader_Count; i++)
         VertexShaders[i] = *new Shader(this, Shader_Vertex, VShaderSrcs[i]);
 
@@ -484,7 +485,7 @@ void* Buffer::Map(size_t start, size_t size, int flags)
     int mode = GL_WRITE_ONLY;
     //if (flags & Map_Unsynchronized)
     //    mode |= GL_MAP_UNSYNCHRONIZED;
-    
+
     glBindBuffer(Use, GLBuffer);
     void* v = glMapBuffer(Use, mode);
     glBindBuffer(Use, 0);
@@ -723,10 +724,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     Texture* NewTex = new Texture(this, width, height);
     glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
     glGetError();
-    
+
     glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, glformat, gltype, data);
     OVR_ASSERT(!glGetError());
-    
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);

@@ -1,6 +1,6 @@
 project (CORE_OculusVR)
 
-include_directories(Include)
+include_directories(Include Src Src/Kernel Src/Util)
 
 set(SOURCE_FILES
     Src/Kernel/OVR_Alg.cpp
@@ -33,6 +33,50 @@ set(SOURCE_FILES
     Src/Util/Util_Render_Stereo.cpp
 )
 
+set(HEADER_FILES
+    Include/OVR.h
+    Include/OVRVersion.h 
+    Src/Kernel/OVR_Alg.h
+    Src/Kernel/OVR_Allocator.h
+    Src/Kernel/OVR_Array.h
+    Src/Kernel/OVR_Atomic.h
+    Src/Kernel/OVR_Color.h
+    Src/Kernel/OVR_ContainerAllocator.h
+    Src/Kernel/OVR_File.h
+    Src/Kernel/OVR_Hash.h
+    Src/Kernel/OVR_KeyCodes.h
+    Src/Kernel/OVR_List.h
+    Src/Kernel/OVR_Log.h
+    Src/Kernel/OVR_Math.h
+    Src/Kernel/OVR_RefCount.h
+    Src/Kernel/OVR_Std.h
+    Src/Kernel/OVR_String.h
+    Src/Kernel/OVR_SysFile.h
+    Src/Kernel/OVR_System.h
+    Src/Kernel/OVR_Timer.h
+    Src/Kernel/OVR_Threads.h
+    Src/Kernel/OVR_Types.h
+    Src/Kernel/OVR_UTF8Util.h
+    Src/OVR_Device.h
+    Src/OVR_DeviceConstants.h
+    Src/OVR_DeviceHandle.h
+    Src/OVR_DeviceImpl.h
+    Src/OVR_DeviceMessages.h
+    Src/OVR_HIDDevice.h
+    Src/OVR_HIDDeviceBase.h
+    Src/OVR_HIDDeviceImpl.h
+    Src/OVR_JSON.h
+    Src/OVR_LatencyTestImpl.h
+    Src/OVR_Profile.h
+    Src/OVR_SensorFilter.h
+    Src/OVR_SensorFusion.h
+    Src/OVR_SensorImpl.h
+    Src/OVR_ThreadCommandQueue.h
+    Src/Util/Util_LatencyTest.h
+    Src/Util/Util_MagCalibration.h
+    Src/Util/Util_Render_Stereo.h
+)
+
 if(WIN32)
     list(APPEND SOURCE_FILES 
         Src/Kernel/OVR_ThreadsWinAPI.cpp
@@ -42,6 +86,13 @@ if(WIN32)
         Src/OVR_Win32_HMDDevice.cpp
         Src/OVR_Win32_SensorDevice.cpp
     )
+    list(APPEND HEADER_FILES
+        Src/OVR_Win32_DeviceManager.h
+        Src/OVR_Win32_DeviceStatus.h
+        Src/OVR_Win32_HIDDevice.h
+        Src/OVR_Win32_HMDDevice.h
+        Src/OVR_Win32_SensorDevice.h
+    )
 elseif(APPLE)
     list(APPEND SOURCE_FILES 
         Src/Kernel/OVR_ThreadsPthread.cpp
@@ -50,6 +101,12 @@ elseif(APPLE)
         Src/OVR_OSX_HMDDevice.cpp
         Src/OVR_OSX_SensorDevice.cpp
     )
+    list(APPEND HEADER_FILES
+        Src/OVR_OSX_DeviceManager.h
+        Src/OVR_OSX_HIDDevice.h
+        Src/OVR_OSX_HMDDevice.h
+        Src/OVR_OSX_SensorDevice.h
+    )
 else()
     list(APPEND SOURCE_FILES 
         Src/Kernel/OVR_ThreadsPthread.cpp
@@ -57,6 +114,12 @@ else()
         Src/OVR_Linux_HIDDevice.cpp
         Src/OVR_Linux_HMDDevice.cpp
         Src/OVR_Linux_SensorDevice.cpp
+    )
+    list(APPEND HEADER_FILES
+        Src/OVR_Linux_DeviceManager.h
+        Src/OVR_Linux_HIDDevice.h
+        Src/OVR_Linux_HMDDevice.h
+        Src/OVR_Linux_SensorDevice.h
     )
     list(APPEND EXTRA_LIBS
         EDID
@@ -73,5 +136,5 @@ else()
     SET(OculusVR_EXTRA_LIBS EDID pthread udev X11 Xrandr)
 endif()
 
-add_library(OculusVR STATIC ${SOURCE_FILES})
+add_library(OculusVR STATIC ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(OculusVR ${OculusVR_EXTRA_LIBS})

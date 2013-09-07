@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.8)
 
 # Support our own custom modules
 list(APPEND CMAKE_MODULE_PATH
-    ${CMAKE_SOURCE_DIR}/CMake/Modules
+    ${CMAKE_SOURCE_DIR}/Modules
 )
 
 set(CMAKE_BUILD_TYPE "Debug")
@@ -38,15 +38,15 @@ add_subdirectory(../LibOVR "${CMAKE_CURRENT_BINARY_DIR}/LibOVR")
 # Make sure to set up the OVR include paths
 include_directories(${CORE_OculusVR_SOURCE_DIR}/Include)
 include_directories(${CORE_OculusVR_SOURCE_DIR}/Src)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Kernel)
+include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Util)
 
 # Used by the sample code to read the tuscany resources
 add_subdirectory(../3rdParty/TinyXml "${CMAKE_CURRENT_BINARY_DIR}/3rdParty/TinyXml" )
 include_directories(${LIB_TinyXML2_SOURCE_DIR})
 
 add_definitions( -DGL_GLEXT_PROTOTYPES )
-
 add_subdirectory (../Samples/CommonSrc "${CMAKE_CURRENT_BINARY_DIR}/Samples/CommonSrc")
 add_subdirectory (../Samples/OculusWorldDemo "${CMAKE_CURRENT_BINARY_DIR}/Samples/OculusWorldDemo")
-#add_subdirectory (../Samples/OculusRoomTiny)
-
+add_subdirectory (../Samples/OculusRoomTiny "${CMAKE_CURRENT_BINARY_DIR}/Samples/OculusRoomTiny")
 
