@@ -18,12 +18,12 @@ if (WIN32)
     	${DirectX_LIB_SEARCH_PATH}/d3dcompiler.lib
     	${DirectX_LIB_SEARCH_PATH}/dxgi.lib
 	)
+	include_directories(${DirectX_INC_SEARCH_PATH})
 
     list(APPEND SOURCE_FILES 
         Win32_OculusRoomTiny.cpp
         RenderTiny_D3D1X_Device.cpp
     )
-
     add_executable(OculusTinyRoom WIN32 ${SOURCE_FILES})
 elseif (APPLE) 
 

@@ -23,6 +23,7 @@ limitations under the License.
 
 #include "OculusRoomTiny.h"
 #include <Xinput.h>
+#include "OVR_KeyCodes.h"
 
 // *** Win32 System Variables
 POINT WindowCenter;
@@ -108,6 +109,62 @@ void giveUsFocus(bool setFocus, HWND hWnd)
     }
 }
 
+unsigned int ovrKeyForWin32Key(WPARAM key) {
+    if (key >= 'A' && key <= 'Z') {
+        int offset = (key - 'A');
+        return Key_A + offset;
+    }
+
+    if (key >= '0' && key <= '9') {
+        return Key_Num0 + (key - '0');
+    }
+    if (key >= VK_F1 && key <= VK_F12) {
+        return Key_F1 + (key - VK_F1);
+    }
+    if (key >= VK_LEFT && key <= VK_DOWN) {
+        return Key_Left + (key - VK_LEFT);
+    }
+
+    switch (key) {
+    case VK_ESCAPE:
+        return Key_Escape;
+
+    case VK_SHIFT:
+        return Key_Shift;
+
+    case VK_CONTROL:
+        return Key_Shift;
+
+    case VK_ADD:
+        return Key_KP_Add;
+
+    case VK_SUBTRACT:
+        return Key_KP_Subtract;
+
+    case VK_PRIOR:
+        return Key_PageUp;
+
+    case VK_NEXT:
+        return Key_PageUp;
+
+    case VK_HOME:
+        return Key_Home;
+    case VK_END:
+        return Key_End;
+
+	case VK_INSERT:
+        return Key_Delete;
+
+	case VK_DELETE:
+        return Key_Insert;
+
+	case VK_OEM_102:
+		return Key_Backslash;
+    }
+    return Key_None;
+}
+
+
 LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg)
@@ -141,10 +198,12 @@ LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
         break;
 
     case WM_KEYDOWN:
-        OnKey((unsigned)wp, true);
+        OnKey(ovrKeyForWin32Key(wp), true);
         break;
-    case WM_KEYUP:
-        OnKey((unsigned)wp, false);
+
+	case WM_KEYUP:
+
+        OnKey(ovrKeyForWin32Key(wp), false);
         break;
 
     case WM_SETFOCUS:

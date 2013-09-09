@@ -48,17 +48,12 @@ limitations under the License.
 #define WORLDDEMO_ASSET_PATH4 "../../../Samples/OculusWorldDemo/Assets/Tuscany/"
 #define WORLDDEMO_ASSET_PATH5 "../Samples/OculusWorldDemo/Assets/Tuscany/"
 
+// Try to accomidate a host of different build systems.  
+// Alternatively, make CMake include a task to always put the 
 const char * ASSET_PATHS[] = {
-    // Relative from the cmake Build directory
-    "../Samples/OculusWorldDemo/Assets/Tuscany/",
-    // Relative from the cmake OculusWorldDemo location
-    "../../../Samples/OculusWorldDemo/Assets/Tuscany/",
-    // Relative from the app
     "Assets/Tuscany/",
-    // Relative from Release/Debug locations via VS
     "../Assets/Tuscany/",
-    // Relative from The link file in the root of the SDK
-    "Samples/OculusWorldDemo/Assets/Tuscany/"
+    0
 };
 
 using namespace OVR;
@@ -500,13 +495,15 @@ int OculusWorldDemoApp::OnStartup(int argc, char** argv)
     // Try to modify path for correctness in case specified file is not found.
     if (!SysFile(MainFilePath).IsValid())
     {
-        for (const std::string & path : ASSET_PATHS) {
-            String newPath(String(path.c_str()) + MainFilePath);
+        int i = 0;
+        while (ASSET_PATHS[i]) {
+            String newPath(String(ASSET_PATHS[i]) + MainFilePath);
             printf((const char *)newPath); printf("\n");
             if (SysFile(newPath).IsValid()) {
                 MainFilePath = newPath;
                 break;
             }
+            ++i;
         }
     }
 

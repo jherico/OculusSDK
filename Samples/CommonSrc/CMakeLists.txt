@@ -24,7 +24,7 @@ if(WIN32)
     	${DirectX_LIB_SEARCH_PATH}/d3dcompiler.lib
     	${DirectX_LIB_SEARCH_PATH}/dxgi.lib
 	)
-
+	include_directories(${DirectX_INC_SEARCH_PATH})
 elseif(APPLE)
     list(APPEND SOURCE_FILES 
         Platform/OSX_Platform.mm
