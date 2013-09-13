@@ -1,11 +1,34 @@
+# The project gitignore file is primarily for specifying artifacts in
+# the Official SDK which we do not wish to track in Git, but which we
+# Should expect to exist in any directory where the official SDK has 
+# been placed along with the Git repository
+
+# Please do not submit pull requests with .gitignore modifications 
+# without fist opening an issue or some other dialogue to 
+# ensure that a change to the .gitignore is the right thing to do.
+
+# Also, do not submit pull requests with .gitignore modifications
+# mixed in with other unrelated changes.
+
+
+Doc
 LibOVR/Lib
 LibOVR/Obj
+Mac_OculusWorldDemo.app/Contents/Resources
+OculusWorldDemo.app
 Samples/**/Obj
 Samples/**/Release
 Samples/**/Debug
-Samples/OculusWorldDemo/Assets
-Mac_OculusWorldDemo.app/Contents/Resources
-Doc
 Tools
-.*
-OculusWorldDemo.app
+
+# Do not include items like these that are not specific to this project.
+# .*
+# *~
+
+# If you need to exclude temp or backup files or files created  your build 
+# system, you should place those in a global gitignore file in your root 
+# directory.
+# See: https://help.github.com/articles/ignoring-files
+
+
+
