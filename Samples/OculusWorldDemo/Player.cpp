@@ -24,7 +24,7 @@ limitations under the License.
 #include <Kernel/OVR_Alg.h>
 
 Player::Player(void)
-	: EyeHeight(1.8f),
+	: UserEyeHeight(1.8f),
 	  EyePos(7.7f, 1.8f, -1.0f),
       EyeYaw(YawInitial), EyePitch(0), EyeRoll(0),
       LastSensorYaw(0)
@@ -158,9 +158,9 @@ void Player::HandleCollision(double dt, Array<Ptr<CollisionModel> >* collisionMo
         }
 
         // Maintain the minimum camera height
-        if (EyeHeight - finalDistanceDown < 1.0f)
+        if (UserEyeHeight - finalDistanceDown < 1.0f)
         {
-            EyePos.y += EyeHeight - finalDistanceDown;
+            EyePos.y += UserEyeHeight - finalDistanceDown;
         }
     }
 }

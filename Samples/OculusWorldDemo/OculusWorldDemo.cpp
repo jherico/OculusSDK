@@ -36,13 +36,25 @@ limitations under the License.
 
 #include "Player.h"
 
+#include <vector>
+#include <string>
+
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
 #define WORLDDEMO_ASSET_PATH1 "Assets/Tuscany/"
 #define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
 // This path allows the shortcut to work.
 #define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH4 "../../../Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH5 "../Samples/OculusWorldDemo/Assets/Tuscany/"
 
+// Try to accomidate a host of different build systems.  
+// Alternatively, make CMake include a task to always put the 
+const char * ASSET_PATHS[] = {
+    "Assets/Tuscany/",
+    "../Assets/Tuscany/",
+    0
+};
 
 using namespace OVR;
 using namespace OVR::Platform;
@@ -342,8 +354,8 @@ int OculusWorldDemoApp::OnStartup(int argc, char** argv)
         pUserProfile = pHMD->GetProfile();
         if (pUserProfile)
         {
-            ThePlayer.EyeHeight = pUserProfile->GetEyeHeight();
-            ThePlayer.EyePos.y = ThePlayer.EyeHeight;
+            ThePlayer.UserEyeHeight = pUserProfile->GetEyeHeight();
+            ThePlayer.EyePos.y = ThePlayer.UserEyeHeight;
         }
     }
     else
@@ -483,15 +495,16 @@ int OculusWorldDemoApp::OnStartup(int argc, char** argv)
     // Try to modify path for correctness in case specified file is not found.
     if (!SysFile(MainFilePath).IsValid())
     {
-        String prefixPath1(pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1),
-               prefixPath2(WORLDDEMO_ASSET_PATH2),
-               prefixPath3(WORLDDEMO_ASSET_PATH3);
-        if (SysFile(prefixPath1 + MainFilePath).IsValid())
-            MainFilePath = prefixPath1 + MainFilePath;
-        else if (SysFile(prefixPath2 + MainFilePath).IsValid())
-            MainFilePath = prefixPath2 + MainFilePath;
-        else if (SysFile(prefixPath3 + MainFilePath).IsValid())
-            MainFilePath = prefixPath3 + MainFilePath;
+        int i = 0;
+        while (ASSET_PATHS[i]) {
+            String newPath(String(ASSET_PATHS[i]) + MainFilePath);
+            printf((const char *)newPath); printf("\n");
+            if (SysFile(newPath).IsValid()) {
+                MainFilePath = newPath;
+                break;
+            }
+            ++i;
+        }
     }
 
     PopulatePreloadScene();
@@ -915,7 +928,7 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
 
         // Reset the camera position in case we get stuck
     case Key_T:
-        ThePlayer.EyePos = Vector3f(10.0f, 1.6f, 10.0f);
+        ThePlayer.EyePos = Vector3f(10.0f, ThePlayer.UserEyeHeight, 10.0f);
         break;
 
     case Key_F5:
@@ -1109,6 +1122,7 @@ void OculusWorldDemoApp::OnIdle()
                         {
                             pSensor = *desc.Handle.CreateDeviceTyped<SensorDevice>();
                             SFusion.AttachToSensor(pSensor);
+
                             SetAdjustMessage("---------------------------\n"
                                              "SENSOR connected\n"
                                              "---------------------------");
@@ -1214,16 +1228,6 @@ void OculusWorldDemoApp::OnIdle()
         (this->*pAdjustFunc)(dt * AdjustDirection * (ShiftDown ? 5.0f : 1.0f));
     }
 
-    // Process latency tester results.
-    const char* results = LatencyUtil.GetResultsString();
-    if (results != NULL)
-    {
-        LogText("LATENCY TESTER: %s\n", results);
-    }
-
-    // Have to place this as close as possible to where the HMD orientation is read.
-    LatencyUtil.ProcessInputs();
-
     // Magnetometer calibration procedure
     if (MagCal.IsManuallyCalibrating())
         UpdateManualMagCalibration();
@@ -1243,6 +1247,17 @@ void OculusWorldDemoApp::OnIdle()
             SetAdjustMessage("   Magnetometer Calibration Complete   \nCenter: %f %f %f",mc.x,mc.y,mc.z);
         }
     }
+
+
+    // Process latency tester results.
+    const char* results = LatencyUtil.GetResultsString();
+    if (results != NULL)
+    {
+        LogText("LATENCY TESTER: %s\n", results);
+    }
+
+    // >>> THIS MUST BE PLACED AS CLOSE AS POSSIBLE TO WHERE THE HMD ORIENTATION IS READ <<<
+    LatencyUtil.ProcessInputs();
 
     // Handle Sensor motion.
     // We extract Yaw, Pitch, Roll instead of directly using the orientation
@@ -1474,9 +1489,9 @@ void OculusWorldDemoApp::UpdateManualMagCalibration()
 static const char* HelpText =
     "F1         \t100 NoStereo                   \t420 Z    \t520 Manual Mag Calib\n"
     "F2         \t100 Stereo                     \t420 X    \t520 Auto Mag Calib\n"
-    "F3         \t100 StereoHMD                  \t420 ;    \t520 Mag Set Ref Point\n"
-    "F4         \t100 MSAA                       \t420 F6   \t520 Mag Info\n"
-    "F9         \t100 FullScreen                 \t420 R    \t520 Reset SensorFusion\n"
+    "F3         \t100 StereoHMD                  \t420 F6    \t520 Yaw Drift Info\n"
+    "F4         \t100 MSAA                       \t420 R    \t520 Reset SensorFusion\n"
+    "F9         \t100 FullScreen                 \t420\n"
     "F11        \t100 Fast FullScreen                   \t500 - +       \t660 Adj EyeHeight\n"
     "C          \t100 Chromatic Ab                      \t500 [ ]       \t660 Adj FOV\n"
     "P          \t100 Motion Pred                       \t500 Shift     \t660 Adj Faster\n"
@@ -1568,7 +1583,7 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
     {
         LoadingScene.Render(pRender, Matrix4f());
         String loadMessage = String("Loading ") + MainFilePath;
-        DrawTextBox(pRender, 0.0f, 0.25f, textHeight, loadMessage.ToCStr(), DrawText_HCenter);
+        DrawTextBox(pRender, 0.0f, 0.0f, textHeight, loadMessage.ToCStr(), DrawText_HCenter);
         LoadingState = LoadingState_DoLoad;
     }
 
@@ -1587,7 +1602,7 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
                     " FPS: %d  Frame: %d \n Pos: %3.2f, %3.2f, %3.2f \n"
                     " EyeHeight: %3.2f",
                     RadToDegree(ThePlayer.EyeYaw), RadToDegree(ThePlayer.EyePitch), RadToDegree(ThePlayer.EyeRoll),
-                    FPS, FrameCounter, ThePlayer.EyePos.x, ThePlayer.EyePos.y, ThePlayer.EyePos.z, ThePlayer.EyePos.y);
+                    FPS, FrameCounter, ThePlayer.EyePos.x, ThePlayer.EyePos.y, ThePlayer.EyePos.z, ThePlayer.UserEyeHeight);
         size_t texMemInMB = pRender->GetTotalTextureMemoryUsage() / 1058576;
         if (texMemInMB)
         {
@@ -1695,10 +1710,10 @@ void OculusWorldDemoApp::AdjustEyeHeight(float dt)
 {
     float dist = 0.5f * dt;
 
-    ThePlayer.EyeHeight += dist;
+    ThePlayer.UserEyeHeight += dist;
     ThePlayer.EyePos.y += dist;
 
-    SetAdjustMessage("EyeHeight: %4.2f", ThePlayer.EyeHeight);
+    SetAdjustMessage("UserEyeHeight: %4.2f", ThePlayer.UserEyeHeight);
 }
 
 void OculusWorldDemoApp::AdjustMotionPrediction(float dt)

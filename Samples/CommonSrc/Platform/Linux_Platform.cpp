@@ -24,7 +24,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 // Renderers
 #include "../Render/Render_GL_Device.h"
 
-#include <X11/extensions/Xinerama.h>
+#include <X11/extensions/Xrandr.h>
 
 
 namespace OVR { namespace Platform { namespace Linux {
@@ -370,28 +370,23 @@ int PlatformCore::Run()
 
 bool PlatformCore::determineScreenOffset(int screenId, int* screenOffsetX, int* screenOffsetY)
 {
-    Display* display = XOpenDisplay(NULL);
-
-    bool foundScreen = false;
-
-    if (display)
-    {
-        int numberOfScreens;
-        XineramaScreenInfo* screens = XineramaQueryScreens(display, &numberOfScreens);
-
-        if (screenId < numberOfScreens)
-        {
-            XineramaScreenInfo screenInfo = screens[screenId];
-            *screenOffsetX = screenInfo.x_org;
-            *screenOffsetY = screenInfo.y_org;
-
-            foundScreen = true;
+    bool result = false;
+    if (screenId) {
+        Display* display = XOpenDisplay(NULL);
+        XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
+        XRROutputInfo * info = XRRGetOutputInfo (display, screen, screenId);
+        if (info->crtc) {
+            XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
+            *screenOffsetX = crtc_info->x;
+            *screenOffsetY = crtc_info->y;
+            XRRFreeCrtcInfo(crtc_info);
+            result = true;
         }
-
-        XFree(screens);
+        XRRFreeOutputInfo (info);
+        XRRFreeScreenResources(screen);
     }
 
-    return foundScreen;
+    return result;
 }
 
 void PlatformCore::showWindowDecorations(bool show)

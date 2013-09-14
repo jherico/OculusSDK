@@ -556,7 +556,9 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     if (!Adapter)
     {
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        HRESULT hr = DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+	    if (FAILED(hr))    
+		    return;
     }
 
     int flags = 0;
@@ -641,12 +643,6 @@ RenderDevice::~RenderDevice()
     }
 }
 
-
-// Implement static initializer function to create this class.
-RenderTiny::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
-{
-    return new RenderDevice(rp, (HWND)oswnd);
-}
 
 
 // Fallback monitor enumeration in case newly plugged in monitor wasn't detected.
@@ -1307,5 +1303,14 @@ void RenderDevice::ForceFlushGPU()
     }
 }
 
-}}}
+} // DX
+
+// Implement static initializer function to create this class.
+RenderTiny::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
+{
+    return new D3D10::RenderDevice(rp, (HWND)oswnd);
+}
+
+
+} }
 

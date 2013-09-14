@@ -247,7 +247,7 @@ void StereoConfig::update2D()
     // eye, where hmd screen projection surface is at 0.05m distance.
     // This introduces an extra off-center pixel projection shift based on eye distance.
     // This offCenterShift is the pixel offset of the other camera's center
-    // in your reference camera based on surface distance.
+    // in your reference camera based on surface distance.    
     float metersToPixels          = (HMD.HResolution / HMD.HScreenSize);
     float lensDistanceScreenPixels= metersToPixels * HMD.LensSeparationDistance;
     float eyeDistanceScreenPixels = metersToPixels * InterpupillaryDistance;
@@ -278,7 +278,7 @@ void StereoConfig::update2D()
 void StereoConfig::updateEyeParams()
 {
     // Projection matrix for the center eye, which the left/right matrices are based on.
-    Matrix4f projCenter = Matrix4f::PerspectiveRH(YFov, Aspect, 0.01f, 1000.0f);
+    Matrix4f projCenter = Matrix4f::PerspectiveRH(YFov, Aspect, 0.01f, 2000.0f);
    
     switch(Mode)
     {

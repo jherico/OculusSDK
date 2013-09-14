@@ -35,14 +35,6 @@ limitations under the License.
 #include <OpenGL/glext.h>
 #else
 #include <GL/gl.h>
-#include <GL/glext.h>
-
-extern "C" {
-    GLAPI void APIENTRY glAttachShader (GLuint program, GLuint shader);
-    GLAPI void APIENTRY glDeleteShader (GLuint shader);
-    GLAPI void APIENTRY glDetachShader (GLuint program, GLuint shader);
-
-}
 #endif
 
 

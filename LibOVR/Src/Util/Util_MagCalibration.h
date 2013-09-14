@@ -41,7 +41,11 @@ public:
     {
         MinMagDistanceSq = MinMagDistance * MinMagDistance;
         MinQuatDistanceSq = MinQuatDistance * MinQuatDistance;
-    }
+        MinMagValues = Vector3f(10000.0f,10000.0f,10000.0f);
+        MaxMagValues = Vector3f(-10000.0f,-10000.0f,-10000.0f);
+		MinQuatValues = Quatf(1.0f,1.0f,1.0f,1.0f);
+		MaxQuatValues = Quatf(0.0f,0.0f,0.0f,0.0f);
+		}
 
     // Methods that are useful for either auto or manual calibration
     bool     IsUnitialized() const       { return Stat == Mag_Uninitialized; }
@@ -93,6 +97,12 @@ public:
     // A result of the calibration, which is the center of a sphere that 
     // roughly approximates the magnetometer data.
     Vector3f GetMagCenter() const { return MagCenter; }
+    // Retrieves the full magnetometer calibration matrix
+    Matrix4f GetMagCalibration() const;
+    // Retrieves the range of each quaternion term during calibration
+    Quatf GetCalibrationQuatSpread() const { return QuatSpread; }
+    // Retrieves the range of each magnetometer term during calibration
+    Vector3f GetCalibrationMagSpread() const { return MagSpread; }
 
 private:
     // Determine the unique sphere through 4 non-coplanar points
@@ -109,6 +119,13 @@ private:
     float    MinQuatDistance;
     float    MinMagDistanceSq;
     float    MinQuatDistanceSq;
+	// For gathering statistics during calibration
+	Vector3f    MinMagValues;
+	Vector3f    MaxMagValues;
+	Vector3f    MagSpread;
+	Quatf		MinQuatValues;
+	Quatf		MaxQuatValues;
+	Quatf       QuatSpread;
 
     unsigned SampleCount;
     Vector3f MagSamples[4];

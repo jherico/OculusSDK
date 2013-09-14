@@ -17,10 +17,12 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #if defined (OVR_OS_WIN32)
 #include <windows.h>
+#pragma comment(lib, "winmm.lib")
 
 #else
 #include <sys/time.h>
 #endif
+
 
 namespace OVR {
 

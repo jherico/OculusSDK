@@ -29,8 +29,10 @@ echo "Installing tinyxml2..."
 apt-get install libtinyxml2-dev
 echo "Installing libudev..."
 apt-get install libudev-dev
-echo "Installing libext..."
-apt-get install libext-dev
+echo "Installing libxext..."
+apt-get install libxext-dev
+echo "Installing mesa-common..."
+apt-get install mesa-common-dev
 echo "Installing freeglut3..."
 apt-get install freeglut3-dev
 echo "Installing Xinerama..."

@@ -562,7 +562,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
     // Nested scope for container destructors to shutdown before DestroyApplication.
     {
         Array<String>      args;
-        Array<const char*> argv;
+        Array<char*> argv;
         argv.PushBack("app");
 
         const char* p = inArgs;
@@ -583,8 +583,9 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
         }
         if (p != pstart)
             args.PushBack(String(pstart, p - pstart));
+		// FIXME memory leak of the command line arguments here
         for (UPInt i = 0; i < args.GetSize(); i++)
-            argv.PushBack(args[i].ToCStr());
+            argv.PushBack(strdup(args[i].ToCStr()));
 
         exitCode = app->OnStartup((int)argv.GetSize(), &argv[0]);
         if (!exitCode)

@@ -29,7 +29,7 @@ using namespace OVR::Platform;
         [self setApp:app];
         [self setPlatform:platform];
         
-        const char* argv[] = {"OVRApp"};
+        char* argv[] = {"OVRApp"};
         int exitCode = app->OnStartup(1, argv);
         if (exitCode)
         {
