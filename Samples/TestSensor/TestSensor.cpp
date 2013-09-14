@@ -1,47 +1,59 @@
 #include "OVR.h"
+#include <unistd.h>
+
+using namespace OVR;
+
+class TrackerHandler : public MessageHandler {
+public:
+    int count;
+    TrackerHandler() : count(0) {};
+    virtual void OnMessage(const Message& msg) {
+        ++count;
+        const MessageBodyFrame & trackerMessage = *(MessageBodyFrame*) &msg;
+        const Vector3f & accel = trackerMessage.Acceleration;
+        OVR_DEBUG_LOG(("X %0.3f Y %0.3f Z %0.3f Length %0.3f", accel.x, accel.y, accel.z, accel.Length()));
+    }
+
+    virtual bool SupportsMessageType(MessageType type) const {
+        return Message_BodyFrame == type;
+    }
+};
+
 
 int main(int argc, char ** argv) {
+    System::Init();
+    Log & log = *Log::GetDefaultLog();
+    log.SetLoggingMask(LogMask_All);
 
-    using namespace OVR;
-
-    OVR::System::Init();
-
-    Ptr<DeviceManager> pManager = 0;
-    Ptr<HMDDevice>     pHMD = 0;
-    Ptr<SensorDevice>  pSensor = 0;
-    SensorFusion       FusionResult;
 
     // *** Initialization - Create the first available HMD Device
-    pManager = *DeviceManager::Create();
-    pHMD     = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
-    if (!pHMD)
+    LogText("Attempting to instantiate the device manager\n");
+    Ptr<DeviceManager> pManager = *DeviceManager::Create();
+    if (!pManager) {
+        LogError("Could not instantiate device manager.\n");
         return -1;
-    pSensor  = *pHMD->GetSensor();
+    }
 
-    // Get DisplayDeviceName, ScreenWidth/Height, etc..
-    HMDInfo hmdInfo;
-    pHMD->GetDeviceInfo(&hmdInfo);
 
-    if (pSensor)
-        FusionResult.AttachToSensor(pSensor);
+    LogText("Attempting to instantiate the sensor device\n");
+    Ptr<SensorDevice> pSensor = *pManager->EnumerateDevices<SensorDevice>().CreateDevice();
+    if (!pSensor) {
+        LogError("Could not instantiate sensor device.");
+        return -1;
+    }
 
-    // *** Per Frame
-    // Get orientation quaternion to control view
-    Quatf q = FusionResult.GetOrientation();
-
-    // Create a matrix from quaternion,
-    // where elements [0][0] through [3][3] contain rotation.
-    Matrix4f bodyFrameMatrix(q);
-
-    // Get Euler angles from quaternion, in specified axis rotation order.
-    float yaw, pitch, roll;
-    q.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&yaw, &pitch, &roll);
-
-    // *** Shutdown
+    LogText("Attaching message handler to the device the sensor device\n");
+    TrackerHandler handler;
+    pSensor->SetMessageHandler(&handler);
+    LogText("Waiting for messages for 1 second\n");
+    sleep(1);
+    LogText("Shutting down sensor device\n");
     pSensor.Clear();
-    pHMD.Clear();
+    LogText("Received %d messages\n", handler.count);
+    LogText("Shutting down DeviceManager\n");
     pManager.Clear();
-
+    LogText("Shutting down OVR SDK\n");
     OVR::System::Destroy();
+    LogText("Done\n");
     return 0;
 }
