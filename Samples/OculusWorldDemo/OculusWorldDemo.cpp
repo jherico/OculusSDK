@@ -41,18 +41,14 @@ limitations under the License.
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
-#define WORLDDEMO_ASSET_PATH1 "Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
-// This path allows the shortcut to work.
-#define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH4 "../../../Samples/OculusWorldDemo/Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH5 "../Samples/OculusWorldDemo/Assets/Tuscany/"
 
-// Try to accomidate a host of different build systems.  
-// Alternatively, make CMake include a task to always put the 
+// Try to accomidate a host of different build systems.
+// Alternatively, make CMake include a task to always put the
 const char * ASSET_PATHS[] = {
+    // Relative to the actual executable
     "Assets/Tuscany/",
-    "../Assets/Tuscany/",
+    // Relative to the build directory
+    "Samples/OculusWorldDemo/Assets/Tuscany/",
     0
 };
 
@@ -498,7 +494,7 @@ int OculusWorldDemoApp::OnStartup(int argc, char** argv)
         int i = 0;
         while (ASSET_PATHS[i]) {
             String newPath(String(ASSET_PATHS[i]) + MainFilePath);
-            printf((const char *)newPath); printf("\n");
+            LogText("Looking for assets in path %s\n", (const char *)newPath);
             if (SysFile(newPath).IsValid()) {
                 MainFilePath = newPath;
                 break;

@@ -221,6 +221,5 @@ int main(int argc, char ** argv)
     // No OVR functions involving memory are allowed after this.
     OVR::System::Destroy();
 
-    OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
     return exitCode;
 }

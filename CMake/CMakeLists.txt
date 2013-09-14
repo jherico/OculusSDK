@@ -7,8 +7,11 @@ list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}/Modules
 )
 
+# Comment out these two lines to disable the debug build
 set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_VERBOSE_MAKEFILE ON)
+add_definitions(-DOVR_BUILD_DEBUG)
+
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-std=gnu++0x)
@@ -17,6 +20,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC"  )    
     endif()
 endif()
+
 
 if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
@@ -49,4 +53,5 @@ add_definitions( -DGL_GLEXT_PROTOTYPES )
 add_subdirectory (../Samples/CommonSrc "${CMAKE_CURRENT_BINARY_DIR}/Samples/CommonSrc")
 add_subdirectory (../Samples/OculusWorldDemo "${CMAKE_CURRENT_BINARY_DIR}/Samples/OculusWorldDemo")
 add_subdirectory (../Samples/OculusRoomTiny "${CMAKE_CURRENT_BINARY_DIR}/Samples/OculusRoomTiny")
+add_subdirectory (../Samples/TestSensor "${CMAKE_CURRENT_BINARY_DIR}/Samples/TestSensor")
 
