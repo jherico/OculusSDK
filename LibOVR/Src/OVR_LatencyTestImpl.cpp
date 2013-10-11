@@ -463,13 +463,13 @@ bool LatencyTestDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
     OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength, HIDDesc.Product.ToCStr());
     OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, HIDDesc.Manufacturer.ToCStr());
     info->Type    = Device_LatencyTester;
-    info->Version = 0;
 
     if (info->InfoClassType == Device_LatencyTester)
     {
         SensorInfo* sinfo = (SensorInfo*)info;
         sinfo->VendorId  = HIDDesc.VendorId;
         sinfo->ProductId = HIDDesc.ProductId;
+        sinfo->Version   = HIDDesc.VersionNumber;
         OVR_strcpy(sinfo->SerialNumber, sizeof(sinfo->SerialNumber),HIDDesc.SerialNumber.ToCStr());
     }
     return true;

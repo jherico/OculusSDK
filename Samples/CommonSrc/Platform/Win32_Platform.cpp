@@ -543,6 +543,7 @@ Render::DisplayId PlatformCore::GetDisplay(int screen)
 
 }}}
 
+OVR::Platform::Application*     g_app;
 
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 {
@@ -552,10 +553,10 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
     OVR_UNUSED2(prevInst, show);
     
     // CreateApplication must be the first call since it does OVR::System::Initialize.
-    Application*     app = Application::CreateApplication();
-    Win32::PlatformCore* platform = new Win32::PlatformCore(app, hinst);
+    g_app = Application::CreateApplication();
+    Win32::PlatformCore* platform = new Win32::PlatformCore(g_app, hinst);
     // The platform attached to an app will be deleted by DestroyApplication.
-    app->SetPlatformCore(platform);
+    g_app->SetPlatformCore(platform);
 
     int exitCode = 0;
 
@@ -586,14 +587,14 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
         for (UPInt i = 0; i < args.GetSize(); i++)
             argv.PushBack(args[i].ToCStr());
 
-        exitCode = app->OnStartup((int)argv.GetSize(), &argv[0]);
+        exitCode = g_app->OnStartup((int)argv.GetSize(), &argv[0]);
         if (!exitCode)
             exitCode = platform->Run();
     }
 
     // No OVR functions involving memory are allowed after this.
-    Application::DestroyApplication(app);
-    app = 0;
+    Application::DestroyApplication(g_app);
+    g_app = 0;
 
     OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
     return exitCode;

@@ -11,9 +11,23 @@
 # Instruction : Ensure that the install.sh has execute permissions.
 #               Navigate to a command shell, enter:
 #               
-#               ./install.sh
+#                   ./install.sh
 #
 #		Enter the administrator password for sudo access.
+#
+# Notes       : UBUNTU 13 USERS
+#               ---------------
+#                 The OculusConfigUtil does not currently support Ubuntu 13
+#                 out of the box.  If you see an error similar to this upon
+#                 launching OculusConfigUtil:
+#
+#                     "error while loading shared libraries: libudev.so.0"
+#
+#                 Then please try the following solution, until we officially 
+#                 support Ubuntu 13:
+#
+#                     cd /lib/x86_64-linux-gnu/
+#                     sudo ln -sf libudev.so.1 libudev.so.0
 #
 #############################################################################
 

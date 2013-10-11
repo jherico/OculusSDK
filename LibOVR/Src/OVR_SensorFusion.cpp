@@ -3,7 +3,7 @@
 Filename    :   OVR_SensorFusion.cpp
 Content     :   Methods that determine head orientation from sensor data over time
 Created     :   October 9, 2012
-Authors     :   Michael Antonov, Steve LaValle
+Authors     :   Michael Antonov, Steve LaValle, Max Katsev
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -19,22 +19,21 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "OVR_JSON.h"
 #include "OVR_Profile.h"
 
+#define MAX_DEVICE_PROFILE_MAJOR_VERSION 1
+
 namespace OVR {
 
 //-------------------------------------------------------------------------------------
 // ***** Sensor Fusion
 
 SensorFusion::SensorFusion(SensorDevice* sensor)
-  : Handler(getThis()), pDelegate(0),
-    Gain(0.05f), YawMult(1), EnableGravity(true), Stage(0), RunningTime(0), DeltaT(0.001f),
-	EnablePrediction(true), PredictionDT(0.03f), PredictionTimeIncrement(0.001f),
-    FRawMag(10), FAccW(20), FAngV(20),
-    TiltCondCount(0), TiltErrorAngle(0), 
-    TiltErrorAxis(0,1,0),
-    MagCondCount(0), MagCalibrated(false), MagRefQ(0, 0, 0, 1), 
-	MagRefM(0), MagRefYaw(0), YawErrorAngle(0), MagRefDistance(0.5f),
-    YawErrorCount(0), YawCorrectionActivated(false), YawCorrectionInProgress(false), 
-	EnableYawCorrection(false), MagNumReferences(0), MagHasNearbyReference(false),
+  : Stage(0), RunningTime(0), DeltaT(0.001f), 
+    Handler(getThis()), pDelegate(0),
+    Gain(0.05f), EnableGravity(true), 
+    EnablePrediction(true), PredictionDT(0.03f), PredictionTimeIncrement(0.001f),
+    FRawMag(10), FAngV(20), 
+    GyroOffset(), TiltAngleFilter(1000),
+    EnableYawCorrection(false), MagCalibrated(false), MagNumReferences(0), MagRefIdx(-1), MagRefScore(0),
     MotionTrackingEnabled(true)
 {
    if (sensor)
@@ -49,10 +48,17 @@ SensorFusion::~SensorFusion()
 
 bool SensorFusion::AttachToSensor(SensorDevice* sensor)
 {
-    
-    pSensor = sensor;
+    // clear the cached device information
+    CachedSensorInfo.SerialNumber[0] = 0;   
+    CachedSensorInfo.VendorId = 0;
+    CachedSensorInfo.ProductId = 0;
+
     if (sensor != NULL)
     {
+        // Cache the sensor device so we can access this information during
+        // mag saving and loading (avoid holding a reference to sensor to prevent 
+        // deadlock on shutdown)
+        sensor->GetDeviceInfo(&CachedSensorInfo);   // save the device information
         MessageHandler* pCurrentHandler = sensor->GetMessageHandler();
 
         if (pCurrentHandler == &Handler)
@@ -94,315 +100,214 @@ void SensorFusion::Reset()
     Q                     = Quatf();
     QUncorrected          = Quatf();
     Stage                 = 0;
-	RunningTime           = 0;
-	MagNumReferences      = 0;
-	MagHasNearbyReference = false;
+    RunningTime           = 0;
+    MagNumReferences      = 0;
+    MagRefIdx             = -1;
+    GyroOffset            = Vector3f();
 }
 
+// Compute a rotation required to transform "estimated" into "measured"
+// Returns an approximation of the goal rotation in the Simultaneous Orthogonal Rotations Angle representation
+// (vector direction is the axis of rotation, norm is the angle)
+Vector3f SensorFusion_ComputeCorrection(Vector3f measured, Vector3f estimated)
+{
+    measured.Normalize();
+    estimated.Normalize();
+    Vector3f correction = measured.Cross(estimated);
+    float cosError = measured.Dot(estimated);
+    // from the def. of cross product, correction.Length() = sin(error)
+    // therefore sin(error) * sqrt(2 / (1 + cos(error))) = 2 * sin(error / 2) ~= error in [-pi, pi]
+    // Mathf::Tolerance is used to avoid div by 0 if cos(error) = -1
+    return correction * sqrt(2 / (1 + cosError + Mathf::Tolerance));
+}
 
 void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 {
     if (msg.Type != Message_BodyFrame || !IsMotionTrackingEnabled())
         return;
-  
+
     // Put the sensor readings into convenient local variables
-    Vector3f angVel    = msg.RotationRate; 
-    Vector3f rawAccel  = msg.Acceleration;
-    Vector3f mag       = msg.MagneticField;
+    Vector3f gyro  = msg.RotationRate; 
+    Vector3f accel = msg.Acceleration;
+    Vector3f mag   = msg.MagneticField;
 
-    // Set variables accessible through the class API
-	DeltaT = msg.TimeDelta;
-    AngV = msg.RotationRate;
-    AngV.y *= YawMult;  // Warning: If YawMult != 1, then AngV is not true angular velocity
-    A = rawAccel;
-
-    // Allow external access to uncalibrated magnetometer values
-    RawMag = mag;  
+    // Insert current sensor data into filter history
+    FRawMag.AddElement(mag);
+    FAngV.AddElement(gyro);
 
     // Apply the calibration parameters to raw mag
-    if (HasMagCalibration())
-    {
-        mag.x += MagCalibrationMatrix.M[0][3];
-        mag.y += MagCalibrationMatrix.M[1][3];
-        mag.z += MagCalibrationMatrix.M[2][3];
-    }
+    Vector3f calMag = MagCalibrated ? GetCalibratedMagValue(FRawMag.Mean()) : FRawMag.Mean();
 
-    // Provide external access to calibrated mag values
-    // (if the mag is not calibrated, then the raw value is returned)
-    CalMag = mag;
-
-    float angVelLength = angVel.Length();
-    float accLength    = rawAccel.Length();
-
-
-    // Acceleration in the world frame (Q is current HMD orientation)
-    Vector3f accWorld  = Q.Rotate(rawAccel);
+    // Set variables accessible through the class API
+    DeltaT = msg.TimeDelta;
+    AngV   = gyro;
+    A      = accel;
+    RawMag = mag;  
+    CalMag = calMag;
 
     // Keep track of time
     Stage++;
     RunningTime += DeltaT;
 
-    // Insert current sensor data into filter history
-    FRawMag.AddElement(RawMag);
-    FAccW.AddElement(accWorld);
-    FAngV.AddElement(angVel);
+    // Small preprocessing
+    Quatf Qinv = Q.Inverted();
+    Vector3f up = Qinv.Rotate(Vector3f(0, 1, 0));
 
-    // Update orientation Q based on gyro outputs.  This technique is
-    // based on direct properties of the angular velocity vector:
-    // Its direction is the current rotation axis, and its magnitude
-    // is the rotation rate (rad/sec) about that axis.  Our sensor
-    // sampling rate is so fast that we need not worry about integral
-    // approximation error (not yet, anyway).
-    if (angVelLength > 0.0f)
-    {
-        Vector3f     rotAxis      = angVel / angVelLength;  
-        float        halfRotAngle = angVelLength * DeltaT * 0.5f;
-        float        sinHRA       = sin(halfRotAngle);
-        Quatf        deltaQ(rotAxis.x*sinHRA, rotAxis.y*sinHRA, rotAxis.z*sinHRA, cos(halfRotAngle));
+    Vector3f gyroCorrected = gyro;
 
-        Q =  Q * deltaQ;
-    }
-    
-    // The quaternion magnitude may slowly drift due to numerical error,
-    // so it is periodically normalized.
-    if (Stage % 5000 == 0)
-        Q.Normalize();
-    
-	// Maintain the uncorrected orientation for later use by predictive filtering
-	QUncorrected = Q;
+    // Apply integral term
+    // All the corrections are stored in the Simultaneous Orthogonal Rotations Angle representation,
+    // which allows to combine and scale them by just addition and multiplication
+    if (EnableGravity || EnableYawCorrection)
+        gyroCorrected -= GyroOffset;
 
-    // Perform tilt correction using the accelerometer data. This enables 
-    // drift errors in pitch and roll to be corrected. Note that yaw cannot be corrected
-    // because the rotation axis is parallel to the gravity vector.
     if (EnableGravity)
     {
-        // Correcting for tilt error by using accelerometer data
-        const float  gravityEpsilon = 0.4f;
-        const float  angVelEpsilon  = 0.1f; // Relatively slow rotation
-        const int    tiltPeriod     = 50;   // Required time steps of stability
-        const float  maxTiltError   = 0.05f;
-        const float  minTiltError   = 0.01f;
+        const float spikeThreshold = 0.01f;
+        const float gravityThreshold = 0.1f;
+        float proportionalGain     = 5 * Gain; // Gain parameter should be removed in a future release
+        float integralGain         = 0.0125f;
 
-        // This condition estimates whether the only measured acceleration is due to gravity 
-        // (the Rift is not linearly accelerating).  It is often wrong, but tends to average
-        // out well over time.
-        if ((fabs(accLength - 9.81f) < gravityEpsilon) &&
-            (angVelLength < angVelEpsilon))
-            TiltCondCount++;
-        else
-            TiltCondCount = 0;
-    
-        // After stable measurements have been taken over a sufficiently long period,
-        // estimate the amount of tilt error and calculate the tilt axis for later correction.
-        if (TiltCondCount >= tiltPeriod)
-        {   // Update TiltErrorEstimate
-            TiltCondCount = 0;
-            // Use an average value to reduce noise (could alternatively use an LPF)
-            Vector3f accWMean = FAccW.Mean();
-            // Project the acceleration vector into the XZ plane
-            Vector3f xzAcc = Vector3f(accWMean.x, 0.0f, accWMean.z);
-            // The unit normal of xzAcc will be the rotation axis for tilt correction
-            Vector3f tiltAxis = Vector3f(xzAcc.z, 0.0f, -xzAcc.x).Normalized();
-            Vector3f yUp = Vector3f(0.0f, 1.0f, 0.0f);
-            // This is the amount of rotation
-            float    tiltAngle = yUp.Angle(accWMean);
-            // Record values if the tilt error is intolerable
-            if (tiltAngle > maxTiltError) 
-            {
-                TiltErrorAngle = tiltAngle;
-                TiltErrorAxis = tiltAxis;
-            }
-        }
+        Vector3f tiltCorrection = SensorFusion_ComputeCorrection(accel, up);
 
-        // This part performs the actual tilt correction as needed
-        if (TiltErrorAngle > minTiltError) 
+        if (Stage > 5)
         {
-            if ((TiltErrorAngle > 0.4f)&&(RunningTime < 8.0f))
-            {   // Tilt completely to correct orientation
-                Q = Quatf(TiltErrorAxis, -TiltErrorAngle) * Q;
-                TiltErrorAngle = 0.0f;
-            }
-            else 
-            {
-                //LogText("Performing tilt correction  -  Angle: %f   Axis: %f %f %f\n",
-                //        TiltErrorAngle,TiltErrorAxis.x,TiltErrorAxis.y,TiltErrorAxis.z);
-                //float deltaTiltAngle = -Gain*TiltErrorAngle*0.005f;
-                // This uses aggressive correction steps while your head is moving fast
-                float deltaTiltAngle = -Gain*TiltErrorAngle*0.005f*(5.0f*angVelLength+1.0f);
-                // Incrementally "un-tilt" by a small step size
-                Q = Quatf(TiltErrorAxis, deltaTiltAngle) * Q;
-                TiltErrorAngle += deltaTiltAngle;
-            }
+            // Spike detection
+            float tiltAngle = up.Angle(accel);
+            TiltAngleFilter.AddElement(tiltAngle);
+            if (tiltAngle > TiltAngleFilter.Mean() + spikeThreshold)
+                proportionalGain = integralGain = 0;
+            // Acceleration detection
+            const float gravity = 9.8f;
+            if (fabs(accel.Length() / gravity - 1) > gravityThreshold)
+                integralGain = 0;
         }
+        else // Apply full correction at the startup
+        {
+            proportionalGain = 1 / DeltaT;
+            integralGain = 0;
+        }
+
+        gyroCorrected += (tiltCorrection * proportionalGain);
+        GyroOffset -= (tiltCorrection * integralGain * DeltaT);
     }
 
-    // Yaw drift correction based on magnetometer data.  This corrects the part of the drift
-    // that the accelerometer cannot handle.
-    // This will only work if the magnetometer has been enabled, calibrated, and a reference
-    // point has been set.
-    const float maxAngVelLength = 3.0f;
-    const int   magWindow = 5;
-    const float yawErrorMax = 0.1f;
-    const float yawErrorMin = 0.01f;
-    const int   yawErrorCountLimit = 50;
-    const float yawRotationStep = 0.00002f;
-
-    if (angVelLength < maxAngVelLength)
-        MagCondCount++;
-    else
-        MagCondCount = 0;
-
-	// Find, create, and utilize reference points for the magnetometer
-	// Need to be careful not to set reference points while there is significant tilt error
-    if ((EnableYawCorrection && MagCalibrated)&&(RunningTime > 10.0f)&&(TiltErrorAngle < 0.2f))
-	{
-	  if (MagNumReferences == 0)
-      {
-		  setMagReference(); // Use the current direction
-      }
-	  else if (Q.Distance(MagRefQ) > MagRefDistance) 
-      {
-		  MagHasNearbyReference = false;
-          float bestDist = 100000.0f;
-          int bestNdx = 0;
-          float dist;
-          for (int i = 0; i < MagNumReferences; i++)
-          {
-              dist = Q.Distance(MagRefTableQ[i]);
-              if (dist < bestDist)
-              {
-                  bestNdx = i;
-                  bestDist = dist;
-              }
-          }
-
-          if (bestDist < MagRefDistance)
-          {
-              MagHasNearbyReference = true;
-              MagRefQ   = MagRefTableQ[bestNdx];
-              MagRefM   = MagRefTableM[bestNdx];
-              MagRefYaw = MagRefTableYaw[bestNdx];
-              //LogText("Using reference %d\n",bestNdx);
-          }
-          else if (MagNumReferences < MagMaxReferences)
-              setMagReference();
-	  }
-	}
-
-	YawCorrectionInProgress = false;
-    if (EnableYawCorrection && MagCalibrated && (RunningTime > 2.0f) && (MagCondCount >= magWindow) &&
-        MagHasNearbyReference)
+    if (EnableYawCorrection && MagCalibrated && RunningTime > 2.0f)
     {
-        // Use rotational invariance to bring reference mag value into global frame
-        Vector3f grefmag = MagRefQ.Rotate(GetCalibratedMagValue(MagRefM));
-        // Bring current (averaged) mag reading into global frame
-        Vector3f gmag = Q.Rotate(GetCalibratedMagValue(FRawMag.Mean()));
-        // Calculate the reference yaw in the global frame
-        Anglef gryaw = Anglef(atan2(grefmag.x,grefmag.z));
-        // Calculate the current yaw in the global frame
-        Anglef gyaw = Anglef(atan2(gmag.x,gmag.z));
-        // The difference between reference and current yaws is the perceived error
-        Anglef YawErrorAngle = gyaw - gryaw;
+        const float maxMagRefDist = 0.1f;
+        const float maxTiltError = 0.05f;
+        float proportionalGain   = 0.01f;
+        float integralGain       = 0.0005f;
 
-        //LogText("Yaw error estimate: %f\n",YawErrorAngle.Get());
-        // If the perceived error is large, keep count
-        if ((YawErrorAngle.Abs() > yawErrorMax) && (!YawCorrectionActivated))
-            YawErrorCount++;
-        // After enough iterations of high perceived error, start the correction process
-        if (YawErrorCount > yawErrorCountLimit)
-            YawCorrectionActivated = true;
-        // If the perceived error becomes small, turn off the yaw correction
-        if ((YawErrorAngle.Abs() < yawErrorMin) && YawCorrectionActivated) 
+        // Update the reference point if needed
+        if (MagRefIdx < 0 || calMag.Distance(MagRefsInBodyFrame[MagRefIdx]) > maxMagRefDist)
         {
-            YawCorrectionActivated = false;
-            YawErrorCount = 0;
+            // Delete a bad point
+            if (MagRefIdx >= 0 && MagRefScore < 0)
+            {
+                MagNumReferences--;
+                MagRefsInBodyFrame[MagRefIdx] = MagRefsInBodyFrame[MagNumReferences];
+                MagRefsInWorldFrame[MagRefIdx] = MagRefsInWorldFrame[MagNumReferences];
+            }
+            // Find a new one
+            MagRefIdx = -1;
+            MagRefScore = 1000;
+            float bestDist = maxMagRefDist;
+            for (int i = 0; i < MagNumReferences; i++)
+            {
+                float dist = calMag.Distance(MagRefsInBodyFrame[i]);
+                if (bestDist > dist)
+                {
+                    bestDist = dist;
+                    MagRefIdx = i;
+                }
+            }
+            // Create one if needed
+            if (MagRefIdx < 0 && MagNumReferences < MagMaxReferences)
+            {
+                MagRefIdx = MagNumReferences;
+                MagRefsInBodyFrame[MagRefIdx] = calMag;
+                MagRefsInWorldFrame[MagRefIdx] = Q.Rotate(calMag).Normalized();
+                MagNumReferences++;
+            }
         }
-        
-        // Perform the actual yaw correction, due to previously detected, large yaw error
-        if (YawCorrectionActivated) 
+
+        if (MagRefIdx >= 0)
         {
-			YawCorrectionInProgress = true;
-            // Incrementally "unyaw" by a small step size
-            Q = Quatf(Vector3f(0.0f,1.0f,0.0f), -yawRotationStep * YawErrorAngle.Sign()) * Q;
+            Vector3f magEstimated = Qinv.Rotate(MagRefsInWorldFrame[MagRefIdx]);
+            Vector3f magMeasured  = calMag.Normalized();
+
+            // Correction is computed in the horizontal plane (in the world frame)
+            Vector3f yawCorrection = SensorFusion_ComputeCorrection(magMeasured.ProjectToPlane(up), 
+                                                                    magEstimated.ProjectToPlane(up));
+
+            if (fabs(up.Dot(magEstimated - magMeasured)) < maxTiltError)
+            {
+                MagRefScore += 2;
+            }
+            else // If the vertical angle is wrong, decrease the score
+            {
+                MagRefScore -= 1;
+                proportionalGain = integralGain = 0;
+            }
+            gyroCorrected += (yawCorrection * proportionalGain);
+            GyroOffset -= (yawCorrection * integralGain * DeltaT);
         }
     }
+
+    // Update the orientation quaternion based on the corrected angular velocity vector
+    Q = Q * Quatf(gyroCorrected, gyroCorrected.Length() * DeltaT);
+
+    // The quaternion magnitude may slowly drift due to numerical error,
+    // so it is periodically normalized.
+    if (Stage % 500 == 0)
+        Q.Normalize();
 }
 
- 
 //  A predictive filter based on extrapolating the smoothed, current angular velocity
 Quatf SensorFusion::GetPredictedOrientation(float pdt)
 {		
-	Lock::Locker lockScope(Handler.GetHandlerLock());
-	Quatf        qP = QUncorrected;
-	
+    Lock::Locker lockScope(Handler.GetHandlerLock());
+    Quatf        qP = Q;
+    
     if (EnablePrediction)
     {
-		// This method assumes a constant angular velocity
-	    Vector3f angVelF  = FAngV.SavitzkyGolaySmooth8();
+        // This method assumes a constant angular velocity
+        Vector3f angVelF  = FAngV.SavitzkyGolaySmooth8();
         float    angVelFL = angVelF.Length();
 
-		// Force back to raw measurement
+        // Force back to raw measurement
         angVelF  = AngV;
-		angVelFL = AngV.Length();
+        angVelFL = AngV.Length();
 
-		// Dynamic prediction interval: Based on angular velocity to reduce vibration
-		const float minPdt   = 0.001f;
-		const float slopePdt = 0.1f;
-		float       newpdt   = pdt;
-		float       tpdt     = minPdt + slopePdt * angVelFL;
-		if (tpdt < pdt)
-			newpdt = tpdt;
-		//LogText("PredictonDTs: %d\n",(int)(newpdt / PredictionTimeIncrement + 0.5f));
+        // Dynamic prediction interval: Based on angular velocity to reduce vibration
+        const float minPdt   = 0.001f;
+        const float slopePdt = 0.1f;
+        float       newpdt   = pdt;
+        float       tpdt     = minPdt + slopePdt * angVelFL;
+        if (tpdt < pdt)
+            newpdt = tpdt;
+        //LogText("PredictonDTs: %d\n",(int)(newpdt / PredictionTimeIncrement + 0.5f));
 
         if (angVelFL > 0.001f)
         {
             Vector3f    rotAxisP      = angVelF / angVelFL;  
             float       halfRotAngleP = angVelFL * newpdt * 0.5f;
             float       sinaHRAP      = sin(halfRotAngleP);
-		    Quatf       deltaQP(rotAxisP.x*sinaHRAP, rotAxisP.y*sinaHRAP,
+            Quatf       deltaQP(rotAxisP.x*sinaHRAP, rotAxisP.y*sinaHRAP,
                                 rotAxisP.z*sinaHRAP, cos(halfRotAngleP));
-            qP = QUncorrected * deltaQP;
-		}
-	}
+            qP = Q * deltaQP;
+        }
+    }
     return qP;
 }    
 
 
 Vector3f SensorFusion::GetCalibratedMagValue(const Vector3f& rawMag) const
 {
-    Vector3f mag = rawMag;
     OVR_ASSERT(HasMagCalibration());
-    mag.x += MagCalibrationMatrix.M[0][3];
-    mag.y += MagCalibrationMatrix.M[1][3];
-    mag.z += MagCalibrationMatrix.M[2][3];
-    return mag;
-}
-
-
-void SensorFusion::setMagReference(const Quatf& q, const Vector3f& rawMag) 
-{
-    if (MagNumReferences < MagMaxReferences)
-    {
-        MagRefTableQ[MagNumReferences] = q;
-        MagRefTableM[MagNumReferences] = rawMag; //FRawMag.Mean();
-
-		//LogText("Inserting reference %d\n",MagNumReferences);
-        
-		MagRefQ   = q;
-        MagRefM   = rawMag;
-
-        float pitch, roll, yaw;
-		Quatf q2 = q;
-        q2.GetEulerAngles<Axis_X, Axis_Z, Axis_Y>(&pitch, &roll, &yaw);
-        MagRefTableYaw[MagNumReferences] = yaw;
-		MagRefYaw = yaw;
-
-        MagNumReferences++;
-
-        MagHasNearbyReference = true;
+    return MagCalibrationMatrix.Transform(rawMag);
     }
-}
-
 
 SensorFusion::BodyFrameHandler::~BodyFrameHandler()
 {
@@ -427,21 +332,18 @@ bool SensorFusion::BodyFrameHandler::SupportsMessageType(MessageType type) const
 // cal_name - an optional name for the calibration or default if cal_name == NULL
 bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
 {
-    if (pSensor == NULL || !HasMagCalibration())
+    if (CachedSensorInfo.SerialNumber[0] == 0 || !HasMagCalibration())
         return false;
     
     // A named calibration may be specified for calibration in different
     // environments, otherwise the default calibration is used
     if (calibrationName == NULL)
         calibrationName = "default";
-    
-    SensorInfo sinfo;
-    pSensor->GetDeviceInfo(&sinfo);
 
     // Generate a mag calibration event
     JSON* calibration = JSON::CreateObject();
     // (hardcoded for now) the measurement and representation method 
-    calibration->AddStringItem("Version", "1.0");   
+    calibration->AddStringItem("Version", "2.0");   
     calibration->AddStringItem("Name", "default");
 
     // time stamp the calibration
@@ -460,19 +362,20 @@ bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
     calibration->AddStringItem("Time", time_str);
 
     // write the full calibration matrix
+    char matrix[256];
     Matrix4f calmat = GetMagCalibration();
-    char matrix[128];
-    int pos = 0;
-    for (int r=0; r<4; r++)
-    {
-        for (int c=0; c<4; c++)
-        {
-            pos += (int)OVR_sprintf(matrix+pos, 128, "%g ", calmat.M[r][c]);
-        }
-    }
+    calmat.ToString(matrix, 256);
+    calibration->AddStringItem("CalibrationMatrix", matrix);
+    // save just the offset, for backwards compatibility
+    // this can be removed when we don't want to support 0.2.4 anymore
+    Vector3f center(calmat.M[0][3], calmat.M[1][3], calmat.M[2][3]);
+    Matrix4f tmp = calmat; tmp.M[0][3] = tmp.M[1][3] = tmp.M[2][3] = 0; tmp.M[3][3] = 1;
+    center = tmp.Inverted().Transform(center);
+    Matrix4f oldcalmat; oldcalmat.M[0][3] = center.x; oldcalmat.M[1][3] = center.y; oldcalmat.M[2][3] = center.z; 
+    oldcalmat.ToString(matrix, 256);
     calibration->AddStringItem("Calibration", matrix);
-
     
+
     String path = GetBaseOVRPath(true);
     path += "/Devices.json";
 
@@ -482,7 +385,14 @@ bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
     {   // Quick sanity check of the file type and format before we parse it
         JSON* version = root->GetFirstItem();
         if (version && version->Name == "Oculus Device Profile Version")
-        {   // In the future I may need to check versioning to determine parse method
+        {   
+            int major = atoi(version->Value.ToCStr());
+            if (major > MAX_DEVICE_PROFILE_MAJOR_VERSION)
+            {
+                // don't use the file on unsupported major version number
+                root->Release();
+                root = NULL;
+            }
         }
         else
         {
@@ -502,7 +412,7 @@ bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
             if (device->Name == "Device")
             {   
                 JSON* item = device->GetItemByName("Serial");
-                if (item && item->Value == sinfo.SerialNumber)
+                if (item && item->Value == CachedSensorInfo.SerialNumber)
                 {   // found an entry for this device
                     item = device->GetNextItem(item);
                     while (item)
@@ -543,9 +453,9 @@ bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
     if (device == NULL)
     {
         device = JSON::CreateObject();
-        device->AddStringItem("Product", sinfo.ProductName);
-        device->AddNumberItem("ProductID", sinfo.ProductId);
-        device->AddStringItem("Serial", sinfo.SerialNumber);
+        device->AddStringItem("Product", CachedSensorInfo.ProductName);
+        device->AddNumberItem("ProductID", CachedSensorInfo.ProductId);
+        device->AddStringItem("Serial", CachedSensorInfo.SerialNumber);
         device->AddBoolItem("EnableYawCorrection", EnableYawCorrection);
 
         root->AddItem("Device", device);
@@ -562,16 +472,13 @@ bool SensorFusion::SaveMagCalibration(const char* calibrationName) const
 // cal_name - an optional name for the calibration or the default if cal_name == NULL
 bool SensorFusion::LoadMagCalibration(const char* calibrationName)
 {
-    if (pSensor == NULL)
+    if (CachedSensorInfo.SerialNumber[0] == 0)
         return false;
 
     // A named calibration may be specified for calibration in different
     // environments, otherwise the default calibration is used
     if (calibrationName == NULL)
         calibrationName = "default";
-    
-    SensorInfo sinfo;
-    pSensor->GetDeviceInfo(&sinfo);
 
     String path = GetBaseOVRPath(true);
     path += "/Devices.json";
@@ -584,7 +491,10 @@ bool SensorFusion::LoadMagCalibration(const char* calibrationName)
     // Quick sanity check of the file type and format before we parse it
     JSON* version = root->GetFirstItem();
     if (version && version->Name == "Oculus Device Profile Version")
-    {   // In the future I may need to check versioning to determine parse method
+    {   
+        int major = atoi(version->Value.ToCStr());
+        if (major > MAX_DEVICE_PROFILE_MAJOR_VERSION)
+            return false;   // don't parse the file on unsupported major version number
     }
     else
     {
@@ -600,13 +510,14 @@ bool SensorFusion::LoadMagCalibration(const char* calibrationName)
         if (device->Name == "Device")
         {   
             JSON* item = device->GetItemByName("Serial");
-            if (item && item->Value == sinfo.SerialNumber)
+            if (item && item->Value == CachedSensorInfo.SerialNumber)
             {   // found an entry for this device
 
                 JSON* autoyaw = device->GetItemByName("EnableYawCorrection");
                 if (autoyaw)
                     autoEnableCorrection = (autoyaw->dValue != 0);
 
+                int maxCalibrationVersion = 0;
                 item = device->GetNextItem(item);
                 while (item)
                 {
@@ -617,69 +528,66 @@ bool SensorFusion::LoadMagCalibration(const char* calibrationName)
                         if (name && name->Value == calibrationName)
                         {   // found a calibration with this name
                             
-                            time_t now;
-                            time(&now);
+                            int major = 0;
+                            JSON* version = calibration->GetItemByName("Version");
+                            if (version)
+                                major = atoi(version->Value.ToCStr());
 
-                            // parse the calibration time
-                            time_t calibration_time = now;
-                            JSON* caltime = calibration->GetItemByName("Time");
-                            if (caltime)
+                            if (major > maxCalibrationVersion && major <= 2)
                             {
-                                const char* caltime_str = caltime->Value.ToCStr();
+                                time_t now;
+                                time(&now);
 
-                                tm ct;
-                                memset(&ct, 0, sizeof(tm));
+                                // parse the calibration time
+                                time_t calibration_time = now;
+                                JSON* caltime = calibration->GetItemByName("Time");
+                                if (caltime)
+                                {
+                                    const char* caltime_str = caltime->Value.ToCStr();
+
+                                    tm ct;
+                                    memset(&ct, 0, sizeof(tm));
                             
 #ifdef OVR_OS_WIN32
-                                struct tm nowtime;
-                                localtime_s(&nowtime, &now);
-                                ct.tm_isdst = nowtime.tm_isdst;
-                                sscanf_s(caltime_str, "%d-%d-%d %d:%d:%d", 
-                                    &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
-                                    &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+                                    struct tm nowtime;
+                                    localtime_s(&nowtime, &now);
+                                    ct.tm_isdst = nowtime.tm_isdst;
+                                    sscanf_s(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                        &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                        &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
 #else
-                                struct tm* nowtime = localtime(&now);
-                                ct.tm_isdst = nowtime->tm_isdst;
-                                sscanf(caltime_str, "%d-%d-%d %d:%d:%d", 
-                                    &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
-                                    &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+                                    struct tm* nowtime = localtime(&now);
+                                    ct.tm_isdst = nowtime->tm_isdst;
+                                    sscanf(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                        &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                        &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
 #endif
-                                ct.tm_year -= 1900;
-                                ct.tm_mon--;
-                                calibration_time = mktime(&ct);
-                            }
-                                                        
-                            // parse the calibration matrix
-                            JSON* cal = calibration->GetItemByName("Calibration");
-                            if (cal)
-                            {
-                                const char* data_str = cal->Value.ToCStr();
-                                Matrix4f calmat;
-                                for (int r=0; r<4; r++)
-                                {
-                                    for (int c=0; c<4; c++)
-                                    {
-                                        calmat.M[r][c] = (float)atof(data_str);
-                                        while (data_str && *data_str != ' ')
-                                            data_str++;
-
-                                        if (data_str)
-                                            data_str++;
-                                    }
+                                    ct.tm_year -= 1900;
+                                    ct.tm_mon--;
+                                    calibration_time = mktime(&ct);
                                 }
+                                                        
+                                // parse the calibration matrix
+                                JSON* cal = calibration->GetItemByName("CalibrationMatrix");
+                                if (cal == NULL)
+                                    cal = calibration->GetItemByName("Calibration");
+                               
+                                if (cal)
+                                {
+                                    Matrix4f calmat = Matrix4f::FromString(cal->Value.ToCStr());
+                                    SetMagCalibration(calmat);
+                                    MagCalibrationTime  = calibration_time;
+                                    EnableYawCorrection = autoEnableCorrection;
 
-                                SetMagCalibration(calmat);
-                                MagCalibrationTime  = calibration_time;
-                                EnableYawCorrection = autoEnableCorrection;
-
-                                return true;
+                                    maxCalibrationVersion = major;
+                                }
                             }
                         } 
                     }
                     item = device->GetNextItem(item);
                 }
 
-                break;
+                return (maxCalibrationVersion > 0);
             }
         }
 

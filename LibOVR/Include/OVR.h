@@ -28,7 +28,6 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "../Src/OVR_Profile.h"
 #include "../Src/Util/Util_LatencyTest.h"
 #include "../Src/Util/Util_Render_Stereo.h"
-#include "../Src/Util/Util_MagCalibration.h"
 
 #endif
 
