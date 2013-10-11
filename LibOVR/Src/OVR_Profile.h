@@ -32,8 +32,9 @@ namespace OVR {
 enum ProfileType
 {
     Profile_Unknown       = 0,
-    Profile_RiftDK1       = 1,
-    Profile_RiftDKHD      = 2,
+    Profile_GenericHMD    = 10,
+    Profile_RiftDK1       = 11,
+    Profile_RiftDKHD      = 12,
 };
 
 class Profile;
@@ -99,10 +100,9 @@ protected:
 //-------------------------------------------------------------------
 // ***** Profile
 
-// The base profile for all HMD devices.  This object is never created directly.
-// Instead derived objects provide specific data implementations.  Some settings
-// such as IPD will be tied to a specific user and be consistent between ,
-// implementations but other settings like optical distortion may vary between devices.
+// The base profile for all users.  This object is not created directly.
+// Instead derived device objects provide add specific device members to 
+// the base profile
 
 class Profile : public RefCountBase<Profile>
 {
@@ -116,66 +116,120 @@ public:
         Gender_Female       = 2
     };
 
-    ProfileType Type;              // The type of device profile
-    char        Name[MaxNameLen];  // The name given to this profile
+    ProfileType          Type;              // The type of device profile
+    char                 Name[MaxNameLen];  // The name given to this profile
 
 protected:
-    GenderType  Gender;            // The gender of the user
-    float       PlayerHeight;      // The height of the user in meters
-    float       IPD;               // Distance between eyes in meters
+    GenderType           Gender;            // The gender of the user
+    float                PlayerHeight;      // The height of the user in meters
+    float                IPD;               // Distance between eyes in meters
 
 public:
-    // These are properties which are intrinsic to the user and affect scene setup
-    GenderType      GetGender()                     { return Gender; };
-    float           GetPlayerHeight()               { return PlayerHeight; };
-    float           GetIPD()                        { return IPD; };
-    float           GetEyeHeight();    
-    
-    void            SetGender(GenderType gender)    { Gender = gender; };
-    void            SetPlayerHeight(float height)   { PlayerHeight = height; };
-    void            SetIPD(float ipd)               { IPD = ipd; };
+    virtual Profile*     Clone() const = 0;
 
+    // These are properties which are intrinsic to the user and affect scene setup
+    GenderType           GetGender()                     { return Gender; };
+    float                GetPlayerHeight()               { return PlayerHeight; };
+    float                GetIPD()                        { return IPD; };
+    float                GetEyeHeight();    
+    
+    void                 SetGender(GenderType gender)    { Gender = gender; };
+    void                 SetPlayerHeight(float height)   { PlayerHeight = height; };
+    void                 SetIPD(float ipd)               { IPD = ipd; };
 
 protected:
     Profile(ProfileType type, const char* name);
-
-    virtual Profile*     Clone() const = 0;
+    
     virtual bool         ParseProperty(const char* prop, const char* sval);
     
     friend class ProfileManager;
 };
 
+//-----------------------------------------------------------------------------
+// ***** HMDProfile
+
+// The generic HMD profile is used for properties that are common to all headsets
+class HMDProfile : public Profile
+{
+protected:
+    // FOV extents in pixels measured by a user
+    int                 LL;       // left eye outer extent
+    int                 LR;       // left eye inner extent
+    int                 RL;       // right eye inner extent
+    int                 RR;       // right eye outer extent
+
+public:
+    virtual Profile*    Clone() const;
+
+    void SetLL(int val) { LL = val; };
+    void SetLR(int val) { LR = val; };
+    void SetRL(int val) { RL = val; };
+    void SetRR(int val) { RR = val; };
+
+    int GetLL() { return LL; };
+    int GetLR() { return LR; };
+    int GetRL() { return RL; };
+    int GetRR() { return RR; };
+
+protected:
+    HMDProfile(ProfileType type, const char* name);
+
+    virtual bool        ParseProperty(const char* prop, const char* sval);
+
+    friend class ProfileManager;
+};
+
+// For headsets that use eye cups
+enum EyeCupType
+{
+    EyeCup_A = 0,
+    EyeCup_B = 1,
+    EyeCup_C = 2
+};
 
 //-----------------------------------------------------------------------------
 // ***** RiftDK1Profile
 
 // This profile is specific to the Rift Dev Kit 1 and contains overrides specific 
 // to that device and lens cup settings.
-class RiftDK1Profile : public Profile
+class RiftDK1Profile : public HMDProfile
 {
-public:
-    enum EyeCupType
-    {
-        EyeCup_A = 0,
-        EyeCup_B = 1,
-        EyeCup_C = 2
-    };
-
 protected:
-    EyeCupType  EyeCups;            // Which eye cup does the player use
-    int         LL;                 // Configuration Utility IPD setting
-    int         LR;                 // Configuration Utility IPD setting
-    int         RL;                 // Configuration Utility IPD setting
-    int         RR;                 // Configuration Utility IPD setting
+    EyeCupType          EyeCups;   // Which eye cup does the player use
 
 public:
+    virtual Profile*    Clone() const;
+
     EyeCupType          GetEyeCup() { return EyeCups; };
     void                SetEyeCup(EyeCupType cup) { EyeCups = cup; };
 
 protected:
     RiftDK1Profile(const char* name);
 
+    virtual bool        ParseProperty(const char* prop, const char* sval);
+
+    friend class ProfileManager;
+};
+
+//-----------------------------------------------------------------------------
+// ***** RiftDKHDProfile
+
+// This profile is specific to the Rift HD Dev Kit and contains overrides specific 
+// to that device and lens cup settings.
+class RiftDKHDProfile : public HMDProfile
+{
+protected:
+    EyeCupType          EyeCups;   // Which eye cup does the player use
+
+public:
     virtual Profile*    Clone() const;
+
+    EyeCupType          GetEyeCup() { return EyeCups; };
+    void                SetEyeCup(EyeCupType cup) { EyeCups = cup; };
+
+protected:
+    RiftDKHDProfile(const char* name);
+
     virtual bool        ParseProperty(const char* prop, const char* sval);
 
     friend class ProfileManager;

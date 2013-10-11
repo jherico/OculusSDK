@@ -122,6 +122,9 @@ public:
     void         AdjustDistortionK2(float dt)  { AdjustDistortion(dt, 2, "K2"); }
     void         AdjustDistortionK3(float dt)  { AdjustDistortion(dt, 3, "K3"); }
 
+	void		 AdjustDistortion(float val, int kIndex);
+	void		 AdjustEsd(float val);
+
     // Adds room model to scene.
     void         PopulateScene(const char* fileName);
     void         PopulatePreloadScene();
@@ -136,10 +139,6 @@ protected:
     int                 Width, Height;
     int                 Screen;
     int                 FirstScreenInCycle;
-
-    // Magnetometer calibration and yaw correction
-    Util::MagCalibration      MagCal;
-	bool			          MagAwaitingForwardLook;
 
     // *** Oculus HMD Variables
     Ptr<DeviceManager>  pManager;
@@ -253,11 +252,6 @@ protected:
     void RaiseLOD();
     void CycleDisplay();
     void GamepadStateChanged(const GamepadState& pad);
-
-	// Variable used by UpdateManualCalibration
-    Anglef FirstMagYaw;
-	int ManualMagCalStage;
-	int ManualMagFailures;
 };
 
 //-------------------------------------------------------------------------------------
@@ -679,9 +673,6 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
 
     case Key_R:
         SFusion.Reset();
-		if (MagCal.IsAutoCalibrating() || MagCal.IsManuallyCalibrating())
-	        MagCal.AbortCalibration();
-
         SetAdjustMessage("Sensor Fusion Reset");
         break;
 
@@ -742,19 +733,11 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
     case Key_Escape:
         if(!down)
         {
-			if (MagCal.IsAutoCalibrating() || MagCal.IsManuallyCalibrating())
-			{
-				MagCal.AbortCalibration();
-				SetAdjustMessage("Aborting Magnetometer Calibration");
-			}
-			else 
-			{
-                // switch to primary screen windowed mode
-                pPlatform->SetFullscreen(RenderParams, Display_Window);
-                RenderParams.Display = pPlatform->GetDisplay(0);
-                pRender->SetParams(RenderParams);
-                Screen = 0;
-			}
+            // switch to primary screen windowed mode
+            pPlatform->SetFullscreen(RenderParams, Display_Window);
+            RenderParams.Display = pPlatform->GetDisplay(0);
+            pRender->SetParams(RenderParams);
+            Screen = 0;
         }
         break;
 
@@ -952,27 +935,28 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
         DropLOD();
         break;
 */
-        // Start calibrating magnetometer
-	case Key_Z:
-		if (down) 
-		{
-			ManualMagCalStage = 0;
-			if (MagCal.IsManuallyCalibrating())
-				MagAwaitingForwardLook = false;
-			else
-			{
-                MagCal.BeginManualCalibration(SFusion);
-				MagAwaitingForwardLook = true;
-			}
-		}
-        break;
 
-    case Key_X:
-		if (down) 
-		{
-            MagCal.BeginAutoCalibration(SFusion);
-            SetAdjustMessage("Starting Auto Mag Calibration");
-		}
+        // Cycle through drift correction options
+    case Key_Z:
+        if (down)
+        {
+            if (SFusion.IsYawCorrectionEnabled())
+            {
+                SFusion.SetGravityEnabled(false);
+                SFusion.SetYawCorrectionEnabled(false);
+            }
+            else if (SFusion.IsGravityEnabled())
+            {
+                SFusion.SetYawCorrectionEnabled(true);
+            }
+            else
+            {
+                SFusion.SetGravityEnabled(true);
+            }
+            SetAdjustMessage("Tilt Correction %s\nYaw Correction %s", 
+                SFusion.IsGravityEnabled() ? "On" : "Off",
+                SFusion.IsYawCorrectionEnabled() ? "On" : "Off");
+        }
         break;
 
         // Show view of yaw angles (for mag calibration/analysis)
@@ -1093,11 +1077,21 @@ void OculusWorldDemoApp::OnIdle()
                         if (!pSensor)
                         {
                             pSensor = *desc.Handle.CreateDeviceTyped<SensorDevice>();
-                            SFusion.AttachToSensor(pSensor);
+							if (pSensor)
+							{
+								SFusion.AttachToSensor(pSensor);
 
-                            SetAdjustMessage("---------------------------\n"
-                                             "SENSOR connected\n"
-                                             "---------------------------");
+								SetAdjustMessage("---------------------------\n"
+												 "SENSOR connected\n"
+												 "---------------------------");
+							}
+							else
+							{
+								SetAdjustMessage("----------------------------\n"
+												 "SENSOR connect failed\n"
+												 "Unplug and reconnect it.\n"
+												 "----------------------------");
+							}
                         }
                         else if (!wasAlreadyCreated)
                         {
@@ -1199,27 +1193,6 @@ void OculusWorldDemoApp::OnIdle()
     {
         (this->*pAdjustFunc)(dt * AdjustDirection * (ShiftDown ? 5.0f : 1.0f));
     }
-
-    // Magnetometer calibration procedure
-    if (MagCal.IsManuallyCalibrating())
-        UpdateManualMagCalibration();
-
-    if (MagCal.IsAutoCalibrating()) 
-    {
-        MagCal.UpdateAutoCalibration(SFusion);
-		int n = MagCal.NumberOfSamples();
-	    if (n == 1)
-	        SetAdjustMessage("   Magnetometer Calibration Has 1 Sample   \n   %d Remaining - Please Keep Looking Around   ",4-n);
-		else if (n < 4)
-			SetAdjustMessage("   Magnetometer Calibration Has %d Samples   \n   %d Remaining - Please Keep Looking Around   ",n,4-n);
-        if (MagCal.IsCalibrated())
-        {
-            SFusion.SetYawCorrectionEnabled(true);
-            Vector3f mc = MagCal.GetMagCenter();
-            SetAdjustMessage("   Magnetometer Calibration Complete   \nCenter: %f %f %f",mc.x,mc.y,mc.z);
-        }
-    }
-
 
     // Process latency tester results.
     const char* results = LatencyUtil.GetResultsString();
@@ -1341,127 +1314,10 @@ void OculusWorldDemoApp::OnIdle()
 }
 
 
-void OculusWorldDemoApp::UpdateManualMagCalibration() 
-{
-    float tyaw, pitch, roll;
-	Anglef yaw;
-    Quatf hmdOrient = SFusion.GetOrientation();
-    hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&tyaw, &pitch, &roll);
-    Vector3f mag = SFusion.GetMagnetometer();
-    float dtr = Math<float>::DegreeToRadFactor;
-	yaw.Set(tyaw); // Using Angle class to handle angle wraparound arithmetic
-
-	const int timeout = 100;
-
-	switch(ManualMagCalStage)
-    {
-        case 0:
-			if (MagAwaitingForwardLook)
-                SetAdjustMessage("Magnetometer Calibration\n** Step 1: Please Look Forward **\n** and Press Z When Ready **");
-			else
-                if (fabs(pitch) < 10.0f*dtr)
-			    {
-                    MagCal.InsertIfAcceptable(hmdOrient, mag);
-				    FirstMagYaw = yaw;
-					MagAwaitingForwardLook = false;
-					if (MagCal.NumberOfSamples() == 1)
-					{
-						ManualMagCalStage = 1;
-						ManualMagFailures = 0;
-					}   
-			    }
-				else
-					MagAwaitingForwardLook = true;
-            break;
-        case 1:
-            SetAdjustMessage("Magnetometer Calibration\n** Step 2: Please Look Up **");
-			yaw -= FirstMagYaw;
-            if ((pitch > 50.0f*dtr) && (yaw.Abs() < 20.0f*dtr))
-			{
-			    MagCal.InsertIfAcceptable(hmdOrient, mag);
-			    ManualMagFailures++;
-	            if ((MagCal.NumberOfSamples() == 2)||(ManualMagFailures > timeout))
-				{
-	   		        ManualMagCalStage = 2;
-					ManualMagFailures = 0;
-				}
-			}
-            break;
-        case 2:
-            SetAdjustMessage("Magnetometer Calibration\n** Step 3: Please Look Left **");
-			yaw -= FirstMagYaw;
-            if (yaw.Get() > 60.0f*dtr) 
-			{
-                MagCal.InsertIfAcceptable(hmdOrient, mag);
-			    ManualMagFailures++;
-	            if ((MagCal.NumberOfSamples() == 3)||(ManualMagFailures > timeout))
-				{
-	   		        ManualMagCalStage = 3;
-					ManualMagFailures = 0;
-				}
-			}
-            break;
-        case 3:
-            SetAdjustMessage("Magnetometer Calibration\n** Step 4: Please Look Right **");
-			yaw -= FirstMagYaw;
-			if (yaw.Get() < -60.0f*dtr)
-			{
-                MagCal.InsertIfAcceptable(hmdOrient, mag);
-			    ManualMagFailures++;
-	            if (MagCal.NumberOfSamples() == 4)
-	   		        ManualMagCalStage = 6;
-				else
-				{
-					if (ManualMagFailures > timeout)
-				    {
-					    ManualMagCalStage = 4;
-					    ManualMagFailures = 0;
-				    }
-				}
-			}
-            break;
-        case 4:
-            SetAdjustMessage("Magnetometer Calibration\n** Step 5: Please Look Upper Right **");
-			yaw -= FirstMagYaw;
-			if ((yaw.Get() < -50.0f*dtr) && (pitch > 40.0f*dtr)) 
-			{
-                MagCal.InsertIfAcceptable(hmdOrient, mag);
-	            if (MagCal.NumberOfSamples() == 4)
-	   		        ManualMagCalStage = 6;
-				else 
-				{
-					if (ManualMagFailures > timeout)
-				    {
-					    ManualMagCalStage = 5;
-					    ManualMagFailures = 0;
-				    }
-				    else
-					    ManualMagFailures++;
-				}
-			}
-            break;
-        case 5:
-            SetAdjustMessage("Calibration Failed\n** Try Again From Another Location **");
-			MagCal.AbortCalibration();
-			break;
-		case 6:
-            if (!MagCal.IsCalibrated()) 
-            {
-                MagCal.SetCalibration(SFusion);
-                SFusion.SetYawCorrectionEnabled(true);
-                Vector3f mc = MagCal.GetMagCenter();
-                SetAdjustMessage("   Magnetometer Calibration and Activation   \nCenter: %f %f %f",
-					mc.x,mc.y,mc.z);
-            }
-    }
-}
-
-
-
-static const char* HelpText =
-    "F1         \t100 NoStereo                   \t420 Z    \t520 Manual Mag Calib\n"
-    "F2         \t100 Stereo                     \t420 X    \t520 Auto Mag Calib\n"
-    "F3         \t100 StereoHMD                  \t420 F6    \t520 Yaw Drift Info\n" 
+static const char* HelpText = 
+    "F1         \t100 NoStereo\n"
+    "F2         \t100 Stereo                     \t420 Z    \t520 Drift Correction\n"
+    "F3         \t100 StereoHMD                  \t420 F6   \t520 Yaw Drift Info\n" 
     "F4         \t100 MSAA                       \t420 R    \t520 Reset SensorFusion\n"
     "F9         \t100 FullScreen                 \t420\n"
     "F11        \t100 Fast FullScreen                   \t500 - +       \t660 Adj EyeHeight\n"                                           
@@ -1518,20 +1374,11 @@ void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
 
     if (SceneMode == Scene_YawView)
     {
-        Matrix4f calView = Matrix4f();
-        float viewYaw = -ThePlayer.LastSensorYaw + SFusion.GetMagRefYaw();
-        calView.M[0][0] = calView.M[2][2] = cos(viewYaw);
-        calView.M[0][2] = sin(viewYaw);
-        calView.M[2][0] = -sin(viewYaw);
-        //LogText("yaw: %f\n",SFusion.GetMagRefYaw());
-
-        if (SFusion.IsYawCorrectionInProgress())
-            YawMarkGreenScene.Render(pRender, stereo.ViewAdjust);
-        else
-            YawMarkRedScene.Render(pRender, stereo.ViewAdjust);
-
-        if (fabs(ThePlayer.EyePitch) < Math<float>::Pi * 0.33)
-        YawLinesScene.Render(pRender, stereo.ViewAdjust * calView);
+        Matrix4f trackerOnlyOrient = Matrix4f::RotationY(ThePlayer.LastSensorYaw) 
+                                   * Matrix4f::RotationX(ThePlayer.EyePitch)
+                                   * Matrix4f::RotationZ(ThePlayer.EyeRoll);
+        YawLinesScene.Render(pRender, stereo.ViewAdjust * trackerOnlyOrient.Inverted());
+        //YawMarkRedScene.Render(pRender, stereo.ViewAdjust);
     }
 
     // *** 2D Text & Grid - Configure Orthographic rendering.
@@ -1702,6 +1549,18 @@ void OculusWorldDemoApp::AdjustMotionPrediction(float dt)
     SetAdjustMessage("MotionPrediction: %6.3fs", motionPred);
 }
 
+void OculusWorldDemoApp::AdjustDistortion(float val, int kIndex)
+{
+    SConfig.SetDistortionK(kIndex, val);
+    SetAdjustMessage("K%d: %6.4f", kIndex, SConfig.GetDistortionK(kIndex));
+}
+
+void OculusWorldDemoApp::AdjustEsd(float val)
+{
+    SConfig.SetEyeToScreenDistance(val);
+	float esd = SConfig.GetEyeToScreenDistance();
+    SetAdjustMessage("ESD:%6.3f  FOV: %6.3f", esd, SConfig.GetYFOVDegrees());
+}
 
 // Loads the scene data
 void OculusWorldDemoApp::PopulateScene(const char *fileName)
@@ -1728,30 +1587,19 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
     Ptr<Model> yawMarkRedModel = *Model::CreateBox(Color(255, 0, 0, 255), Vector3f(0.0f, shifty, -2.0f), Vector3f(0.05f, 0.05f, 0.05f));
     YawMarkRedScene.World.Add(yawMarkRedModel);
 
-    Ptr<Model> yawLinesModel = *new Model(Prim_Lines);
-    float r = 2.0f;
-    float theta0 = Math<float>::PiOver2;
-    float theta1 = 0.0f;
+    Ptr<Model> yawLinesModel = *new Model();
     Color c = Color(255, 200, 200, 255);
-    for (int i = 0; i < 35; i++) 
-    {
-        theta1 = theta0 + Math<float>::Pi / 18.0f;
-        yawLinesModel->AddLine(yawLinesModel->AddVertex(Vector3f(r*cos(theta0),shifty,-r*sin(theta0)),c),
-                               yawLinesModel->AddVertex(Vector3f(r*cos(theta1),shifty,-r*sin(theta1)),c));
-        theta0 = theta1;
-        yawLinesModel->AddLine(yawLinesModel->AddVertex(Vector3f(r*cos(theta0),shifty,-r*sin(theta0)),c),
-                               yawLinesModel->AddVertex(Vector3f(r*cos(theta0),shifty+0.1f,-r*sin(theta0)),c));
-        theta0 = theta1;
-    }
-    theta1 = theta0 + Math<float>::Pi / 18.0f;
-    yawLinesModel->AddLine(yawLinesModel->AddVertex(Vector3f(r*cos(theta0),shifty,-r*sin(theta0)),c),
-                           yawLinesModel->AddVertex(Vector3f(r*cos(theta1),shifty,-r*sin(theta1)),c));
-    yawLinesModel->AddLine(yawLinesModel->AddVertex(Vector3f(0.0f,shifty+0.1f,-r),c),
-                           yawLinesModel->AddVertex(Vector3f(r*sin(0.02f),shifty,-r*cos(0.02f)),c));
-    yawLinesModel->AddLine(yawLinesModel->AddVertex(Vector3f(0.0f,shifty+0.1f,-r),c),
-                           yawLinesModel->AddVertex(Vector3f(r*sin(-0.02f),shifty,-r*cos(-0.02f)),c));
-    yawLinesModel->SetPosition(Vector3f(0.0f,0.0f,0.0f));
-
+    float r = 1.5f;
+    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(-0.1f, 0, -r), c), 
+                               yawLinesModel->AddVertex(Vector3f(0, 0, -r-0.2f), c),
+                               yawLinesModel->AddVertex(Vector3f(0.1f, 0, -r), c));
+    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(-r-0.1f, 0, -r), c), 
+                               yawLinesModel->AddVertex(Vector3f(-r, 0, -r-0.2f), c),
+                               yawLinesModel->AddVertex(Vector3f(-r+0.1f, 0, -r), c));
+    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(r-0.1f, 0, -r), c), 
+                               yawLinesModel->AddVertex(Vector3f(r, 0, -r-0.2f), c),
+                               yawLinesModel->AddVertex(Vector3f(r+0.1f, 0, -r), c));
+    yawLinesModel->SetPosition(Vector3f(0.0f,-1.2f,0.0f));
     YawLinesScene.World.Add(yawLinesModel);
 }
 

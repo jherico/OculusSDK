@@ -239,15 +239,13 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
                                           FirstChild()->ToText()->Value();
         UPInt stringLength = strlen(indexStr);
 
-        for(UPInt j = 0; j < stringLength;)
+        for(UPInt j = 0; j < stringLength; )
         {
             UPInt k = j + 1;
             for(; k < stringLength; ++k)
             {
-                if(indexStr[k] == ' ')
-                {
-                    break;
-                }
+                if (indexStr[k] == ' ')
+                    break;                
             }
             char text[20];
             for(UPInt l = 0; l < k - j; ++l)
@@ -255,8 +253,20 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
                 text[l] = indexStr[j + l];
             }
             text[k - j] = '\0';
-            Models[i]->Indices.InsertAt(0, (unsigned short)atoi(text));
+
+            Models[i]->Indices.PushBack((unsigned short)atoi(text));
             j = k + 1;
+        }
+
+        // Reverse index order to match original expected orientation
+        Array<UInt16>& indices    = Models[i]->Indices;
+        UPInt          indexCount = indices.GetSize();         
+
+        for (UPInt revIndex = 0; revIndex < indexCount/2; revIndex++)
+        {
+            unsigned short itemp               = indices[revIndex];
+            indices[revIndex]                  = indices[indexCount - revIndex - 1];
+            indices[indexCount - revIndex - 1] = itemp;            
         }
 
         delete vertices;

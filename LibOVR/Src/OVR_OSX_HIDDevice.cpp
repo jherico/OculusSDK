@@ -128,6 +128,13 @@ bool HIDDeviceManager::initVendorProductVersion(IOHIDDeviceRef device, HIDDevice
     {
         return false;
     }
+
+    SInt32 result;
+    if (!getIntProperty(device, CFSTR(kIOHIDVersionNumberKey), &result))
+    {
+        return false;
+    }
+    pDevDesc->VersionNumber = result;
     
     return true;
 }

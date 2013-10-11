@@ -173,6 +173,11 @@ bool HIDDeviceManager::initVendorProductVersion(udev_device* device, HIDDeviceDe
     else
         return false;
 
+    if (getIntProperty(device, "bcdDevice", &result))
+        pDevDesc->VersionNumber = result;
+    else
+        return false;
+
     return true;
 }
 

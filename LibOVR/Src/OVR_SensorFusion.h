@@ -4,7 +4,7 @@ PublicHeader:   OVR.h
 Filename    :   OVR_SensorFusion.h
 Content     :   Methods that determine head orientation from sensor data over time
 Created     :   October 9, 2012
-Authors     :   Michael Antonov, Steve LaValle
+Authors     :   Michael Antonov, Steve LaValle, Max Katsev
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -43,7 +43,7 @@ class SensorFusion : public NewOverrideBase
 {
     enum
     {
-        MagMaxReferences = 80
+        MagMaxReferences = 1000
     };        
 
 public:
@@ -94,11 +94,6 @@ public:
     void        EnableMotionTracking(bool enable = true)    { MotionTrackingEnabled = enable; }
     bool        IsMotionTrackingEnabled() const             { return MotionTrackingEnabled;   }
 
-    // Multiplier for yaw rotation (turning); setting this higher than 1 (the default) can allow the game
-    // to be played without auxillary rotation controls, possibly making it more immersive.
-    // Whether this is more or less likely to cause motion sickness is unknown.
-    float       GetYawMultiplier() const  { return YawMult; }
-    void        SetYawMultiplier(float y) { YawMult = y; }
 
 
     // *** Prediction Control
@@ -124,7 +119,6 @@ public:
     void        SetAccelGain(float ag)                      { Gain = ag; }
 
 
-
     // *** Magnetometer and Yaw Drift Correction Control
 
     // Methods to load and save a mag calibration.  Calibrations can optionally
@@ -139,9 +133,6 @@ public:
 	void        SetYawCorrectionEnabled(bool enable)    { EnableYawCorrection = enable; }
     // Determines if yaw correction is enabled.
     bool        IsYawCorrectionEnabled() const          { return EnableYawCorrection;}
-
-    // Yaw correction is currently working (forcing a corrective yaw rotation)
-    bool        IsYawCorrectionInProgress() const       { return YawCorrectionInProgress;}
 
     // Store the calibration matrix for the magnetometer
     void        SetMagCalibration(const Matrix4f& m)
@@ -163,13 +154,9 @@ public:
 
 	// These refer to reference points that associate mag readings with orientations
 	void        ClearMagReferences()             { MagNumReferences = 0; }
-    void        SetMagRefDistance(const float d) { MagRefDistance = d; }
 
 
     Vector3f    GetCalibratedMagValue(const Vector3f& rawMag) const;
-
-    float       GetMagRefYaw() const             { return MagRefYaw; }
-    float       GetYawErrorAngle() const         { return YawErrorAngle; }
 
 
 
@@ -220,7 +207,7 @@ private:
         virtual bool SupportsMessageType(MessageType type) const;
     };   
 
-    Ptr<SensorDevice> pSensor;
+    SensorInfo        CachedSensorInfo;
     
     Quatf             Q;
 	Quatf			  QUncorrected;
@@ -234,7 +221,6 @@ private:
     BodyFrameHandler  Handler;
     MessageHandler*   pDelegate;
     float             Gain;
-    float             YawMult;
     volatile bool     EnableGravity;
 
     bool              EnablePrediction;
@@ -242,31 +228,21 @@ private:
 	float             PredictionTimeIncrement;
 
     SensorFilter      FRawMag;
-    SensorFilter      FAccW;
     SensorFilter      FAngV;
 
-    int               TiltCondCount;
-    float             TiltErrorAngle;
-    Vector3f          TiltErrorAxis;
+    Vector3f          GyroOffset;
+    SensorFilterBase<float> TiltAngleFilter;
+
 
     bool              EnableYawCorrection;
+    bool              MagCalibrated;
     Matrix4f          MagCalibrationMatrix;
     time_t            MagCalibrationTime;    
-    bool              MagCalibrated;
-    int               MagCondCount;
-    float             MagRefDistance;
-    Quatf             MagRefQ;
-    Vector3f          MagRefM;
-    float             MagRefYaw;
-    bool              MagHasNearbyReference;
-    Quatf             MagRefTableQ[MagMaxReferences];
-    Vector3f          MagRefTableM[MagMaxReferences];
-    float             MagRefTableYaw[MagMaxReferences];
     int               MagNumReferences;
-    float             YawErrorAngle;
-    int               YawErrorCount;
-    bool              YawCorrectionInProgress;
-	bool			  YawCorrectionActivated;
+    Vector3f          MagRefsInBodyFrame[MagMaxReferences];
+    Vector3f          MagRefsInWorldFrame[MagMaxReferences];
+    int               MagRefIdx;
+    int               MagRefScore;
 
     bool              MotionTrackingEnabled;
 };

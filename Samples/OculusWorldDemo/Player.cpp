@@ -124,7 +124,7 @@ void Player::HandleCollision(double dt, Array<Ptr<CollisionModel> >* collisionMo
         {
             // Project orientationVector onto the plane
             Vector3f slideVector = orientationVector - collisionPlaneForward.N
-				* (orientationVector * collisionPlaneForward.N);
+				* (orientationVector.Dot(collisionPlaneForward.N));
 
             // Make sure we aren't in a corner
             for(unsigned int j = 0; j < collisionModels->GetSize(); ++j)

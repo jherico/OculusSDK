@@ -32,6 +32,8 @@ enum {
     Sensor_OldVendorId  = 0x0483,
     Sensor_OldProductId = 0x5750,
 
+    Sensor_BootLoader   = 0x1001,
+
     Sensor_DefaultReportRate = 500, // Hz
     Sensor_MaxReportRate     = 1000 // Hz
 };
@@ -400,6 +402,16 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
         virtual void Visit(HIDDevice& device, const HIDDeviceDesc& desc)
         {
+            
+            if (desc.ProductId == Sensor_BootLoader)
+            {   // If we find a sensor in boot loader mode then notify the app
+                // about the existence of the device, but don't allow the app
+                // to create or access the device
+                BootLoaderDeviceCreateDesc createDesc(pFactory, desc);
+                ExternalVisitor.Visit(createDesc);
+                return;
+            }
+            
             SensorDeviceCreateDesc createDesc(pFactory, desc);
             ExternalVisitor.Visit(createDesc);
 
@@ -433,16 +445,29 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
 bool SensorDeviceFactory::MatchVendorProduct(UInt16 vendorId, UInt16 productId) const
 {
+    // search for a tracker sensor or a tracker boot loader device
     return ((vendorId == Sensor_VendorId) && (productId == Sensor_ProductId)) ||
-        ((vendorId == Sensor_OldVendorId) && (productId == Sensor_OldProductId));
+        ((vendorId == Sensor_OldVendorId) && (productId == Sensor_OldProductId)) ||
+        ((vendorId == Sensor_VendorId) && (productId == Sensor_BootLoader));
 }
 
 bool SensorDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr, const HIDDeviceDesc& desc)
 {
     if (MatchVendorProduct(desc.VendorId, desc.ProductId))
     {
-        SensorDeviceCreateDesc createDesc(this, desc);
-        return pdevMgr->AddDevice_NeedsLock(createDesc).GetPtr() != NULL;
+        if (desc.ProductId == Sensor_BootLoader)
+        {   // If we find a sensor in boot loader mode then notify the app
+            // about the existence of the device, but don't allow them
+            // to create or access the device
+            BootLoaderDeviceCreateDesc createDesc(this, desc);
+            pdevMgr->AddDevice_NeedsLock(createDesc);
+            return false;  // return false to allow upstream boot loader factories to catch the device
+        }
+        else
+        {
+            SensorDeviceCreateDesc createDesc(this, desc);
+            return pdevMgr->AddDevice_NeedsLock(createDesc).GetPtr() != NULL;
+        }
     }
     return false;
 }
@@ -464,19 +489,18 @@ bool SensorDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
     OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength, HIDDesc.Product.ToCStr());
     OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, HIDDesc.Manufacturer.ToCStr());
     info->Type    = Device_Sensor;
-    info->Version = 0;
 
     if (info->InfoClassType == Device_Sensor)
     {
         SensorInfo* sinfo = (SensorInfo*)info;
         sinfo->VendorId  = HIDDesc.VendorId;
         sinfo->ProductId = HIDDesc.ProductId;
+        sinfo->Version   = HIDDesc.VersionNumber;
         sinfo->MaxRanges = SensorRangeImpl::GetMaxSensorRange();
         OVR_strcpy(sinfo->SerialNumber, sizeof(sinfo->SerialNumber),HIDDesc.SerialNumber.ToCStr());
     }
     return true;
 }
-
 
 //-------------------------------------------------------------------------------------
 // ***** SensorDevice
@@ -526,6 +550,9 @@ void SensorDeviceImpl::openDevice()
     {
         sr.Unpack();
         sr.GetSensorRange(&CurrentRange);
+        // Increase the magnetometer range, since the default value is not enough in practice
+        CurrentRange.MaxMagneticField = 2.5f;
+        setRange(CurrentRange);
     }
 
 
