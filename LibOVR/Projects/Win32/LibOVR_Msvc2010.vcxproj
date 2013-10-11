@@ -63,7 +63,6 @@
     <ClInclude Include="..\..\Src\OVR_Win32_HIDDevice.h" />
     <ClInclude Include="..\..\Src\OVR_Win32_HMDDevice.h" />
     <ClInclude Include="..\..\Src\OVR_Win32_SensorDevice.h" />
-    <ClInclude Include="..\..\Src\Util\Util_MagCalibration.h" />
     <ClInclude Include="..\..\Src\Util\Util_Render_Stereo.h" />
   </ItemGroup>
   <ItemGroup>
@@ -99,7 +98,6 @@
     <ClCompile Include="..\..\Src\OVR_Win32_HMDDevice.cpp" />
     <ClCompile Include="..\..\Src\Util\Util_LatencyTest.cpp" />
     <ClCompile Include="..\..\Src\OVR_Win32_SensorDevice.cpp" />
-    <ClCompile Include="..\..\Src\Util\Util_MagCalibration.cpp" />
     <ClCompile Include="..\..\Src\Util\Util_Render_Stereo.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

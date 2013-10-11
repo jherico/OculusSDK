@@ -29,7 +29,6 @@ set(SOURCE_FILES
     Src/OVR_SensorImpl.cpp
     Src/OVR_ThreadCommandQueue.cpp
     Src/Util/Util_LatencyTest.cpp
-    Src/Util/Util_MagCalibration.cpp
     Src/Util/Util_Render_Stereo.cpp
 )
 
@@ -73,7 +72,6 @@ set(HEADER_FILES
     Src/OVR_SensorImpl.h
     Src/OVR_ThreadCommandQueue.h
     Src/Util/Util_LatencyTest.h
-    Src/Util/Util_MagCalibration.h
     Src/Util/Util_Render_Stereo.h
 )
 

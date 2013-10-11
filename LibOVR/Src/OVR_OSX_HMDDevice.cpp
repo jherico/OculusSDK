@@ -186,7 +186,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
         unsigned mheight = (unsigned)CGDisplayPixelsHigh(Displays[i]);
         CGRect desktop = CGDisplayBounds(Displays[i]);
         
-        if (vendor == 16082 && product == 1)
+        if (vendor == 16082 && ( (product == 1)||(product == 2) ) ) // 7" or HD
         {
             char idstring[9];
             idstring[0] = 'A'-1+((vendor>>10) & 31);

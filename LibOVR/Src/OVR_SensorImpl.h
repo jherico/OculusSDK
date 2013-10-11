@@ -70,10 +70,56 @@ public:
     {
         // should paths comparison be case insensitive?
         return ((HIDDesc.Path.CompareNoCase(hidDesc.Path) == 0) &&
-                (HIDDesc.SerialNumber == hidDesc.SerialNumber));
+                (HIDDesc.SerialNumber == hidDesc.SerialNumber) &&
+                (HIDDesc.VersionNumber == hidDesc.VersionNumber));
     }
 
     virtual bool        GetDeviceInfo(DeviceInfo* info) const;
+};
+
+// A simple stub for notification of a sensor in Boot Loader mode
+// This descriptor does not support the creation of a device, only the detection
+// of its existence to warn apps that the sensor device needs firmware.
+// The Boot Loader descriptor reuses and is created by the Sensor device factory
+// but in the future may use a dedicated factory
+class BootLoaderDeviceCreateDesc : public HIDDeviceCreateDesc
+{
+public:
+    BootLoaderDeviceCreateDesc(DeviceFactory* factory, const HIDDeviceDesc& hidDesc)
+        : HIDDeviceCreateDesc(factory, Device_BootLoader, hidDesc) { }
+    
+    virtual DeviceCreateDesc* Clone() const
+    {
+        return new BootLoaderDeviceCreateDesc(*this);
+    }
+
+    // Boot Loader device creation is not allowed
+    virtual DeviceBase* NewDeviceInstance() { return NULL; };
+
+    virtual MatchResult MatchDevice(const DeviceCreateDesc& other,
+                                    DeviceCreateDesc**) const
+    {
+        if ((other.Type == Device_BootLoader) && (pFactory == other.pFactory))
+        {
+            const BootLoaderDeviceCreateDesc& s2 = (const BootLoaderDeviceCreateDesc&) other;
+            if (MatchHIDDevice(s2.HIDDesc))
+                return Match_Found;
+        }
+        return Match_None;
+    }
+
+    virtual bool MatchHIDDevice(const HIDDeviceDesc& hidDesc) const
+    {
+        // should paths comparison be case insensitive?
+        return ((HIDDesc.Path.CompareNoCase(hidDesc.Path) == 0) &&
+                (HIDDesc.SerialNumber == hidDesc.SerialNumber));
+    }
+
+    virtual bool        GetDeviceInfo(DeviceInfo* info) const 
+    {
+        OVR_UNUSED(info);
+        return false; 
+    }
 };
 
 

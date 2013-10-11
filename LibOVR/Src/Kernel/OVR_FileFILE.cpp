@@ -580,4 +580,4 @@ bool    SysFile::GetFileStat(FileStat* pfileStat, const String& path)
     return true;
 }
 
-} // Scaleform
+} // Namespace OVR

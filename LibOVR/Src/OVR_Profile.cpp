@@ -41,6 +41,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #endif
 
 #define PROFILE_VERSION 1.0
+#define MAX_PROFILE_MAJOR_VERSION 1
 
 namespace OVR {
 
@@ -154,11 +155,18 @@ Profile* ProfileManager::CreateProfileObject(const char* user,
     Profile* profile = NULL;
     switch (device)
     {
+        case Profile_GenericHMD:
+            *device_name = NULL;
+            profile = new HMDProfile(Profile_GenericHMD, user);
+            break;
         case Profile_RiftDK1:
             *device_name = "RiftDK1";
             profile = new RiftDK1Profile(user);
             break;
         case Profile_RiftDKHD:
+            *device_name = "RiftDKHD";
+            profile = new RiftDKHDProfile(user);
+            break;
         case Profile_Unknown:
             break;
     }
@@ -175,7 +183,6 @@ void ProfileManager::ClearCache()
     ProfileCache.Clear();
     CacheDevice = Profile_Unknown;
 }
-
 
 // Poplulates the local profile cache.  This occurs on the first access of the profile
 // data.  All profile operations are performed against the local cache until the
@@ -198,8 +205,11 @@ void ProfileManager::LoadCache(ProfileType device)
     JSON* item1 = root->GetNextItem(item0);
     JSON* item2 = root->GetNextItem(item1);
 
-    if (OVR_strcmp(item0->Name, "Oculus Profile Version") == 0)
-    {   // In the future I may need to check versioning to determine parse method
+    if (item0->Name == "Oculus Profile Version")
+    {
+        int major = atoi(item0->Value.ToCStr());
+        if (major > MAX_PROFILE_MAJOR_VERSION)
+            return;   // don't parse the file on unsupported major version number
     }
     else
     {
@@ -214,55 +224,57 @@ void ProfileManager::LoadCache(ProfileType device)
 
     for (int p=0; p<profileCount; p++)
     {
-        profileItem = profileItem->GetNextItem(profileItem);
-        if (!profileItem)
+        profileItem = root->GetNextItem(profileItem);
+        if (profileItem == NULL)
             break;
-        
-        // Read the required Name field
-        const char* profileName;
-        JSON* item = profileItem->GetFirstItem();
-        
-        if (item && (OVR_strcmp(item->Name, "Name") == 0))
-        {   
-            profileName = item->Value;
-        }
-        else
-        {
-            return;   // invalid field
-        }
 
-        const char*   deviceName  = 0;
-        bool          deviceFound = false;
-        Ptr<Profile>  profile     = *CreateProfileObject(profileName, device, &deviceName);
-
-        // Read the base profile fields.
-        if (profile)
+        if (profileItem->Name == "Profile")
         {
-            while (item = profileItem->GetNextItem(item), item)
+            // Read the required Name field
+            const char* profileName;
+            JSON* item = profileItem->GetFirstItem();
+        
+            if (item && (item->Name == "Name"))
+            {   
+                profileName = item->Value;
+            }
+            else
             {
-                if (item->Type != JSON_Object)
-                {
-                    profile->ParseProperty(item->Name, item->Value);
-                }
-                else
-                {   // Search for the matching device to get device specific fields
-                    if (!deviceFound && OVR_strcmp(item->Name, deviceName) == 0)
-                    {
-                        deviceFound = true;
+                return;   // invalid field
+            }
 
-                        for (JSON* deviceItem = item->GetFirstItem(); deviceItem;
-                             deviceItem = item->GetNextItem(deviceItem))
+            const char*   deviceName  = 0;
+            bool          deviceFound = false;
+            Ptr<Profile>  profile     = *CreateProfileObject(profileName, device, &deviceName);
+
+            // Read the base profile fields.
+            if (profile)
+            {
+                while (item = profileItem->GetNextItem(item), item)
+                {
+                    if (item->Type != JSON_Object)
+                    {
+                        profile->ParseProperty(item->Name, item->Value);
+                    }
+                    else
+                    {   // Search for the matching device to get device specific fields
+                        if (!deviceFound && deviceName && OVR_strcmp(item->Name, deviceName) == 0)
                         {
-                            profile->ParseProperty(deviceItem->Name, deviceItem->Value);
+                            deviceFound = true;
+
+                            for (JSON* deviceItem = item->GetFirstItem(); deviceItem;
+                                 deviceItem = item->GetNextItem(deviceItem))
+                            {
+                                profile->ParseProperty(deviceItem->Name, deviceItem->Value);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Add the new profile
-        if (deviceFound)
+            // Add the new profile
             ProfileCache.PushBack(profile);
+        }
     }
 
     CacheDevice = device;
@@ -276,10 +288,33 @@ void ProfileManager::SaveCache()
  
     Lock::Locker lockScope(&ProfileLock);
 
-    // TODO: Since there is only a single device type now, a full tree overwrite
-    // is sufficient but in the future a selective device branch replacement will
-    // be necessary
+    Ptr<JSON> oldroot = *JSON::Load(path);
+    if (oldroot)
+    {
+        if (oldroot->GetItemCount() >= 3)
+        {
+            JSON* item0 = oldroot->GetFirstItem();
+            JSON* item1 = oldroot->GetNextItem(item0);
+            oldroot->GetNextItem(item1);
 
+            if (item0->Name == "Oculus Profile Version")
+            {
+                int major = atoi(item0->Value.ToCStr());
+                if (major > MAX_PROFILE_MAJOR_VERSION)
+                    oldroot.Clear();   // don't use the file on unsupported major version number
+            }
+            else
+            {
+                oldroot.Clear(); 
+            }
+        }
+        else
+        {
+            oldroot.Clear();
+        }
+    }
+    
+    // Create a new json root
     Ptr<JSON> root = *JSON::CreateObject();
     root->AddNumberItem("Oculus Profile Version", PROFILE_VERSION);
     root->AddStringItem("CurrentProfile", DefaultProfile);
@@ -290,6 +325,7 @@ void ProfileManager::SaveCache()
     {
         Profile* profile = ProfileCache[i];
 
+        // Write the base profile information
         JSON* json_profile = JSON::CreateObject();
         json_profile->Name = "Profile";
         json_profile->AddStringItem("Name", profile->Name);
@@ -304,29 +340,100 @@ void ProfileManager::SaveCache()
         json_profile->AddNumberItem("PlayerHeight", profile->PlayerHeight);
         json_profile->AddNumberItem("IPD", profile->IPD);
 
+        char* device_name = NULL;
+        // Create a device-specific subtree for the cached device
         if (profile->Type == Profile_RiftDK1)
         {
-            RiftDK1Profile* riftdk1 = (RiftDK1Profile*)profile;
-            JSON* json_riftdk1 = JSON::CreateObject();
-            json_profile->AddItem("RiftDK1", json_riftdk1);
+            device_name = "RiftDK1";
+            
+            RiftDK1Profile* rift = (RiftDK1Profile*)profile;
+            JSON* json_rift = JSON::CreateObject();
+            json_profile->AddItem(device_name, json_rift);
 
             const char* eyecup = "A";
-            switch (riftdk1->EyeCups)
+            switch (rift->EyeCups)
             {
-                case RiftDK1Profile::EyeCup_A: eyecup = "A"; break;
-                case RiftDK1Profile::EyeCup_B: eyecup = "B"; break;
-                case RiftDK1Profile::EyeCup_C: eyecup = "C"; break;
+                case EyeCup_A: eyecup = "A"; break;
+                case EyeCup_B: eyecup = "B"; break;
+                case EyeCup_C: eyecup = "C"; break;
             }
-            json_riftdk1->AddStringItem("EyeCup", eyecup);
-            json_riftdk1->AddNumberItem("LL", riftdk1->LL);
-            json_riftdk1->AddNumberItem("LR", riftdk1->LR);
-            json_riftdk1->AddNumberItem("RL", riftdk1->RL);
-            json_riftdk1->AddNumberItem("RR", riftdk1->RR);
+            json_rift->AddStringItem("EyeCup", eyecup);
+            json_rift->AddNumberItem("LL", rift->LL);
+            json_rift->AddNumberItem("LR", rift->LR);
+            json_rift->AddNumberItem("RL", rift->RL);
+            json_rift->AddNumberItem("RR", rift->RR);
+        }
+        else if (profile->Type == Profile_RiftDKHD)
+        {
+            device_name = "RiftDKHD";
+            
+            RiftDKHDProfile* rift = (RiftDKHDProfile*)profile;
+            JSON* json_rift = JSON::CreateObject();
+            json_profile->AddItem(device_name, json_rift);
+
+            const char* eyecup = "A";
+            switch (rift->EyeCups)
+            {
+                case EyeCup_A: eyecup = "A"; break;
+                case EyeCup_B: eyecup = "B"; break;
+                case EyeCup_C: eyecup = "C"; break;
+            }
+            json_rift->AddStringItem("EyeCup", eyecup);
+            //json_rift->AddNumberItem("LL", rift->LL);
+            //json_rift->AddNumberItem("LR", rift->LR);
+            //json_rift->AddNumberItem("RL", rift->RL);
+            //json_rift->AddNumberItem("RR", rift->RR);
         }
 
+        // There may be multiple devices stored per user, but only a single
+        // device is represented by this root.  We don't want to overwrite
+        // the other devices so we need to examine the older root 
+        // and merge previous devices into new json root
+        if (oldroot)
+        {
+            JSON* old_profile = oldroot->GetFirstItem();
+            while (old_profile)
+            {
+                if (old_profile->Name == "Profile")
+                {
+                    JSON* profile_name = old_profile->GetItemByName("Name");
+                    if (profile_name && OVR_strcmp(profile->Name, profile_name->Value) == 0)
+                    {   // Now that we found the user in the older root, add all the 
+                        // object children to the new root - except for the one for the
+                        // current device
+                        JSON* old_item = old_profile->GetFirstItem();
+                        while (old_item)
+                        {
+                            if (old_item->Type == JSON_Object 
+                                && (device_name == NULL || OVR_strcmp(old_item->Name, device_name) != 0))
+                            {
+                                JSON* old_device = old_item;
+                                old_item = old_profile->GetNextItem(old_item);
+
+                                // remove the node from the older root to avoid multiple reference
+                                old_device->RemoveNode();
+                                // add the node pointer to the new root
+                                json_profile->AddItem(old_device->Name, old_device);
+                            }
+                            else
+                            {
+                                old_item = old_profile->GetNextItem(old_item);
+                            }
+                        }
+
+                        break;
+                    }
+                }
+
+                old_profile = oldroot->GetNextItem(old_profile);
+            }
+        }
+
+        // Add the completed user profile to the new root
         root->AddItem("Profile", json_profile);
     }
 
+    // Save the profile to disk
     root->Save(path);
 }
 
@@ -613,32 +720,20 @@ float Profile::GetEyeHeight()
     return eye_height;
 }
 
-
 //-----------------------------------------------------------------------------
-// ***** RiftDK1Profile
+// ***** HMDProfile
 
-RiftDK1Profile::RiftDK1Profile(const char* name) : Profile(Profile_RiftDK1, name)
+HMDProfile::HMDProfile(ProfileType type, const char* name) : Profile(type, name)
 {
-    EyeCups = EyeCup_A;
     LL = 0;
     LR = 0;
     RL = 0;
     RR = 0;
 }
 
-bool RiftDK1Profile::ParseProperty(const char* prop, const char* sval)
+bool HMDProfile::ParseProperty(const char* prop, const char* sval)
 {
-    if (OVR_strcmp(prop, "EyeCup") == 0)
-    {
-        switch (sval[0])
-        {
-            case 'C': EyeCups = EyeCup_C; break;
-            case 'B': EyeCups = EyeCup_B; break;
-            default:  EyeCups = EyeCup_A; break;
-        }
-        return true;
-    }
-    else if (OVR_strcmp(prop, "LL") == 0)
+    if (OVR_strcmp(prop, "LL") == 0)
     {
         LL = atoi(sval);
         return true;
@@ -662,9 +757,69 @@ bool RiftDK1Profile::ParseProperty(const char* prop, const char* sval)
     return Profile::ParseProperty(prop, sval);
 }
 
+Profile* HMDProfile::Clone() const
+{
+    HMDProfile* profile = new HMDProfile(*this);
+    return profile;
+}
+
+//-----------------------------------------------------------------------------
+// ***** RiftDK1Profile
+
+RiftDK1Profile::RiftDK1Profile(const char* name) : HMDProfile(Profile_RiftDK1, name)
+{
+    EyeCups = EyeCup_A;
+}
+
+bool RiftDK1Profile::ParseProperty(const char* prop, const char* sval)
+{
+    if (OVR_strcmp(prop, "EyeCup") == 0)
+    {
+        switch (sval[0])
+        {
+            case 'C': EyeCups = EyeCup_C; break;
+            case 'B': EyeCups = EyeCup_B; break;
+            default:  EyeCups = EyeCup_A; break;
+        }
+        return true;
+    }
+        
+    return HMDProfile::ParseProperty(prop, sval);
+}
+
 Profile* RiftDK1Profile::Clone() const
 {
     RiftDK1Profile* profile = new RiftDK1Profile(*this);
+    return profile;
+}
+
+//-----------------------------------------------------------------------------
+// ***** RiftDKHDProfile
+
+RiftDKHDProfile::RiftDKHDProfile(const char* name) : HMDProfile(Profile_RiftDKHD, name)
+{
+    EyeCups = EyeCup_A;
+}
+
+bool RiftDKHDProfile::ParseProperty(const char* prop, const char* sval)
+{
+    if (OVR_strcmp(prop, "EyeCup") == 0)
+    {
+        switch (sval[0])
+        {
+            case 'C': EyeCups = EyeCup_C; break;
+            case 'B': EyeCups = EyeCup_B; break;
+            default:  EyeCups = EyeCup_A; break;
+        }
+        return true;
+    }
+        
+    return HMDProfile::ParseProperty(prop, sval);
+}
+
+Profile* RiftDKHDProfile::Clone() const
+{
+    RiftDKHDProfile* profile = new RiftDKHDProfile(*this);
     return profile;
 }
 
