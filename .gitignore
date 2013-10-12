@@ -20,6 +20,8 @@ Samples/**/Obj
 Samples/**/Release
 Samples/**/Debug
 Tools
+# Added in 0.2.5
+Firmware
 
 # Do not include items like these that are not specific to this project.
 # .*
@@ -29,6 +31,4 @@ Tools
 # system, you should place those in a global gitignore file in your root 
 # directory.
 # See: https://help.github.com/articles/ignoring-files
-
-
 
