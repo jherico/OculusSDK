@@ -53,5 +53,6 @@ add_definitions( -DGL_GLEXT_PROTOTYPES )
 add_subdirectory (Samples/CommonSrc )
 add_subdirectory (Samples/OculusWorldDemo )
 add_subdirectory (Samples/OculusRoomTiny )
+add_subdirectory (Samples/SensorBox )
 add_subdirectory (Samples/TestSensor )
 

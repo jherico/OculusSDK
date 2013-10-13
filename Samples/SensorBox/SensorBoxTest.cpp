@@ -91,17 +91,16 @@ public:
 
     virtual int  OnStartup(int argc, char** argv);
     virtual void OnIdle();
-    virtual void OnDisplay();
-    virtual void OnResize(int w, int h);
 
     virtual void OnMouseMove(int x, int y, int modifiers);
-    virtual void OnKey(KeyCode key, int chr, bool down, int modifiers);
+    virtual void OnKey(OVR::KeyCode key, int chr, bool down, int modifiers);
 };
 
 InputTestApp::InputTestApp()
     : pRender(0), CurrentView(View_Perspective),
       LastUpdate(0), LastTitleUpdate(0), pAxes(0), pBox(0)
 {
+
 }
 
 
@@ -116,6 +115,7 @@ void UseCase()
     Ptr<HMDDevice>     pHMD = 0;
     Ptr<SensorDevice>  pSensor = 0;
     SensorFusion       FusionResult;
+
 
     // *** Initialization - Create the first available HMD Device
     pManager = *DeviceManager::Create();
@@ -162,7 +162,7 @@ InputTestApp::~InputTestApp()
 
 int InputTestApp::OnStartup(int argc, char** argv)
 {
-    if (!pPlatform->SetupWindow(400,300))
+    if (!pPlatform->SetupWindow(1200,800))
         return 1;
 
 
@@ -241,7 +241,11 @@ int InputTestApp::OnStartup(int argc, char** argv)
     // Report relative mouse motion (not absolute position)
    // pPlatform->SetMouseMode(Mouse_Relative);
 
+#ifdef OVR_OS_WIN32
+    const char* graphics = "d3d10";
+#else
     const char* graphics = "GL";
+#endif
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "-r") && i < argc-1)
             graphics = argv[i+1];
@@ -363,7 +367,7 @@ static float CalcDownAngleDegrees(Quatf q)
     return RadToDegree(downVector.Angle(val));
 }
 
-void InputTestApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
+void InputTestApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifiers)
 {
     OVR_UNUSED2(chr, modifiers);
 
@@ -446,10 +450,6 @@ void InputTestApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
     }
 }
 
-void InputTestApp::OnResize(int w, int h) {
-    pRender->SetViewport(0, 0, w, h);
-}
-
 void InputTestApp::OnIdle()
 {
     double curtime = pPlatform->GetAppTime();
@@ -488,9 +488,7 @@ void InputTestApp::OnIdle()
     {
         pBox2->SetOrientation(SFusion2.GetOrientation());
     }
-}
 
-void InputTestApp::OnDisplay() {
     // Render
     int w, h;
     pPlatform->GetWindowSize(&w, &h);
