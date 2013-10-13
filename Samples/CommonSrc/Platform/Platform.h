@@ -165,7 +165,6 @@ public:
     virtual void OnQuitRequest() { pPlatform->Exit(0); }
 
     virtual void OnIdle() {}
-    virtual void OnDisplay() {}
 
     virtual void OnKey(KeyCode key, int chr, bool down, int modifiers)
     { OVR_UNUSED4(key, chr, down, modifiers); }

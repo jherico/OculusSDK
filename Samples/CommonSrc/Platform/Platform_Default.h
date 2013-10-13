@@ -27,14 +27,7 @@ limitations under the License.
 // This should select proper header file for the platform/compiler.
 #include <Kernel/OVR_Types.h>
 
-#if defined(OVR_USE_GLUT)
-  #include "GLUT_Platform.h"
-  #include "../Render/Render_GL_GLUT_Device.h"
-
-  #define OVR_DEFAULT_RENDER_DEVICE_SET                                         \
-    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::GLUT::RenderDevice::CreateDevice)
-
-#elif defined(OVR_OS_WIN32)
+#if defined(OVR_OS_WIN32)
   #include "Win32_Platform.h"
 
   #include "../Render/Render_D3D11_Device.h"

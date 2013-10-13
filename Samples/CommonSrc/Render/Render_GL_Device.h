@@ -34,9 +34,10 @@ limitations under the License.
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
 #else
+#define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
+#include <GL/glext.h>
 #endif
-
 
 namespace OVR { namespace Render { namespace GL {
 
