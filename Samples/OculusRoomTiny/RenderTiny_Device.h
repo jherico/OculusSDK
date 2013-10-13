@@ -39,7 +39,6 @@ using namespace OVR::Util::Render;
 
 class RenderDevice;
 
-
 //-----------------------------------------------------------------------------------
 
 // Rendering primitive type used to render Model.
@@ -595,7 +594,7 @@ public:
 
     // This static function is implemented in each derived class
     // to support a specific renderer type.
-    static RenderDevice* CreateDevice(const RendererParams& rp, void* oswnd);
+    static RenderDevice* CreateDevice(const RendererParams& rp, void * oswnd);
 
 
     virtual void Init() {}

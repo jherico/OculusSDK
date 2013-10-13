@@ -26,17 +26,8 @@ limitations under the License.
 
 #include "RenderTiny_Device.h"
 
-#if defined(OVR_OS_WIN32)
-#include <Windows.h>
-#endif
-
-#if defined(OVR_OS_MAC)
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#else
-#include <GL/gl.h>
-#include <GL/glext.h>
-#endif
+#include "GL/glew.h"
+#include "GLFW/glfw3.h"
 
 namespace OVR { namespace RenderTiny { namespace GL {
 
@@ -184,11 +175,11 @@ class RenderDevice : public RenderTiny::RenderDevice
     GLuint                   CurrentFbo;
 
     const LightingParams*    Lighting;
-    void* oswnd;
+    GLFWwindow* window;
 
 
 public:
-    RenderDevice(const RendererParams& p, void * oswnd);
+    RenderDevice(const RendererParams& p, GLFWwindow * oswnd);
     virtual void Present();
 
     // Implement static initializer function to create this class.

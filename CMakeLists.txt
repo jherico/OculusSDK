@@ -45,6 +45,15 @@ include_directories(${CORE_OculusVR_SOURCE_DIR}/Src)
 include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Kernel)
 include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Util)
 
+# Cross platform window creation
+add_subdirectory(3rdParty/glfw)
+include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
+
+# Cross platform access to shader functionality
+add_definitions( -DGLEW_STATIC )
+add_subdirectory(3rdParty/glew)
+include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
+
 # Used by the sample code to read the tuscany resources
 add_subdirectory(3rdParty/TinyXml)
 include_directories(${LIB_TinyXML2_SOURCE_DIR})

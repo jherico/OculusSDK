@@ -23,19 +23,25 @@ limitations under the License.
 
 #include "OculusRoomTiny.h"
 #include "RenderTiny_Device.h"
-#include "OVR_KeyCodes.h"
+
 //-------------------------------------------------------------------------------------
 // ***** OculusRoomTiny Class
 
-// Static pApp simplifies routing the window function.
-OculusRoomTinyApp* OculusRoomTinyApp::pApp = 0;
+void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    OculusRoomTinyApp * instance = (OculusRoomTinyApp *)glfwGetWindowUserPointer(window);
+    instance->OnKey(key, action == GLFW_PRESS || action == GLFW_REPEAT);
+}
 
-OculusRoomTinyApp::OculusRoomTinyApp(OVR_TINY_STARTUP hInstance) :
-    Width(1280), Height(800), Quit(false), LastUpdate(0), StartupTicks(OVR::Timer::GetTicks()), EyePos(0.0f, 1.6f, -5.0f), EyeYaw(YawInitial),
-    EyePitch(0), EyeRoll(0), LastSensorYaw(0), MoveForward(0), MoveBack(0), MoveLeft(0), MoveRight(0), ShiftDown(0), ControlDown(0), PostProcess(PostProcess_Distortion),
-	hInstance(hInstance)
+void glfwErrorCallback(int error, const char* description) {
+    LogText("Error code %d, message: %s", error, description);
+    exit(1);
+}
+
+
+OculusRoomTinyApp::OculusRoomTinyApp() :
+    window(0), Width(1280), Height(800), Quit(false), LastUpdate(0), StartupTicks(OVR::Timer::GetTicks()), EyePos(0.0f, 1.6f, -5.0f), EyeYaw(YawInitial),
+    EyePitch(0), EyeRoll(0), LastSensorYaw(0), MoveForward(0), MoveBack(0), MoveLeft(0), MoveRight(0), ShiftDown(0), ControlDown(0), PostProcess(PostProcess_Distortion)
 {
-    pApp = this;
 }
 
 OculusRoomTinyApp::~OculusRoomTinyApp()
@@ -44,9 +50,93 @@ OculusRoomTinyApp::~OculusRoomTinyApp()
     pSensor.Clear();
     pHMD.Clear();
     destroyWindow();
-    pApp = 0;
 }
 
+bool OculusRoomTinyApp::setupWindow()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_DEPTH_BITS, 16);
+    glfwWindowHint(GLFW_DECORATED, 0);
+    window = glfwCreateWindow(HMDInfo.HResolution, HMDInfo.VResolution, "OculusRoomTiny", NULL, NULL);
+    assert(window != 0);
+    glfwSetWindowPos(window, HMDInfo.DesktopX, HMDInfo.DesktopY);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetKeyCallback(window, glfwKeyCallback);
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
+    glewInit();
+    return window != 0;
+}
+
+
+void OculusRoomTinyApp::destroyWindow()
+{
+    pRender.Clear();
+
+    if (window)
+    {
+        // Release window resources.
+        glfwDestroyWindow(window);
+        window = 0;
+        Width = Height = 0;
+    }
+}
+
+enum MessageBoxResult {
+    Continue,
+    Cancel,
+    Retry
+};
+
+MessageBoxResult MessageBox(const String & text) {
+    // FIXME extract the win32-ness
+    //        if (detectionMessage)
+    //        {
+    //            int         detectionResult = IDCONTINUE;
+    //            String messageText(detectionMessage);
+    //            messageText += "\n\n"
+    //                           "Press 'Try Again' to run retry detection.\n"
+    //                           "Press 'Continue' to run full-screen anyway.";
+    //
+    //            detectionResult = ::MessageBoxA(0, messageText.ToCStr(), "Oculus Rift Detection",
+    //                                            MB_CANCELTRYCONTINUE|MB_ICONWARNING);
+    //
+    //            if (detectionResult == IDCANCEL)
+    //                return 1;
+    //        }
+
+    //
+    //        if (detectionMessage)
+    //        {
+    //            String messageText(detectionMessage);
+    //            messageText += "\n\n"
+    //            "Press 'Try Again' to run retry detection.\n"
+    //            "Press 'Continue' to run full-screen anyway.";
+    //
+    //            CFStringRef headerStrRef  = CFStringCreateWithCString(NULL, "Oculus Rift Detection", kCFStringEncodingMacRoman);
+    //            CFStringRef messageStrRef = CFStringCreateWithCString(NULL, messageText, kCFStringEncodingMacRoman);
+    //
+    //            //launch the message box
+    //            CFUserNotificationDisplayAlert(0,
+    //                                           kCFUserNotificationNoteAlertLevel,
+    //                                           NULL, NULL, NULL,
+    //                                           headerStrRef, // header text
+    //                                           messageStrRef, // message text
+    //                                           CFSTR("Try again"),
+    //                                           CFSTR("Continue"),
+    //                                           CFSTR("Cancel"),
+    //                                           &detectionResult);
+    //
+    //            //Clean up the strings
+    //            CFRelease(headerStrRef);
+    //            CFRelease(messageStrRef);
+    //
+    //            if (detectionResult == kCFUserNotificationCancelResponse ||
+    //                detectionResult == kCFUserNotificationOtherResponse)
+    //                return 1;
+    //        }
+    return Continue;
+}
 
 int OculusRoomTinyApp::OnStartup(const char* args)
 {
@@ -107,54 +197,28 @@ int OculusRoomTinyApp::OnStartup(const char* args)
         else
             detectionMessage = 0;
 
-        detectedHardware = true;
-// FIXME extract the win32-ness
-//        if (detectionMessage)
-//        {
-//            int         detectionResult = IDCONTINUE;
-//            String messageText(detectionMessage);
-//            messageText += "\n\n"
-//                           "Press 'Try Again' to run retry detection.\n"
-//                           "Press 'Continue' to run full-screen anyway.";
-//
-//            detectionResult = ::MessageBoxA(0, messageText.ToCStr(), "Oculus Rift Detection",
-//                                            MB_CANCELTRYCONTINUE|MB_ICONWARNING);
-//
-//            if (detectionResult == IDCANCEL)
-//                return 1;
-//        }
+        if (detectionMessage) {
+            String messageText(detectionMessage);
+            messageText += "\n\n"
+                           "Press 'Try Again' to run retry detection.\n"
+                           "Press 'Continue' to run full-screen anyway.";
+            MessageBoxResult result = MessageBox(messageText);
+            // Yeah, this is confusing, but it's correct.
+            switch (result) {
+            // semantic Retry means 'continue the loop'
+            case Retry:
+                continue;
 
-//
-//        if (detectionMessage)
-//        {
-//            String messageText(detectionMessage);
-//            messageText += "\n\n"
-//            "Press 'Try Again' to run retry detection.\n"
-//            "Press 'Continue' to run full-screen anyway.";
-//
-//            CFStringRef headerStrRef  = CFStringCreateWithCString(NULL, "Oculus Rift Detection", kCFStringEncodingMacRoman);
-//            CFStringRef messageStrRef = CFStringCreateWithCString(NULL, messageText, kCFStringEncodingMacRoman);
-//
-//            //launch the message box
-//            CFUserNotificationDisplayAlert(0,
-//                                           kCFUserNotificationNoteAlertLevel,
-//                                           NULL, NULL, NULL,
-//                                           headerStrRef, // header text
-//                                           messageStrRef, // message text
-//                                           CFSTR("Try again"),
-//                                           CFSTR("Continue"),
-//                                           CFSTR("Cancel"),
-//                                           &detectionResult);
-//
-//            //Clean up the strings
-//            CFRelease(headerStrRef);
-//            CFRelease(messageStrRef);
-//
-//            if (detectionResult == kCFUserNotificationCancelResponse ||
-//                detectionResult == kCFUserNotificationOtherResponse)
-//                return 1;
-//        }
+            case Cancel:
+                return 1;
 
+            // semantic Continue means exit the loop
+            case Continue:
+                break;
+            }
+        } else {
+            detectedHardware = true;
+        }
     }
 
     if (HMDInfo.HResolution > 0)
@@ -203,18 +267,16 @@ int OculusRoomTinyApp::OnStartup(const char* args)
     SConfig.Set2DAreaFov(DegreeToRad(85.0f));
 
     // Setup Graphics.
-    pRender = *RenderTiny::RenderDevice::CreateDevice(RenderParams, (void*)hWnd);
+    pRender = *RenderTiny::RenderDevice::CreateDevice(RenderParams, window);
     if (!pRender)
         return 1;
     pRender->SetSceneRenderScale(SConfig.GetDistortionScale());
     pRender->SetWindowSize(0, 0);
 
-
     // *** Populate Room Scene
 
     // This creates lights and models.
     PopulateRoomScene(&Scene, pRender);
-
 
     LastUpdate = GetAppTime();
     return 0;
@@ -276,11 +338,11 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
 {
     switch (vk)
     {
-    case Key_Q:
+    case GLFW_KEY_Q:
         if (down && ControlDown)
             Quit = true;
         break;
-    case Key_Escape:
+    case GLFW_KEY_ESCAPE:
         if (!down)
             Quit = true;
         break;
@@ -288,18 +350,18 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
     // Handle player movement keys.
     // We just update movement state here, while the actual translation is done in OnIdle()
     // based on time.
-    case Key_W:      MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); break;
-    case Key_S:      MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); break;
-    case Key_A:      MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); break;
-    case Key_D:      MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); break;
-    case Key_Up:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); break;
-    case Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); break;
+    case GLFW_KEY_W:      MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); break;
+    case GLFW_KEY_S:      MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); break;
+    case GLFW_KEY_A:      MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); break;
+    case GLFW_KEY_D:      MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); break;
+    case GLFW_KEY_UP:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); break;
+    case GLFW_KEY_DOWN:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); break;
 
-    case Key_R:
+    case GLFW_KEY_R:
         SFusion.Reset();
         break;
 
-    case Key_P:
+    case GLFW_KEY_P:
         if (down)
         {
             // Toggle chromatic aberration correction on/off.
@@ -319,42 +381,44 @@ void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
         break;
 
     // Switch rendering modes/distortion.
-    case Key_F1:
+    case GLFW_KEY_F1:
         SConfig.SetStereoMode(Stereo_None);
         PostProcess = PostProcess_None;
         break;
-    case Key_F2:
+    case GLFW_KEY_F2:
         SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
         PostProcess = PostProcess_None;
         break;
-    case Key_F3:
+    case GLFW_KEY_F3:
         SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
         PostProcess = PostProcess_Distortion;
         break;
 
     // Stereo IPD adjustments, in meter (default IPD is 64mm).
-    case Key_KP_Add:
-    case Key_Insert:
+    case GLFW_KEY_KP_ADD:
+    case GLFW_KEY_INSERT:
         if (down)
             SConfig.SetIPD(SConfig.GetIPD() + 0.0005f * (ShiftDown ? 5.0f : 1.0f));
         break;
-    case Key_KP_Subtract:
-    case Key_Delete:
+    case GLFW_KEY_KP_SUBTRACT:
+    case GLFW_KEY_DELETE:
         if (down)
             SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
         break;
 
-    case Key_Backslash:
+    case GLFW_KEY_BACKSLASH:
         if (down)
             // Swap eye positions.
             SConfig.SetIPD(SConfig.GetIPD() * -1);
         break;
 
     // Holding down Shift key accelerates adjustment velocity.
-    case Key_Shift:
+    case GLFW_KEY_LEFT_SHIFT:
+    case GLFW_KEY_RIGHT_SHIFT:
         ShiftDown = down;
         break;
-    case Key_Control:
+    case GLFW_KEY_LEFT_CONTROL:
+    case GLFW_KEY_RIGHT_CONTROL:
         ControlDown = down;
         break;
     }
@@ -482,4 +546,45 @@ void OculusRoomTinyApp::Render(const StereoEyeParams& stereo)
     Scene.Render(pRender, stereo.ViewAdjust * View);
 
     pRender->FinishScene();
+}
+
+
+
+
+int OculusRoomTinyApp::Run()
+{
+    pRender->SetWindowSize(HMDInfo.HResolution, HMDInfo.VResolution);
+    pRender->SetViewport(0, 0, HMDInfo.HResolution, HMDInfo.VResolution);
+    while (!Quit) {
+        glfwPollEvents();
+        OnIdle();
+    }
+    return 0;
+}
+
+//-------------------------------------------------------------------------------------
+// ***** Program Startup
+
+int main(int argc, char ** argv)
+{
+    int exitCode = 0;
+
+    // Initializes LibOVR. This LogMask_All enables maximum logging.
+    // Custom allocator can also be specified here.
+    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
+
+    // Scope to force application destructor before System::Destroy.
+    {
+        OculusRoomTinyApp app;
+        exitCode = app.OnStartup(0);
+        if (!exitCode)
+        {
+            // Processes messages and calls OnIdle() to do rendering.
+            exitCode = app.Run();
+        }
+    }
+
+    // No OVR functions involving memory are allowed after this.
+    OVR::System::Destroy();
+    return exitCode;
 }
