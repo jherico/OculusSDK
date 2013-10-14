@@ -19,7 +19,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "OVR_HIDDeviceImpl.h"
 
 namespace OVR {
-    
+
 struct TrackerMessage;
 class ExternalVisitor;
 
@@ -36,7 +36,7 @@ public:
     virtual bool MatchVendorProduct(UInt16 vendorId, UInt16 productId) const;
     virtual bool DetectHIDDevice(DeviceManager* pdevMgr, const HIDDeviceDesc& desc);
 protected:
-    DeviceManager* getManager() const { return (DeviceManager*) pManager; }   
+    DeviceManager* getManager() const { return (DeviceManager*) pManager; }
 };
 
 
@@ -46,7 +46,7 @@ class SensorDeviceCreateDesc : public HIDDeviceCreateDesc
 public:
     SensorDeviceCreateDesc(DeviceFactory* factory, const HIDDeviceDesc& hidDesc)
         : HIDDeviceCreateDesc(factory, Device_Sensor, hidDesc) { }
-    
+
     virtual DeviceCreateDesc* Clone() const
     {
         return new SensorDeviceCreateDesc(*this);
@@ -145,7 +145,7 @@ struct SensorDisplayInfoImpl
     };
 
     UInt16  CommandId;
-    UByte   DistortionType;    
+    UByte   DistortionType;
     UInt16  HResolution, VResolution;
     float   HScreenSize, VScreenSize;
     float   VCenter;
@@ -174,24 +174,24 @@ public:
     // DeviceCommaon interface
     virtual bool Initialize(DeviceBase* parent);
     virtual void Shutdown();
-    
+
     virtual void SetMessageHandler(MessageHandler* handler);
 
     // HIDDevice::Notifier interface.
-    virtual void OnInputReport(UByte* pData, UInt32 length);
+    virtual void OnInputReport(const UByte* pData, UInt32 length);
     virtual UInt64 OnTicks(UInt64 ticksMks);
 
     // HMD-Mounted sensor has a different coordinate frame.
-    virtual void SetCoordinateFrame(CoordinateFrame coordframe);    
-    virtual CoordinateFrame GetCoordinateFrame() const;    
+    virtual void SetCoordinateFrame(CoordinateFrame coordframe);
+    virtual CoordinateFrame GetCoordinateFrame() const;
 
     // SensorDevice interface
     virtual bool SetRange(const SensorRange& range, bool waitFlag);
     virtual void GetRange(SensorRange* range) const;
 
-    // Sets report rate (in Hz) of MessageBodyFrame messages (delivered through MessageHandler::OnMessage call). 
-    // Currently supported maximum rate is 1000Hz. If the rate is set to 500 or 333 Hz then OnMessage will be 
-    // called twice or thrice at the same 'tick'. 
+    // Sets report rate (in Hz) of MessageBodyFrame messages (delivered through MessageHandler::OnMessage call).
+    // Currently supported maximum rate is 1000Hz. If the rate is set to 500 or 333 Hz then OnMessage will be
+    // called twice or thrice at the same 'tick'.
     // If the rate is  < 333 then the OnMessage / MessageBodyFrame will be called three
     // times for each 'tick': the first call will contain averaged values, the second
     // and third calls will provide with most recent two recorded samples.
@@ -202,7 +202,7 @@ public:
     virtual unsigned    GetReportRate() const;
 
     // Hack to create HMD device from sensor display info.
-    static void EnumerateHMDFromSensorDisplayInfo(const SensorDisplayInfoImpl& displayInfo, 
+    static void EnumerateHMDFromSensorDisplayInfo(const SensorDisplayInfoImpl& displayInfo,
                                                   DeviceFactory::EnumerateVisitor& visitor);
 protected:
 
@@ -223,7 +223,7 @@ protected:
     { return (SensorDeviceCreateDesc*)pCreateDesc.GetPtr(); }
 
     HIDDeviceDesc* getHIDDesc() const
-    { return &getCreateDesc()->HIDDesc; }    
+    { return &getCreateDesc()->HIDDesc; }
 */
 
     // Set if the sensor is located on the HMD.
@@ -241,10 +241,10 @@ protected:
     Vector3f    LastRotationRate;
     Vector3f    LastMagneticField;
 
-    // Current sensor range obtained from device. 
+    // Current sensor range obtained from device.
     SensorRange MaxValidRange;
     SensorRange CurrentRange;
-    
+
     UInt16      OldCommandId;
 };
 

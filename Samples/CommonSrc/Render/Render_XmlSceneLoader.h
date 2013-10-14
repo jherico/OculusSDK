@@ -33,7 +33,8 @@ using namespace OVR::Render;
 #undef new
 #endif
 
-#include "../../../3rdParty/TinyXml/tinyxml2.h"
+#include <tinyxml2.h>
+//#include "../../../3rdParty/TinyXml/tinyxml2.h"
 
 namespace OVR { namespace Render {
 

@@ -229,10 +229,9 @@ static const char* FShaderSrcs[FShader_Count] =
     LitTextureFragShaderSrc
 };
 
-
-
-RenderDevice::RenderDevice(const RendererParams& p)
+RenderDevice::RenderDevice(const RendererParams& p, GLFWwindow* oswnd) : window(oswnd)
 {
+
     for (int i = 0; i < VShader_Count; i++)
         VertexShaders[i] = *new Shader(this, Shader_Vertex, VShaderSrcs[i]);
 
@@ -484,7 +483,7 @@ void* Buffer::Map(size_t start, size_t size, int flags)
     int mode = GL_WRITE_ONLY;
     //if (flags & Map_Unsynchronized)
     //    mode |= GL_MAP_UNSYNCHRONIZED;
-    
+
     glBindBuffer(Use, GLBuffer);
     void* v = glMapBuffer(Use, mode);
     glBindBuffer(Use, 0);
@@ -723,10 +722,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     Texture* NewTex = new Texture(this, width, height);
     glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
     glGetError();
-    
+
     glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, glformat, gltype, data);
     OVR_ASSERT(!glGetError());
-    
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -781,4 +780,57 @@ RBuffer::~RBuffer()
     glDeleteRenderbuffersEXT(1, &BufId);
 }
 
-}}}
+void RenderDevice::Present() {
+    glfwSwapBuffers(window);
+}
+
+} // Namespace GL
+
+// Implement static initializer function to create this class.
+RenderTiny::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void * oswnd)
+{
+    int attr[16];
+    int nattr = 2;
+    GLFWwindow *window = (GLFWwindow *)oswnd;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
+    return new GL::RenderDevice(rp, window);
+}
+
+} // Namespace RenderTiny
+} // Namespace OVR
+
+//
+//
+//Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
+//{
+//
+//    if (!context)
+//        return NULL;
+//
+//    if (!glXMakeCurrent(PC->Disp, PC->Win, context))
+//    {
+//        glXDestroyContext(PC->Disp, context);
+//        return NULL;
+//    }
+//
+//    XMapRaised(PC->Disp, PC->Win);
+//
+//    return new Render::GL::Linux::RenderDevice(rp, PC->Disp, PC->Win, context);
+//}
+//
+//void RenderDevice::Present()
+//{
+//    glXSwapBuffers(Disp, Win);
+//}
+//
+//void RenderDevice::Shutdown()
+//{
+//    if (Context)
+//    {
+//        glXMakeCurrent(Disp, 0, NULL);
+//        glXDestroyContext(Disp, Context);
+//        Context = NULL;
+//        Win = 0;
+//    }
+//}

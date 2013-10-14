@@ -19,12 +19,14 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "Kernel/OVR_Timer.h"
 
+#include <iostream>
+
 namespace OVR {
-    
+
 //-------------------------------------------------------------------------------------
 // ***** Oculus Sensor-specific packet data structures
 
-enum {    
+enum {
     Sensor_VendorId  = Oculus_VendorId,
     Sensor_ProductId = 0x0001,
 
@@ -50,8 +52,8 @@ static SInt16 DecodeSInt16(const UByte* buffer)
 }
 
 static UInt32 DecodeUInt32(const UByte* buffer)
-{    
-    return (buffer[0]) | UInt32(buffer[1] << 8) | UInt32(buffer[2] << 16) | UInt32(buffer[3] << 24);    
+{
+    return (buffer[0]) | UInt32(buffer[1] << 8) | UInt32(buffer[2] << 16) | UInt32(buffer[3] << 24);
 }
 
 static float DecodeFloat(const UByte* buffer)
@@ -114,9 +116,9 @@ struct TrackerSensors
         Timestamp		= DecodeUInt16(buffer + 2);
         LastCommandID	= DecodeUInt16(buffer + 4);
         Temperature		= DecodeSInt16(buffer + 6);
-        
-        //if (SampleCount > 2)        
-        //    OVR_DEBUG_LOG_TEXT(("TackerSensor::Decode SampleCount=%d\n", SampleCount));        
+
+        //if (SampleCount > 2)
+        //    OVR_DEBUG_LOG_TEXT(("TackerSensor::Decode SampleCount=%d\n", SampleCount));
 
         // Only unpack as many samples as there actually are
         UByte iterationCount = (SampleCount > 2) ? 3 : SampleCount;
@@ -141,7 +143,7 @@ struct TrackerMessage
     TrackerSensors     Sensors;
 };
 
-bool DecodeTrackerMessage(TrackerMessage* message, UByte* buffer, int size)
+bool DecodeTrackerMessage(TrackerMessage* message, const UByte* buffer, int size)
 {
     memset(message, 0, sizeof(TrackerMessage));
 
@@ -176,7 +178,7 @@ static const UInt16 MagRangeRamp[]   = { 880, 1300, 1900, 2500 };
 
 static UInt16 SelectSensorRampValue(const UInt16* ramp, unsigned count,
                                     float val, float factor, const char* label)
-{    
+{
     UInt16 threshold = (UInt16)(val * factor);
 
     for (unsigned i = 0; i<count; i++)
@@ -197,7 +199,7 @@ struct SensorRangeImpl
 {
     enum  { PacketSize = 8 };
     UByte   Buffer[PacketSize];
-    
+
     UInt16  CommandId;
     UInt16  AccelScale;
     UInt16  GyroScale;
@@ -309,7 +311,7 @@ struct SensorConfigImpl
         PacketInterval     = Buffer[4];
         KeepAliveIntervalMs= Buffer[5] | (UInt16(Buffer[6]) << 8);
     }
-    
+
 };
 
 
@@ -390,7 +392,7 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
         void operator = (const SensorEnumerator&) { }
 
         DeviceFactory*     pFactory;
-        EnumerateVisitor&  ExternalVisitor;   
+        EnumerateVisitor&  ExternalVisitor;
     public:
         SensorEnumerator(DeviceFactory* factory, EnumerateVisitor& externalVisitor)
             : pFactory(factory), ExternalVisitor(externalVisitor) { }
@@ -418,7 +420,7 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
             // Check if the sensor returns DisplayInfo. If so, try to use it to override potentially
             // mismatching monitor information (in case wrong EDID is reported by splitter),
             // or to create a new "virtualized" HMD Device.
-            
+
             SensorDisplayInfoImpl displayInfo;
 
             if (device.GetFeatureReport(displayInfo.Buffer, SensorDisplayInfoImpl::PacketSize))
@@ -440,7 +442,7 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     SensorEnumerator sensorEnumerator(this, visitor);
     GetManagerImpl()->GetHIDDeviceManager()->Enumerate(&sensorEnumerator);
 
-    //double totalSeconds = Timer::GetProfileSeconds() - start; 
+    //double totalSeconds = Timer::GetProfileSeconds() - start;
 }
 
 bool SensorDeviceFactory::MatchVendorProduct(UInt16 vendorId, UInt16 productId) const
@@ -522,7 +524,7 @@ SensorDeviceImpl::SensorDeviceImpl(SensorDeviceCreateDesc* createDesc)
 SensorDeviceImpl::~SensorDeviceImpl()
 {
     // Check that Shutdown() was called.
-    OVR_ASSERT(!pCreateDesc->pDevice);    
+    OVR_ASSERT(!pCreateDesc->pDevice);
 }
 
 // Internal creation APIs.
@@ -581,14 +583,14 @@ void SensorDeviceImpl::closeDeviceOnError()
 }
 
 void SensorDeviceImpl::Shutdown()
-{   
+{
     HIDDeviceImpl<OVR::SensorDevice>::Shutdown();
 
     LogText("OVR::SensorDevice - Closed '%s'\n", getHIDDesc()->Path.ToCStr());
 }
 
 
-void SensorDeviceImpl::OnInputReport(UByte* pData, UInt32 length)
+void SensorDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
 {
 
     bool processed = false;
@@ -606,7 +608,6 @@ void SensorDeviceImpl::OnInputReport(UByte* pData, UInt32 length)
 
 UInt64 SensorDeviceImpl::OnTicks(UInt64 ticksMks)
 {
-
     if (ticksMks >= NextKeepAliveTicks)
     {
         // Use 3-seconds keep alive by default.
@@ -632,10 +633,10 @@ bool SensorDeviceImpl::SetRange(const SensorRange& range, bool waitFlag)
     {
         return threadQueue->PushCall(this, &SensorDeviceImpl::setRange, range);
     }
-    
-    if (!threadQueue->PushCallAndWaitResult(this, 
+
+    if (!threadQueue->PushCallAndWaitResult(this,
                                             &SensorDeviceImpl::setRange,
-                                            &result, 
+                                            &result,
                                             range))
     {
         return false;
@@ -653,19 +654,19 @@ void SensorDeviceImpl::GetRange(SensorRange* range) const
 bool SensorDeviceImpl::setRange(const SensorRange& range)
 {
     SensorRangeImpl sr(range);
-    
+
     if (GetInternalDevice()->SetFeatureReport(sr.Buffer, SensorRangeImpl::PacketSize))
     {
         Lock::Locker lockScope(GetLock());
         sr.GetSensorRange(&CurrentRange);
         return true;
     }
-    
+
     return false;
 }
 
 void SensorDeviceImpl::SetCoordinateFrame(CoordinateFrame coordframe)
-{ 
+{
     // Push call with wait.
     GetManagerImpl()->GetThreadQueue()->
         PushCall(this, &SensorDeviceImpl::setCoordinateFrame, coordframe, true);
@@ -692,7 +693,7 @@ Void SensorDeviceImpl::setCoordinateFrame(CoordinateFrame coordframe)
     scfg.Pack();
 
     GetInternalDevice()->SetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize);
-    
+
     // Re-read the state, in case of older firmware that doesn't support Sensor coordinates.
     if (GetInternalDevice()->GetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize))
     {
@@ -707,7 +708,7 @@ Void SensorDeviceImpl::setCoordinateFrame(CoordinateFrame coordframe)
 }
 
 void SensorDeviceImpl::SetReportRate(unsigned rateHz)
-{ 
+{
     // Push call with wait.
     GetManagerImpl()->GetThreadQueue()->
         PushCall(this, &SensorDeviceImpl::setReportRate, rateHz, true);
@@ -755,9 +756,9 @@ void SensorDeviceImpl::SetMessageHandler(MessageHandler* handler)
         DeviceBase::SetMessageHandler(handler);
     }
     else
-    {       
+    {
         DeviceBase::SetMessageHandler(handler);
-    }    
+    }
 }
 
 // Sensor reports data in the following coordinate system:
@@ -783,15 +784,15 @@ Vector3f AccelFromBodyFrameUpdate(const TrackerSensors& update, UByte sampleNumb
 
 Vector3f MagFromBodyFrameUpdate(const TrackerSensors& update,
                                 bool convertHMDToSensor = false)
-{   
-    // Note: Y and Z are swapped in comparison to the Accel.  
+{
+    // Note: Y and Z are swapped in comparison to the Accel.
     // This accounts for DK1 sensor firmware axis swap, which should be undone in future releases.
     if (!convertHMDToSensor)
     {
         return Vector3f( (float)update.MagX,
                          (float)update.MagZ,
                          (float)update.MagY) * 0.0001f;
-    }    
+    }
 
     return Vector3f( (float)update.MagX,
                      (float)update.MagY,
@@ -815,10 +816,10 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
 {
     if (message->Type != TrackerMessage_Sensors)
         return;
-    
+
     const float     timeUnit   = (1.0f / 1000.f);
     TrackerSensors& s = message->Sensors;
-    
+
 
     // Call OnMessage() within a lock to avoid conflicts with handlers.
     Lock::Locker scopeLock(HandlerRef.GetLock());
@@ -865,7 +866,7 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
 
     if (HandlerRef.GetHandler())
     {
-        MessageBodyFrame sensors(this);                
+        MessageBodyFrame sensors(this);
         UByte            iterations = s.SampleCount;
 
         if (s.SampleCount > 3)
@@ -879,7 +880,7 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
         }
 
         for (UByte i = 0; i < iterations; i++)
-        {            
+        {
             sensors.Acceleration = AccelFromBodyFrameUpdate(s, i, convertHMDToSensor);
             sensors.RotationRate = EulerFromBodyFrameUpdate(s, i, convertHMDToSensor);
             sensors.MagneticField= MagFromBodyFrameUpdate(s, convertHMDToSensor);

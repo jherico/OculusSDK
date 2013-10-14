@@ -71,7 +71,7 @@ private:
                                         uint32_t reportId,
                                         uint8_t* pReport,
                                         CFIndex reportLength);
-    void hidReportCallback(UByte* pData, UInt32 length);
+    void hidReportCallback(const UByte* pData, UInt32 length);
 
     static void staticDeviceRemovedCallback(void* pContext,
                                             IOReturn result,

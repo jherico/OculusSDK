@@ -39,7 +39,7 @@ public:
     virtual bool DetectHIDDevice(DeviceManager* pdevMgr, const HIDDeviceDesc& desc);
 
 protected:
-    DeviceManager* getManager() const { return (DeviceManager*) pManager; }   
+    DeviceManager* getManager() const { return (DeviceManager*) pManager; }
 };
 
 
@@ -49,7 +49,7 @@ class LatencyTestDeviceCreateDesc : public HIDDeviceCreateDesc
 public:
     LatencyTestDeviceCreateDesc(DeviceFactory* factory, const HIDDeviceDesc& hidDesc)
         : HIDDeviceCreateDesc(factory, Device_LatencyTester, hidDesc) { }
-    
+
     virtual DeviceCreateDesc* Clone() const
     {
         return new LatencyTestDeviceCreateDesc(*this);
@@ -61,7 +61,7 @@ public:
                                     DeviceCreateDesc**) const
     {
         if ((other.Type == Device_LatencyTester) && (pFactory == other.pFactory))
-        {            
+        {
             const LatencyTestDeviceCreateDesc& s2 = (const LatencyTestDeviceCreateDesc&) other;
             if (MatchHIDDevice(s2.HIDDesc))
                 return Match_Found;
@@ -95,7 +95,7 @@ public:
     virtual void Shutdown();
 
     // DeviceManagerThread::Notifier interface.
-    virtual void OnInputReport(UByte* pData, UInt32 length);
+    virtual void OnInputReport(const UByte* pData, UInt32 length);
 
     // LatencyTesterDevice interface
     virtual bool SetConfiguration(const OVR::LatencyTestConfiguration& configuration, bool waitFlag = false);

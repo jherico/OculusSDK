@@ -43,7 +43,7 @@ using namespace OVR::Render;
 //  Y - Up    (colored red)
 //  Z - Back  (Out from screen, colored blue)
 //  X - Right (green)
-//  All cameras are looking at the origin.  
+//  All cameras are looking at the origin.
 
 // Camera view types.
 enum ViewType
@@ -64,11 +64,11 @@ class InputTestApp : public Application
     Ptr<DeviceManager> pManager;
     Ptr<HMDDevice>     pHMD;
     Ptr<SensorDevice>  pSensor;
-    Ptr<SensorDevice>  pSensor2;    
+    Ptr<SensorDevice>  pSensor2;
 
     SensorFusion       SFusion;
     SensorFusion       SFusion2;
-    
+
     double          LastUpdate;
     ViewType        CurrentView;
 
@@ -89,11 +89,11 @@ public:
     InputTestApp();
     ~InputTestApp();
 
-    virtual int  OnStartup(int argc, const char** argv);
+    virtual int  OnStartup(int argc, char** argv);
     virtual void OnIdle();
 
     virtual void OnMouseMove(int x, int y, int modifiers);
-    virtual void OnKey(KeyCode key, int chr, bool down, int modifiers);
+    virtual void OnKey(OVR::KeyCode key, int chr, bool down, int modifiers);
 };
 
 InputTestApp::InputTestApp()
@@ -116,7 +116,7 @@ void UseCase()
     Ptr<SensorDevice>  pSensor = 0;
     SensorFusion       FusionResult;
 
-     
+
     // *** Initialization - Create the first available HMD Device
     pManager = *DeviceManager::Create();
     pHMD     = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
@@ -127,7 +127,7 @@ void UseCase()
     // Get DisplayDeviceName, ScreenWidth/Height, etc..
     HMDInfo hmdInfo;
     pHMD->GetDeviceInfo(&hmdInfo);
-    
+
     if (pSensor)
         FusionResult.AttachToSensor(pSensor);
 
@@ -137,7 +137,7 @@ void UseCase()
 
     // Create a matrix from quaternion,
     // where elements [0][0] through [3][3] contain rotation.
-    Matrix4f bodyFrameMatrix(q); 
+    Matrix4f bodyFrameMatrix(q);
 
     // Get Euler angles from quaternion, in specified axis rotation order.
     float yaw, pitch, roll;
@@ -156,24 +156,24 @@ InputTestApp::~InputTestApp()
 {
     pSensor.Clear();
     pManager.Clear();
-    
+
 }
 
 
-int InputTestApp::OnStartup(int argc, const char** argv)
+int InputTestApp::OnStartup(int argc, char** argv)
 {
     if (!pPlatform->SetupWindow(1200,800))
         return 1;
-    
+
 
     pManager = *DeviceManager::Create();
-    
+
     // This initialization logic supports running two sensors at the same time.
-   
+
     DeviceEnumerator<SensorDevice> isensor = pManager->EnumerateDevices<SensorDevice>();
     DeviceEnumerator<SensorDevice> oculusSensor;
     DeviceEnumerator<SensorDevice> oculusSensor2;
-    
+
     while(isensor)
     {
         DeviceInfo di;
@@ -210,13 +210,13 @@ int InputTestApp::OnStartup(int argc, const char** argv)
 
     oculusSensor.Clear();
     oculusSensor2.Clear();
-       
-    
+
+
     /*
     DeviceHandle hHMD = pManager->EnumerateDevices<HMDDevice>();
     HMDInfo      hmdInfo;
     if (hHMD)
-    {        
+    {
         hHMD.GetDeviceInfo(&hmdInfo);
     }
     */
@@ -241,25 +241,29 @@ int InputTestApp::OnStartup(int argc, const char** argv)
     // Report relative mouse motion (not absolute position)
    // pPlatform->SetMouseMode(Mouse_Relative);
 
+#ifdef OVR_OS_WIN32
     const char* graphics = "d3d10";
+#else
+    const char* graphics = "GL";
+#endif
     for (int i = 1; i < argc; i++)
         if (!strcmp(argv[i], "-r") && i < argc-1)
             graphics = argv[i+1];
 
     pRender = pPlatform->SetupGraphics(OVR_DEFAULT_RENDER_DEVICE_SET, graphics,
                                        RendererParams());
-  
+
     //WireframeFill = pRender->CreateSimpleFill(Fill::F_Wireframe);
 
 
-    
+
     // *** Rotating Box
-    
+
     pBox = *new Container;
-    pBox->Add(Ptr<Model>(        
+    pBox->Add(Ptr<Model>(
        *Model::CreateAxisFaceColorBox(-2.0f, 2.0f, Color(0,   0xAA, 0),        // x = green
                                       -1.0f, 1.0f, Color(0xAA,0,    0),        // y = red
-                                      -1.0f, 1.0f, Color(0,   0,    0xAA)) )); // z = blue 
+                                      -1.0f, 1.0f, Color(0,   0,    0xAA)) )); // z = blue
     // Drop-down line from box, to make it easier to see differences in angle.
     Ptr<Model> downLine = *new Model(Prim_Lines);
     downLine->AddLine(Vertex(0.0f,-4.5f, 0.0f, 0xFFE0B0B0),
@@ -267,7 +271,7 @@ int InputTestApp::OnStartup(int argc, const char** argv)
     pBox->Add(downLine);
     Sc.World.Add(pBox);
 
-    
+
     // Secondary rotating coordinate object, if we have two values.
     if (pSensor2)
     {
@@ -302,7 +306,7 @@ int InputTestApp::OnStartup(int argc, const char** argv)
                    Vertex( 0.0f, 8.0f, 0.0f, 0xFFFF4040)); // Y - arrow
     pAxes->AddLine(Vertex(-0.4f, 7.6f, 0.0f, 0xFFFF4040),
                    Vertex( 0.0f, 8.0f, 0.0f, 0xFFFF4040)); // Y
-    
+
     pAxes->AddLine(Vertex( 0.0f, 0.0f,-8.0f, 0xFF4040FF),
                    Vertex( 0.0f, 0.0f, 8.0f, 0xFF4040FF)); // Z
     pAxes->AddLine(Vertex( 0.4f, 0.0f, 7.6f, 0xFF4040FF),
@@ -310,7 +314,7 @@ int InputTestApp::OnStartup(int argc, const char** argv)
     pAxes->AddLine(Vertex(-0.4f, 0.0f, 7.6f, 0xFF4040FF),
                    Vertex( 0.0f, 0.0f, 8.0f, 0xFF4040FF)); // Z - arrow
     Sc.World.Add(pAxes);
-   
+
 
     SetView(CurrentView);
 
@@ -339,7 +343,7 @@ void InputTestApp::SetView(ViewType type)
         View = Matrix4f::LookAtRH(Vector3f(0.0f,-10.0f, 0.0f),   // eye
                                   Vector3f(0.0f,  0.0f, 0.0f),   // at
                                   Vector3f(0.0f,  0.0f, 1.0f));
-        
+
         break;
         default:
             break;
@@ -358,12 +362,12 @@ void InputTestApp::OnMouseMove(int x, int y, int modifiers)
 
 static float CalcDownAngleDegrees(Quatf q)
 {
-    Vector3f downVector(0.0f, -1.0f, 0.0f);    
+    Vector3f downVector(0.0f, -1.0f, 0.0f);
     Vector3f val= q.Rotate(downVector);
     return RadToDegree(downVector.Angle(val));
 }
 
-void InputTestApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
+void InputTestApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifiers)
 {
     OVR_UNUSED2(chr, modifiers);
 
@@ -429,7 +433,7 @@ void InputTestApp::OnKey(KeyCode key, int chr, bool down, int modifiers)
                 LogText("Angle: %2.3f Secondary Sensor Angle: %2.3f\n",
                         CalcDownAngleDegrees(SFusion.GetOrientation()),
                         CalcDownAngleDegrees(SFusion2.GetOrientation()));
-            }                        
+            }
         }
         break;
 
@@ -451,7 +455,7 @@ void InputTestApp::OnIdle()
     double curtime = pPlatform->GetAppTime();
  //   float  dt      = float(LastUpdate - curtime);
     LastUpdate     = curtime;
-    
+
     if (pBox)
     {
         Quatf q = SFusion.GetOrientation();
@@ -461,7 +465,7 @@ void InputTestApp::OnIdle()
    //     Vector3f euler;
    //     SFusion.GetOrientation().GetEulerABC<Axis_Y, Axis_X, Axis_Z, Rotate_CCW, Handed_R>(&euler.y, &euler.x, &euler.z);
    //     Matrix4f mat = Matrix4f::RotationY(euler.y) * Matrix4f::RotationX(euler.x) * Matrix4f::RotationZ(euler.z);
-   //  pBox->SetMatrix(mat);    
+   //  pBox->SetMatrix(mat);
 
         // Update titlebar every 20th of a second.
         if ((curtime - LastTitleUpdate) > 0.05f)
@@ -496,7 +500,7 @@ void InputTestApp::OnIdle()
 
     pRender->SetProjection(Proj);
     pRender->SetDepthMode(1,1);
-    
+
     Sc.Render(pRender, View);
 
     pRender->Present();

@@ -19,8 +19,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_Profile.h"
 
-#include <X11/Xlib.h>
-#include <X11/extensions/Xinerama.h>
+#include "edid.h"
 
 namespace OVR { namespace Linux {
 
@@ -70,7 +69,7 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
         if (!DeviceId.IsEmpty() ||
              ((HScreenSize == s2.HScreenSize) &&
               (VScreenSize == s2.VScreenSize)) )
-        {            
+        {
             *pcandidate = 0;
             return Match_Found;
         }
@@ -92,10 +91,10 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
         *pcandidate = 0;
         return Match_Found;
     }
-    
+
     // SensorDisplayInfo may override resolution settings, so store as candidate.
     if (s2.DeviceId.IsEmpty())
-    {        
+    {
         *pcandidate = const_cast<DeviceCreateDesc*>((const DeviceCreateDesc*)this);
         return Match_Candidate;
     }
@@ -105,22 +104,22 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
         *pcandidate = const_cast<DeviceCreateDesc*>((const DeviceCreateDesc*)this);
         return Match_Candidate;
     }
-    
+
     return Match_None;
 }
 
 
-bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other, 
+bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other,
                                                  bool* newDeviceFlag)
 {
     // This candidate was the the "best fit" to apply sensor DisplayInfo to.
     OVR_ASSERT(other.Type == Device_HMD);
-    
+
     const HMDDeviceCreateDesc& s2 = (const HMDDeviceCreateDesc&) other;
 
     // Force screen size on resolution from SensorDisplayInfo.
     // We do this because USB detection is more reliable as compared to HDMI EDID,
-    // which may be corrupted by splitter reporting wrong monitor 
+    // which may be corrupted by splitter reporting wrong monitor
     if (s2.DeviceId.IsEmpty())
     {
         HScreenSize = s2.HScreenSize;
@@ -174,44 +173,47 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     // Rift models.
 
     bool foundHMD = false;
-
+    RRCrtc crtcId = 0;
     Display* display = XOpenDisplay(NULL);
-    if (display && XineramaIsActive(display))
-    {
-        int numberOfScreens;
-        XineramaScreenInfo* screens = XineramaQueryScreens(display, &numberOfScreens);
-
-        for (int i = 0; i < numberOfScreens; i++)
-        {
-            XineramaScreenInfo screenInfo = screens[i];
-
-            if (screenInfo.width == 1280 && screenInfo.height == 800)
-            {
-                String deviceName = "OVR0001";
-
-                HMDDeviceCreateDesc hmdCreateDesc(this, deviceName, i);
-                hmdCreateDesc.SetScreenParameters(screenInfo.x_org, screenInfo.y_org, 1280, 800, 0.14976f, 0.0936f);
-
-                OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
-                                    deviceName.ToCStr(), i));
-
-                // Notify caller about detected device. This will call EnumerateAddDevice
-                // if the this is the first time device was detected.
-                visitor.Visit(hmdCreateDesc);
-                foundHMD = true;
-                break;
-            }
+    XRRScreenResources *screen = XRRGetScreenResources(display, DefaultRootWindow(display));
+    for (int iscres = screen->noutput - 1; iscres >= 0; --iscres) {
+        RROutput output = screen->outputs[iscres];
+        MonitorInfo * mi = read_edid_data(display, output);
+        if (mi == NULL) {
+            continue;
         }
 
-        XFree(screens);
-    }
+        XRROutputInfo * info = XRRGetOutputInfo (display, screen, output);
+        if (0 == memcmp(mi->manufacturer_code, "OVR", 3)) {
+            int x = -1, y = -1, w = -1, h = -1;
+            if (info->connection == RR_Connected && info->crtc) {
+                XRRCrtcInfo * crtc_info = XRRGetCrtcInfo (display, screen, info->crtc);
+                x = crtc_info->x;
+                y = crtc_info->y;
+                w = crtc_info->width;
+                h = crtc_info->height;
+                XRRFreeCrtcInfo(crtc_info);
+            }
+            HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
+            hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
+            // Notify caller about detected device. This will call EnumerateAddDevice
+            // if the this is the first time device was detected.
+            visitor.Visit(hmdCreateDesc);
+            foundHMD = true;
+            break;
+        } // if
 
+        OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %s - %d\n",
+                            mi->dsc_product_name, screen->outputs[iscres]));
+        XRRFreeOutputInfo (info);
+        delete mi;
+    } // for
+    XRRFreeScreenResources(screen);
 
     // Real HMD device is not found; however, we still may have a 'fake' HMD
     // device created via SensorDeviceImpl::EnumerateHMDFromSensorDisplayInfo.
     // Need to find it and set 'Enumerated' to true to avoid Removal notification.
-    if (!foundHMD)
-    {
+    if (!foundHMD) {
         Ptr<DeviceCreateDesc> hmdDevDesc = getManager()->FindDevice("", Device_HMD);
         if (hmdDevDesc)
             hmdDevDesc->Enumerated = true;
@@ -236,8 +238,8 @@ Profile* HMDDeviceCreateDesc::GetProfileAddRef() const
     const char *    profileName    = pDevice ?
                         ((HMDDevice*)pDevice)->GetProfileName() :
                         profileManager->GetDefaultProfileName(profileType);
-    
-    return profileName ? 
+
+    return profileName ?
         profileManager->LoadProfile(profileType, profileName) :
         profileManager->GetDeviceDefaultProfile(profileType);
 }
@@ -287,7 +289,7 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
             memcpy(hmdInfo->DistortionK, DistortionK, sizeof(float)*4);
         }
         else
-        {						
+        {
 			if (is7Inch)
             {
                 // 7" screen.
@@ -338,7 +340,7 @@ bool HMDDevice::Initialize(DeviceBase* parent)
     pParent = parent;
 
     // Initialize user profile to default for device.
-    ProfileManager* profileManager = GetManager()->GetProfileManager();    
+    ProfileManager* profileManager = GetManager()->GetProfileManager();
     ProfileName = profileManager->GetDefaultProfileName(getDesc()->GetProfileType());
 
     return true;
@@ -351,7 +353,7 @@ void HMDDevice::Shutdown()
 }
 
 Profile* HMDDevice::GetProfile() const
-{    
+{
     if (!pCachedProfile)
         pCachedProfile = *getDesc()->GetProfileAddRef();
     return pCachedProfile.GetPtr();

@@ -39,7 +39,6 @@ using namespace OVR::Util::Render;
 
 class RenderDevice;
 
-
 //-----------------------------------------------------------------------------------
 
 // Rendering primitive type used to render Model.
@@ -71,7 +70,7 @@ enum BuiltinShaders
 
     FShader_Solid                   = 0,
     FShader_Gouraud                 = 1,
-    FShader_Texture                 = 2,    
+    FShader_Texture                 = 2,
     FShader_PostProcess             = 3,
     FShader_PostProcessWithChromAb  = 4,
     FShader_LitGouraud              = 5,
@@ -152,7 +151,7 @@ public:
 
     virtual void Set(PrimitiveType) const { }
     virtual void SetUniformBuffer(class Buffer* buffers, int i = 0) { OVR_UNUSED2(buffers, i); }
- 
+
 protected:
     virtual bool SetUniform(const char* name, int n, const float* v) { OVR_UNUSED3(name, n, v); return false; }
 };
@@ -188,7 +187,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).     
+    // (unless a buffer is used, then each buffer is independent).
     virtual bool SetUniform(const char* name, int n, const float* v)
     {
         bool result = 0;
@@ -239,11 +238,11 @@ class ShaderFill : public RefCountBase<ShaderFill>
 
 public:
     ShaderFill(ShaderSet* sh) : Shaders(sh) {  }
-    ShaderFill(ShaderSet& sh) : Shaders(sh) {  }    
+    ShaderFill(ShaderSet& sh) : Shaders(sh) {  }
 
     ShaderSet*  GetShaders() { return Shaders; }
 
-    virtual void Set(PrimitiveType prim = Prim_Unknown) const;   
+    virtual void Set(PrimitiveType prim = Prim_Unknown) const;
     virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
 };
 
@@ -252,7 +251,7 @@ public:
 // is recommended. Some renderers cannot have high-performance buffers which are readable,
 // so reading in Map should not be relied on.
 //
-// Constraints on buffers, such as ReadOnly, are not enforced by the API but may result in 
+// Constraints on buffers, such as ReadOnly, are not enforced by the API but may result in
 // rendering-system dependent undesirable behavior, such as terrible performance or unreported failure.
 //
 // Use of a buffer inconsistent with usage is also not checked by the API, but it may result in bad
@@ -293,7 +292,7 @@ public:
 // Node is a base class for geometry in a Scene, it contains base position
 // and orientation data.
 // Model and Container both derive from it.
-// 
+//
 class Node : public RefCountBase<Node>
 {
     Vector3f     Pos;
@@ -327,10 +326,10 @@ public:
     void  SetMatrix(const Matrix4f& m)
     {
         MatCurrent = true;
-        Mat = m;        
+        Mat = m;
     }
 
-    const Matrix4f&  GetMatrix() const 
+    const Matrix4f&  GetMatrix() const
     {
         if (!MatCurrent)
         {
@@ -351,17 +350,17 @@ struct Vertex
 {
     Vector3f  Pos;
     Color     C;
-    float     U, V;	
+    float     U, V;
     Vector3f  Norm;
 
-    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255), 
+    Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255),
             float u = 0, float v = 0, Vector3f n = Vector3f(1,0,0))
       : Pos(p), C(c), U(u), V(v), Norm(n)
     {}
     Vertex(float x, float y, float z, const Color& c = Color(64,0,0,255),
            float u = 0, float v = 0) : Pos(x,y,z), C(c), U(u), V(v)
     { }
-	
+
     bool operator==(const Vertex& b) const
     {
         return Pos == b.Pos && C == b.C && U == b.U && V == b.V;
@@ -375,14 +374,14 @@ struct LightingParams
     Vector4f Ambient;
     Vector4f LightPos[8];
     Vector4f LightColor[8];
-    float    LightCount;    
+    float    LightCount;
     int      Version;
 
     LightingParams() : LightCount(0), Version(0) {}
 
 
     void Update(const Matrix4f& view, const Vector4f* SceneLightPos)
-    {    
+    {
         Version++;
         for (int i = 0; i < LightCount; i++)
         {
@@ -403,7 +402,7 @@ struct LightingParams
 //-----------------------------------------------------------------------------------
 
 // Model is a triangular mesh with a fill that can be added to scene.
-// 
+//
 class Model : public Node
 {
 public:
@@ -411,7 +410,7 @@ public:
     Array<UInt16>     Indices;
     PrimitiveType     Type;
     Ptr<ShaderFill>   Fill;
-    bool              Visible;	
+    bool              Visible;
 
     // Some renderers will create these if they didn't exist before rendering.
     // Currently they are not updated, so vertex data should not be changed after rendering.
@@ -430,7 +429,7 @@ public:
     // Node implementation.
     virtual NodeType GetType() const       { return Node_Model; }
     virtual void    Render(const Matrix4f& ltw, RenderDevice* ren);
-    
+
 
     // Returns the index next added vertex will have.
     UInt16 GetNextVertexIndex() const
@@ -468,17 +467,17 @@ public:
 
     Container()  { }
     ~Container() { }
- 
+
     virtual NodeType GetType() const { return Node_Container; }
 
     virtual void Render(const Matrix4f& ltw, RenderDevice* ren);
 
-    void Add(Node *n)  { Nodes.PushBack(n); }	
-	void Clear()       { Nodes.Clear(); }	
+    void Add(Node *n)  { Nodes.PushBack(n); }
+	void Clear()       { Nodes.Clear(); }
 };
 
 
-// Scene combines a collection of model 
+// Scene combines a collection of model
 class Scene
 {
 public:
@@ -493,7 +492,7 @@ public:
     {
         Lighting.Ambient = color;
     }
-    
+
     void AddLight(Vector3f pos, Vector4f color)
     {
         int n = (int)Lighting.LightCount;
@@ -527,7 +526,7 @@ enum DisplayMode
     Display_Window     = 0,
     Display_Fullscreen = 1
 };
-    
+
 
 // Rendering parameters used by RenderDevice::CreateDevice.
 struct RendererParams
@@ -541,7 +540,7 @@ struct RendererParams
     long   DisplayId;
 
     RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
-    
+
     bool IsDisplaySet() const
     {
         return MonitorName.GetLength() || DisplayId;
@@ -556,9 +555,9 @@ struct RendererParams
 // Rendering device abstraction.
 // Provides platform-independent part of implementation, with platform-specific
 // part being in a separate derived class/file, such as D3D10::RenderDevice.
-// 
+//
 class RenderDevice : public RefCountBase<RenderDevice>
-{    
+{
 protected:
     int             WindowWidth, WindowHeight;
     RendererParams  Params;
@@ -575,7 +574,7 @@ protected:
     Ptr<ShaderSet>  pPostProcessShader;
     Ptr<Buffer>     pFullScreenVertexBuffer;
     float           SceneRenderScale;
-    DistortionConfig Distortion;    
+    DistortionConfig Distortion;
 
     // For lighting on platforms with uniform buffers
     Ptr<Buffer>     LightingBuffer;
@@ -595,16 +594,17 @@ public:
 
     // This static function is implemented in each derived class
     // to support a specific renderer type.
-    //static RenderDevice* CreateDevice(const RendererParams& rp, void* oswnd);
+    static RenderDevice* CreateDevice(const RendererParams& rp, void * oswnd);
 
 
     virtual void Init() {}
     virtual void Shutdown() {}
     virtual bool SetParams(const RendererParams&) { return 0; }
+    virtual void SetWindowSize(int w, int h) { WindowWidth = w; WindowHeight = h; }
 
     const RendererParams& GetParams() const { return Params; }
 
-    
+
     // StereoParams apply Viewport, Projection and Distortion simultaneously,
     // doing full configuration for one eye.
     void        ApplyStereoParams(const StereoEyeParams& params)
@@ -627,12 +627,12 @@ public:
         if (eye == StereoEye_Right)
             Distortion.XCenterOffset = -Distortion.XCenterOffset;
     }
-   
-    // Set viewport ignoring any adjustments used for the stereo mode.
-    virtual void SetRealViewport(const Viewport& vp) = 0;    
 
-    virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1) = 0;   
- 
+    // Set viewport ignoring any adjustments used for the stereo mode.
+    virtual void SetRealViewport(const Viewport& vp) = 0;
+
+    virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1) = 0;
+
     virtual bool IsFullscreen() const { return Params.Fullscreen != Display_Window; }
     virtual void Present() = 0;
     // Waits for rendering to complete; important for reducing latency.
@@ -642,7 +642,7 @@ public:
     virtual Buffer*  CreateBuffer() { return NULL; }
     virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount=1)
     { OVR_UNUSED5(format,width,height,data, mipcount); return NULL; }
-    
+
 
     virtual ShaderSet* CreateShaderSet() { return new ShaderSet; }
     virtual Shader*    LoadBuiltinShader(ShaderStage stage, int shader) = 0;
@@ -670,7 +670,7 @@ public:
 
     // The index 0 is reserved for non-buffer uniforms, and so cannot be used with this function.
     virtual void SetCommonUniformBuffer(int i, Buffer* buffer) { OVR_UNUSED2(i, buffer); }
-    
+
     virtual Matrix4f GetProjection() const { return Proj; }
 
     // This is a View matrix only, it will be combined with the projection matrix from SetProjection
@@ -682,10 +682,10 @@ public:
     virtual ShaderFill *CreateSimpleFill() = 0;
     ShaderFill *        CreateTextureFill(Texture* tex);
 
- 
+
     // Don't call these directly, use App/Platform instead
-    virtual bool SetFullscreen(DisplayMode fullscreen) { OVR_UNUSED(fullscreen); return false; }    
-    
+    virtual bool SetFullscreen(DisplayMode fullscreen) { OVR_UNUSED(fullscreen); return false; }
+
 
     enum PostProcessShader
     {
@@ -707,7 +707,7 @@ public:
 protected:
     // Stereo & post-processing
     virtual bool  initPostProcessSupport(PostProcessType pptype);
-   
+
 private:
     PostProcessShader   PostProcessShaderRequested;
     PostProcessShader   PostProcessShaderActive;

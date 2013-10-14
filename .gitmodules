@@ -1,0 +1,3 @@
+[submodule "3rdParty/glfw"]
+	path = 3rdParty/glfw
+	url = https://github.com/jherico/glfw.git

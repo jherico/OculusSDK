@@ -26,18 +26,8 @@ limitations under the License.
 
 #include "RenderTiny_Device.h"
 
-#if defined(OVR_OS_WIN32)
-#include <Windows.h>
-#endif
-
-#if defined(OVR_OS_MAC)
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#else
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
-#endif
+#include "GL/glew.h"
+#include "GLFW/glfw3.h"
 
 namespace OVR { namespace RenderTiny { namespace GL {
 
@@ -154,7 +144,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).     
+    // (unless a buffer is used, then each buffer is independent).
     virtual bool SetUniform(const char* name, int n, const float* v);
     virtual bool SetUniform4x4f(const char* name, const Matrix4f& m);
 
@@ -185,10 +175,15 @@ class RenderDevice : public RenderTiny::RenderDevice
     GLuint                   CurrentFbo;
 
     const LightingParams*    Lighting;
-    
+    GLFWwindow* window;
+
 
 public:
-    RenderDevice(const RendererParams& p);
+    RenderDevice(const RendererParams& p, GLFWwindow * oswnd);
+    virtual void Present();
+
+    // Implement static initializer function to create this class.
+    static RenderTiny::RenderDevice* CreateDevice(const RendererParams& rp, void* oswnd);
 
     virtual void SetRealViewport(const Viewport& vp);
 
