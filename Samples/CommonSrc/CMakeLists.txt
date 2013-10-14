@@ -1,4 +1,4 @@
-project(SAMPLE_CommonSrc)
+project(CommonSrc)
 
 set(SOURCE_FILES
     Platform/Platform.cpp
@@ -25,7 +25,9 @@ if(WIN32)
     	${DirectX_LIB_SEARCH_PATH}/dxgi.lib
 	)
 	include_directories(${DirectX_INC_SEARCH_PATH})
+
 elseif(APPLE)
+
     list(APPEND SOURCE_FILES 
         Platform/OSX_Platform.mm
         Platform/OSX_Gamepad.cpp
@@ -33,8 +35,15 @@ elseif(APPLE)
 	    Render/Render_GL_Device.cpp
     )
 
-    # FIXME ??? need to add libraries here
+    find_library(OpenGL_LIBRARY OpenGL)
+    find_library(COCOA_LIBRARY Cocoa)
+    list(APPEND CommonSrc_EXTRA_LIBS 
+        ${COCOA_LIBRARY} 
+        ${OpenGL_LIBRARY}
+    )
+
 else()
+
     list(APPEND SOURCE_FILES 
         Platform/Linux_Platform.cpp
         Platform/Linux_Gamepad.cpp
@@ -42,6 +51,7 @@ else()
     )
 
     list(APPEND CommonSrc_EXTRA_LIBS GL GLU glut) 
+
 endif()
 
 add_library (CommonSrc STATIC ${SOURCE_FILES})

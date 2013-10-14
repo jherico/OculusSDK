@@ -40,10 +40,10 @@ add_subdirectory(LibOVR)
 #
 
 # Make sure to set up the OVR include paths
-include_directories(${CORE_OculusVR_SOURCE_DIR}/Include)
-include_directories(${CORE_OculusVR_SOURCE_DIR}/Src)
-include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Kernel)
-include_directories(${CORE_OculusVR_SOURCE_DIR}/Src/Util)
+include_directories(${LibOVR_SOURCE_DIR}/Include)
+include_directories(${LibOVR_SOURCE_DIR}/Src)
+include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
+include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
 
 # Cross platform window creation
 add_subdirectory(3rdParty/glfw)
@@ -56,7 +56,7 @@ include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
 
 # Used by the sample code to read the tuscany resources
 add_subdirectory(3rdParty/TinyXml)
-include_directories(${LIB_TinyXML2_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/3rdParty/TinyXml)
 
 add_definitions( -DGL_GLEXT_PROTOTYPES )
 add_subdirectory (Samples/CommonSrc )

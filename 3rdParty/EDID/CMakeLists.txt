@@ -1,3 +1,3 @@
-project (LIB_EDID)
+project (LibEDID)
 
-add_library(EDID STATIC edid.cpp)
+add_library(edid STATIC edid.cpp)

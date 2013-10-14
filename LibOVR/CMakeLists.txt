@@ -1,4 +1,4 @@
-project (CORE_OculusVR)
+project (LibOVR)
 
 include_directories(Include Src Src/Kernel Src/Util)
 
@@ -118,18 +118,26 @@ else()
         Src/OVR_Linux_HMDDevice.h
     )
     list(APPEND EXTRA_LIBS
-        EDID
+        edid
     )
-    include_directories(${LIB_EDID_SOURCE_DIR})
+    include_directories(${LibEDID_SOURCE_DIR})
 endif()
 
 if(WIN32)
+
     SET(OculusVR_EXTRA_LIBS setupapi winmm)
+
 elseif(APPLE)
-    # FIXME ???
+
+    find_library(COCOA_LIBRARY Cocoa)
+    find_library(IOKIT_LIBRARY IOKit)
+    set(OculusVR_EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
+
 else()
+
     # FIXME switch to pkg-config for this?
-    SET(OculusVR_EXTRA_LIBS EDID pthread udev X11 Xrandr)
+    SET(OculusVR_EXTRA_LIBS edid pthread udev X11 Xrandr)
+
 endif()
 
 add_library(OculusVR STATIC ${SOURCE_FILES} ${HEADER_FILES})

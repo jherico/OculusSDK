@@ -1,27 +1,25 @@
 #include "MessageBox.h"
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
 
 MessageBoxResult MessageBox(const char * text) {
-#ifdef OVR_OS_WIN32
-    
-    // FIXME extract the win32-ness
-    //        if (detectionMessage)
-    //        {
-    //            int         detectionResult = IDCONTINUE;
-    //            String messageText(detectionMessage);
-    //            messageText += "\n\n"
-    //                           "Press 'Try Again' to run retry detection.\n"
-    //                           "Press 'Continue' to run full-screen anyway.";
-    //
-    //            detectionResult = ::MessageBoxA(0, messageText.ToCStr(), "Oculus Rift Detection",
-    //                                            MB_CANCELTRYCONTINUE|MB_ICONWARNING);
-    //
-    //            if (detectionResult == IDCANCEL)
-    //                return 1;
-    //        }
+#ifdef WIN32
+        int result = ::MessageBoxA(0, text, "Oculus Rift Detection",
+                        MB_CANCELTRYCONTINUE|MB_ICONWARNING);
+        switch (result) {
+        case IDCANCEL:
+            return Cancel;
+        case IDCONTINUE:
+            return Continue;
+        case IDRETRY:
+            return Retry;
+        }
 #endif
     
 #ifdef __APPLE__

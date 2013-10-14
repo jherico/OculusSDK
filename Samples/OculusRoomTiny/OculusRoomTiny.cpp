@@ -508,8 +508,12 @@ int OculusRoomTinyApp::Run()
 
 //-------------------------------------------------------------------------------------
 // ***** Program Startup
-
+#ifdef WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+#else
 int main(int argc, char ** argv)
+#endif
+
 {
     int exitCode = 0;
 
