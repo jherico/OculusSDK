@@ -23,9 +23,7 @@ limitations under the License.
 
 #include "OculusRoomTiny.h"
 #include "RenderTiny_Device.h"
-
-//-------------------------------------------------------------------------------------
-// ***** OculusRoomTiny Class
+#include "MessageBox.h"
 
 void glfwKeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     OculusRoomTinyApp * instance = (OculusRoomTinyApp *)glfwGetWindowUserPointer(window);
@@ -37,6 +35,8 @@ void glfwErrorCallback(int error, const char* description) {
     exit(1);
 }
 
+//-------------------------------------------------------------------------------------
+// ***** OculusRoomTiny Class
 
 OculusRoomTinyApp::OculusRoomTinyApp() :
     window(0), Width(1280), Height(800), Quit(false), LastUpdate(0), StartupTicks(OVR::Timer::GetTicks()), EyePos(0.0f, 1.6f, -5.0f), EyeYaw(YawInitial),
@@ -46,7 +46,7 @@ OculusRoomTinyApp::OculusRoomTinyApp() :
 
 OculusRoomTinyApp::~OculusRoomTinyApp()
 {
-	RemoveHandlerFromDevices();
+    RemoveHandlerFromDevices();
     pSensor.Clear();
     pHMD.Clear();
     destroyWindow();
@@ -57,7 +57,7 @@ bool OculusRoomTinyApp::setupWindow()
     glfwInit();
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
     glfwWindowHint(GLFW_DECORATED, 0);
-    window = glfwCreateWindow(HMDInfo.HResolution, HMDInfo.VResolution, "OculusRoomTiny", NULL, NULL);
+    window = glfwCreateWindow(Width, Height, "OculusRoomTiny", NULL, NULL);
     assert(window != 0);
     glfwSetWindowPos(window, HMDInfo.DesktopX, HMDInfo.DesktopY);
     glfwSetWindowUserPointer(window, this);
@@ -67,7 +67,6 @@ bool OculusRoomTinyApp::setupWindow()
     glewInit();
     return window != 0;
 }
-
 
 void OculusRoomTinyApp::destroyWindow()
 {
@@ -82,62 +81,6 @@ void OculusRoomTinyApp::destroyWindow()
     }
 }
 
-enum MessageBoxResult {
-    Continue,
-    Cancel,
-    Retry
-};
-
-MessageBoxResult MessageBox(const String & text) {
-    // FIXME extract the win32-ness
-    //        if (detectionMessage)
-    //        {
-    //            int         detectionResult = IDCONTINUE;
-    //            String messageText(detectionMessage);
-    //            messageText += "\n\n"
-    //                           "Press 'Try Again' to run retry detection.\n"
-    //                           "Press 'Continue' to run full-screen anyway.";
-    //
-    //            detectionResult = ::MessageBoxA(0, messageText.ToCStr(), "Oculus Rift Detection",
-    //                                            MB_CANCELTRYCONTINUE|MB_ICONWARNING);
-    //
-    //            if (detectionResult == IDCANCEL)
-    //                return 1;
-    //        }
-
-    //
-    //        if (detectionMessage)
-    //        {
-    //            String messageText(detectionMessage);
-    //            messageText += "\n\n"
-    //            "Press 'Try Again' to run retry detection.\n"
-    //            "Press 'Continue' to run full-screen anyway.";
-    //
-    //            CFStringRef headerStrRef  = CFStringCreateWithCString(NULL, "Oculus Rift Detection", kCFStringEncodingMacRoman);
-    //            CFStringRef messageStrRef = CFStringCreateWithCString(NULL, messageText, kCFStringEncodingMacRoman);
-    //
-    //            //launch the message box
-    //            CFUserNotificationDisplayAlert(0,
-    //                                           kCFUserNotificationNoteAlertLevel,
-    //                                           NULL, NULL, NULL,
-    //                                           headerStrRef, // header text
-    //                                           messageStrRef, // message text
-    //                                           CFSTR("Try again"),
-    //                                           CFSTR("Continue"),
-    //                                           CFSTR("Cancel"),
-    //                                           &detectionResult);
-    //
-    //            //Clean up the strings
-    //            CFRelease(headerStrRef);
-    //            CFRelease(messageStrRef);
-    //
-    //            if (detectionResult == kCFUserNotificationCancelResponse ||
-    //                detectionResult == kCFUserNotificationOtherResponse)
-    //                return 1;
-    //        }
-    return Continue;
-}
-
 int OculusRoomTinyApp::OnStartup(const char* args)
 {
     OVR_UNUSED(args);
@@ -149,11 +92,11 @@ int OculusRoomTinyApp::OnStartup(const char* args)
 
     pManager = *DeviceManager::Create();
 
-	// We'll handle it's messages in this case.
-	pManager->SetMessageHandler(this);
+    // We'll handle it's messages in this case.
+    pManager->SetMessageHandler(this);
 
-	bool detectedHardware = false;
-    while (!detectedHardware) {
+    bool initDone = false;
+    while (!initDone) {
         // Release Sensor/HMD in case this is a retry.
         pSensor.Clear();
         pHMD.Clear();
@@ -214,10 +157,11 @@ int OculusRoomTinyApp::OnStartup(const char* args)
 
             // semantic Continue means exit the loop
             case Continue:
+                initDone = true;
                 break;
             }
         } else {
-            detectedHardware = true;
+            initDone = true;
         }
     }
 
@@ -284,22 +228,22 @@ int OculusRoomTinyApp::OnStartup(const char* args)
 
 void OculusRoomTinyApp::OnMessage(const Message& msg)
 {
-	if (msg.Type == Message_DeviceAdded && msg.pDevice == pManager)
-	{
-		LogText("DeviceManager reported device added.\n");
-	}
-	else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pManager)
-	{
-		LogText("DeviceManager reported device removed.\n");
-	}
-	else if (msg.Type == Message_DeviceAdded && msg.pDevice == pSensor)
-	{
-		LogText("Sensor reported device added.\n");
-	}
-	else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pSensor)
-	{
-		LogText("Sensor reported device removed.\n");
-	}
+    if (msg.Type == Message_DeviceAdded && msg.pDevice == pManager)
+    {
+        LogText("DeviceManager reported device added.\n");
+    }
+    else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pManager)
+    {
+        LogText("DeviceManager reported device removed.\n");
+    }
+    else if (msg.Type == Message_DeviceAdded && msg.pDevice == pSensor)
+    {
+        LogText("Sensor reported device added.\n");
+    }
+    else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pSensor)
+    {
+        LogText("Sensor reported device removed.\n");
+    }
 }
 
 
@@ -553,8 +497,8 @@ void OculusRoomTinyApp::Render(const StereoEyeParams& stereo)
 
 int OculusRoomTinyApp::Run()
 {
-    pRender->SetWindowSize(HMDInfo.HResolution, HMDInfo.VResolution);
-    pRender->SetViewport(0, 0, HMDInfo.HResolution, HMDInfo.VResolution);
+    pRender->SetWindowSize(Width, Height);
+    pRender->SetViewport(0, 0, Width, Height);
     while (!Quit) {
         glfwPollEvents();
         OnIdle();

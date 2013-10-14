@@ -1,8 +1,8 @@
-set(EXE_NAME OculusRoomTiny)
-
-project(SAMPLE_${EXE_NAME})
+project(OculusRoomTiny)
 
 set(SOURCE_FILES
+    MessageBox.cpp
+    MessageBox.h
     OculusRoomTiny.cpp
     OculusRoomTiny.h
     OculusRoomModel.cpp
@@ -14,27 +14,26 @@ set(SOURCE_FILES
 
 set(EXTRA_LIBS 
 	OculusVR
-	glfw
 	glew 
+	glfw
     ${GLFW_LIBRARIES}
 )
 
-
 if(WIN32)
 
-    add_executable(${EXE_NAME} WIN32 ${SOURCE_FILES} )
+    add_executable(${PROJECT_NAME} WIN32 ${SOURCE_FILES} )
 
 elseif(APPLE)
 
-    add_executable(${EXE_NAME} MACOSX_BUNDLE ${SOURCE_FILES} )
+    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${SOURCE_FILES} )
 
 else()
 
-    add_executable(${EXE_NAME} ${SOURCE_FILES} )
+    add_executable(${PROJECT_NAME} ${SOURCE_FILES} )
 
 endif()
 
-target_link_libraries(${EXE_NAME} ${EXTRA_LIBS})
+target_link_libraries(${PROJECT_NAME} ${EXTRA_LIBS})
 
 
 
