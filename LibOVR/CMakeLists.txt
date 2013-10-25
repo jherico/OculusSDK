@@ -135,10 +135,25 @@ elseif(APPLE)
 
 else()
 
-    # FIXME switch to pkg-config for this?
-    SET(OculusVR_EXTRA_LIBS edid pthread udev X11 Xrandr)
+    find_package(X11 REQUIRED)
 
+    # Set up library and include paths
+    list(APPEND OculusVR_EXTRA_LIBS ${X11_X11_LIB})
+
+    # Check for XRandR (modern resolution switching and gamma control)
+    if (NOT X11_Xrandr_FOUND)
+        message(FATAL_ERROR "The RandR library and headers were not found")
+    endif()
+
+    list(APPEND OculusVR_EXTRA_LIBS ${X11_Xrandr_LIB})
+
+    find_package (Threads REQUIRED)
+    list(APPEND OculusVR_EXTRA_LIBS ${CMAKE_THREAD_LIBS_INIT})
+
+    list(APPEND OculusVR_EXTRA_LIBS edid udev )
 endif()
 
+
 add_library(OculusVR STATIC ${SOURCE_FILES} ${HEADER_FILES})
+set(OVR_LIBRARIES ${OculusVR_EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")
 target_link_libraries(OculusVR ${OculusVR_EXTRA_LIBS})
