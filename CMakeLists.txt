@@ -1,3 +1,8 @@
+set(CMAKE_USER_MAKE_RULES_OVERRIDE
+   ${CMAKE_CURRENT_SOURCE_DIR}/CMake/c_flag_overrides.cmake)
+set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
+   ${CMAKE_CURRENT_SOURCE_DIR}/CMake/cxx_flag_overrides.cmake)
+   
 project(OculusSDK)
 
 cmake_minimum_required(VERSION 2.8)
@@ -64,4 +69,6 @@ add_subdirectory (Samples/OculusWorldDemo )
 add_subdirectory (Samples/OculusRoomTiny )
 add_subdirectory (Samples/SensorBox )
 add_subdirectory (Samples/TestSensor )
+add_subdirectory (Samples/TestSensorC )
+
 

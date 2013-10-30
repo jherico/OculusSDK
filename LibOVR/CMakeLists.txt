@@ -19,6 +19,7 @@ set(SOURCE_FILES
     Src/Kernel/OVR_System.cpp
     Src/Kernel/OVR_Timer.cpp
     Src/Kernel/OVR_UTF8Util.cpp
+    Src/OVR_C_Impl.cpp
     Src/OVR_DeviceHandle.cpp
     Src/OVR_DeviceImpl.cpp
     Src/OVR_JSON.cpp
@@ -33,6 +34,7 @@ set(SOURCE_FILES
 )
 
 set(HEADER_FILES
+    Include/OVR_C.h
     Include/OVR.h
     Include/OVRVersion.h 
     Src/Kernel/OVR_Alg.h
