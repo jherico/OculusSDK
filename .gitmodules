@@ -1,3 +1,6 @@
 [submodule "3rdParty/glfw"]
 	path = 3rdParty/glfw
 	url = https://github.com/jherico/glfw.git
+[submodule "3rdParty/glew"]
+	path = 3rdParty/glew
+	url = https://github.com/jherico/glew.git
