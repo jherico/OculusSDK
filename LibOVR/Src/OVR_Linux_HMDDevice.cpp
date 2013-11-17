@@ -194,7 +194,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
                 h = crtc_info->height;
                 XRRFreeCrtcInfo(crtc_info);
             }
-            HMDDeviceCreateDesc hmdCreateDesc(this, mi->dsc_product_name, output);
+            HMDDeviceCreateDesc hmdCreateDesc(this, info->name, output);
             hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
             // Notify caller about detected device. This will call EnumerateAddDevice
             // if the this is the first time device was detected.
