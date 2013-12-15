@@ -46,7 +46,7 @@ enum Axis
 enum RotateDirection
 {
     Rotate_CCW = 1,
-    Rotate_CW  = -1 
+    Rotate_CW  = -1
 };
 
 // Constants for right handed and left handed coordinate systems
@@ -71,7 +71,7 @@ struct WorldAxes
     AxisDirection XAxis, YAxis, ZAxis;
 
     WorldAxes(AxisDirection x, AxisDirection y, AxisDirection z)
-        : XAxis(x), YAxis(y), ZAxis(z) 
+        : XAxis(x), YAxis(y), ZAxis(z)
     { OVR_ASSERT(abs(x) != abs(y) && abs(y) != abs(z) && abs(z) != abs(x));}
 };
 
@@ -83,7 +83,7 @@ struct WorldAxes
 // per type, with Math<float> and Math<double> being distinct.
 template<class Type>
 class Math
-{  
+{
 };
 
 // Single-precision Math constants class.
@@ -140,18 +140,18 @@ T DegreeToRad(T rads) { return rads * Math<T>::DegreeToRadFactor; }
 
 // Numerically stable acos function
 template<class T>
-T Acos(T val) { 
+T Acos(T val) {
 		if (val > T(1))				return T(0);
 		else if (val < T(-1))		return Math<T>::Pi;
-		else						return acos(val); 
+		else						return acos(val);
 };
 
 // Numerically stable asin function
 template<class T>
-T Asin(T val) { 
+T Asin(T val) {
 	if (val > T(1))				return Math<T>::PiOver2;
 	else if (val < T(-1))		return Math<T>::PiOver2 * T(3);
-	else						return asin(val); 
+	else						return asin(val);
 };
 
 #ifdef OVR_CC_MSVC
@@ -179,7 +179,7 @@ public:
 
     bool     operator== (const Vector2& b) const  { return x == b.x && y == b.y; }
     bool     operator!= (const Vector2& b) const  { return x != b.x || y != b.y; }
-             
+
     Vector2  operator+  (const Vector2& b) const  { return Vector2(x + b.x, y + b.y); }
     Vector2& operator+= (const Vector2& b)        { x += b.x; y += b.y; return *this; }
     Vector2  operator-  (const Vector2& b) const  { return Vector2(x - b.x, y - b.y); }
@@ -201,7 +201,7 @@ public:
     {
         return (fabs(b.x-x) < tolerance) && (fabs(b.y-y) < tolerance);
     }
-    
+
     // Entrywise product of two vectors
     Vector2	EntrywiseMultiply(const Vector2& b) const	{ return Vector2(x * b.x, y * b.y);}
 
@@ -211,8 +211,8 @@ public:
     T		Dot(const Vector2& b) const          { return x*b.x + y*b.y; }
 
     // Returns the angle from this vector to b, in radians.
-    T       Angle(const Vector2& b) const        
-	{ 
+    T       Angle(const Vector2& b) const
+	{
 		T div = LengthSq()*b.LengthSq();
 		OVR_ASSERT(div != T(0));
 		T result = Acos((this->Dot(b))/sqrt(div));
@@ -230,19 +230,19 @@ public:
 	// Determine if this a unit vector.
     bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
 
-    // Normalize, convention vector length to 1.    
-    void    Normalize()                          
+    // Normalize, convention vector length to 1.
+    void    Normalize()
 	{
 		T l = Length();
 		OVR_ASSERT(l != T(0));
-		*this /= l; 
+		*this /= l;
 	}
     // Returns normalized (unit) version of the vector without modifying itself.
-    Vector2 Normalized() const                   
-	{ 
+    Vector2 Normalized() const
+	{
 		T l = Length();
 		OVR_ASSERT(l != T(0));
-		return *this / l; 
+		return *this / l;
 	}
 
     // Linearly interpolates from this vector to another.
@@ -251,11 +251,11 @@ public:
 
     // Projects this vector onto the argument; in other words,
     // A.Project(B) returns projection of vector A onto B.
-    Vector2 ProjectTo(const Vector2& b) const    
-	{ 
+    Vector2 ProjectTo(const Vector2& b) const
+	{
 		T l2 = b.LengthSq();
 		OVR_ASSERT(l2 != T(0));
-		return b * ( Dot(b) / l2 ); 
+		return b * ( Dot(b) / l2 );
 	}
 };
 
@@ -283,7 +283,7 @@ public:
 
     bool     operator== (const Vector3& b) const  { return x == b.x && y == b.y && z == b.z; }
     bool     operator!= (const Vector3& b) const  { return x != b.x || y != b.y || z != b.z; }
-             
+
     Vector3  operator+  (const Vector3& b) const  { return Vector3(x + b.x, y + b.y, z + b.z); }
     Vector3& operator+= (const Vector3& b)        { x += b.x; y += b.y; z += b.z; return *this; }
     Vector3  operator-  (const Vector3& b) const  { return Vector3(x - b.x, y - b.y, z - b.z); }
@@ -303,14 +303,14 @@ public:
     // Compare two vectors for equality with tolerance. Returns true if vectors match withing tolerance.
     bool      Compare(const Vector3&b, T tolerance = Mathf::Tolerance)
     {
-        return (fabs(b.x-x) < tolerance) && 
-			   (fabs(b.y-y) < tolerance) && 
+        return (fabs(b.x-x) < tolerance) &&
+			   (fabs(b.y-y) < tolerance) &&
 			   (fabs(b.z-z) < tolerance);
     }
-    
+
     // Entrywise product of two vectors
-    Vector3	EntrywiseMultiply(const Vector3& b) const	{ return Vector3(x * b.x, 
-																		 y * b.y, 
+    Vector3	EntrywiseMultiply(const Vector3& b) const	{ return Vector3(x * b.x,
+																		 y * b.y,
 																		 z * b.z);}
 
 	// Dot product
@@ -326,7 +326,7 @@ public:
                                                                   x*b.y - y*b.x); }
 
     // Returns the angle from this vector to b, in radians.
-    T       Angle(const Vector3& b) const 
+    T       Angle(const Vector3& b) const
 	{
 		T div = LengthSq()*b.LengthSq();
 		OVR_ASSERT(div != T(0));
@@ -341,24 +341,24 @@ public:
 
     // Returns distance between two points represented by vectors.
     T       Distance(Vector3& b) const           { return (*this - b).Length(); }
-    
+
     // Determine if this a unit vector.
     bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
 
-    // Normalize, convention vector length to 1.    
-    void    Normalize()                          
+    // Normalize, convention vector length to 1.
+    void    Normalize()
 	{
 		T l = Length();
 		OVR_ASSERT(l != T(0));
-		*this /= l; 
+		*this /= l;
 	}
 
     // Returns normalized (unit) version of the vector without modifying itself.
-    Vector3 Normalized() const                   
-	{ 
+    Vector3 Normalized() const
+	{
 		T l = Length();
 		OVR_ASSERT(l != T(0));
-		return *this / l; 
+		return *this / l;
 	}
 
     // Linearly interpolates from this vector to another.
@@ -367,11 +367,11 @@ public:
 
     // Projects this vector onto the argument; in other words,
     // A.Project(B) returns projection of vector A onto B.
-    Vector3 ProjectTo(const Vector3& b) const    
-	{ 
+    Vector3 ProjectTo(const Vector3& b) const
+	{
 		T l2 = b.LengthSq();
 		OVR_ASSERT(l2 != T(0));
-		return b * ( Dot(b) / l2 ); 
+		return b * ( Dot(b) / l2 );
 	}
 
     // Projects this vector onto a plane defined by a normal vector
@@ -401,7 +401,7 @@ public:
 
     bool     operator== (const Size& b) const  { return Width == b.Width && Height == b.Height; }
     bool     operator!= (const Size& b) const  { return Width != b.Width || Height != b.Height; }
-             
+
     Size  operator+  (const Size& b) const  { return Size(Width + b.Width, Height + b.Height); }
     Size& operator+= (const Size& b)        { Width += b.Width; Height += b.Height; return *this; }
     Size  operator-  (const Size& b) const  { return Size(Width - b.Width, Height - b.Height); }
@@ -414,7 +414,7 @@ public:
 
     // Scalar multiplication/division scales both components.
     Size  operator*  (T s) const            { return Size(Width*s, Height*s); }
-    Size& operator*= (T s)                  { Width *= s; Height *= s; return *this; }    
+    Size& operator*= (T s)                  { Width *= s; Height *= s; return *this; }
     Size  operator/  (T s) const            { return Size(Width/s, Height/s); }
     Size& operator/= (T s)                  { Width /= s; Height /= s; return *this; }
 
@@ -438,19 +438,19 @@ typedef Size<double>    Sized;
 // The matrix is stored in row-major order in memory, meaning that values
 // of the first row are stored before the next one.
 //
-// The arrangement of the matrix is chosen to be in Right-Handed 
+// The arrangement of the matrix is chosen to be in Right-Handed
 // coordinate system and counterclockwise rotations when looking down
 // the axis
 //
 // Transformation Order:
 //   - Transformations are applied from right to left, so the expression
 //     M1 * M2 * M3 * V means that the vector V is transformed by M3 first,
-//     followed by M2 and M1. 
+//     followed by M2 and M1.
 //
 // Coordinate system: Right Handed
 //
 // Rotations: Counterclockwise when looking down the axis. All angles are in radians.
-//    
+//
 //  | sx   01   02   tx |    // First column  (sx, 10, 20): Axis X basis vector.
 //  | 10   sy   12   ty |    // Second column (01, sy, 21): Axis Y basis vector.
 //  | 20   21   sz   tz |    // Third columnt (02, 12, sz): Axis Z basis vector.
@@ -463,7 +463,7 @@ class Matrix4f
     static Matrix4f IdentityValue;
 
 public:
-    float M[4][4];    
+    float M[4][4];
 
     enum NoInitType { NoInit };
 
@@ -473,7 +473,7 @@ public:
     // By default, we construct identity matrix.
     Matrix4f()
     {
-        SetIdentity();        
+        SetIdentity();
     }
 
     Matrix4f(float m11, float m12, float m13, float m14,
@@ -659,8 +659,8 @@ public:
 
     Matrix4f Adjugated() const
     {
-        return Matrix4f(Cofactor(0,0), Cofactor(1,0), Cofactor(2,0), Cofactor(3,0), 
-                        Cofactor(0,1), Cofactor(1,1), Cofactor(2,1), Cofactor(3,1), 
+        return Matrix4f(Cofactor(0,0), Cofactor(1,0), Cofactor(2,0), Cofactor(3,0),
+                        Cofactor(0,1), Cofactor(1,1), Cofactor(2,1), Cofactor(3,1),
                         Cofactor(0,2), Cofactor(1,2), Cofactor(2,2), Cofactor(3,2),
                         Cofactor(0,3), Cofactor(1,3), Cofactor(2,3), Cofactor(3,3));
     }
@@ -711,7 +711,7 @@ public:
         float psign = -1.0f;
         if (((A1 + 1) % 3 == A2) && ((A2 + 1) % 3 == A3)) // Determine whether even permutation
         psign = 1.0f;
-        
+
         float pm = psign*M[A1][A3];
         if (pm < -1.0f + Math<float>::SingularityRadius)
         { // South pole singularity
@@ -743,9 +743,9 @@ public:
     // rotations are CCW or CW (D) in LH or RH coordinate system (S)
     template <Axis A1, Axis A2, RotateDirection D, HandedSystem S>
     void ToEulerAnglesABA(float *a, float *b, float *c)
-    {        
+    {
          OVR_COMPILER_ASSERT(A1 != A2);
-  
+
         // Determine the axis that was not supplied
         int m = 3 - A1 - A2;
 
@@ -774,21 +774,21 @@ public:
         }
         return;
     }
-  
+
     // Creates a matrix that converts the vertices from one coordinate system
     // to another.
     static Matrix4f AxisConversion(const WorldAxes& to, const WorldAxes& from)
-    {        
+    {
         // Holds axis values from the 'to' structure
         int toArray[3] = { to.XAxis, to.YAxis, to.ZAxis };
 
         // The inverse of the toArray
-        int inv[4]; 
+        int inv[4];
         inv[0] = inv[abs(to.XAxis)] = 0;
         inv[abs(to.YAxis)] = 1;
         inv[abs(to.ZAxis)] = 2;
 
-        Matrix4f m(0,  0,  0, 
+        Matrix4f m(0,  0,  0,
                    0,  0,  0,
                    0,  0,  0);
 
@@ -797,7 +797,7 @@ public:
         m.M[inv[abs(from.YAxis)]][1] = float(from.YAxis/toArray[inv[abs(from.YAxis)]]);
         m.M[inv[abs(from.ZAxis)]][2] = float(from.ZAxis/toArray[inv[abs(from.ZAxis)]]);
         return m;
-    } 
+    }
 
 
 	// Creates a matrix for translation by vector
@@ -850,7 +850,7 @@ public:
         return t;
     }
 
-  
+
 
     // Creates a rotation matrix rotating around the X axis by 'angle' radians.
     // Just for quick testing.  Not for final API.  Need to remove case.
@@ -858,19 +858,19 @@ public:
     {
         float sina = s * d *sin(angle);
         float cosa = cos(angle);
-        
+
         switch(A)
         {
         case Axis_X:
-            return Matrix4f(1,  0,     0, 
+            return Matrix4f(1,  0,     0,
                             0,  cosa,  -sina,
                             0,  sina,  cosa);
         case Axis_Y:
-            return Matrix4f(cosa,  0,   sina, 
+            return Matrix4f(cosa,  0,   sina,
                             0,     1,   0,
                             -sina, 0,   cosa);
         case Axis_Z:
-            return Matrix4f(cosa,  -sina,  0, 
+            return Matrix4f(cosa,  -sina,  0,
                             sina,  cosa,   0,
                             0,     0,      1);
         }
@@ -888,7 +888,7 @@ public:
     {
         float sina = sin(angle);
         float cosa = cos(angle);
-        return Matrix4f(1,  0,     0, 
+        return Matrix4f(1,  0,     0,
                         0,  cosa,  -sina,
                         0,  sina,  cosa);
     }
@@ -904,7 +904,7 @@ public:
     {
         float sina = sin(angle);
         float cosa = cos(angle);
-        return Matrix4f(cosa,  0,   sina, 
+        return Matrix4f(cosa,  0,   sina,
                         0,     1,   0,
                         -sina, 0,   cosa);
     }
@@ -920,7 +920,7 @@ public:
     {
         float sina = sin(angle);
         float cosa = cos(angle);
-        return Matrix4f(cosa,  -sina,  0, 
+        return Matrix4f(cosa,  -sina,  0,
                         sina,  cosa,   0,
                         0,     0,      1);
     }
@@ -934,12 +934,12 @@ public:
 
     // LookAtLH creates a View transformation matrix for left-handed coordinate system.
     // The resulting matrix points camera from 'eye' towards 'at' direction, with 'up'
-    // specifying the up vector. 
+    // specifying the up vector.
     static Matrix4f LookAtLH(const Vector3f& eye, const Vector3f& at, const Vector3f& up);
-    
-    
+
+
     // PerspectiveRH creates a right-handed perspective projection matrix that can be
-    // used with the Oculus sample renderer. 
+    // used with the Oculus sample renderer.
     //  yfov   - Specifies vertical field of view in radians.
     //  aspect - Screen aspect ration, which is usually width/height for square pixels.
     //           Note that xfov = yfov * aspect.
@@ -948,10 +948,10 @@ public:
     // Even though RHS usually looks in the direction of negative Z, positive values
     // are expected for znear and zfar.
     static Matrix4f PerspectiveRH(float yfov, float aspect, float znear, float zfar);
-    
-    
+
+
     // PerspectiveRH creates a left-handed perspective projection matrix that can be
-    // used with the Oculus sample renderer. 
+    // used with the Oculus sample renderer.
     //  yfov   - Specifies vertical field of view in radians.
     //  aspect - Screen aspect ration, which is usually width/height for square pixels.
     //           Note that xfov = yfov * aspect.
@@ -968,7 +968,7 @@ public:
 // **************************************** Quat **************************************//
 //
 // Quatf represents a quaternion class used for rotations.
-// 
+//
 // Quaternion multiplications are done in right-to-left order, to match the
 // behavior of matrices.
 
@@ -978,7 +978,7 @@ class Quat
 {
 public:
     // w + Xi + Yj + Zk
-    T x, y, z, w;    
+    T x, y, z, w;
 
     Quat() : x(0), y(0), z(0), w(1) {}
     Quat(T x_, T y_, T z_, T w_) : x(x_), y(y_), z(z_), w(w_) {}
@@ -1018,7 +1018,7 @@ public:
 			*axis  = Vector3<T>(x, y, z).Normalized();
 			*angle = T(2) * Acos(w);
 		}
-		else 
+		else
 		{
 			*axis = Vector3<T>(1, 0, 0);
 			*angle= 0;
@@ -1048,8 +1048,8 @@ public:
     T       LengthSq() const                { return (x * x + y * y + z * z + w * w); }
 
     // Simple Eulidean distance in R^4 (not SLERP distance, but at least respects Haar measure)
-    T       Distance(const Quat& q) const	
-	{ 
+    T       Distance(const Quat& q) const
+	{
         T d1 = (*this - q).Length();
         T d2 = (*this + q).Length(); // Antipodal point check
         return (d1 < d2) ? d1 : d2;
@@ -1065,31 +1065,31 @@ public:
     // Normalize
     bool    IsNormalized() const            { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
 
-    void    Normalize()                     
+    void    Normalize()
 	{
  		T l = Length();
 		OVR_ASSERT(l != T(0));
-		*this /= l; 
+		*this /= l;
 	}
 
-	Quat    Normalized() const              
-	{ 
+	Quat    Normalized() const
+	{
 		T l = Length();
 		OVR_ASSERT(l != T(0));
-		return *this / l; 
+		return *this / l;
 	}
 
     // Returns conjugate of the quaternion. Produces inverse rotation if quaternion is normalized.
     Quat    Conj() const                    { return Quat(-x, -y, -z, w); }
 
-    // Quaternion multiplication. Combines quaternion rotations, performing the one on the 
+    // Quaternion multiplication. Combines quaternion rotations, performing the one on the
     // right hand side first.
     Quat  operator* (const Quat& b) const   { return Quat(w * b.x + x * b.w + y * b.z - z * b.y,
                                                           w * b.y - x * b.z + y * b.w + z * b.x,
                                                           w * b.z + x * b.y - y * b.x + z * b.w,
                                                           w * b.w - x * b.x - y * b.y - z * b.z); }
 
-    // 
+    //
     // this^p normalized; same as rotating by this p times.
     Quat PowNormalized(T p) const
     {
@@ -1098,15 +1098,15 @@ public:
         GetAxisAngle(&v, &a);
         return Quat(v, a * p);
     }
-    
+
     // Rotate transforms vector in a manner that matches Matrix rotations (counter-clockwise,
-    // assuming negative direction of the axis). Standard formula: q(t) * V * q(t)^-1. 
+    // assuming negative direction of the axis). Standard formula: q(t) * V * q(t)^-1.
     Vector3<T> Rotate(const Vector3<T>& v) const
     {
         return ((*this * Quat<T>(v.x, v.y, v.z, T(0))) * Inverted()).Imag();
     }
 
-    
+
     // Inversed quaternion rotates in the opposite direction.
     Quat        Inverted() const
     {
@@ -1118,7 +1118,7 @@ public:
     {
         *this = Quat(-x, -y, -z, w);
     }
-    
+
     // Converting quaternion to matrix.
     operator Matrix4f() const
     {
@@ -1142,31 +1142,31 @@ public:
 		// In almost all cases, the first part is executed.
 		// However, if the trace is not positive, the other
 		// cases arise.
-		if (trace > T(0)) 
+		if (trace > T(0))
 		{
 			T s = sqrt(trace + T(1)) * T(2); // s=4*qw
 			q.w = T(0.25) * s;
 			q.x = (m.M[2][1] - m.M[1][2]) / s;
 			q.y = (m.M[0][2] - m.M[2][0]) / s;
-			q.z = (m.M[1][0] - m.M[0][1]) / s; 
-		} 
-		else if ((m.M[0][0] > m.M[1][1])&&(m.M[0][0] > m.M[2][2])) 
+			q.z = (m.M[1][0] - m.M[0][1]) / s;
+		}
+		else if ((m.M[0][0] > m.M[1][1])&&(m.M[0][0] > m.M[2][2]))
 		{
 			T s = sqrt(T(1) + m.M[0][0] - m.M[1][1] - m.M[2][2]) * T(2);
 			q.w = (m.M[2][1] - m.M[1][2]) / s;
 			q.x = T(0.25) * s;
 			q.y = (m.M[0][1] + m.M[1][0]) / s;
 			q.z = (m.M[2][0] + m.M[0][2]) / s;
-		} 
-		else if (m.M[1][1] > m.M[2][2]) 
+		}
+		else if (m.M[1][1] > m.M[2][2])
 		{
 			T s = sqrt(T(1) + m.M[1][1] - m.M[0][0] - m.M[2][2]) * T(2); // S=4*qy
 			q.w = (m.M[0][2] - m.M[2][0]) / s;
 			q.x = (m.M[0][1] + m.M[1][0]) / s;
 			q.y = T(0.25) * s;
 			q.z = (m.M[1][2] + m.M[2][1]) / s;
-		} 
-		else 
+		}
+		else
 		{
 			T s = sqrt(T(1) + m.M[2][2] - m.M[0][0] - m.M[1][1]) * T(2); // S=4*qz
 			q.w = (m.M[1][0] - m.M[0][1]) / s;
@@ -1178,7 +1178,7 @@ public:
 	}
 
 
-    
+
     // GetEulerAngles extracts Euler angles from the quaternion, in the specified order of
     // axis rotations and the specified coordinate system. Right-handed coordinate system
     // is the default, with CCW rotations while looking in the negative axis direction.
@@ -1188,7 +1188,7 @@ public:
     // is followed by rotation c around axis A3
     // rotations are CCW or CW (D) in LH or RH coordinate system (S)
     template <Axis A1, Axis A2, Axis A3, RotateDirection D, HandedSystem S>
-    void GetEulerAngles(T *a, T *b, T *c)
+    void GetEulerAngles(T *a, T *b, T *c) const
     {
         OVR_COMPILER_ASSERT((A1 != A2) && (A2 != A3) && (A1 != A3));
 
@@ -1203,7 +1203,7 @@ public:
         // Determine whether even permutation
         if (((A1 + 1) % 3 == A2) && ((A2 + 1) % 3 == A3))
             psign = T(1);
-        
+
         T s2 = psign * T(2) * (psign*w*Q[A2] + Q[A1]*Q[A3]);
 
         if (s2 < T(-1) + Math<T>::SingularityRadius)
@@ -1227,7 +1227,7 @@ public:
             *b = S*D*asin(s2);
             *c = S*D*atan2(T(2)*(w*Q[A3] - psign*Q[A1]*Q[A2]),
 		                   ww + Q11 - Q22 - Q33);
-        }      
+        }
         return;
     }
 
@@ -1319,7 +1319,7 @@ public:
 	};
 
     Angle() : a(0) {}
-    
+
 	// Fix the range to be between -Pi and Pi
 	Angle(T a_, AngularUnits u = Radians) : a((u == Radians) ? a_ : a_*Math<T>::DegreeToRadFactor) { FixRange(); }
 
@@ -1330,10 +1330,10 @@ public:
 
     bool operator== (const Angle& b) const    { return a == b.a; }
     bool operator!= (const Angle& b) const    { return a != b.a; }
-//	bool operator<  (const Angle& b) const    { return a < a.b; } 
-//	bool operator>  (const Angle& b) const    { return a > a.b; } 
-//	bool operator<= (const Angle& b) const    { return a <= a.b; } 
-//	bool operator>= (const Angle& b) const    { return a >= a.b; } 
+//	bool operator<  (const Angle& b) const    { return a < a.b; }
+//	bool operator>  (const Angle& b) const    { return a > a.b; }
+//	bool operator<= (const Angle& b) const    { return a <= a.b; }
+//	bool operator>= (const Angle& b) const    { return a >= a.b; }
 //	bool operator= (const T& x)               { a = x; FixRange(); }
 
 	// These operations assume a is already between -Pi and Pi.
@@ -1345,7 +1345,7 @@ public:
 	Angle& operator-= (const T& x)            { a = a - x; FixRange(); return *this; }
 	Angle  operator-  (const Angle& b) const  { Angle res = *this; res -= b; return res; }
 	Angle  operator-  (const T& x) const      { Angle res = *this; res -= x; return res; }
-	
+
 	T   Distance(const Angle& b)              { T c = fabs(a - b.a); return (c <= Math<T>::Pi) ? c : Math<T>::TwoPi - c; }
 
 private:
@@ -1353,7 +1353,7 @@ private:
 	// The stored angle, which should be maintained between -Pi and Pi
 	T a;
 
-	// Fixes the angle range to [-Pi,Pi], but assumes no more than 2Pi away on either side 
+	// Fixes the angle range to [-Pi,Pi], but assumes no more than 2Pi away on either side
 	inline void FastFixRange()
 	{
 		if (a < -Math<T>::Pi)
