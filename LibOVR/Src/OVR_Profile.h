@@ -168,8 +168,6 @@ public:
         Gender_Female       = 2
     };
 
-    String               Name;  // The name given to this profile
-
 protected:
     GenderType           Gender;            // The gender of the user
     float                PlayerHeight;      // The height of the user in meters
@@ -205,7 +203,7 @@ public:
     }
 
 protected:
-    Profile(const char* name);
+    Profile();
     friend class ProfileManager;
     friend class ProfileLoader;
 };
@@ -286,7 +284,7 @@ protected:
     // Synchronize ProfileManager access since it may be accessed from multiple threads,
     // as it's shared through DeviceManager.
     Lock                    ProfileLock;
-    typedef AssociativePtrArray<Profile, String> Map;
+    typedef Hash<String, Profile> Map;
     Map                     ProfileCache;
     String                  DefaultProfile;
     bool                    Changed;

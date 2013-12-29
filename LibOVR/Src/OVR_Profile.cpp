@@ -366,8 +366,7 @@ public:
     }
   }
 
-  static void writeProfile(Json::Value & parent, const Profile & profile) {
-    Json::Value & out = parent[profile.Name];
+  static void writeProfile(Json::Value & out, const Profile & profile) {
 
     switch (profile.GetGender()) {
         case Profile::Gender_Male:
@@ -464,9 +463,9 @@ void ProfileManager::LoadCache() {
       String name = profileNode["Name"].asCString();
       // The profile having to know it's own name is a symptom of the lack
       // of a proper associative array class in the OVR codebase.
-      Profile * profile = new Profile(name);
+      Profile * profile = new Profile();
       ProfileLoader::loadV1Profile(*profile, profileNode);
-      ProfileCache.PushBack(profile);
+      ProfileCache.Set(name, profile);
     }
     break;
 
@@ -532,7 +531,8 @@ void ProfileManager::SaveCache()
     Json::Value & profiles = root[KEY_PROFILES];
     for (unsigned int i=0; i<ProfileCache.GetSize(); i++) {
       const Profile * profile = ProfileCache[i];
-      ProfileLoader::writeProfile(profiles, *profile);
+      String name;
+      ProfileLoader::writeProfile(profiles[name], *profile);
     }
 
     {
@@ -674,12 +674,11 @@ bool ProfileManager::Delete(const Profile * profile)
 //-----------------------------------------------------------------------------
 // ***** Profile
 
-Profile::Profile(const char* name)
+Profile::Profile()
 {
     Gender       = Gender_Unspecified;
     PlayerHeight = DEFAULT_HEIGHT;
     IPD          = DEFAULT_IPD;
-    Name         = name;
 }
 
 // Computes the eye height from the metric head height
