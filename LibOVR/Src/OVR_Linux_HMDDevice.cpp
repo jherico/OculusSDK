@@ -234,13 +234,14 @@ Profile* HMDDeviceCreateDesc::GetProfileAddRef() const
 {
     // Create device may override profile name, so get it from there is possible.
     ProfileManager* profileManager = GetManagerImpl()->GetProfileManager();
+    ProfileType     profileType    = GetProfileType();
     const char *    profileName    = pDevice ?
                         ((HMDDevice*)pDevice)->GetProfileName() :
-                        profileManager->GetDefaultProfileName();
+                        profileManager->GetDefaultProfileName(profileType);
 
     return profileName ?
-        profileManager->LoadProfile(profileName) :
-        profileManager->GetDefaultProfile();
+        profileManager->LoadProfile(profileType, profileName) :
+        profileManager->GetDeviceDefaultProfile(profileType);
 }
 
 
@@ -340,7 +341,7 @@ bool HMDDevice::Initialize(DeviceBase* parent)
 
     // Initialize user profile to default for device.
     ProfileManager* profileManager = GetManager()->GetProfileManager();
-    ProfileName = profileManager->GetDefaultProfileName();
+    ProfileName = profileManager->GetDefaultProfileName(getDesc()->GetProfileType());
 
     return true;
 }
@@ -371,7 +372,7 @@ bool HMDDevice::SetProfileName(const char* name)
         ProfileName.Clear();
         return 0;
     }
-    if (GetManager()->GetProfileManager()->HasProfile(name))
+    if (GetManager()->GetProfileManager()->HasProfile(getDesc()->GetProfileType(), name))
     {
         ProfileName = name;
         return true;
