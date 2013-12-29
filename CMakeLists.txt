@@ -26,11 +26,6 @@ if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
-# Used by the SDK to read the EDID of the monitors
-if(UNIX AND NOT(APPLE) AND NOT(CYGWIN))
-    add_subdirectory(3rdParty/EDID)
-endif()
-
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
 

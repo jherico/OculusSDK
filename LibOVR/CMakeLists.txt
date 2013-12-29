@@ -117,40 +117,50 @@ else()
         Src/OVR_Linux_HIDDevice.h
         Src/OVR_Linux_HMDDevice.h
     )
-    list(APPEND EXTRA_LIBS
-        edid
-    )
-    include_directories(${LibEDID_SOURCE_DIR})
 endif()
+
+add_subdirectory(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/jsoncpp 
+    ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/jsoncpp
+)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/jsoncpp)
+
+set(OculusVR_EXTRA_LIBS jsoncpp)
 
 if(WIN32)
 
-    SET(OculusVR_EXTRA_LIBS setupapi winmm)
+    list(APPEND OculusVR_EXTRA_LIBS setupapi winmm)
 
 elseif(APPLE)
 
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKIT_LIBRARY IOKit)
-    set(OculusVR_EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
+    list(APPEND OculusVR_EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
 
 else()
+    # Used by the SDK to read the EDID of the monitors
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID 
+        ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID
+    )
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID)
 
     find_package(X11 REQUIRED)
-
-    # Set up library and include paths
-    list(APPEND OculusVR_EXTRA_LIBS ${X11_X11_LIB})
+    find_package (Threads REQUIRED)
 
     # Check for XRandR (modern resolution switching and gamma control)
     if (NOT X11_Xrandr_FOUND)
         message(FATAL_ERROR "The RandR library and headers were not found")
     endif()
 
-    list(APPEND OculusVR_EXTRA_LIBS ${X11_Xrandr_LIB})
-
-    find_package (Threads REQUIRED)
-    list(APPEND OculusVR_EXTRA_LIBS ${CMAKE_THREAD_LIBS_INIT})
-
-    list(APPEND OculusVR_EXTRA_LIBS edid udev )
+    # Set up library and include paths
+    list(APPEND OculusVR_EXTRA_LIBS 
+        ${X11_X11_LIB} 
+        ${X11_Xrandr_LIB}
+        ${CMAKE_THREAD_LIBS_INIT}
+        edid udev
+    )
 endif()
 
 
