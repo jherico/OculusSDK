@@ -234,13 +234,8 @@ Profile* HMDDeviceCreateDesc::GetProfileAddRef() const
 {
     // Create device may override profile name, so get it from there is possible.
     ProfileManager* profileManager = GetManagerImpl()->GetProfileManager();
-    const char *    profileName    = pDevice ?
-                        ((HMDDevice*)pDevice)->GetProfileName() :
-                        profileManager->GetDefaultProfileName();
-
-    return profileName ?
-        profileManager->LoadProfile(profileName) :
-        profileManager->GetDefaultProfile();
+    String profileName = profileManager-> GetDefaultProfileName();
+    return profileManager->LoadProfile(profileName);
 }
 
 

@@ -1,24 +1,24 @@
 /************************************************************************************
 
-PublicHeader:   None
-Filename    :   OVR_Profile.cpp
-Content     :   Structs and functions for loading and storing device profile settings
-Created     :   February 14, 2013
-Notes       :
+ PublicHeader:   None
+ Filename    :   OVR_Profile.cpp
+ Content     :   Structs and functions for loading and storing device profile settings
+ Created     :   February 14, 2013
+ Notes       :
 
-   Profiles are used to store per-user settings that can be transferred and used
-   across multiple applications.  For example, player IPD can be configured once
-   and reused for a unified experience across games.  Configuration and saving of profiles
-   can be accomplished in game via the Profile API or by the official Oculus Configuration
-   Utility.
+ Profiles are used to store per-user settings that can be transferred and used
+ across multiple applications.  For example, player IPD can be configured once
+ and reused for a unified experience across games.  Configuration and saving of profiles
+ can be accomplished in game via the Profile API or by the official Oculus Configuration
+ Utility.
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+ Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
+ Use of this software is subject to the terms of the Oculus license
+ agreement provided at the time of installation or download, or which
+ otherwise accompanies this software in either electronic or hard copy form.
 
-************************************************************************************/
+ ************************************************************************************/
 
 #include "OVR_Profile.h"
 #include "OVR_Log.h"
@@ -40,7 +40,6 @@ otherwise accompanies this software in either electronic or hard copy form.
 #endif
 
 #endif
-
 
 #define PROFILE_VERSION 2
 #define MAX_PROFILE_MAJOR_VERSION 2
@@ -68,127 +67,98 @@ otherwise accompanies this software in either electronic or hard copy form.
 #define DEFAULT_HEIGHT 1.778f
 #define DEFAULT_IPD 0.064f
 
-
 namespace OVR {
 
 //-----------------------------------------------------------------------------
 // Returns the pathname of the JSON file containing the stored profiles
 String GetBaseOVRPath(bool create_dir)
-{
-    String path;
+    {
+  String path;
 
 #if defined(OVR_OS_WIN32)
 
-    TCHAR data_path[MAX_PATH];
-    SHGetFolderPath(0, CSIDL_LOCAL_APPDATA, NULL, 0, data_path);
-    path = String(data_path);
+  TCHAR data_path[MAX_PATH];
+  SHGetFolderPath(0, CSIDL_LOCAL_APPDATA, NULL, 0, data_path);
+  path = String(data_path);
 
-    path += "/Oculus";
+  path += "/Oculus";
 
-    if (create_dir)
-    {   // Create the Oculus directory if it doesn't exist
-        WCHAR wpath[128];
-        OVR::UTF8Util::DecodeString(wpath, path.ToCStr());
+  if (create_dir)
+  {   // Create the Oculus directory if it doesn't exist
+    WCHAR wpath[128];
+    OVR::UTF8Util::DecodeString(wpath, path.ToCStr());
 
-        DWORD attrib = GetFileAttributes(wpath);
-        bool exists = attrib != INVALID_FILE_ATTRIBUTES && (attrib & FILE_ATTRIBUTE_DIRECTORY);
-        if (!exists)
-        {
-            CreateDirectory(wpath, NULL);
-        }
+    DWORD attrib = GetFileAttributes(wpath);
+    bool exists = attrib != INVALID_FILE_ATTRIBUTES && (attrib & FILE_ATTRIBUTE_DIRECTORY);
+    if (!exists)
+    {
+      CreateDirectory(wpath, NULL);
     }
+  }
 
 #elif defined(OVR_OS_MAC)
 
-    const char* home = getenv("HOME");
-    path = home;
-    path += "/Library/Preferences/Oculus";
+  const char* home = getenv("HOME");
+  path = home;
+  path += "/Library/Preferences/Oculus";
 
-    if (create_dir)
-    {   // Create the Oculus directory if it doesn't exist
-        DIR* dir = opendir(path);
-        if (dir == NULL)
-        {
-            mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
-        }
-        else
-        {
-            closedir(dir);
-        }
+  if (create_dir)
+  {   // Create the Oculus directory if it doesn't exist
+    DIR* dir = opendir(path);
+    if (dir == NULL)
+    {
+      mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
     }
+    else
+    {
+      closedir(dir);
+    }
+  }
 
 #else
-    // Updated the config folder location logic to rely on the
-    // XDG specification for config locations (the XDK location was being
-    // used anyway, but was hardcoded).  This is analgous to using
-    // SHGetFolderPath in the windows implementation, rather than
-    // hardcoding %HOME%/AppData/Local
-    const char * config_home = getenv("XDG_CONFIG_HOME");
-    if (NULL != config_home) {
-      path = config_home;
-    } else {
-      // only if XDG_CONFIG_HOME is unses does the specification say to
-      // fallback on the default of $HOME/.config
-      path = getenv("HOME");
-      path += "/.config";
-    }
-    path += "/Oculus";
+  // Updated the config folder location logic to rely on the
+  // XDG specification for config locations (the XDK location was being
+  // used anyway, but was hardcoded).  This is analgous to using
+  // SHGetFolderPath in the windows implementation, rather than
+  // hardcoding %HOME%/AppData/Local
+  const char * config_home = getenv("XDG_CONFIG_HOME");
+  if (NULL != config_home) {
+    path = config_home;
+  } else {
+    // only if XDG_CONFIG_HOME is unses does the specification say to
+    // fallback on the default of $HOME/.config
+    path = getenv("HOME");
+    path += "/.config";
+  }
+  path += "/Oculus";
 
-    if (create_dir)
-    {   // Create the Oculus directory if it doesn't exist
-        DIR* dir = opendir(path);
-        if (dir == NULL)
-        {
-            mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
-        }
-        else
-        {
-            closedir(dir);
-        }
+  if (create_dir)
+  {   // Create the Oculus directory if it doesn't exist
+    DIR* dir = opendir(path);
+    if (dir == NULL)
+    {
+      mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO);
     }
+    else
+    {
+      closedir(dir);
+    }
+  }
 
 #endif
 
-    return path;
+  return path;
 }
 
 String GetProfilePath(bool create_dir)
-{
-    String path = GetBaseOVRPath(create_dir);
-    path += "/Profiles.json";
-    return path;
+    {
+  String path = GetBaseOVRPath(create_dir);
+  path += "/Profiles.json";
+  return path;
 }
 
 //-----------------------------------------------------------------------------
 // ***** ProfileManager
-
-ProfileManager::ProfileManager()
-{
-    Changed = false;
-    Loaded = false;
-}
-
-ProfileManager::~ProfileManager()
-{
-    // If the profiles have been altered then write out the profile file
-    if (Changed)
-        SaveCache();
-
-    ClearCache();
-}
-
-ProfileManager* ProfileManager::Create()
-{
-    return new ProfileManager();
-}
-
-// Clear the local profile cache
-void ProfileManager::ClearCache()
-{
-    Lock::Locker lockScope(&ProfileLock);
-    ProfileCache.Clear();
-    Loaded = false;
-}
 
 // Profile loader is an intermediary that allows me to break down the
 // serialization into smaller pieces that work directly against the
@@ -250,7 +220,8 @@ public:
       out.Gender = Profile::GenderType::Gender_Unspecified;
     }
 
-    out.PlayerHeight = node.get(KEY_PLAYER_HEIGHT, DEFAULT_HEIGHT).asFloat();
+    out.PlayerHeight =
+        node.get(KEY_PLAYER_HEIGHT, DEFAULT_HEIGHT).asFloat();
     out.IPD = node.get(KEY_IPD, DEFAULT_IPD).asFloat();
     loadHmd(out.Generic, node.get("GenericHMD", Json::Value::null));
     loadRift(out.RiftDK1, node.get("RiftDK1", Json::Value::null));
@@ -263,7 +234,8 @@ public:
     }
     loadV1Profile(out, node);
     if (node.isMember(KEY_STRABISMUS_CORRECTION)) {
-      loadQuaternion(out.StrabismusCorrection, node[KEY_STRABISMUS_CORRECTION]);
+      loadQuaternion(out.StrabismusCorrection,
+          node[KEY_STRABISMUS_CORRECTION]);
     }
   }
 
@@ -322,33 +294,41 @@ public:
     }
   }
 
-  static void writeRiftDevice(Json::Value & deviceNode, const RiftDevice & device) {
+  static void writeRiftDevice(Json::Value & deviceNode,
+      const RiftDevice & device) {
     switch (device.EyeCups)
     {
-        case EyeCup_B: deviceNode[KEY_EYECUP] = "B"; break;
-        case EyeCup_C: deviceNode[KEY_EYECUP] = "C"; break;
-        // A is the default, so no need to serialize it
-        case EyeCup_A: deviceNode.removeMember(KEY_EYECUP); break;
+    case EyeCup_B:
+      deviceNode[KEY_EYECUP] = "B";
+      break;
+    case EyeCup_C:
+      deviceNode[KEY_EYECUP] = "C";
+      break;
+      // A is the default, so no need to serialize it
+    case EyeCup_A:
+      deviceNode.removeMember(KEY_EYECUP);
+      break;
     }
     writeHmdDevice(deviceNode, device);
   }
 
   // Applying the "remove nodes if they're empty" logic here is a little
   // arduous, but it makes the resulting JSON cleaner
-  static void updateDeviceProfile(Json::Value & parent, const HmdDevice & device) {
+  static void updateDeviceProfile(Json::Value & parent,
+      const HmdDevice & device) {
     String name;
     Json::Value newChild;
     switch (device.GetDeviceType()) {
     case Profile_RiftDK1:
       name = "RiftDK1";
       newChild = parent[name];
-      writeRiftDevice(newChild, (RiftDevice&)device);
+      writeRiftDevice(newChild, (RiftDevice&) device);
       break;
 
     case Profile_RiftDKHD:
       name = "RiftDKHD";
       newChild = parent[name];
-      writeRiftDevice(newChild, (RiftDevice&)device);
+      writeRiftDevice(newChild, (RiftDevice&) device);
       break;
 
     case Profile_GenericHMD:
@@ -369,14 +349,14 @@ public:
   static void writeProfile(Json::Value & out, const Profile & profile) {
 
     switch (profile.GetGender()) {
-        case Profile::Gender_Male:
-          out[KEY_GENDER] = "Male";
-          break;
-        case Profile::Gender_Female:
-          out[KEY_GENDER] = "Female";
-          break;
-        default:
-          out.removeMember(KEY_GENDER);
+    case Profile::Gender_Male:
+      out[KEY_GENDER] = "Male";
+      break;
+    case Profile::Gender_Female:
+      out[KEY_GENDER] = "Female";
+      break;
+    default:
+      out.removeMember(KEY_GENDER);
     }
 
     // Epsilon is 10 micrometers. Smaller than a human hair
@@ -428,31 +408,113 @@ bool parseJsonFile(const String & file, Json::Value & root) {
   return true;
 
 }
-// Poplulates the local profile cache.  This occurs on the first access of the profile
-// data.  All profile operations are performed against the local cache until the
-// ProfileManager is released or goes out of scope at which time the cache is serialized
-// to disk.
-void ProfileManager::LoadCache() {
-  if (Loaded) {
-    return;
+
+
+class ProfileManagerImpl : public ProfileManager {
+  typedef std::map<String, Ptr<Profile>> Map;
+  Map           Profiles;
+  Lock          ProfileLock;
+  bool          Loaded;
+  bool          Changed;
+  String        DefaultProfile;
+  // Can't be static or global due to allocator issues
+  const String  DEFAULT_DEFAULT_PROFILE;
+
+public:
+  ProfileManagerImpl() : DEFAULT_DEFAULT_PROFILE("default") {
+    Loaded = false;
+    Changed = false;
   }
 
-  Lock::Locker lockScope(&ProfileLock);
-  ClearCache();
-
-  Json::Value root;
-  if (!parseJsonFile(GetProfilePath(false), root)) {
-    LogError("Failed to parse configuration");
-    return;
+  virtual ~ProfileManagerImpl() {
+    // If the profiles have been altered then write out the profile file
+    if (Changed)
+      SaveCache();
+    ClearCache();
   }
 
-  if (!root.isMember(KEY_PROFILE_VERSION)) {
-    LogError("Profile JSON is malformed, missing version number");
-    return;
+  // Returns a profile with all system default values
+  Profile* GetDefaultProfile() {
+    return new Profile();
+//    Lock::Locker lockScope(&ProfileLock);
+//    if (!DefaultProfile.IsEmpty() && HasProfile(DefaultProfile)) {
+//      return LoadProfile(DefaultProfile);
+//    }
+//    return new Profile();
   }
 
-  int major = root[KEY_PROFILE_VERSION].asInt();
-  switch (major) {
+  // Returns the name of the profile that is marked as the current default user.
+  const String & GetDefaultProfileName() {
+    Lock::Locker lockScope(&ProfileLock);
+    LoadCache();
+
+    if (0 == Profiles.count(DefaultProfile)) {
+      return DEFAULT_DEFAULT_PROFILE;
+    }
+
+    return DefaultProfile;
+  }
+
+  // Marks a particular user as the current default user.
+  bool SetDefaultProfileName(const String & name) {
+    if (DEFAULT_DEFAULT_PROFILE == name) {
+      return false;
+    }
+
+    Lock::Locker lockScope(&ProfileLock);
+    LoadCache();
+    if (Profiles.count(name) == 0) {
+      return false;
+    }
+
+    DefaultProfile = name;
+    Changed = true;
+    return true;
+  }
+
+  unsigned GetProfileCount() {
+    Lock::Locker lockScope(&ProfileLock);
+    return Profiles.size();
+  }
+
+  bool HasProfile(const String & name) {
+    Lock::Locker lockScope(&ProfileLock);
+    return 0 != Profiles.count(name);
+  }
+
+  // Clear the local profile cache
+  void ClearCache()
+  {
+    Lock::Locker lockScope(&ProfileLock);
+    Profiles.clear();
+    Loaded = false;
+  }
+
+  // Poplulates the local profile cache.  This occurs on the first access of the profile
+  // data.  All profile operations are performed against the local cache until the
+  // ProfileManager is released or goes out of scope at which time the cache is serialized
+  // to disk.
+  void LoadCache() {
+    if (Loaded) {
+      return;
+    }
+
+    Lock::Locker lockScope(&ProfileLock);
+    ClearCache();
+
+    Json::Value root;
+    if (!parseJsonFile(GetProfilePath(false), root)) {
+      LogError("Failed to parse configuration");
+      return;
+    }
+
+    if (!root.isMember(KEY_PROFILE_VERSION)) {
+      LogError("Profile JSON is malformed, missing version number");
+      return;
+    }
+
+    int major = root[KEY_PROFILE_VERSION].asInt();
+    switch (major) {
     case 1: {
       if (root.size() < 3) {
         LogError("Profile JSON is malformed, insufficient keys");
@@ -465,9 +527,9 @@ void ProfileManager::LoadCache() {
       // of a proper associative array class in the OVR codebase.
       Profile * profile = new Profile();
       ProfileLoader::loadV1Profile(*profile, profileNode);
-      ProfileCache.Set(name, profile);
+      Profiles[name] = *profile;
     }
-    break;
+      break;
 
     case 2: {
       if (!root.isMember(KEY_PROFILES)) {
@@ -479,9 +541,9 @@ void ProfileManager::LoadCache() {
       Json::Value::const_iterator itr;
       for (itr = profiles.begin(); itr != profiles.end(); ++itr) {
         String profileName = itr.memberName();
-        Profile * profile = new Profile(profileName);
+        Profile * profile = new Profile();
         ProfileLoader::loadProfile(*profile, root[profileName]);
-        ProfileCache.PushBack(profile);
+        Profiles[profileName] = *profile;
       }
 
       if (!root.isMember(KEY_CURRENT_PROFILE)) {
@@ -490,24 +552,24 @@ void ProfileManager::LoadCache() {
         DefaultProfile = root[KEY_CURRENT_PROFILE].asCString();
       }
     }
-    break;
+      break;
 
     default:
       LogError("Usupported profile version %d", major);
       return;   // don't parse the file on unsupported major version number
+    }
+    Loaded = true;
   }
-  Loaded = true;
-}
 
-// Serializes the profiles to disk.
-void ProfileManager::SaveCache()
-{
+  // Serializes the profiles to disk.
+  void SaveCache()
+  {
     Lock::Locker lockScope(&ProfileLock);
     // Limit scope of reader
     Json::Value root;
     String path = GetProfilePath(false);
     if (!parseJsonFile(path, root))
-    {
+        {
       root = Json::Value();
     }
 
@@ -518,7 +580,7 @@ void ProfileManager::SaveCache()
     // isn't valid JSON if it has multiple profiles, I doubt anyone is
     // extending it yet
     if (root.isMember(KEY_PROFILE_VERSION) &&
-        PROFILE_VERSION != root[KEY_PROFILE_VERSION].asInt()) {
+    PROFILE_VERSION != root[KEY_PROFILE_VERSION].asInt()) {
       root = Json::Value();
     }
 
@@ -529,146 +591,80 @@ void ProfileManager::SaveCache()
 
     // Generate a JSON object of 'profile name' to 'profile data'
     Json::Value & profiles = root[KEY_PROFILES];
-    for (unsigned int i=0; i<ProfileCache.GetSize(); i++) {
-      const Profile * profile = ProfileCache[i];
-      String name;
+    Map::const_iterator itr;
+    for (itr = Profiles.begin(); Profiles.end() != itr; ++itr) {
+      const String & name = itr->first;
+      const Profile * profile = itr->second;
       ProfileLoader::writeProfile(profiles[name], *profile);
     }
 
     {
       Json::StyledWriter writer;
-      std::string output = writer.write( root );
+      std::string output = writer.write(root);
       SysFile f;
-      if (!f.Open(path, File::Open_Write | File::Open_Create | File::Open_Truncate, File::Mode_Write)) {
+      if (!f.Open(path,
+          File::Open_Write | File::Open_Create | File::Open_Truncate,
+          File::Mode_Write)) {
         LogError("Unable to open %s for writing", path.ToCStr());
         return;
       }
-      int written = f.Write((const unsigned char*)output.c_str(),
+      int written = f.Write((const unsigned char*) output.c_str(),
           output.length());
       if (written != output.length()) {
         LogError("Short write, only %d of %d bytes written",
-            written, (int)output.length());
+            written, (int) output.length());
       }
       f.Close();
     }
-}
+  }
 
-// Returns the number of stored profiles for this device type
-unsigned int ProfileManager::GetProfileCount()
-{
-    Lock::Locker lockScope(&ProfileLock);
-    return ProfileCache.GetSize();
-}
-
-bool ProfileManager::HasProfile(const char* name)
-{
-  return NULL != ProfileCache.at(name);
-}
-
-// Returns a profile object for a particular device and user name.  The returned
-// memory should be encapsulated in a Ptr<> object or released after use.  Returns
-// NULL if the profile is not found
-Profile* ProfileManager::LoadProfile(const char* user)
-{
-   // Maybe 'null' should be interpreted as 'return the default?'
-    if (user == NULL)
-        return NULL;
-
+  // Returns a profile object for a particular device and user name.  The returned
+  // memory should be encapsulated in a Ptr<> object or released after use.
+  Profile* LoadProfile(const String & name) {
+    if (DEFAULT_DEFAULT_PROFILE == name) {
+      return GetDefaultProfile();
+    }
     Lock::Locker lockScope(&ProfileLock);
     LoadCache();
-    Profile * result = ProfileCache.at(user);
-    if (!result) {
+    if (!HasProfile(name)) {
       return NULL;
     }
-    // Never give the caller memory that we ourselves are managing.
-    return result->Clone();
-}
+    return Profiles[name]->Clone();
+  }
 
-// Returns a profile with all system default values
-Profile* ProfileManager::GetDefaultProfile()
-{
-    return new Profile("default");
-}
-
-// Returns the name of the profile that is marked as the current default user.
-const char* ProfileManager::GetDefaultProfileName()
-{
-    Lock::Locker lockScope(&ProfileLock);
-    LoadCache();
-
-    if (ProfileCache.GetSize() > 0)
-    {
-        OVR_strcpy(NameBuff, 32, DefaultProfile);
-        return NameBuff;
-    }
-    else
-    {
-        return NULL;
-    }
-}
-
-
-// Marks a particular user as the current default user.
-bool ProfileManager::SetDefaultProfileName(const char* name) {
-    Lock::Locker lockScope(&ProfileLock);
-    LoadCache();
-    // TODO: I should verify that the user is valid
-    if (ProfileCache.GetSize() > 0)
-    {
-        DefaultProfile = name;
-        Changed = true;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-
-// Saves a new or existing profile.  Returns true on success or false on an
-// invalid or failed save.
-bool ProfileManager::Save(const Profile * profile)
-{
+  // Saves a new or existing profile.  Returns true on success or false on an
+  // invalid or failed save.
+  bool Save(const String & name, const Profile * profile) {
     if (NULL == profile) {
       return false;
     }
 
-    if (OVR_strcmp(profile->Name, "default") == 0)
-        return false;  // don't save a default profile
+    if (name == "default")
+      return false;  // don't save a default profile
 
     Lock::Locker lockScope(&ProfileLock);
     LoadCache();
 
-    // Look for the pre-existence of this profile
-    int index = ProfileCache.IndexOf(profile->Name);
-    if (Map::npos == index) {
-      // TODO: I should do a proper field comparison to avoid unnecessary
-      // overwrites and file saves
+    Profiles[name] = *profile->Clone();
+    Changed = true;
+    return true;
+  }
 
-      // Replace the previous instance with the new profile
-      ProfileCache[index] = profile->Clone();
-    } else {
-      ProfileCache.PushBack(profile->Clone());
+  // Removes an existing profile.  Returns true if the profile was found and deleted
+  // and returns false otherwise.
+  bool Delete(const String & name) {
+    Lock::Locker lockScope(&ProfileLock);
+    if (0 == Profiles.erase(name)) {
+      return false;
     }
     Changed = true;
     return true;
-}
+  }
+};
 
-// Removes an existing profile.  Returns true if the profile was found and deleted
-// and returns false otherwise.
-bool ProfileManager::Delete(const Profile * profile)
+ProfileManager* ProfileManager::Create()
 {
-    if (NULL == profile) {
-      return false;
-    }
-    Lock::Locker lockScope(&ProfileLock);
-    int index = ProfileCache.IndexOf(profile->Name);
-    if (Map::npos == index) {
-      return false;
-    }
-    ProfileCache.RemoveAt(index);
-    return true;
+  return new ProfileManagerImpl();
 }
 
 //-----------------------------------------------------------------------------
@@ -676,29 +672,29 @@ bool ProfileManager::Delete(const Profile * profile)
 
 Profile::Profile()
 {
-    Gender       = Gender_Unspecified;
-    PlayerHeight = DEFAULT_HEIGHT;
-    IPD          = DEFAULT_IPD;
+  Gender = Gender_Unspecified;
+  PlayerHeight = DEFAULT_HEIGHT;
+  IPD = DEFAULT_IPD;
 }
 
 // Computes the eye height from the metric head height
 float Profile::GetEyeHeight() const
 {
-    const float EYE_TO_HEADTOP_RATIO =   0.44538f;
-    const float MALE_AVG_HEAD_HEIGHT =   0.232f;
-    const float FEMALE_AVG_HEAD_HEIGHT = 0.218f;
+  const float EYE_TO_HEADTOP_RATIO = 0.44538f;
+  const float MALE_AVG_HEAD_HEIGHT = 0.232f;
+  const float FEMALE_AVG_HEAD_HEIGHT = 0.218f;
 
-    // compute distance from top of skull to the eye
-    float head_height;
-    if (Gender == Gender_Female)
-        head_height = FEMALE_AVG_HEAD_HEIGHT;
-    else
-        head_height = MALE_AVG_HEAD_HEIGHT;
+  // compute distance from top of skull to the eye
+  float head_height;
+  if (Gender == Gender_Female)
+    head_height = FEMALE_AVG_HEAD_HEIGHT;
+  else
+    head_height = MALE_AVG_HEAD_HEIGHT;
 
-    float skull = EYE_TO_HEADTOP_RATIO * head_height;
+  float skull = EYE_TO_HEADTOP_RATIO * head_height;
 
-    float eye_height  = PlayerHeight - skull;
-    return eye_height;
+  float eye_height = PlayerHeight - skull;
+  return eye_height;
 }
 
 }  // OVR

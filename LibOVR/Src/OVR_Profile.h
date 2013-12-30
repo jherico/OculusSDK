@@ -146,19 +146,12 @@ protected:
     friend class Profile;
 };
 
-template <class KeyType>
-class KeyedObject {
-public:
-  virtual ~KeyedObject() {
-  }
-  virtual const KeyType & GetKey() const = 0;
-};
 //-------------------------------------------------------------------
 // ***** Profile
 
 // The base profile for all users.  This object is not created directly.
 //
-class Profile : public RefCountBase<Profile>, KeyedObject<String>
+class Profile : public RefCountBase<Profile>
 {
 public:
     enum GenderType
@@ -180,7 +173,6 @@ protected:
     RiftDKHDDevice      RiftDKHD;
 
 public:
-    const String &      GetKey() const                   { return Name; };
     // These are properties which are intrinsic to the user and affect scene setup
     GenderType           GetGender() const               { return Gender; };
     float                GetPlayerHeight() const         { return PlayerHeight; };
@@ -204,59 +196,8 @@ public:
 
 protected:
     Profile();
-    friend class ProfileManager;
+    friend class ProfileManagerImpl;
     friend class ProfileLoader;
-};
-
-
-/*
- * A really hacky low-performing associative array, because the
- * ProfileManager is attempting to mimic the functionality of one
- *
- * It should have the same performance characteristics as the
- * previous ProfileManager embedded implementation.  I'm not write a
- * full treemap or hashmap implementaiton because, seriously, there are
- * plenty out there in the standard libraries, and if OVR doesn't want to
- * use them then I'm not going to get roped into building one just to
- * support the policy of never using STL.
- *
- * Using at(KeyType) instead of operator[KeyType] since the latter would
- * interfere with ability to access the index based base class operator[]
- */
-template <class ValueType, class KeyType>
-class AssociativePtrArray : public Array<Ptr<ValueType> > {
-public:
-  enum {
-    npos = -1
-  };
-
-  int IndexOf(const KeyType & key) const {
-    for (int i = 0; i< this->GetSize(); ++i) {
-      const Ptr<ValueType> & data = this->Data.Data[i];
-      if (data && data->GetKey() == key) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  ValueType * at(const KeyType & key) {
-    int index = IndexOf(key);
-    if (npos == index) {
-      return Ptr<ValueType>();
-    }
-    Ptr<ValueType> & ptr = this->Data.Data[index];
-    return ptr;
-  }
-
-  const ValueType * at(const KeyType & key) const {
-    int index = IndexOf(key);
-    if (npos == index) {
-      return Ptr<ValueType>();
-    }
-    const Ptr<ValueType> & ptr = this->Data.Data[index];
-    return ptr;
-  }
 };
 
 // -----------------------------------------------------------------------------
@@ -280,68 +221,23 @@ public:
 
 class ProfileManager : public RefCountBase<ProfileManager>
 {
-protected:
-    // Synchronize ProfileManager access since it may be accessed from multiple threads,
-    // as it's shared through DeviceManager.
-    Lock                    ProfileLock;
-    typedef Hash<String, Profile> Map;
-    Map                     ProfileCache;
-    String                  DefaultProfile;
-    bool                    Changed;
-    bool                    Loaded;
-    // A container for the name data returned by GetDefaultProfileName()
-    // which can't be a String, because once acquired by the caller,
-    // it can't be allowed to be deallocated without risk.  Ultimately
-    // this is caused by the inability to be able to safely return the
-    // String type from methods, which itself boils down to the problem
-    // with providing an explicit operator const char *() on a String
-    // class.  Doing so makes it too easy for a caller to get a char *
-    // to a temporary or have the pointer become deallocated memory
-    // at some later point unexpectedly.
-    char                    NameBuff[32];
-
 public:
     static ProfileManager* Create();
 
-    // Static interface functions
-    unsigned            GetProfileCount();
-    bool                HasProfile(const char* name);
-    Profile*            LoadProfile(const char* name);
-    Profile*            GetDefaultProfile();
-    const char*         GetDefaultProfileName();
-    bool                SetDefaultProfileName(const char* name);
-
-    // The previous implementation seemed to imply that if you loaded
-    // some profiles for a given 'device type' and then saved changes,
-    // and then loaded a different device type, your changes would be lost
-    // because the cache would be cleared without ever being persisted to
-    // disk.  The redesign fixes this by eliminating the 'per-device-type'
-    // profile mechanism.
-    //
-    // Profiles represent a users settings and they
-    // may have different settings for each device, so the profile should
-    // encapsulate all of them.
-    //
-    // Ideally, you should be able to query the top level profile for
-    // properties related to the hardware based on whatever you're using,
-    // rather than having to query specifically for generic, DK1 or DKHD
-    // but the class hierarchy makes that problematic.
-    bool                Save(const Profile * profile);
-    bool                Delete(const Profile * profile);
-
-    // Index based fetching is completely removed.  I have no idea what
-    // was intended to be useful for.  Perhaps it was intended as a
-    // potential optimization since querying by name is O(N) instead of
-    // O(1), but it's unfathomable that the performance difference would
-    // ever be noticeable, unless the caller is doing something pathological
-    // like calling using profile manager every frame, and unlikely even
-    // then
+    virtual unsigned    GetProfileCount() = 0;
+    virtual bool        HasProfile(const String & name) = 0;
+    virtual Profile*    LoadProfile(const String & name) = 0;
+    virtual Profile*    GetDefaultProfile() = 0;
+    virtual const String & GetDefaultProfileName() = 0;
+    virtual bool        SetDefaultProfileName(const String & name) =0;
+    virtual bool        Save(const String & name, const Profile * profile) = 0;
+    virtual bool        Delete(const String & name) = 0;
 protected:
-    ProfileManager();
-    ~ProfileManager();
-    void                LoadCache();
-    void                SaveCache();
-    void                ClearCache();
+    ProfileManager() {
+    }
+
+    virtual ~ProfileManager() {
+    }
 };
 
 
