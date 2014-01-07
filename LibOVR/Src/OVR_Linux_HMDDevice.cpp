@@ -25,23 +25,23 @@ namespace OVR { namespace Linux {
 
 //-------------------------------------------------------------------------------------
 
-HMDDeviceCreateDesc::HMDDeviceCreateDesc(DeviceFactory* factory, const String& displayDeviceName, long dispId)
+HMDDeviceCreateDesc::HMDDeviceCreateDesc(
+    DeviceFactory* factory,
+    const String& displayDeviceName,
+    const String& deviceId)
         : DeviceCreateDesc(factory, Device_HMD),
           DisplayDeviceName(displayDeviceName),
           DesktopX(0), DesktopY(0), Contents(0),
           HResolution(0), VResolution(0), HScreenSize(0), VScreenSize(0),
-          DisplayId(dispId)
-{
-    DeviceId = DisplayDeviceName;
-}
+          DeviceId(deviceId)
+{ }
 
 HMDDeviceCreateDesc::HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other)
         : DeviceCreateDesc(other.pFactory, Device_HMD),
           DeviceId(other.DeviceId), DisplayDeviceName(other.DisplayDeviceName),
           DesktopX(other.DesktopX), DesktopY(other.DesktopY), Contents(other.Contents),
           HResolution(other.HResolution), VResolution(other.VResolution),
-          HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize),
-          DisplayId(other.DisplayId)
+          HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize)
 {
 }
 
@@ -61,8 +61,7 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
 
     const HMDDeviceCreateDesc& s2 = (const HMDDeviceCreateDesc&) other;
 
-    if ((DeviceId == s2.DeviceId) &&
-        (DisplayId == s2.DisplayId))
+    if (DeviceId == s2.DeviceId)
     {
         // Non-null DeviceId may match while size is different if screen size was overwritten
         // by SensorDisplayInfo in prior iteration.
@@ -132,14 +131,12 @@ bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other,
             Contents |= Contents_Distortion;
         }
         DeviceId          = s2.DeviceId;
-        DisplayId         = s2.DisplayId;
         DisplayDeviceName = s2.DisplayDeviceName;
         if (newDeviceFlag) *newDeviceFlag = true;
     }
     else if (DeviceId.IsEmpty())
     {
         DeviceId          = s2.DeviceId;
-        DisplayId         = s2.DisplayId;
         DisplayDeviceName = s2.DisplayDeviceName;
 
 		// ScreenSize and Resolution are NOT assigned here, since they may have
@@ -194,7 +191,9 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
                 h = crtc_info->height;
                 XRRFreeCrtcInfo(crtc_info);
             }
-            HMDDeviceCreateDesc hmdCreateDesc(this, info->name, output);
+            char buffer[512];
+            sprintf(buffer, "%s%04d", mi->manufacturer_code, mi->product_code);
+            HMDDeviceCreateDesc hmdCreateDesc(this, info->name, buffer);
             hmdCreateDesc.SetScreenParameters(x, y, w, h, 0.14976f, 0.0936f);
             // Notify caller about detected device. This will call EnumerateAddDevice
             // if the this is the first time device was detected.
@@ -318,7 +317,6 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
 
         OVR_strcpy(hmdInfo->DisplayDeviceName, sizeof(hmdInfo->DisplayDeviceName),
                    DisplayDeviceName.ToCStr());
-        hmdInfo->DisplayId = DisplayId;
     }
 
     return true;

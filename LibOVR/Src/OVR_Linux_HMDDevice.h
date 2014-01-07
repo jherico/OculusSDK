@@ -59,11 +59,13 @@ protected:
     unsigned    Contents;
     unsigned    HResolution, VResolution;
     float       HScreenSize, VScreenSize;
-    long        DisplayId;
     float       DistortionK[4];
 
 public:
-    HMDDeviceCreateDesc(DeviceFactory* factory, const String& displayDeviceName, long dispId);
+    HMDDeviceCreateDesc(
+        DeviceFactory* factory,
+        const String& displayDeviceName,
+        const String& displayDeviceId);
     HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other);
 
     virtual DeviceCreateDesc* Clone() const
@@ -84,7 +86,7 @@ public:
     virtual bool GetDeviceInfo(DeviceInfo* info) const;
 
     // Requests the currently used default profile. This profile affects the
-    // settings reported by HMDInfo. 
+    // settings reported by HMDInfo.
     Profile* GetProfileAddRef() const;
 
     ProfileType GetProfileType() const
@@ -120,26 +122,26 @@ public:
 
 // HMDDevice represents an Oculus HMD device unit. An instance of this class
 // is typically created from the DeviceManager.
-//  After HMD device is created, we its sensor data can be obtained by 
+//  After HMD device is created, we its sensor data can be obtained by
 //  first creating a Sensor object and then wrappig it in SensorFusion.
 
 class HMDDevice : public DeviceImpl<OVR::HMDDevice>
 {
 public:
     HMDDevice(HMDDeviceCreateDesc* createDesc);
-    ~HMDDevice();    
+    ~HMDDevice();
 
     virtual bool Initialize(DeviceBase* parent);
     virtual void Shutdown();
 
     // Requests the currently used default profile. This profile affects the
-    // settings reported by HMDInfo. 
+    // settings reported by HMDInfo.
     virtual Profile*    GetProfile() const;
     virtual const char* GetProfileName() const;
     virtual bool        SetProfileName(const char* name);
 
     // Query associated sensor.
-    virtual OVR::SensorDevice* GetSensor();  
+    virtual OVR::SensorDevice* GetSensor();
 
 protected:
     HMDDeviceCreateDesc* getDesc() const { return (HMDDeviceCreateDesc*)pCreateDesc.GetPtr(); }
