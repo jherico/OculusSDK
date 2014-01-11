@@ -6,11 +6,22 @@ Content     :   Simple general purpose algorithms: Sort, Binary Search, etc.
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ************************************************************************************/
 
@@ -640,13 +651,13 @@ inline UByte UpperBit(UPInt val)
 
     if (val & 0xFFFF0000)
     {
-        return (val & 0xFF000000) ? 
+        return static_cast<UByte>((val & 0xFF000000) ? 
             UpperBitTable[(val >> 24)       ] + 24: 
-            UpperBitTable[(val >> 16) & 0xFF] + 16;
+            UpperBitTable[(val >> 16) & 0xFF] + 16);
     }
-    return (val & 0xFF00) ?
+    return static_cast<UByte>((val & 0xFF00) ?
         UpperBitTable[(val >> 8) & 0xFF] + 8:
-        UpperBitTable[(val     ) & 0xFF];
+        UpperBitTable[(val     ) & 0xFF]);
 
 #else
 
@@ -685,13 +696,13 @@ inline UByte LowerBit(UPInt val)
 
     if (val & 0xFFFF)
     {
-        return (val & 0xFF) ?
+        return static_cast<UByte>( (val & 0xFF) ?
             LowerBitTable[ val & 0xFF]:
-            LowerBitTable[(val >> 8) & 0xFF] + 8;
+            LowerBitTable[(val >> 8) & 0xFF] + 8 );
     }
-    return (val & 0xFF0000) ?
+    return static_cast<UByte>( (val & 0xFF0000) ?
             LowerBitTable[(val >> 16) & 0xFF] + 16:
-            LowerBitTable[(val >> 24) & 0xFF] + 24;
+            LowerBitTable[(val >> 24) & 0xFF] + 24 );
 
 #else
 
@@ -802,7 +813,7 @@ namespace ByteUtil {
     // Swap the byte order of primitive types
     inline UByte    SwapOrder(UByte v)      { return v; }
     inline SByte    SwapOrder(SByte v)      { return v; }
-    inline UInt16   SwapOrder(UInt16 v)     { return UInt16(v>>8)|UInt16(v<<8); }
+    inline UInt16   SwapOrder(UInt16 v)     { return static_cast<UInt16>( UInt16(v>>8)|UInt16(v<<8) ); }
     inline SInt16   SwapOrder(SInt16 v)     { return SInt16((UInt16(v)>>8)|(v<<8)); }
     inline UInt32   SwapOrder(UInt32 v)     { return (v>>24)|((v&0x00FF0000)>>8)|((v&0x0000FF00)<<8)|(v<<24); }
     inline SInt32   SwapOrder(SInt32 p)     { return (SInt32)SwapOrder(UInt32(p)); }

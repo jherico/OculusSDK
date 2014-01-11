@@ -6,11 +6,22 @@ Content     :   Standard library defines and simple types
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ************************************************************************************/
 
@@ -148,9 +159,11 @@ otherwise accompanies this software in either electronic or hard copy form.
 // Disable MSVC warnings
 #if defined(OVR_CC_MSVC)
 #  pragma warning(disable : 4127)    // Inconsistent dll linkage
+#  pragma warning(disable : 4514)    // Unreferenced inline function has been removed
 #  pragma warning(disable : 4530)    // Exception handling
+#  pragma warning(disable : 4711)    // function 'x()' selected for automatic inline expansion
+#  pragma warning(disable : 4820)    // 'n' bytes padding added after data member 'item'
 #  if (OVR_CC_MSVC<1300)
-#    pragma warning(disable : 4514)  // Unreferenced inline function has been removed
 #    pragma warning(disable : 4710)  // Function not inlined
 #    pragma warning(disable : 4714)  // _force_inline not inlined
 #    pragma warning(disable : 4786)  // Debug variable name longer than 255 chars

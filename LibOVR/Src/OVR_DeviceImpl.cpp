@@ -5,11 +5,22 @@ Content     :   Partial back-end independent implementation of Device interfaces
 Created     :   October 10, 2012
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 *************************************************************************************/
 
@@ -561,7 +572,7 @@ Ptr<DeviceCreateDesc> DeviceManagerImpl::FindDevice(
     return NULL;
 }
 
-Ptr<DeviceCreateDesc> DeviceManagerImpl::FindHIDDevice(const HIDDeviceDesc& hidDevDesc)
+Ptr<DeviceCreateDesc> DeviceManagerImpl::FindHIDDevice(const HIDDeviceDesc& hidDevDesc, bool created)
 {
     Lock::Locker deviceLock(GetLock());
     DeviceCreateDesc* devDesc;
@@ -569,8 +580,16 @@ Ptr<DeviceCreateDesc> DeviceManagerImpl::FindHIDDevice(const HIDDeviceDesc& hidD
     for (devDesc = Devices.GetFirst();
         !Devices.IsNull(devDesc);  devDesc = devDesc->pNext)
     {
-        if (devDesc->MatchHIDDevice(hidDevDesc))
-            return devDesc;
+        if (created)
+        {   // Search for matching device that is created
+            if (devDesc->MatchHIDDevice(hidDevDesc) && devDesc->pDevice)
+                return devDesc;
+        }
+        else
+        {   // Search for any matching device
+            if (devDesc->MatchHIDDevice(hidDevDesc))
+                return devDesc;
+        }
     }
     return NULL;
 }
