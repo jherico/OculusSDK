@@ -6,11 +6,22 @@ Content     :   Provides static functions for precise timing
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ************************************************************************************/
 
@@ -50,6 +61,9 @@ public:
     // measured in microseconds (mks, or 1/1000000 of a second). The actual precision
     // is system-specific and may be much lower, such as 1 ms.
     static UInt64  OVR_STDCALL GetTicks();
+
+    // Returns global high-resolution application timer in seconds.
+    static double  OVR_STDCALL GetSeconds();
 
     
     // ***** Profiling APIs.
@@ -95,6 +109,11 @@ private:
 };
 
 
-} // Namespace OVR
+// Global high-resolution time in seconds. This is intended to replace Timer class in OVR.
+double ovr_GetTimeInSeconds();
+
+
+
+} // OVR::Timer
 
 #endif

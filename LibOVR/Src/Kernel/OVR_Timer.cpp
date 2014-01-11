@@ -5,19 +5,33 @@ Content     :   Provides static functions for precise timing
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ************************************************************************************/
 
 #include "OVR_Timer.h"
+#include "OVR_Log.h"
 
 #if defined (OVR_OS_WIN32)
 #include <windows.h>
-#pragma comment(lib, "winmm.lib")
+#elif defined(OVR_OS_ANDROID)
+#include <time.h>
+#include <android/log.h>
 
 #else
 #include <sys/time.h>
@@ -26,8 +40,15 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 namespace OVR {
 
-//-----------------------------------------------------------------------------------
-// ***** Timer Class
+
+//------------------------------------------------------------------------
+// *** Timer - Platform Independent functions
+
+double ovr_GetTimeInSeconds()
+{
+    return Timer::GetSeconds();
+}
+
 
 UInt64 Timer::GetProfileTicks()
 {
@@ -39,11 +60,53 @@ double Timer::GetProfileSeconds()
     return TicksToSeconds(GetProfileTicks()-StartTime);
 }
 
+#ifndef OVR_OS_ANDROID
+
+double Timer::GetSeconds()
+{
+    return (double)Timer::GetRawTicks() / (double) GetRawFrequency();
+}
+#endif
+
+
+//------------------------------------------------------------------------
+// *** Android Specific Timer
+
+
+#if defined(OVR_OS_ANDROID)
+
+// Returns global high-resolution application timer in seconds.
+double Timer::GetSeconds()
+{
+    return double(Timer::GetRawTicks()) * 0.000000001;
+}
+
+UInt64 Timer::GetRawTicks()
+{
+    // Choreographer vsync timestamp is based on.
+    struct timespec tp;
+    const int       status = clock_gettime(CLOCK_MONOTONIC, &tp);
+
+    if (status != 0)
+    {
+        OVR_DEBUG_LOG(("clock_gettime status=%i", status ));
+    }
+    const UInt64 result = (UInt64)tp.tv_sec * (UInt64)(1000 * 1000 * 1000) + UInt64(tp.tv_nsec);
+    return result;
+}
+
+UInt64 Timer::GetRawFrequency()
+{
+    return MksPerSecond * 1000;
+}
+
+#endif
+
 
 //------------------------------------------------------------------------
 // *** Win32 Specific Timer
 
-#if (defined (OVR_OS_WIN32))
+#if defined (OVR_OS_WIN32)
 
 CRITICAL_SECTION WinAPI_GetTimeCS;
 volatile UInt32  WinAPI_OldTime = 0;
@@ -129,13 +192,16 @@ void Timer::shutdownTimerSystem()
 {
 }
 
+
+#if !defined(OVR_OS_ANDROID)
+
 UInt64  Timer::GetRawTicks()
 {
     // TODO: prefer rdtsc when available?
+	UInt64 result;
 
     // Return microseconds.
     struct timeval tv;
-    UInt64 result;
 
     gettimeofday(&tv, 0);
 
@@ -149,6 +215,8 @@ UInt64 Timer::GetRawFrequency()
 {
     return MksPerSecond;
 }
+
+#endif // !OVR_OS_ANDROID
 
 #endif  // !OVR_OS_WIN32
 

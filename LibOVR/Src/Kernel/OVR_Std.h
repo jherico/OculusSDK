@@ -6,11 +6,22 @@ Content     :   Standard C function interface
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ************************************************************************************/
 
@@ -218,7 +229,7 @@ inline long OVR_CDECL OVR_strtol(const char* string, char** tailptr, int radix)
     return strtol(string, tailptr, radix);
 }
 
-inline long OVR_CDECL OVR_strtoul(const char* string, char** tailptr, int radix)
+inline unsigned long OVR_CDECL OVR_strtoul(const char* string, char** tailptr, int radix)
 {
     return strtoul(string, tailptr, radix);
 }
@@ -270,7 +281,7 @@ inline UPInt OVR_CDECL OVR_sprintf(char *dest, UPInt destsize, const char* forma
 {
     va_list argList;
     va_start(argList,format);
-    UPInt ret;
+    SInt32 ret;
 #if defined(OVR_CC_MSVC)
     #if defined(OVR_MSVC_SAFESTRING)
         ret = _vsnprintf_s(dest, destsize, _TRUNCATE, format, argList);
@@ -287,7 +298,7 @@ inline UPInt OVR_CDECL OVR_sprintf(char *dest, UPInt destsize, const char* forma
     OVR_ASSERT(ret < destsize);
 #endif
     va_end(argList);
-    return ret;
+    return (UPInt)ret;
 }
 
 inline UPInt OVR_CDECL OVR_vsprintf(char *dest, UPInt destsize, const char * format, va_list argList)

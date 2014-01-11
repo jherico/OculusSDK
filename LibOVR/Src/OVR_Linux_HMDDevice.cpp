@@ -7,9 +7,20 @@ Authors     :   Brant Lewis
 
 Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 *************************************************************************************/
 
@@ -31,18 +42,25 @@ HMDDeviceCreateDesc::HMDDeviceCreateDesc(
     const String& deviceId)
         : DeviceCreateDesc(factory, Device_HMD),
           DisplayDeviceName(displayDeviceName),
-          DesktopX(0), DesktopY(0), Contents(0),
+          DesktopX(0), DesktopY(0), Contents(0), EyeToScreenDistance(0),
           HResolution(0), VResolution(0), HScreenSize(0), VScreenSize(0),
-          DeviceId(deviceId)
-{ }
+          DisplayId(dispId)
+{
+    DeviceId = DisplayDeviceName;
+    for (int i=0; i<4; i++)
+        DistortionK[i] = 0;
+}
 
 HMDDeviceCreateDesc::HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other)
         : DeviceCreateDesc(other.pFactory, Device_HMD),
           DeviceId(other.DeviceId), DisplayDeviceName(other.DisplayDeviceName),
           DesktopX(other.DesktopX), DesktopY(other.DesktopY), Contents(other.Contents),
           HResolution(other.HResolution), VResolution(other.VResolution),
-          HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize)
+          HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize),
+          DisplayId(other.DisplayId), EyeToScreenDistance(other.EyeToScreenDistance)
 {
+    for (int i=0; i<4; i++)
+        DistortionK[i] = other.DistortionK[i];
 }
 
 HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCreateDesc& other,
@@ -286,6 +304,7 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
         if (Contents & Contents_Distortion)
         {
             memcpy(hmdInfo->DistortionK, DistortionK, sizeof(float)*4);
+            hmdInfo->EyeToScreenDistance = EyeToScreenDistance;
         }
         else
         {
@@ -308,12 +327,12 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
 				else
 					hmdInfo->EyeToScreenDistance = 0.0387f;
             }
-
-			hmdInfo->ChromaAbCorrection[0] = 0.996f;
-			hmdInfo->ChromaAbCorrection[1] = -0.004f;
-			hmdInfo->ChromaAbCorrection[2] = 1.014f;
-			hmdInfo->ChromaAbCorrection[3] = 0.0f;
         }
+
+        hmdInfo->ChromaAbCorrection[0] = 0.996f;
+        hmdInfo->ChromaAbCorrection[1] = -0.004f;
+        hmdInfo->ChromaAbCorrection[2] = 1.014f;
+        hmdInfo->ChromaAbCorrection[3] = 0.0f;
 
         OVR_strcpy(hmdInfo->DisplayDeviceName, sizeof(hmdInfo->DisplayDeviceName),
                    DisplayDeviceName.ToCStr());

@@ -5,11 +5,22 @@ Content     :   Methods that determine head orientation from sensor data over ti
 Created     :   October 9, 2012
 Authors     :   Michael Antonov, Steve LaValle, Max Katsev
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Use of this software is subject to the terms of the Oculus license
-agreement provided at the time of installation or download, or which
+Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
+you may not use the Oculus VR SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 *************************************************************************************/
 
@@ -256,7 +267,9 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     }
 
     // Update the orientation quaternion based on the corrected angular velocity vector
-    Q = Q * Quatf(gyroCorrected, gyroCorrected.Length() * DeltaT);
+    float angle = gyroCorrected.Length() * DeltaT;
+    if (angle > 0.0f)
+        Q = Q * Quatf(gyroCorrected, angle);
 
     // The quaternion magnitude may slowly drift due to numerical error,
     // so it is periodically normalized.
