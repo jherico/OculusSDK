@@ -7,16 +7,16 @@ Authors     :   Brant Lewis
 
 Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR SDK License Version 2.0 (the "License");
+you may not use the Oculus VR SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -43,8 +43,7 @@ HMDDeviceCreateDesc::HMDDeviceCreateDesc(
         : DeviceCreateDesc(factory, Device_HMD),
           DisplayDeviceName(displayDeviceName),
           DesktopX(0), DesktopY(0), Contents(0), EyeToScreenDistance(0),
-          HResolution(0), VResolution(0), HScreenSize(0), VScreenSize(0),
-          DisplayId(dispId)
+          HResolution(0), VResolution(0), HScreenSize(0), VScreenSize(0)
 {
     DeviceId = DisplayDeviceName;
     for (int i=0; i<4; i++)
@@ -57,7 +56,7 @@ HMDDeviceCreateDesc::HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other)
           DesktopX(other.DesktopX), DesktopY(other.DesktopY), Contents(other.Contents),
           HResolution(other.HResolution), VResolution(other.VResolution),
           HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize),
-          DisplayId(other.DisplayId), EyeToScreenDistance(other.EyeToScreenDistance)
+          EyeToScreenDistance(other.EyeToScreenDistance)
 {
     for (int i=0; i<4; i++)
         DistortionK[i] = other.DistortionK[i];
