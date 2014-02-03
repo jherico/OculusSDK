@@ -3,12 +3,19 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.oculusvr</groupId>
   <artifactId>jocular</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>1.0.0-SNAPSHOT</version>
+
+  <repositories>
+    <repository>
+      <id>ec2</id>
+      <url>http://ec2.saintandreas.org/maven</url>
+    </repository>
+  </repositories>
+  
   <build>
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>2.3.2</version>
         <configuration>
           <source>1.7</source>
           <target>1.7</target>
@@ -23,7 +30,7 @@
     <dependency>
       <groupId>org.saintandreas</groupId>
       <artifactId>math</artifactId>
-      <version>0.0.1-SNAPSHOT</version>
+      <version>[1, )</version>
     </dependency>
       <dependency>
       <groupId>com.google.guava</groupId>
@@ -33,7 +40,7 @@
     <dependency>
       <groupId>com.codeminders</groupId>
       <artifactId>hidapi</artifactId>
-      <version>1.1</version>
+      <version>[1.1, )</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
