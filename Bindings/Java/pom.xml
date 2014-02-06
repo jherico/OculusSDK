@@ -5,14 +5,44 @@
   <artifactId>jocular</artifactId>
   <version>1.0.0-SNAPSHOT</version>
 
+  <scm>
+    <connection>scm:git:git://git@github.com/jherico/OculusSDK.git</connection>
+    <developerConnection>scm:git:git://git@github.com/jherico/OculusSDK.git</developerConnection>
+    <url>https://github.com/jherico/OculusSDK</url>
+  </scm>
+
   <repositories>
     <repository>
       <id>ec2</id>
+      <releases>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+        <checksumPolicy>warn</checksumPolicy>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>never</updatePolicy>
+        <checksumPolicy>fail</checksumPolicy>
+      </snapshots>
       <url>http://ec2.saintandreas.org/maven</url>
+      <layout>default</layout>
     </repository>
   </repositories>
-  
+
+  <distributionManagement>
+    <repository>
+      <id>ec2</id>
+      <url>scp://ec2.saintandreas.org/var/maven</url>
+    </repository>
+  </distributionManagement>
+
   <build>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-ssh</artifactId>
+      </extension>
+    </extensions>
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -32,7 +62,7 @@
       <artifactId>math</artifactId>
       <version>[1, )</version>
     </dependency>
-      <dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>[14, )</version>
@@ -60,5 +90,5 @@
       <version>[1.9, )</version>
       <scope>test</scope>
     </dependency>
-    </dependencies>
+  </dependencies>
 </project>
