@@ -292,7 +292,7 @@ bool HIDDevice::HIDInitialize(const String& path)
 
     if (!openDevice())
     {
-        LogText("OVR::Win32::HIDDevice - Failed to open HIDDevice: ", path);
+        LogText("OVR::Win32::HIDDevice - Failed to open HIDDevice: ", path.ToCStr());
         return false;
     }
 
