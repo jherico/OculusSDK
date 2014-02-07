@@ -34,29 +34,33 @@ add_subdirectory(LibOVR)
 # Sample code support
 #
 
-# Make sure to set up the OVR include paths
-include_directories(${LibOVR_SOURCE_DIR}/Include)
-include_directories(${LibOVR_SOURCE_DIR}/Src)
-include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
-include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
+option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
 
-# Cross platform window creation
-add_subdirectory(3rdParty/glfw)
-include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
+if(OCULUS_BUILD_SAMPLES)
+    # Make sure to set up the OVR include paths
+    include_directories(${LibOVR_SOURCE_DIR}/Include)
+    include_directories(${LibOVR_SOURCE_DIR}/Src)
+    include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
+    include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
 
-# Cross platform access to shader functionality
-add_definitions( -DGLEW_STATIC )
-add_subdirectory(3rdParty/glew)
-include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
+    # Cross platform window creation
+    add_subdirectory(3rdParty/glfw)
+    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
 
-# Used by the sample code to read the tuscany resources
-add_subdirectory(3rdParty/TinyXml)
-include_directories(${CMAKE_SOURCE_DIR}/3rdParty/TinyXml)
+    # Cross platform access to shader functionality
+    add_definitions( -DGLEW_STATIC )
+    add_subdirectory(3rdParty/glew)
+    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
 
-add_definitions( -DGL_GLEXT_PROTOTYPES )
-add_subdirectory (Samples/CommonSrc )
-add_subdirectory (Samples/OculusWorldDemo )
-add_subdirectory (Samples/OculusRoomTiny )
-add_subdirectory (Samples/SensorBox )
-add_subdirectory (Samples/TestSensor )
+    # Used by the sample code to read the tuscany resources
+    add_subdirectory(3rdParty/TinyXml)
+    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/TinyXml)
+
+    add_definitions( -DGL_GLEXT_PROTOTYPES )
+    add_subdirectory (Samples/CommonSrc )
+    add_subdirectory (Samples/OculusWorldDemo )
+    add_subdirectory (Samples/OculusRoomTiny )
+    add_subdirectory (Samples/SensorBox )
+    add_subdirectory (Samples/TestSensor )
+endif()
 
