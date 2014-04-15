@@ -26,6 +26,9 @@ if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
+include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
+include_directories(${CMAKE_SOURCE_DIR}/LibOVR/Src/CAPI/D3D1X)
+
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
 
@@ -44,13 +47,14 @@ if(OCULUS_BUILD_SAMPLES)
     include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
 
     # Cross platform window creation
-    add_subdirectory(3rdParty/glfw)
-    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
+ #   add_subdirectory(3rdParty/glfw)
+ #   include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
 
     # Cross platform access to shader functionality
-    add_definitions( -DGLEW_STATIC )
-    add_subdirectory(3rdParty/glew)
-    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
+ #   add_definitions( -DGLEW_STATIC )
+ #   add_subdirectory(3rdParty/glew)
+#    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
+    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
 
     # Used by the sample code to read the tuscany resources
     add_subdirectory(3rdParty/TinyXml)
@@ -59,8 +63,8 @@ if(OCULUS_BUILD_SAMPLES)
     add_definitions( -DGL_GLEXT_PROTOTYPES )
     add_subdirectory (Samples/CommonSrc )
     add_subdirectory (Samples/OculusWorldDemo )
-    add_subdirectory (Samples/OculusRoomTiny )
-    add_subdirectory (Samples/SensorBox )
-    add_subdirectory (Samples/TestSensor )
+    #add_subdirectory (Samples/OculusRoomTiny )
+    #add_subdirectory (Samples/SensorBox )
+    #add_subdirectory (Samples/TestSensor )
 endif()
 

@@ -37,10 +37,13 @@ limitations under the License.
 
 // Modify this list or pass a smaller set to select a specific render device,
 // while avoiding linking extra classes.
+  //#define OVR_DEFAULT_RENDER_DEVICE_SET															\
+		//SetupGraphicsDeviceSet("D3D11", &OVR::Render::D3D11::RenderDevice::CreateDevice,		\
+  //      SetupGraphicsDeviceSet("D3D10", &OVR::Render::D3D10::RenderDevice::CreateDevice,		\
+  //      SetupGraphicsDeviceSet("GL", &OVR::Render::GL::Win32::RenderDevice::CreateDevice)))
+
   #define OVR_DEFAULT_RENDER_DEVICE_SET															\
-		SetupGraphicsDeviceSet("D3D11", &OVR::Render::D3D11::RenderDevice::CreateDevice,		\
-        SetupGraphicsDeviceSet("D3D10", &OVR::Render::D3D10::RenderDevice::CreateDevice,		\
-        SetupGraphicsDeviceSet("GL", &OVR::Render::GL::Win32::RenderDevice::CreateDevice)))
+    SetupGraphicsDeviceSet("GL", &OVR::Render::GL::Win32::RenderDevice::CreateDevice)
 
 #elif defined(OVR_OS_MAC) && !defined(OVR_MAC_X11)
   #include "OSX_Platform.h"

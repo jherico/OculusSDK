@@ -1,8 +1,8 @@
 project(OculusRoomTiny)
 
 set(SOURCE_FILES
-    MessageBox.cpp
-    MessageBox.h
+#    MessageBox.cpp
+#    MessageBox.h
     OculusRoomTiny.cpp
     OculusRoomTiny.h
     OculusRoomModel.cpp
