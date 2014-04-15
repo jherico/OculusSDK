@@ -5,16 +5,16 @@ Content     :   Win32-specific DeviceManager header.
 Created     :   September 21, 2012
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -90,10 +90,10 @@ public:
         virtual void    OnOverlappedEvent(HANDLE hevent) { OVR_UNUSED1(hevent); }
 
         // Called when timing ticks are updated.
-        // Returns the largest number of microseconds this function can
+        // Returns the largest number of seconds this function can
         // wait till next call.
-        virtual UInt64  OnTicks(UInt64 ticksMks)
-        { OVR_UNUSED1(ticksMks);  return Timer::MksPerSecond * 1000; }
+        virtual double  OnTicks(double tickSeconds)
+        { OVR_UNUSED1(tickSeconds);  return 1000.0; }
 
 		enum DeviceMessageType
 		{
@@ -135,14 +135,14 @@ private:
     // Event notifications for devices whose OVERLAPPED I/O we service.
     // This list is modified through AddDeviceOverlappedEvent.
     // WaitHandles[0] always == hCommandEvent, with null device.
-    Array<HANDLE>           WaitHandles;
-    Array<Notifier*>        WaitNotifiers;
+    ArrayPOD<HANDLE>        WaitHandles;
+    ArrayPOD<Notifier*>     WaitNotifiers;
 
     // Ticks notifiers - used for time-dependent events such as keep-alive.
-    Array<Notifier*>        TicksNotifiers;
+    ArrayPOD<Notifier*>     TicksNotifiers;
 
 	// Message notifiers.
-    Array<Notifier*>        MessageNotifiers;
+    ArrayPOD<Notifier*>     MessageNotifiers;
 
 	// Object that manages notifications originating from Windows messages.
 	Ptr<DeviceStatus>		pStatusObject;

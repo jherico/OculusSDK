@@ -23,9 +23,122 @@ limitations under the License.
 
 #include "../Render/Render_GL_Device.h"
 #include "Kernel/OVR_Log.h"
+#include "OVR_CAPI_GL.h"
 
 namespace OVR { namespace Render { namespace GL {
 
+// GL Hooks for PC.
+#if defined(OVR_OS_WIN32)
+    
+PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
+PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
+PFNGLGENFRAMEBUFFERSEXTPROC              glGenFramebuffersEXT;
+PFNGLDELETEFRAMEBUFFERSEXTPROC           glDeleteFramebuffersEXT;
+PFNGLDELETESHADERPROC                    glDeleteShader;
+PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC       glCheckFramebufferStatusEXT;
+PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC      glFramebufferRenderbufferEXT;
+PFNGLFRAMEBUFFERTEXTURE2DEXTPROC         glFramebufferTexture2DEXT;
+PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebufferEXT;
+PFNGLACTIVETEXTUREPROC                   glActiveTexture;
+PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
+PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
+PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
+PFNGLBINDBUFFERPROC                      glBindBuffer;
+PFNGLUNIFORMMATRIX3FVPROC                glUniformMatrix3fv;
+PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
+PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
+PFNGLBUFFERDATAPROC                      glBufferData;
+PFNGLGENBUFFERSPROC                      glGenBuffers;
+PFNGLMAPBUFFERPROC                       glMapBuffer;
+PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
+PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
+PFNGLGETSHADERIVPROC                     glGetShaderiv;
+PFNGLCOMPILESHADERPROC                   glCompileShader;
+PFNGLSHADERSOURCEPROC                    glShaderSource;
+PFNGLCREATESHADERPROC                    glCreateShader;
+PFNGLCREATEPROGRAMPROC                   glCreateProgram;
+PFNGLATTACHSHADERPROC                    glAttachShader;
+PFNGLDETACHSHADERPROC                    glDetachShader;
+PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
+PFNGLUNIFORM1IPROC                       glUniform1i;
+PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
+PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
+PFNGLUSEPROGRAMPROC                      glUseProgram;
+PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
+PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
+PFNGLLINKPROGRAMPROC                     glLinkProgram;
+PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
+PFNGLUNIFORM4FVPROC                      glUniform4fv;
+PFNGLUNIFORM3FVPROC                      glUniform3fv;
+PFNGLUNIFORM2FVPROC                      glUniform2fv;
+PFNGLUNIFORM1FVPROC                      glUniform1fv;
+PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
+PFNGLRENDERBUFFERSTORAGEEXTPROC          glRenderbufferStorageEXT;
+PFNGLBINDRENDERBUFFEREXTPROC             glBindRenderbufferEXT;
+PFNGLGENRENDERBUFFERSEXTPROC             glGenRenderbuffersEXT;
+PFNGLDELETERENDERBUFFERSEXTPROC          glDeleteRenderbuffersEXT;
+
+PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
+
+void InitGLExtensions()
+{
+    if (glGenFramebuffersEXT)
+        return;
+	
+    
+    wglGetSwapIntervalEXT =             (PFNWGLGETSWAPINTERVALEXTPROC)             wglGetProcAddress("wglGetSwapIntervalEXT");
+    wglSwapIntervalEXT =                (PFNWGLSWAPINTERVALEXTPROC)                wglGetProcAddress("wglSwapIntervalEXT");
+    glGenFramebuffersEXT =              (PFNGLGENFRAMEBUFFERSEXTPROC)              wglGetProcAddress("glGenFramebuffersEXT");
+    glDeleteFramebuffersEXT =           (PFNGLDELETEFRAMEBUFFERSEXTPROC)           wglGetProcAddress("glDeleteFramebuffersEXT");
+    glDeleteShader =                    (PFNGLDELETESHADERPROC)                    wglGetProcAddress("glDeleteShader");
+    glCheckFramebufferStatusEXT =       (PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC)       wglGetProcAddress("glCheckFramebufferStatusEXT");
+    glFramebufferRenderbufferEXT =      (PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC)      wglGetProcAddress("glFramebufferRenderbufferEXT");
+    glFramebufferTexture2DEXT =         (PFNGLFRAMEBUFFERTEXTURE2DEXTPROC)         wglGetProcAddress("glFramebufferTexture2DEXT");
+    glBindFramebufferEXT =              (PFNGLBINDFRAMEBUFFEREXTPROC)              wglGetProcAddress("glBindFramebufferEXT");
+    glActiveTexture =                   (PFNGLACTIVETEXTUREPROC)                   wglGetProcAddress("glActiveTexture");
+    glDisableVertexAttribArray =        (PFNGLDISABLEVERTEXATTRIBARRAYPROC)        wglGetProcAddress("glDisableVertexAttribArray");
+    glVertexAttribPointer =             (PFNGLVERTEXATTRIBPOINTERPROC)             wglGetProcAddress("glVertexAttribPointer");
+    glEnableVertexAttribArray =         (PFNGLENABLEVERTEXATTRIBARRAYPROC)         wglGetProcAddress("glEnableVertexAttribArray");
+    glBindBuffer =                      (PFNGLBINDBUFFERPROC)                      wglGetProcAddress("glBindBuffer");
+    glUniformMatrix3fv =                (PFNGLUNIFORMMATRIX3FVPROC)                wglGetProcAddress("glUniformMatrix3fv");
+    glUniformMatrix4fv =                (PFNGLUNIFORMMATRIX4FVPROC)                wglGetProcAddress("glUniformMatrix4fv");
+    glDeleteBuffers =                   (PFNGLDELETEBUFFERSPROC)                   wglGetProcAddress("glDeleteBuffers");
+    glBufferData =                      (PFNGLBUFFERDATAPROC)                      wglGetProcAddress("glBufferData");
+    glGenBuffers =                      (PFNGLGENBUFFERSPROC)                      wglGetProcAddress("glGenBuffers");
+    glMapBuffer =                       (PFNGLMAPBUFFERPROC)                       wglGetProcAddress("glMapBuffer");
+    glUnmapBuffer =                     (PFNGLUNMAPBUFFERPROC)                     wglGetProcAddress("glUnmapBuffer");
+    glGetShaderInfoLog =                (PFNGLGETSHADERINFOLOGPROC)                wglGetProcAddress("glGetShaderInfoLog");
+    glGetShaderiv =                     (PFNGLGETSHADERIVPROC)                     wglGetProcAddress("glGetShaderiv");
+    glCompileShader =                   (PFNGLCOMPILESHADERPROC)                   wglGetProcAddress("glCompileShader");
+    glShaderSource =                    (PFNGLSHADERSOURCEPROC)                    wglGetProcAddress("glShaderSource");
+    glCreateShader =                    (PFNGLCREATESHADERPROC)                    wglGetProcAddress("glCreateShader");
+    glCreateProgram =                   (PFNGLCREATEPROGRAMPROC)                   wglGetProcAddress("glCreateProgram");
+    glAttachShader =                    (PFNGLATTACHSHADERPROC)                    wglGetProcAddress("glAttachShader");
+    glDetachShader =                    (PFNGLDETACHSHADERPROC)                    wglGetProcAddress("glDetachShader");
+    glDeleteProgram =                   (PFNGLDELETEPROGRAMPROC)                   wglGetProcAddress("glDeleteProgram");
+    glUniform1i =                       (PFNGLUNIFORM1IPROC)                       wglGetProcAddress("glUniform1i");
+    glGetUniformLocation =              (PFNGLGETUNIFORMLOCATIONPROC)              wglGetProcAddress("glGetUniformLocation");
+    glGetActiveUniform =                (PFNGLGETACTIVEUNIFORMPROC)                wglGetProcAddress("glGetActiveUniform");
+    glUseProgram =                      (PFNGLUSEPROGRAMPROC)                      wglGetProcAddress("glUseProgram");
+    glGetProgramInfoLog =               (PFNGLGETPROGRAMINFOLOGPROC)               wglGetProcAddress("glGetProgramInfoLog");
+    glGetProgramiv =                    (PFNGLGETPROGRAMIVPROC)                    wglGetProcAddress("glGetProgramiv");
+    glLinkProgram =                     (PFNGLLINKPROGRAMPROC)                     wglGetProcAddress("glLinkProgram");
+    glBindAttribLocation =              (PFNGLBINDATTRIBLOCATIONPROC)              wglGetProcAddress("glBindAttribLocation");
+    glUniform4fv =                      (PFNGLUNIFORM4FVPROC)                      wglGetProcAddress("glUniform4fv");
+    glUniform3fv =                      (PFNGLUNIFORM3FVPROC)                      wglGetProcAddress("glUniform3fv");
+    glUniform2fv =                      (PFNGLUNIFORM2FVPROC)                      wglGetProcAddress("glUniform2fv");
+    glUniform1fv =                      (PFNGLUNIFORM1FVPROC)                      wglGetProcAddress("glUniform1fv");
+    glCompressedTexImage2D =            (PFNGLCOMPRESSEDTEXIMAGE2DPROC)            wglGetProcAddress("glCompressedTexImage2D");
+    glRenderbufferStorageEXT =          (PFNGLRENDERBUFFERSTORAGEEXTPROC)          wglGetProcAddress("glRenderbufferStorageEXT");
+    glBindRenderbufferEXT =             (PFNGLBINDRENDERBUFFEREXTPROC)             wglGetProcAddress("glBindRenderbufferEXT");
+    glGenRenderbuffersEXT =             (PFNGLGENRENDERBUFFERSEXTPROC)             wglGetProcAddress("glGenRenderbuffersEXT");
+    glDeleteRenderbuffersEXT =          (PFNGLDELETERENDERBUFFERSEXTPROC)          wglGetProcAddress("glDeleteRenderbuffersEXT");
+
+
+    glGenVertexArrays =                 (PFNGLGENVERTEXARRAYSPROC)                 wglGetProcAddress("glGenVertexArrays");
+}
+
+#endif
 
 
 static const char* StdVertexShaderSrc =
@@ -157,6 +270,53 @@ static const char* MultiTextureFragShaderSrc =
 	"	gl_FragColor = color2;\n"
     "}\n";
 
+static const char* PostProcessMeshFragShaderSrc =
+    "uniform sampler2D Texture;\n"
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord0;\n"
+    "varying vec2 oTexCoord1;\n"
+    "varying vec2 oTexCoord2;\n"
+    "\n"
+    "void main()\n"
+    "{\n"
+    "   float ResultR = texture2D(Texture, oTexCoord0).r;\n"
+    "   float ResultG = texture2D(Texture, oTexCoord1).g;\n"
+    "   float ResultB = texture2D(Texture, oTexCoord2).b;\n"
+    "   gl_FragColor = vec4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "}\n";
+
+static const char* PostProcessMeshTimewarpFragShaderSrc =
+    "uniform sampler2D Texture;\n"
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord0;\n"
+    "varying vec2 oTexCoord1;\n"
+    "varying vec2 oTexCoord2;\n"
+    "\n"
+    "void main()\n"
+    "{\n"
+    "   float ResultR = texture2D(Texture, oTexCoord0).r;\n"
+    "   float ResultG = texture2D(Texture, oTexCoord1).g;\n"
+    "   float ResultB = texture2D(Texture, oTexCoord2).b;\n"
+    "   gl_FragColor = vec4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "}\n";
+
+static const char* PostProcessMeshPositionalTimewarpFragShaderSrc =
+    "uniform sampler2D Texture0;\n"
+    "uniform sampler2D Texture1;\n"
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord0;\n"
+    "varying vec2 oTexCoord1;\n"
+    "varying vec2 oTexCoord2;\n"
+    "\n"
+    "void main()\n"
+    "{\n"
+	"   gl_FragColor.r = oColor.r * texture2D(Texture1, oTexCoord0).r;\n"
+    "   gl_FragColor.g = oColor.g * texture2D(Texture1, oTexCoord1).g;\n"
+    "   gl_FragColor.b = oColor.b * texture2D(Texture1, oTexCoord2).b;\n"
+    "   gl_FragColor.a = 1.0;\n"
+    "}\n";
+
+
 static const char* PostProcessVertexShaderSrc =
     "uniform mat4 View;\n"
     "uniform mat4 Texm;\n"
@@ -167,85 +327,275 @@ static const char* PostProcessVertexShaderSrc =
     "{\n"
     "   gl_Position = View * Position;\n"
     "   oTexCoord = vec2(Texm * vec4(TexCoord,0,1));\n"
-    "   oTexCoord.y = 1.0-oTexCoord.y;\n"
+    "}\n";
+
+static const char* PostProcessMeshVertexShaderSrc =
+    "uniform vec2 EyeToSourceUVScale;\n"
+    "uniform vec2 EyeToSourceUVOffset;\n"
+
+    "attribute vec2 Position;\n"
+    "attribute vec4 Color;\n"
+    "attribute vec2 TexCoord0;\n"
+    "attribute vec2 TexCoord1;\n"
+    "attribute vec2 TexCoord2;\n"
+
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord0;\n"
+    "varying vec2 oTexCoord1;\n"
+    "varying vec2 oTexCoord2;\n"
+
+    "void main()\n"
+    "{\n"
+    "   gl_Position.x = Position.x;\n"
+    "   gl_Position.y = Position.y;\n"
+    "   gl_Position.z = 0.5;\n"
+    "   gl_Position.w = 1.0;\n"
+    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
+    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
+    "   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oTexCoord0.y = 1-oTexCoord0.y;\n"
+    "   oTexCoord1 = TexCoord1 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oTexCoord1.y = 1-oTexCoord1.y;\n"
+    "   oTexCoord2 = TexCoord2 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oTexCoord2.y = 1-oTexCoord2.y;\n"
+    "   oColor = Color;\n"              // Used for vignette fade.
+    "}\n";
+
+static const char* PostProcessMeshTimewarpVertexShaderSrc =
+    "uniform vec2 EyeToSourceUVScale;\n"
+    "uniform vec2 EyeToSourceUVOffset;\n"
+    "uniform mat4 EyeRotationStart;\n"
+    "uniform mat4 EyeRotationEnd;\n"
+
+    "attribute vec2 Position;\n"
+    "attribute vec4 Color;\n"
+    "attribute vec2 TexCoord0;\n"
+    "attribute vec2 TexCoord1;\n"
+    "attribute vec2 TexCoord2;\n"
+
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord0;\n"
+    "varying vec2 oTexCoord1;\n"
+    "varying vec2 oTexCoord2;\n"
+
+    "void main()\n"
+    "{\n"
+    "   gl_Position.x = Position.x;\n"
+    "   gl_Position.y = Position.y;\n"
+    "   gl_Position.z = 0.0;\n"
+    "   gl_Position.w = 1.0;\n"
+
+    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
+    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
+    "   vec3 TanEyeAngleR = vec3 ( TexCoord0.x, TexCoord0.y, 1.0 );\n"
+    "   vec3 TanEyeAngleG = vec3 ( TexCoord1.x, TexCoord1.y, 1.0 );\n"
+    "   vec3 TanEyeAngleB = vec3 ( TexCoord2.x, TexCoord2.y, 1.0 );\n"
+
+    // Accurate time warp lerp vs. faster
+#if 1
+    // Apply the two 3x3 timewarp rotations to these vectors.
+	"   vec3 TransformedRStart = (EyeRotationStart * vec4(TanEyeAngleR, 0)).xyz;\n"
+	"   vec3 TransformedGStart = (EyeRotationStart * vec4(TanEyeAngleG, 0)).xyz;\n"
+	"   vec3 TransformedBStart = (EyeRotationStart * vec4(TanEyeAngleB, 0)).xyz;\n"
+	"   vec3 TransformedREnd   = (EyeRotationEnd * vec4(TanEyeAngleR, 0)).xyz;\n"
+	"   vec3 TransformedGEnd   = (EyeRotationEnd * vec4(TanEyeAngleG, 0)).xyz;\n"
+	"   vec3 TransformedBEnd   = (EyeRotationEnd * vec4(TanEyeAngleB, 0)).xyz;\n"
+    // And blend between them.
+    "   vec3 TransformedR = mix ( TransformedRStart, TransformedREnd, Color.a );\n"
+    "   vec3 TransformedG = mix ( TransformedGStart, TransformedGEnd, Color.a );\n"
+    "   vec3 TransformedB = mix ( TransformedBStart, TransformedBEnd, Color.a );\n"
+#else
+    "   mat3 EyeRotation = mix ( EyeRotationStart, EyeRotationEnd, Color.a );\n"
+    "   vec3 TransformedR   = EyeRotation * TanEyeAngleR;\n"
+    "   vec3 TransformedG   = EyeRotation * TanEyeAngleG;\n"
+    "   vec3 TransformedB   = EyeRotation * TanEyeAngleB;\n"
+#endif
+
+    // Project them back onto the Z=1 plane of the rendered images.
+    "   float RecipZR = 1.0 / TransformedR.z;\n"
+    "   float RecipZG = 1.0 / TransformedG.z;\n"
+    "   float RecipZB = 1.0 / TransformedB.z;\n"
+    "   vec2 FlattenedR = vec2 ( TransformedR.x * RecipZR, TransformedR.y * RecipZR );\n"
+    "   vec2 FlattenedG = vec2 ( TransformedG.x * RecipZG, TransformedG.y * RecipZG );\n"
+    "   vec2 FlattenedB = vec2 ( TransformedB.x * RecipZB, TransformedB.y * RecipZB );\n"
+
+    // These are now still in TanEyeAngle space.
+    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
+    "   vec2 SrcCoordR = FlattenedR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   vec2 SrcCoordG = FlattenedG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   vec2 SrcCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oTexCoord0 = SrcCoordR;\n"
+    "   oTexCoord0.y = 1-oTexCoord0.y;\n"
+    "   oTexCoord1 = SrcCoordG;\n"
+    "   oTexCoord1.y = 1-oTexCoord1.y;\n"
+    "   oTexCoord2 = SrcCoordB;\n"
+    "   oTexCoord2.y = 1-oTexCoord2.y;\n"
+    "   oColor = Color.r;\n"              // Used for vignette fade.
+    "}\n";
+
+static const char* PostProcessMeshPositionalTimewarpVertexShaderSrc =
+    "#version 150\n"
+	"uniform sampler2D Texture0;\n"
+    "uniform vec2 EyeToSourceUVScale;\n"
+    "uniform vec2 EyeToSourceUVOffset;\n"
+	"uniform vec2 DepthProjector;\n"
+	"uniform vec2 DepthDimSize;\n"
+	"uniform mat4 EyeRotationStart;\n"
+    "uniform mat4 EyeRotationEnd;\n"
+
+    "in vec2 Position;\n"
+    "in vec4 Color;\n"
+    "in vec2 TexCoord0;\n"
+    "in vec2 TexCoord1;\n"
+    "in vec2 TexCoord2;\n"
+
+    "out vec4 oColor;\n"
+    "out vec2 oTexCoord0;\n"
+    "out vec2 oTexCoord1;\n"
+    "out vec2 oTexCoord2;\n"
+
+    "vec4 PositionFromDepth(vec2 inTexCoord)\n"
+    "{\n"
+    "   vec2 eyeToSourceTexCoord = inTexCoord * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   eyeToSourceTexCoord.y = 1 - eyeToSourceTexCoord.y;\n"
+	"   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n"
+	"   float linearDepth = DepthProjector.y / (depth - DepthProjector.x);\n"
+	"   vec4 retVal = vec4(inTexCoord, 1, 1);\n"
+    "   retVal.xyz *= linearDepth;\n"
+    "   return retVal;\n"
+    "}\n"
+
+    "vec2 TimewarpTexCoordToWarpedPos(vec2 inTexCoord, float a)\n"
+    "{\n"
+    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
+    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.	
+    // Apply the 4x4 timewarp rotation to these vectors.
+    "   vec4 inputPos = PositionFromDepth(inTexCoord);\n"
+    "   vec3 transformed = mix ( EyeRotationStart * inputPos,  EyeRotationEnd * inputPos, a ).xyz;\n"
+    // Project them back onto the Z=1 plane of the rendered images.
+    "   vec2 flattened = transformed.xy / transformed.z;\n"
+    // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
+    "   vec2 noDepthUV = flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    //"   float depth = texture2DLod(Texture0, noDepthUV, 0).r;\n"
+    "   return noDepthUV.xy;\n"
+    "}\n"
+
+    "void main()\n"
+    "{\n"
+    "   gl_Position.x = Position.x;\n"
+    "   gl_Position.y = Position.y;\n"
+    "   gl_Position.z = 0.0;\n"
+    "   gl_Position.w = 1.0;\n"
+
+    // warped positions are a bit more involved, hence a separate function
+    "   oTexCoord0 = TimewarpTexCoordToWarpedPos(TexCoord0, Color.a);\n"
+    "   oTexCoord0.y = 1-oTexCoord0.y;\n"
+    "   oTexCoord1 = TimewarpTexCoordToWarpedPos(TexCoord1, Color.a);\n"
+    "   oTexCoord1.y = 1-oTexCoord1.y;\n"
+    "   oTexCoord2 = TimewarpTexCoordToWarpedPos(TexCoord2, Color.a);\n"
+    "   oTexCoord2.y = 1-oTexCoord2.y;\n"
+
+    "   oColor = vec4(Color.r);              // Used for vignette fade.\n"
     "}\n";
 
 static const char* PostProcessFragShaderSrc =
     "uniform vec2 LensCenter;\n"
     "uniform vec2 ScreenCenter;\n"
-    "uniform vec2 Scale;\n"
-    "uniform vec2 ScaleIn;\n"
+    "uniform vec2 EyeToSourceUVScale;\n"
+    "uniform vec2 EyeToSourceNDCScale;\n"
     "uniform vec4 HmdWarpParam;\n"
-    "uniform sampler2D Texture0;\n"
+    "uniform sampler2D Texture1;\n"
+
     "varying vec2 oTexCoord;\n"
-    "\n"
+
     "vec2 HmdWarp(vec2 in01)\n"
     "{\n"
-    "   vec2  theta = (in01 - LensCenter) * ScaleIn;\n" // Scales to [-1, 1]
+    "   vec2  theta = (in01 - LensCenter) * EyeToSourceNDCScale;\n" // Scales to [-1, 1]
     "   float rSq = theta.x * theta.x + theta.y * theta.y;\n"
     "   vec2  theta1 = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq + "
     "                           HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);\n"
-    "   return LensCenter + Scale * theta1;\n"
+    "   return LensCenter + EyeToSourceUVScale * theta1;\n"
     "}\n"
+
     "void main()\n"
     "{\n"
     "   vec2 tc = HmdWarp(oTexCoord);\n"
     "   if (!all(equal(clamp(tc, ScreenCenter-vec2(0.25,0.5), ScreenCenter+vec2(0.25,0.5)), tc)))\n"
     "       gl_FragColor = vec4(0);\n"
     "   else\n"
-    "       gl_FragColor = texture2D(Texture0, tc);\n"
+    "       gl_FragColor = texture2D(Texture1, tc);\n"
     "}\n";
 
 // Shader with lens distortion and chromatic aberration correction.
-static const char* PostProcessFullFragShaderSrc =
-    "uniform vec2 LensCenter;\n"
-    "uniform vec2 ScreenCenter;\n"
-    "uniform vec2 Scale;\n"
-    "uniform vec2 ScaleIn;\n"
+static const char* PostProcessFragShaderWithChromAbSrc =
+    "uniform sampler2D Texture;\n"
+    "uniform vec3 DistortionClearColor;\n"
+    "uniform float EdgeFadeScale;\n"
+    "uniform vec2 EyeToSourceUVScale;\n"
+    "uniform vec2 EyeToSourceUVOffset;\n"
+    "uniform vec2 EyeToSourceNDCScale;\n"
+    "uniform vec2 EyeToSourceNDCOffset;\n"
+    "uniform vec2 TanEyeAngleScale;\n"
+    "uniform vec2 TanEyeAngleOffset;\n"
     "uniform vec4 HmdWarpParam;\n"
     "uniform vec4 ChromAbParam;\n"
-    "uniform sampler2D Texture0;\n"
+
+    "varying vec4 oPosition;\n"
     "varying vec2 oTexCoord;\n"
-    "\n"
-    // Scales input texture coordinates for distortion.
-    // ScaleIn maps texture coordinates to Scales to ([-1, 1]), although top/bottom will be
-    // larger due to aspect ratio.
-    "void main()\n"
+
+	"void main()\n"
     "{\n"
-    "   vec2  theta = (oTexCoord - LensCenter) * ScaleIn;\n" // Scales to [-1, 1]
-    "   float rSq= theta.x * theta.x + theta.y * theta.y;\n"
-    "   vec2  theta1 = theta * (HmdWarpParam.x + HmdWarpParam.y * rSq + "
-    "                  HmdWarpParam.z * rSq * rSq + HmdWarpParam.w * rSq * rSq * rSq);\n"
-    "   \n"
-    "   // Detect whether blue texture coordinates are out of range since these will scaled out the furthest.\n"
-    "   vec2 thetaBlue = theta1 * (ChromAbParam.z + ChromAbParam.w * rSq);\n"
-    "   vec2 tcBlue = LensCenter + Scale * thetaBlue;\n"
-    "   if (!all(equal(clamp(tcBlue, ScreenCenter-vec2(0.25,0.5), ScreenCenter+vec2(0.25,0.5)), tcBlue)))\n"
+    // Input oTexCoord is [-1,1] across the half of the screen used for a single eye.
+    "   vec2 TanEyeAngleDistorted = oTexCoord * TanEyeAngleScale + TanEyeAngleOffset;\n" // Scales to tan(thetaX),tan(thetaY), but still distorted (i.e. only the center is correct)
+    "   float  RadiusSq = TanEyeAngleDistorted.x * TanEyeAngleDistorted.x + TanEyeAngleDistorted.y * TanEyeAngleDistorted.y;\n"
+    "   float Distort = 1.0 / ( 1.0 + RadiusSq * ( HmdWarpParam.y + RadiusSq * ( HmdWarpParam.z + RadiusSq * ( HmdWarpParam.w ) ) ) );\n"
+    "   float DistortR = Distort * ( ChromAbParam.x + RadiusSq * ChromAbParam.y );\n"
+    "   float DistortG = Distort;\n"
+    "   float DistortB = Distort * ( ChromAbParam.z + RadiusSq * ChromAbParam.w );\n"
+    "   vec2 TanEyeAngleR = DistortR * TanEyeAngleDistorted;\n"
+    "   vec2 TanEyeAngleG = DistortG * TanEyeAngleDistorted;\n"
+    "   vec2 TanEyeAngleB = DistortB * TanEyeAngleDistorted;\n"
+
+    // These are now in "TanEyeAngle" space.
+    // The vectors (TanEyeAngleRGB.x, TanEyeAngleRGB.y, 1.0) are real-world vectors pointing from the eye to where the components of the pixel appear to be.
+    // If you had a raytracer, you could just use them directly.
+
+    // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
+    "   vec2 SourceCoordR = TanEyeAngleR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+	"	SourceCoordR.y = 1 - SourceCoordR.y;\n"
+    "   vec2 SourceCoordG = TanEyeAngleG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+	"	SourceCoordG.y = 1 - SourceCoordG.y;\n"
+    "   vec2 SourceCoordB = TanEyeAngleB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+	"	SourceCoordB.y = 1 - SourceCoordB.y;\n"
+
+    // Find the distance to the nearest edge.
+    "   vec2 NDCCoord = TanEyeAngleG * EyeToSourceNDCScale + EyeToSourceNDCOffset;\n"
+	"   float EdgeFadeIn = clamp ( EdgeFadeScale, 0, 1e5 ) * ( 1.0 - max ( abs ( NDCCoord.x ), abs ( NDCCoord.y ) ) );\n"
+    "   if ( EdgeFadeIn < 0.0 )\n"
     "   {\n"
-    "       gl_FragColor = vec4(0);\n"
-    "       return;\n"
+    "       gl_FragColor = vec4(DistortionClearColor.r, DistortionClearColor.g, DistortionClearColor.b, 1.0);\n"
+	"       return;\n"
     "   }\n"
-    "   \n"
-    "   // Now do blue texture lookup.\n"
-    "   float blue = texture2D(Texture0, tcBlue).b;\n"
-    "   \n"
-    "   // Do green lookup (no scaling).\n"
-    "   vec2  tcGreen = LensCenter + Scale * theta1;\n"
-    "   vec4  center = texture2D(Texture0, tcGreen);\n"
-    "   \n"
-    "   // Do red scale and lookup.\n"
-    "   vec2  thetaRed = theta1 * (ChromAbParam.x + ChromAbParam.y * rSq);\n"
-    "   vec2  tcRed = LensCenter + Scale * thetaRed;\n"
-    "   float red = texture2D(Texture0, tcRed).r;\n"
-    "   \n"
-    "   gl_FragColor = vec4(red, center.g, blue, center.a);\n"
+    "   EdgeFadeIn = clamp ( EdgeFadeIn, 0.0, 1.0 );\n"
+
+    // Actually do the lookups.
+    "   float ResultR = texture2D(Texture, SourceCoordR).r;\n"
+    "   float ResultG = texture2D(Texture, SourceCoordG).g;\n"
+    "   float ResultB = texture2D(Texture, SourceCoordB).b;\n"
+
+    "   gl_FragColor =  vec4(ResultR * EdgeFadeIn, ResultG * EdgeFadeIn, ResultB * EdgeFadeIn, 1.0);\n"
     "}\n";
+
+
 
 static const char* VShaderSrcs[VShader_Count] =
 {
     DirectVertexShaderSrc,
     StdVertexShaderSrc,
-    PostProcessVertexShaderSrc
+    PostProcessVertexShaderSrc,
+	PostProcessMeshVertexShaderSrc,
+    PostProcessMeshTimewarpVertexShaderSrc,
+    PostProcessMeshPositionalTimewarpVertexShaderSrc
 };
 static const char* FShaderSrcs[FShader_Count] =
 {
@@ -253,16 +603,17 @@ static const char* FShaderSrcs[FShader_Count] =
     GouraudFragShaderSrc,
     TextureFragShaderSrc,
     AlphaTextureFragShaderSrc,
-    PostProcessFragShaderSrc,
-    PostProcessFullFragShaderSrc,
+    PostProcessFragShaderWithChromAbSrc,
     LitSolidFragShaderSrc,
     LitTextureFragShaderSrc,
-    MultiTextureFragShaderSrc
+    MultiTextureFragShaderSrc,
+    PostProcessMeshFragShaderSrc,
+    PostProcessMeshTimewarpFragShaderSrc,
+    PostProcessMeshPositionalTimewarpFragShaderSrc
 };
 
 
-
-RenderDevice::RenderDevice(const RendererParams& p)
+RenderDevice::RenderDevice(const RendererParams&)
 {
     for (int i = 0; i < VShader_Count; i++)
         VertexShaders[i] = *new Shader(this, Shader_Vertex, VShaderSrcs[i]);
@@ -277,6 +628,37 @@ RenderDevice::RenderDevice(const RendererParams& p)
 
     glGenFramebuffersEXT(1, &CurrentFbo);
 }
+
+RenderDevice::~RenderDevice()
+{
+    Shutdown();
+}
+
+void RenderDevice::Shutdown()
+{
+    // Release any other resources first.
+    OVR::Render::RenderDevice::Shutdown();
+    
+    // This runs before the subclass's Shutdown(), where the context, etc, may be deleted.
+
+    glDeleteFramebuffersEXT(1, &CurrentFbo);
+    
+    for (int i = 0; i < VShader_Count; ++i)
+        VertexShaders[i].Clear();
+
+    for (int i = 0; i < FShader_Count; ++i)
+        FragShaders[i].Clear();
+
+    DefaultFill.Clear();
+    DepthBuffers.Clear();
+}
+
+
+void RenderDevice::FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex)
+{
+	Render::RenderDevice::FillTexturedRect(left, top, right, bottom, ul, vb, ur, vt, c, tex);
+}
+
 
 Shader *RenderDevice::LoadBuiltinShader(ShaderStage stage, int shader)
 {
@@ -323,7 +705,7 @@ void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
         glDisable(GL_DEPTH_TEST);
 }
 
-void RenderDevice::SetRealViewport(const Viewport& vp)
+void RenderDevice::SetViewport(const Recti& vp)
 {
     int wh;
     if (CurRenderTarget)
@@ -332,30 +714,38 @@ void RenderDevice::SetRealViewport(const Viewport& vp)
         wh = WindowHeight;
     glViewport(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
 
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
+    //glEnable(GL_SCISSOR_TEST);
+    //glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
 }
 
-void RenderDevice::Clear(float r, float g, float b, float a, float depth)
+void RenderDevice::WaitUntilGpuIdle()
 {
-    glClearColor(r,g,b,a);
-    glClearDepth(depth);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	glFlush();
+	glFinish();
 }
 
-RBuffer* RenderDevice::GetDepthBuffer(int w, int h, int ms)
+void RenderDevice::Clear(float r, float g, float b, float a, float depth, bool clearColor /*= true*/, bool clearDepth /*= true*/)
+{
+	glClearColor(r,g,b,a);
+	glClearDepth(depth);
+    glClear(
+        ( clearColor ? ( GL_COLOR_BUFFER_BIT ) : 0 ) |
+        ( clearDepth ? ( GL_DEPTH_BUFFER_BIT ) : 0 )
+        );
+}
+
+Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms)
 {
     for (unsigned i = 0; i < DepthBuffers.GetSize(); i++)
-        if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height)// && ms == DepthBuffers[i]->Samples)
+        if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height && ms == DepthBuffers[i]->GetSamples())
             return DepthBuffers[i];
 
-    //Ptr<Texture> newDepth = *CreateTexture(Texture_Depth|Texture_RenderTarget|ms, w, h, NULL);
-    Ptr<RBuffer> newDepth = *new RBuffer(GL_DEPTH24_STENCIL8, w, h); // combined depth stencil
+    Ptr<Texture> newDepth = *CreateTexture(Texture_Depth|Texture_RenderTarget|ms, w, h, NULL);
     DepthBuffers.PushBack(newDepth);
     return newDepth.GetPtr();
 }
 
-void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture*, Render::Texture* stencil)
+void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* depth, Render::Texture* stencil)
 {
     OVR_UNUSED(stencil);
 
@@ -365,14 +755,14 @@ void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture*, Ren
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
         return;
     }
-    //if (depth == NULL)
-    RBuffer* depth = GetDepthBuffer(color->GetWidth(), color->GetHeight(), 0); //CurRenderTarget->Samples);
+	
+	if (depth == NULL)
+		depth = GetDepthBuffer(color->GetWidth(), color->GetHeight(), CurRenderTarget->GetSamples());
 
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, CurrentFbo);
     glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, ((Texture*)color)->TexId, 0);
     if (depth)
-        //glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, ((Texture*)depth)->TexId, 0);
-        glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, ((RBuffer*)depth)->BufId);
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, ((Texture*)depth)->TexId, 0);
     else
         glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, 0);
 
@@ -404,8 +794,7 @@ Fill* RenderDevice::CreateSimpleFill(int flags)
     OVR_UNUSED(flags);
     return DefaultFill;
 }
-
-
+    
 void RenderDevice::Render(const Matrix4f& matrix, Model* model)
 {
     // Store data in buffers if not already
@@ -428,7 +817,7 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
 }
 
 void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                      const Matrix4f& matrix, int offset, int count, PrimitiveType rprim)
+                      const Matrix4f& matrix, int offset, int count, PrimitiveType rprim, bool useDistortionVertex/* = false*/)
 {
     ShaderSet* shaders = (ShaderSet*) ((ShaderFill*)fill)->GetShaders();
 
@@ -461,15 +850,26 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
         Lighting->Set(shaders);
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
-    for (int i = 0; i < 5; i++)
-        glEnableVertexAttribArray(i);
+	glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
+	for (int i = 0; i < 5; i++)
+		glEnableVertexAttribArray(i);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, Pos));
-    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex), (char*)offset + offsetof(Vertex, C));
-    glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, U));
-    glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, U2));
-    glVertexAttribPointer(4, 3, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, Norm));
+	if (useDistortionVertex)
+	{		
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, Pos));
+		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, Col));
+		glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexR));
+		glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexG));
+		glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexB));
+	}
+	else
+	{
+		glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, Pos));
+		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex), (char*)offset + offsetof(Vertex, C));
+		glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, U));
+		glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, U2));
+		glVertexAttribPointer(4, 3, GL_FLOAT, false, sizeof(Vertex), (char*)offset + offsetof(Vertex, Norm));
+	}
 
     if (indices)
     {
@@ -482,8 +882,8 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
         glDrawArrays(prim, 0, count);
     }
 
-    for (int i = 0; i < 5; i++)
-        glDisableVertexAttribArray(i);
+	for (int i = 0; i < 5; i++)
+		glDisableVertexAttribArray(i);
 }
 
 void RenderDevice::RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
@@ -526,7 +926,7 @@ bool Buffer::Data(int use, const void* buffer, size_t size)
     return 1;
 }
 
-void* Buffer::Map(size_t start, size_t size, int flags)
+void* Buffer::Map(size_t, size_t, int)
 {
     int mode = GL_WRITE_ONLY;
     //if (flags & Map_Unsynchronized)
@@ -543,7 +943,13 @@ bool Buffer::Unmap(void*)
     glBindBuffer(Use, GLBuffer);
     int r = glUnmapBuffer(Use);
     glBindBuffer(Use, 0);
-    return r;
+    return r != 0;
+}
+
+Shader::~Shader()
+{
+    if (GLShader)
+        glDeleteShader(GLShader);
 }
 
 bool Shader::Compile(const char* src)
@@ -576,6 +982,24 @@ ShaderSet::~ShaderSet()
     glDeleteProgram(Prog);
 }
 
+void ShaderSet::SetShader(Render::Shader *s)
+{
+    Shaders[s->GetStage()] = s;
+    Shader* gls = (Shader*)s;
+    glAttachShader(Prog, gls->GLShader);
+    if (Shaders[Shader_Vertex] && Shaders[Shader_Fragment])
+        Link();
+}
+
+void ShaderSet::UnsetShader(int stage)
+{
+    Shader* gls = (Shader*)(Render::Shader*)Shaders[stage];
+    if (gls)
+        glDetachShader(Prog, gls->GLShader);
+    Shaders[stage] = NULL;
+    Link();
+}
+
 bool ShaderSet::Link()
 {
     glBindAttribLocation(Prog, 0, "Position");
@@ -600,14 +1024,19 @@ bool ShaderSet::Link()
     UniformInfo.Clear();
     LightingVer = 0;
     UsesLighting = 0;
-    GLuint i = 0;
-    for(;; i++)
+
+	GLint uniformCount = 0;
+	glGetProgramiv(Prog, GL_ACTIVE_UNIFORMS, &uniformCount);
+	OVR_ASSERT(uniformCount >= 0);
+
+    for(GLuint i = 0; i < (GLuint)uniformCount; i++)
     {
         GLsizei namelen;
         GLint size = 0;
         GLenum type;
         GLchar name[32];
         glGetActiveUniform(Prog, i, sizeof(name), &namelen, &size, &type, name);
+
         if (size)
         {
             int l = glGetUniformLocation(Prog, name);
@@ -628,6 +1057,7 @@ bool ShaderSet::Link()
             case GL_FLOAT_VEC2: u.Type = 2; break;
             case GL_FLOAT_VEC3: u.Type = 3; break;
             case GL_FLOAT_VEC4: u.Type = 4; break;
+            case GL_FLOAT_MAT3: u.Type = 12; break;
             case GL_FLOAT_MAT4: u.Type = 16; break;
             default:
                 continue;
@@ -645,7 +1075,7 @@ bool ShaderSet::Link()
     for (int i = 0; i < 8; i++)
     {
         char texv[32];
-        sprintf(texv, "Texture%d", i);
+        OVR_sprintf(texv, 10, "Texture%d", i);
         TexLoc[i] = glGetUniformLocation(Prog, texv);
         if (TexLoc[i] < 0)
             break;
@@ -664,7 +1094,7 @@ void ShaderSet::Set(PrimitiveType) const
 
 bool ShaderSet::SetUniform(const char* name, int n, const float* v)
 {
-    for (int i = 0; i < UniformInfo.GetSize(); i++)
+    for (unsigned int i = 0; i < UniformInfo.GetSize(); i++)
         if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
         {
             OVR_ASSERT(UniformInfo[i].Location >= 0);
@@ -675,6 +1105,8 @@ bool ShaderSet::SetUniform(const char* name, int n, const float* v)
             case 2:   glUniform2fv(UniformInfo[i].Location, n/2, v); break;
             case 3:   glUniform3fv(UniformInfo[i].Location, n/3, v); break;
             case 4:   glUniform4fv(UniformInfo[i].Location, n/4, v); break;
+            case 12:  glUniformMatrix3fv(UniformInfo[i].Location, 1, 1, v); break;
+            case 16:  glUniformMatrix4fv(UniformInfo[i].Location, 1, 1, v); break;
             default: OVR_ASSERT(0);
             }
             return 1;
@@ -686,7 +1118,7 @@ bool ShaderSet::SetUniform(const char* name, int n, const float* v)
 
 bool ShaderSet::SetUniform4x4f(const char* name, const Matrix4f& m)
 {
-    for (int i = 0; i < UniformInfo.GetSize(); i++)
+    for (unsigned int i = 0; i < UniformInfo.GetSize(); i++)
         if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
         {
             glUseProgram(Prog);
@@ -722,7 +1154,7 @@ void Texture::SetSampleMode(int sm)
     case Sample_Linear:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
 
     case Sample_Anisotropic:
@@ -734,7 +1166,7 @@ void Texture::SetSampleMode(int sm)
     case Sample_Nearest:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
     }
 
@@ -758,6 +1190,20 @@ void Texture::SetSampleMode(int sm)
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+ovrTexture Texture::Get_ovrTexture()
+{
+	ovrTexture tex;
+	OVR::Sizei newRTSize(Width, Height);
+
+    ovrGLTextureData* texData = (ovrGLTextureData*)&tex;
+    texData->Header.API            = ovrRenderAPI_OpenGL;
+    texData->Header.TextureSize    = newRTSize;
+    texData->Header.RenderViewport = Recti(newRTSize);
+    texData->TexId                 = TexId;
+
+	return tex;
+}
+
 Texture* RenderDevice::CreateTexture(int format, int width, int height, const void* data, int mipcount)
 {
     GLenum   glformat, gltype = GL_UNSIGNED_BYTE;
@@ -765,7 +1211,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     {
     case Texture_RGBA:  glformat = GL_RGBA; break;
     case Texture_R:     glformat = GL_ALPHA; break;
-    case Texture_Depth: glformat = GL_DEPTH; gltype = GL_DEPTH_COMPONENT; break;
+    case Texture_Depth: glformat = GL_DEPTH_COMPONENT32F; gltype = GL_FLOAT; break;
     case Texture_DXT1:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
     case Texture_DXT3:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
     case Texture_DXT5:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
@@ -774,7 +1220,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     }
     Texture* NewTex = new Texture(this, width, height);
     glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
-    glGetError();
+	OVR_ASSERT(!glGetError());
     
     if (format & Texture_Compressed)
     {
@@ -792,6 +1238,8 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             if (h < 1) h = 1;
         }
     }
+    else if (format & Texture_Depth)
+        glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, GL_DEPTH_COMPONENT, gltype, data);
     else
         glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, glformat, gltype, data);
 
@@ -831,12 +1279,6 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     return NewTex;
 }
 
-bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
-{
-    Params.Fullscreen = fullscreen;
-    return true;
-}
-
 RBuffer::RBuffer(GLenum format, GLint w, GLint h)
 {
     Width = w;
@@ -849,7 +1291,8 @@ RBuffer::RBuffer(GLenum format, GLint w, GLint h)
 
 RBuffer::~RBuffer()
 {
-    glDeleteRenderbuffersEXT(1, &BufId);
+    if (BufId)
+        glDeleteRenderbuffersEXT(1, &BufId);
 }
 
 }}}

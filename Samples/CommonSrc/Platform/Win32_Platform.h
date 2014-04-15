@@ -98,4 +98,14 @@ KeyCode MapVKToKeyCode(unsigned vk);
 // OVR_PLATFORM_APP_ARGS specifies the Application startup class with no args.
 #define OVR_PLATFORM_APP(AppClass) OVR_PLATFORM_APP_ARGS(AppClass, ())
 
+#define OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass, LogClass, args)                         \
+	OVR::Platform::Application* OVR::Platform::Application::CreateApplication()          \
+	{ static LogClass log; OVR::System::Init(&log);                                      \
+	   return new AppClass args; }                                                       \
+	void OVR::Platform::Application::DestroyApplication(OVR::Platform::Application* app) \
+	{ OVR::Platform::PlatformCore* platform = app->pPlatform;                            \
+	    delete app; delete platform; OVR::System::Destroy(); };
+
+#define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())
+
 #endif // OVR_Win32_Platform_h

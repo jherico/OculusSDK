@@ -5,7 +5,7 @@ Content     :   A DDS file loader for cross-platform compressed texture support.
 Created     :   March 5, 2013
 Authors     :   Peter Hoff, Dan Goodman, Bryan Croteau
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,10 +75,10 @@ Texture* LoadTextureDDS(RenderDevice* ren, File* f)
 
     f->Read((unsigned char*)(&header), sizeof(header));
 
-    int width = header.Width;
+    int width  = header.Width;
     int height = header.Height;
 
-    int format = 0;
+    int format = Texture_RGBA;
 
     UInt32 mipCount = header.MipMapCount;
     if(mipCount <= 0)

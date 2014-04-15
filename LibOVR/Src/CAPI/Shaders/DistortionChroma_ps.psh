@@ -1,0 +1,12 @@
+Texture2D Texture : register(t0);
+SamplerState Linear : register(s0);
+
+float4 main(in float4 oPosition : SV_Position, in float4 oColor : COLOR,
+            in float3 oTexCoord0 : TEXCOORD0, in float3 oTexCoord1 : TEXCOORD1, in float3 oTexCoord2 : TEXCOORD2) : SV_Target
+{
+	float ResultR = Texture.Sample(Linear, oTexCoord0.xy).r;
+	float ResultG = Texture.Sample(Linear, oTexCoord1.xy).g;
+	float ResultB = Texture.Sample(Linear, oTexCoord2.xy).b;
+	return float4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);
+	//"	return oColor.rrrr;
+}

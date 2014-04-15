@@ -6,16 +6,16 @@ Content     :   Template implementation for Array
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -222,7 +222,7 @@ struct ArrayData : ArrayDataBase<T, Allocator, SizePolicy>
     ArrayData()
         : BaseType() { }
 
-    ArrayData(int size)
+    ArrayData(UPInt size)
         : BaseType() { Resize(size); }
 
     ArrayData(const SelfType& a)
@@ -281,7 +281,7 @@ struct ArrayDataCC : ArrayDataBase<T, Allocator, SizePolicy>
     ArrayDataCC(const ValueType& defval)
         : BaseType(), DefaultValue(defval) { }
 
-    ArrayDataCC(const ValueType& defval, int size)
+    ArrayDataCC(const ValueType& defval, UPInt size)
         : BaseType(), DefaultValue(defval) { Resize(size); }
 
     ArrayDataCC(const SelfType& a)
@@ -359,14 +359,14 @@ public:
 
     ArrayBase()
         : Data() {}
-    ArrayBase(int size)
+    ArrayBase(UPInt size)
         : Data(size) {}
     ArrayBase(const SelfType& a)
         : Data(a.Data) {}
 
     ArrayBase(const ValueType& defval)
         : Data(defval) {}
-    ArrayBase(const ValueType& defval, int size)
+    ArrayBase(const ValueType& defval, UPInt size)
         : Data(defval, size) {}
   
     SizePolicyType* GetSizePolicy() const                  { return Data.Policy; }
@@ -499,6 +499,9 @@ public:
 
     // Removing an element from the array is an expensive operation!
     // It compacts only after removing the last element.
+    // If order of elements in the array is not important then use 
+    // RemoveAtUnordered, that could be much faster than the regular
+    // RemoveAt.
     void    RemoveAt(UPInt index)
     {
         OVR_ASSERT(index < Data.Size);
@@ -513,6 +516,32 @@ public:
                 Data.Data + index, 
                 Data.Data + index + 1,
                 Data.Size - 1 - index);
+            --Data.Size;
+        }
+    }
+
+    // Removes an element from the array without respecting of original order of 
+    // elements for better performance. Do not use on array where order of elements
+    // is important, otherwise use it instead of regular RemoveAt().
+    void    RemoveAtUnordered(UPInt index)
+    {
+        OVR_ASSERT(index < Data.Size);
+        if (Data.Size == 1)
+        {
+            Clear();
+        }
+        else
+        {
+            // copy the last element into the 'index' position 
+            // and decrement the size (instead of moving all elements
+            // in [index + 1 .. size - 1] range).
+            const UPInt lastElemIndex = Data.Size - 1;
+            if (index < lastElemIndex)
+            {
+                AllocatorType::Destruct(Data.Data + index);
+                AllocatorType::Construct(Data.Data + index, Data.Data[lastElemIndex]);
+            }
+            AllocatorType::Destruct(Data.Data + lastElemIndex);
             --Data.Size;
         }
     }
@@ -725,7 +754,7 @@ public:
     typedef ArrayBase<ArrayData<T, ContainerAllocator<T>, SizePolicy> > BaseType;
 
     Array() : BaseType() {}
-    Array(int size) : BaseType(size) {}
+    Array(UPInt size) : BaseType(size) {}
     Array(const SizePolicyType& p) : BaseType() { SetSizePolicy(p); }
     Array(const SelfType& a) : BaseType(a) {}
     const SelfType& operator=(const SelfType& a) { BaseType::operator=(a); return *this; }
@@ -747,7 +776,7 @@ public:
     typedef ArrayBase<ArrayData<T, ContainerAllocator_POD<T>, SizePolicy> > BaseType;
 
     ArrayPOD() : BaseType() {}
-    ArrayPOD(int size) : BaseType(size) {}
+    ArrayPOD(UPInt size) : BaseType(size) {}
     ArrayPOD(const SizePolicyType& p) : BaseType() { SetSizePolicy(p); }
     ArrayPOD(const SelfType& a) : BaseType(a) {}
     const SelfType& operator=(const SelfType& a) { BaseType::operator=(a); return *this; }
@@ -769,7 +798,7 @@ public:
     typedef ArrayBase<ArrayData<T, ContainerAllocator_CPP<T>, SizePolicy> > BaseType;
 
     ArrayCPP() : BaseType() {}
-    ArrayCPP(int size) : BaseType(size) {}
+    ArrayCPP(UPInt size) : BaseType(size) {}
     ArrayCPP(const SizePolicyType& p) : BaseType() { SetSizePolicy(p); }
     ArrayCPP(const SelfType& a) : BaseType(a) {}
     const SelfType& operator=(const SelfType& a) { BaseType::operator=(a); return *this; }
@@ -793,7 +822,7 @@ public:
     typedef ArrayBase<ArrayDataCC<T, ContainerAllocator<T>, SizePolicy> >   BaseType;
 
     ArrayCC(const ValueType& defval) : BaseType(defval) {}
-    ArrayCC(const ValueType& defval, int size) : BaseType(defval, size) {}
+    ArrayCC(const ValueType& defval, UPInt size) : BaseType(defval, size) {}
     ArrayCC(const ValueType& defval, const SizePolicyType& p) : BaseType(defval) { SetSizePolicy(p); }
     ArrayCC(const SelfType& a) : BaseType(a) {}
     const SelfType& operator=(const SelfType& a) { BaseType::operator=(a); return *this; }

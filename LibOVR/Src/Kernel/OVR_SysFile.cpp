@@ -6,16 +6,16 @@ Content     :   File wrapper class implementation (Win32)
 Created     :   April 5, 1999
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -83,7 +83,7 @@ SysFile::SysFile() : DelegatedFile(0)
     pFile = *new UnopenedFile;
 }
 
-File* FileFILEOpen(const String& path, int flags, int mode);
+Ptr<File> FileFILEOpen(const String& path, int flags, int mode);
 
 // Opens a file
 SysFile::SysFile(const String& path, int flags, int mode) : DelegatedFile(0)
@@ -96,7 +96,7 @@ SysFile::SysFile(const String& path, int flags, int mode) : DelegatedFile(0)
 // Will fail if file's already open
 bool SysFile::Open(const String& path, int flags, int mode)
 {
-    pFile = *FileFILEOpen(path, flags, mode);
+    pFile = FileFILEOpen(path, flags, mode);
     if ((!pFile) || (!pFile->IsValid()))
     {
         pFile = *new UnopenedFile;

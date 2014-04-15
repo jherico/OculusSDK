@@ -52,12 +52,12 @@ PlatformCore::PlatformCore(Application *app)
 {
     pApp = app;
     pApp->SetPlatformCore(this);    
-    StartupTicks = OVR::Timer::GetTicks();
+    StartupSeconds = OVR::Timer::GetSeconds();
 }
 
 double PlatformCore::GetAppTime() const
 {
-    return (OVR::Timer::GetTicks() - StartupTicks) * (1.0 / (double)OVR::Timer::MksPerSecond);
+    return OVR::Timer::GetSeconds() - StartupSeconds;
 }
 
 bool PlatformCore::SetFullscreen(const Render::RendererParams&, int fullscreen)

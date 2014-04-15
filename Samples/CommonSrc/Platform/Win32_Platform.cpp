@@ -21,6 +21,8 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include <Windows.h>
+
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_String.h"
@@ -177,7 +179,7 @@ static UByte KeyMap[][2] =
     { VK_OEM_MINUS, Key_Minus },
     { VK_OEM_PERIOD,Key_Period },
     { VK_OEM_2,     Key_Slash },
-    { VK_OEM_3,     Key_Bar },
+    { VK_OEM_3,     Key_Backtick },
     { VK_OEM_4,     Key_BracketLeft },
     { VK_OEM_5,     Key_Backslash },
     { VK_OEM_6,     Key_BracketRight },
@@ -418,8 +420,8 @@ int PlatformCore::Run()
             if (IsIconic(hWnd))
             {
                 Sleep(10);
+            }
         }
-    }
     }
 
     return ExitCode;
@@ -545,6 +547,7 @@ Render::DisplayId PlatformCore::GetDisplay(int screen)
 
 OVR::Platform::Application*     g_app;
 
+
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 {
     using namespace OVR;
@@ -563,7 +566,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
     // Nested scope for container destructors to shutdown before DestroyApplication.
     {
         Array<String>      args;
-        Array<char*> argv;
+        Array<const char*> argv;
         argv.PushBack("app");
 
         const char* p = inArgs;
@@ -584,9 +587,8 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
         }
         if (p != pstart)
             args.PushBack(String(pstart, p - pstart));
-		// FIXME memory leak of the command line arguments here
         for (UPInt i = 0; i < args.GetSize(); i++)
-            argv.PushBack(strdup(args[i].ToCStr()));
+            argv.PushBack(args[i].ToCStr());
 
         exitCode = g_app->OnStartup((int)argv.GetSize(), &argv[0]);
         if (!exitCode)

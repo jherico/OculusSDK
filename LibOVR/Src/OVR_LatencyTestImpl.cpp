@@ -5,16 +5,16 @@ Content     :   Oculus Latency Tester device implementation.
 Created     :   March 7, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,28 +25,19 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_LatencyTestImpl.h"
+#include "Kernel/OVR_Alg.h"
 
 namespace OVR {
+
+using namespace Alg;
 
 //-------------------------------------------------------------------------------------
 // ***** Oculus Latency Tester specific packet data structures
 
-enum {
+enum {    
     LatencyTester_VendorId  = Oculus_VendorId,
     LatencyTester_ProductId = 0x0101,
 };
-
-// Reported data is little-endian now
-static UInt16 DecodeUInt16(const UByte* buffer)
-{
-    return (UInt16(buffer[1]) << 8) | UInt16(buffer[0]);
-}
-
-/* Unreferenced
-static SInt16 DecodeSInt16(const UByte* buffer)
-{
-    return (SInt16(buffer[1]) << 8) | SInt16(buffer[0]);
-}*/
 
 static void UnpackSamples(const UByte* buffer, UByte* r, UByte* g, UByte* b)
 {
@@ -88,7 +79,7 @@ struct LatencyTestSamples
 
         SampleCount		= buffer[1];
         Timestamp		= DecodeUInt16(buffer + 2);
-
+        
         for (UByte i = 0; i < SampleCount; i++)
         {
             UnpackSamples(buffer + 4 + (3 * i),  &Samples[i].Value[0], &Samples[i].Value[1], &Samples[i].Value[2]);
@@ -104,7 +95,7 @@ struct LatencyTestSamplesMessage
     LatencyTestSamples        Samples;
 };
 
-bool DecodeLatencyTestSamplesMessage(LatencyTestSamplesMessage* message, const UByte* buffer, int size)
+bool DecodeLatencyTestSamplesMessage(LatencyTestSamplesMessage* message, UByte* buffer, int size)
 {
     memset(message, 0, sizeof(LatencyTestSamplesMessage));
 
@@ -157,7 +148,7 @@ struct LatencyTestColorDetectedMessage
     LatencyTestColorDetected  ColorDetected;
 };
 
-bool DecodeLatencyTestColorDetectedMessage(LatencyTestColorDetectedMessage* message, const UByte* buffer, int size)
+bool DecodeLatencyTestColorDetectedMessage(LatencyTestColorDetectedMessage* message, UByte* buffer, int size)
 {
     memset(message, 0, sizeof(LatencyTestColorDetectedMessage));
 
@@ -206,7 +197,7 @@ struct LatencyTestStartedMessage
     LatencyTestStarted  TestStarted;
 };
 
-bool DecodeLatencyTestStartedMessage(LatencyTestStartedMessage* message, const UByte* buffer, int size)
+bool DecodeLatencyTestStartedMessage(LatencyTestStartedMessage* message, UByte* buffer, int size)
 {
     memset(message, 0, sizeof(LatencyTestStartedMessage));
 
@@ -253,7 +244,7 @@ struct LatencyTestButtonMessage
     LatencyTestButton         Button;
 };
 
-bool DecodeLatencyTestButtonMessage(LatencyTestButtonMessage* message, const UByte* buffer, int size)
+bool DecodeLatencyTestButtonMessage(LatencyTestButtonMessage* message, UByte* buffer, int size)
 {
     memset(message, 0, sizeof(LatencyTestButtonMessage));
 
@@ -314,7 +305,7 @@ struct LatencyTestCalibrateImpl
     UByte   Buffer[PacketSize];
 
     Color CalibrationColor;
-
+    
     LatencyTestCalibrateImpl(const Color& calibrationColor)
         : CalibrationColor(calibrationColor)
     {
@@ -355,8 +346,7 @@ struct LatencyTestStartTestImpl
         UInt16 commandID = 1;
 
         Buffer[0] = 8;
-		Buffer[1] = UByte(commandID  & 0xFF);
-		Buffer[2] = UByte(commandID >> 8);
+        EncodeUInt16(Buffer+1, commandID);
 		Buffer[3] = TargetColor.R;
 		Buffer[4] = TargetColor.G;
 		Buffer[5] = TargetColor.B;
@@ -364,7 +354,7 @@ struct LatencyTestStartTestImpl
 
     void Unpack()
     {
-//      UInt16 commandID = Buffer[1] | (UInt16(Buffer[2]) << 8);
+//      UInt16 commandID = DecodeUInt16(Buffer+1);
         TargetColor.R = Buffer[3];
         TargetColor.G = Buffer[4];
         TargetColor.B = Buffer[5];
@@ -388,19 +378,13 @@ struct LatencyTestDisplayImpl
     {
         Buffer[0] = 9;
         Buffer[1] = Display.Mode;
-        Buffer[2] = UByte(Display.Value & 0xFF);
-        Buffer[3] = UByte((Display.Value >> 8) & 0xFF);
-        Buffer[4] = UByte((Display.Value >> 16) & 0xFF);
-        Buffer[5] = UByte((Display.Value >> 24) & 0xFF);
+        EncodeUInt32(Buffer+2, Display.Value);
     }
 
     void Unpack()
     {
         Display.Mode = Buffer[1];
-        Display.Value = UInt32(Buffer[2]) |
-            (UInt32(Buffer[3]) << 8) |
-            (UInt32(Buffer[4]) << 16) |
-            (UInt32(Buffer[5]) << 24);
+        Display.Value = DecodeUInt32(Buffer+2);
     }
 };
 
@@ -418,7 +402,7 @@ void LatencyTestDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
         void operator = (const LatencyTestEnumerator&) { }
 
         DeviceFactory*     pFactory;
-        EnumerateVisitor&  ExternalVisitor;
+        EnumerateVisitor&  ExternalVisitor;   
     public:
         LatencyTestEnumerator(DeviceFactory* factory, EnumerateVisitor& externalVisitor)
             : pFactory(factory), ExternalVisitor(externalVisitor) { }
@@ -443,10 +427,10 @@ void LatencyTestDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
 bool LatencyTestDeviceFactory::MatchVendorProduct(UInt16 vendorId, UInt16 productId) const
 {
-    return ((vendorId == LatencyTester_VendorId) && (productId == LatencyTester_ProductId));
+    return ((vendorId == LatencyTester_VendorId) && (productId == LatencyTester_ProductId));                
 }
 
-bool LatencyTestDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr,
+bool LatencyTestDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr, 
                                                const HIDDeviceDesc& desc)
 {
     if (MatchVendorProduct(desc.VendorId, desc.ProductId))
@@ -471,17 +455,17 @@ bool LatencyTestDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
         (info->InfoClassType != Device_None))
         return false;
 
-    OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength, HIDDesc.Product.ToCStr());
-    OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, HIDDesc.Manufacturer.ToCStr());
-    info->Type    = Device_LatencyTester;
+    info->Type =            Device_LatencyTester;
+    info->ProductName =     HIDDesc.Product;
+    info->Manufacturer =    HIDDesc.Manufacturer;
+    info->Version =         HIDDesc.VersionNumber;
 
     if (info->InfoClassType == Device_LatencyTester)
     {
         SensorInfo* sinfo = (SensorInfo*)info;
         sinfo->VendorId  = HIDDesc.VendorId;
         sinfo->ProductId = HIDDesc.ProductId;
-        sinfo->Version   = HIDDesc.VersionNumber;
-        OVR_strcpy(sinfo->SerialNumber, sizeof(sinfo->SerialNumber),HIDDesc.SerialNumber.ToCStr());
+        sinfo->SerialNumber = HIDDesc.SerialNumber;
     }
     return true;
 }
@@ -497,7 +481,7 @@ LatencyTestDeviceImpl::LatencyTestDeviceImpl(LatencyTestDeviceCreateDesc* create
 LatencyTestDeviceImpl::~LatencyTestDeviceImpl()
 {
     // Check that Shutdown() was called.
-    OVR_ASSERT(!pCreateDesc->pDevice);
+    OVR_ASSERT(!pCreateDesc->pDevice);    
 }
 
 // Internal creation APIs.
@@ -513,20 +497,20 @@ bool LatencyTestDeviceImpl::Initialize(DeviceBase* parent)
 }
 
 void LatencyTestDeviceImpl::Shutdown()
-{
+{   
     HIDDeviceImpl<OVR::LatencyTestDevice>::Shutdown();
 
     LogText("OVR::LatencyTestDevice - Closed '%s'\n", getHIDDesc()->Path.ToCStr());
 }
 
-void LatencyTestDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
+void LatencyTestDeviceImpl::OnInputReport(UByte* pData, UInt32 length)
 {
-
+    
     bool processed = false;
     if (!processed)
     {
-        LatencyTestSamplesMessage message;
-        if (DecodeLatencyTestSamplesMessage(&message, pData, length))
+        LatencyTestSamplesMessage message; 
+        if (DecodeLatencyTestSamplesMessage(&message, pData, length))     
         {
             processed = true;
             onLatencyTestSamplesMessage(&message);
@@ -535,8 +519,8 @@ void LatencyTestDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
 
     if (!processed)
     {
-        LatencyTestColorDetectedMessage message;
-        if (DecodeLatencyTestColorDetectedMessage(&message, pData, length))
+        LatencyTestColorDetectedMessage message; 
+        if (DecodeLatencyTestColorDetectedMessage(&message, pData, length))     
         {
             processed = true;
             onLatencyTestColorDetectedMessage(&message);
@@ -545,8 +529,8 @@ void LatencyTestDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
 
     if (!processed)
     {
-        LatencyTestStartedMessage message;
-        if (DecodeLatencyTestStartedMessage(&message, pData, length))
+        LatencyTestStartedMessage message; 
+        if (DecodeLatencyTestStartedMessage(&message, pData, length))     
         {
             processed = true;
             onLatencyTestStartedMessage(&message);
@@ -555,8 +539,8 @@ void LatencyTestDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
 
     if (!processed)
     {
-        LatencyTestButtonMessage message;
-        if (DecodeLatencyTestButtonMessage(&message, pData, length))
+        LatencyTestButtonMessage message; 
+        if (DecodeLatencyTestButtonMessage(&message, pData, length))     
         {
             processed = true;
             onLatencyTestButtonMessage(&message);
@@ -565,7 +549,7 @@ void LatencyTestDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
 }
 
 bool LatencyTestDeviceImpl::SetConfiguration(const OVR::LatencyTestConfiguration& configuration, bool waitFlag)
-{
+{  
     bool                result = false;
     ThreadCommandQueue* queue = GetManagerImpl()->GetThreadQueue();
 
@@ -576,9 +560,9 @@ bool LatencyTestDeviceImpl::SetConfiguration(const OVR::LatencyTestConfiguration
             return queue->PushCall(this, &LatencyTestDeviceImpl::setConfiguration, configuration);
         }
 
-        if (!queue->PushCallAndWaitResult(  this,
+        if (!queue->PushCallAndWaitResult(  this, 
             &LatencyTestDeviceImpl::setConfiguration,
-            &result,
+            &result, 
             configuration))
         {
             return false;
@@ -597,7 +581,7 @@ bool LatencyTestDeviceImpl::setConfiguration(const OVR::LatencyTestConfiguration
 }
 
 bool LatencyTestDeviceImpl::GetConfiguration(OVR::LatencyTestConfiguration* configuration)
-{
+{  
     bool result = false;
 
 	ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
@@ -630,9 +614,9 @@ bool LatencyTestDeviceImpl::SetCalibrate(const Color& calibrationColor, bool wai
         return queue->PushCall(this, &LatencyTestDeviceImpl::setCalibrate, calibrationColor);
     }
 
-    if (!queue->PushCallAndWaitResult(  this,
+    if (!queue->PushCallAndWaitResult(  this, 
                                         &LatencyTestDeviceImpl::setCalibrate,
-                                        &result,
+                                        &result, 
                                         calibrationColor))
     {
         return false;
@@ -657,9 +641,9 @@ bool LatencyTestDeviceImpl::SetStartTest(const Color& targetColor, bool waitFlag
         return queue->PushCall(this, &LatencyTestDeviceImpl::setStartTest, targetColor);
     }
 
-    if (!queue->PushCallAndWaitResult(  this,
+    if (!queue->PushCallAndWaitResult(  this, 
                                         &LatencyTestDeviceImpl::setStartTest,
-                                        &result,
+                                        &result, 
                                         targetColor))
     {
         return false;
@@ -684,9 +668,9 @@ bool LatencyTestDeviceImpl::SetDisplay(const OVR::LatencyTestDisplay& display, b
         return queue->PushCall(this, &LatencyTestDeviceImpl::setDisplay, display);
     }
 
-    if (!queue->PushCallAndWaitResult(  this,
+    if (!queue->PushCallAndWaitResult(  this, 
                                         &LatencyTestDeviceImpl::setDisplay,
-                                        &result,
+                                        &result, 
                                         display))
     {
         return false;
@@ -711,16 +695,16 @@ void LatencyTestDeviceImpl::onLatencyTestSamplesMessage(LatencyTestSamplesMessag
 
     // Call OnMessage() within a lock to avoid conflicts with handlers.
     Lock::Locker scopeLock(HandlerRef.GetLock());
-
-    if (HandlerRef.GetHandler())
+  
+    if (HandlerRef.HasHandlers())
     {
         MessageLatencyTestSamples samples(this);
         for (UByte i = 0; i < s.SampleCount; i++)
-        {
+        {            
             samples.Samples.PushBack(Color(s.Samples[i].Value[0], s.Samples[i].Value[1], s.Samples[i].Value[2]));
         }
 
-        HandlerRef.GetHandler()->OnMessage(samples);
+        HandlerRef.Call(samples);
     }
 }
 
@@ -734,14 +718,14 @@ void LatencyTestDeviceImpl::onLatencyTestColorDetectedMessage(LatencyTestColorDe
     // Call OnMessage() within a lock to avoid conflicts with handlers.
     Lock::Locker scopeLock(HandlerRef.GetLock());
 
-    if (HandlerRef.GetHandler())
+    if (HandlerRef.HasHandlers())
     {
         MessageLatencyTestColorDetected detected(this);
         detected.Elapsed = s.Elapsed;
         detected.DetectedValue = Color(s.TriggerValue[0], s.TriggerValue[1], s.TriggerValue[2]);
         detected.TargetValue = Color(s.TargetValue[0], s.TargetValue[1], s.TargetValue[2]);
 
-        HandlerRef.GetHandler()->OnMessage(detected);
+        HandlerRef.Call(detected);
     }
 }
 
@@ -755,12 +739,12 @@ void LatencyTestDeviceImpl::onLatencyTestStartedMessage(LatencyTestStartedMessag
     // Call OnMessage() within a lock to avoid conflicts with handlers.
     Lock::Locker scopeLock(HandlerRef.GetLock());
 
-    if (HandlerRef.GetHandler())
+    if (HandlerRef.HasHandlers())
     {
         MessageLatencyTestStarted started(this);
         started.TargetValue = Color(ts.TargetValue[0], ts.TargetValue[1], ts.TargetValue[2]);
 
-        HandlerRef.GetHandler()->OnMessage(started);
+        HandlerRef.Call(started);
     }
 }
 
@@ -774,11 +758,11 @@ void LatencyTestDeviceImpl::onLatencyTestButtonMessage(LatencyTestButtonMessage*
     // Call OnMessage() within a lock to avoid conflicts with handlers.
     Lock::Locker scopeLock(HandlerRef.GetLock());
 
-    if (HandlerRef.GetHandler())
+    if (HandlerRef.HasHandlers())
     {
         MessageLatencyTestButton button(this);
 
-        HandlerRef.GetHandler()->OnMessage(button);
+        HandlerRef.Call(button);
     }
 }
 

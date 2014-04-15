@@ -3,18 +3,18 @@
 Filename    :   OVR_SensorImpl.cpp
 Content     :   Oculus Sensor device implementation.
 Created     :   March 7, 2013
-Authors     :   Lee Cooper
+Authors     :   Lee Cooper, Dov Katz
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,25 +25,31 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_SensorImpl.h"
+#include "OVR_Sensor2Impl.h"
+#include "OVR_SensorImpl_Common.h"
+#include "OVR_JSON.h"
+#include "OVR_Profile.h"
+#include "Kernel/OVR_Alg.h"
+#include <time.h>
 
 // HMDDeviceDesc can be created/updated through Sensor carrying DisplayInfo.
 
 #include "Kernel/OVR_Timer.h"
 
-#include <iostream>
+//extern FILE *SF_LOG_fp;
 
 namespace OVR {
+
+using namespace Alg;
 
 //-------------------------------------------------------------------------------------
 // ***** Oculus Sensor-specific packet data structures
 
-enum {
+enum {    
     Sensor_VendorId  = Oculus_VendorId,
-    Sensor_ProductId = 0x0001,
-
-    // ST's VID used originally; should be removed in the future
-    Sensor_OldVendorId  = 0x0483,
-    Sensor_OldProductId = 0x5750,
+    Sensor_Tracker_ProductId = Device_Tracker_ProductId,
+    Sensor_Tracker2_ProductId = Device_Tracker2_ProductId,
+    Sensor_KTracker_ProductId = Device_KTracker_ProductId,
 
     Sensor_BootLoader   = 0x1001,
 
@@ -51,45 +57,6 @@ enum {
     Sensor_MaxReportRate     = 1000 // Hz
 };
 
-// Reported data is little-endian now
-static UInt16 DecodeUInt16(const UByte* buffer)
-{
-    return (UInt16(buffer[1]) << 8) | UInt16(buffer[0]);
-}
-
-static SInt16 DecodeSInt16(const UByte* buffer)
-{
-    return (SInt16(buffer[1]) << 8) | SInt16(buffer[0]);
-}
-
-static UInt32 DecodeUInt32(const UByte* buffer)
-{
-    return (buffer[0]) | UInt32(buffer[1] << 8) | UInt32(buffer[2] << 16) | UInt32(buffer[3] << 24);
-}
-
-static float DecodeFloat(const UByte* buffer)
-{
-    union {
-        UInt32 U;
-        float  F;
-    };
-
-    U = DecodeUInt32(buffer);
-    return F;
-}
-
-
-static void UnpackSensor(const UByte* buffer, SInt32* x, SInt32* y, SInt32* z)
-{
-    // Sign extending trick
-    // from http://graphics.stanford.edu/~seander/bithacks.html#FixedSignExtend
-    struct {SInt32 x:21;} s;
-
-    *x = s.x = (buffer[0] << 13) | (buffer[1] << 5) | ((buffer[2] & 0xF8) >> 3);
-    *y = s.x = ((buffer[2] & 0x07) << 18) | (buffer[3] << 10) | (buffer[4] << 2) |
-               ((buffer[5] & 0xC0) >> 6);
-    *z = s.x = ((buffer[5] & 0x3F) << 15) | (buffer[6] << 7) | (buffer[7] >> 1);
-}
 
 // Messages we care for
 enum TrackerMessageType
@@ -98,12 +65,6 @@ enum TrackerMessageType
     TrackerMessage_Sensors           = 1,
     TrackerMessage_Unknown           = 0x100,
     TrackerMessage_SizeError         = 0x101,
-};
-
-struct TrackerSample
-{
-    SInt32 AccelX, AccelY, AccelZ;
-    SInt32 GyroX, GyroY, GyroZ;
 };
 
 
@@ -127,14 +88,14 @@ struct TrackerSensors
         Timestamp		= DecodeUInt16(buffer + 2);
         LastCommandID	= DecodeUInt16(buffer + 4);
         Temperature		= DecodeSInt16(buffer + 6);
-
-        //if (SampleCount > 2)
-        //    OVR_DEBUG_LOG_TEXT(("TackerSensor::Decode SampleCount=%d\n", SampleCount));
+        
+        //if (SampleCount > 2)        
+        //    OVR_DEBUG_LOG_TEXT(("TackerSensor::Decode SampleCount=%d\n", SampleCount));        
 
         // Only unpack as many samples as there actually are
-        UByte iterationCount = (SampleCount > 2) ? 3 : SampleCount;
+        int iterationCount = (SampleCount > 2) ? 3 : SampleCount;
 
-        for (UByte i = 0; i < iterationCount; i++)
+        for (int i = 0; i < iterationCount; i++)
         {
             UnpackSensor(buffer + 8 + 16 * i,  &Samples[i].AccelX, &Samples[i].AccelY, &Samples[i].AccelZ);
             UnpackSensor(buffer + 16 + 16 * i, &Samples[i].GyroX,  &Samples[i].GyroY,  &Samples[i].GyroZ);
@@ -154,210 +115,6 @@ struct TrackerMessage
     TrackerSensors     Sensors;
 };
 
-bool DecodeTrackerMessage(TrackerMessage* message, const UByte* buffer, int size)
-{
-    memset(message, 0, sizeof(TrackerMessage));
-
-    if (size < 4)
-    {
-        message->Type = TrackerMessage_SizeError;
-        return false;
-    }
-
-    switch (buffer[0])
-    {
-    case TrackerMessage_Sensors:
-        message->Type = message->Sensors.Decode(buffer, size);
-        break;
-
-    default:
-        message->Type = TrackerMessage_Unknown;
-        break;
-    }
-
-    return (message->Type < TrackerMessage_Unknown) && (message->Type != TrackerMessage_None);
-}
-
-
-// ***** SensorRangeImpl Implementation
-
-// Sensor HW only accepts specific maximum range values, used to maximize
-// the 16-bit sensor outputs. Use these ramps to specify and report appropriate values.
-static const UInt16 AccelRangeRamp[] = { 2, 4, 8, 16 };
-static const UInt16 GyroRangeRamp[]  = { 250, 500, 1000, 2000 };
-static const UInt16 MagRangeRamp[]   = { 880, 1300, 1900, 2500 };
-
-static UInt16 SelectSensorRampValue(const UInt16* ramp, unsigned count,
-                                    float val, float factor, const char* label)
-{
-    UInt16 threshold = (UInt16)(val * factor);
-
-    for (unsigned i = 0; i<count; i++)
-    {
-        if (ramp[i] >= threshold)
-            return ramp[i];
-    }
-    OVR_DEBUG_LOG(("SensorDevice::SetRange - %s clamped to %0.4f",
-                   label, float(ramp[count-1]) / factor));
-    OVR_UNUSED2(factor, label);
-    return ramp[count-1];
-}
-
-// SensorScaleImpl provides buffer packing logic for the Sensor Range
-// record that can be applied to DK1 sensor through Get/SetFeature. We expose this
-// through SensorRange class, which has different units.
-struct SensorRangeImpl
-{
-    enum  { PacketSize = 8 };
-    UByte   Buffer[PacketSize];
-
-    UInt16  CommandId;
-    UInt16  AccelScale;
-    UInt16  GyroScale;
-    UInt16  MagScale;
-
-    SensorRangeImpl(const SensorRange& r, UInt16 commandId = 0)
-    {
-        SetSensorRange(r, commandId);
-    }
-
-    void SetSensorRange(const SensorRange& r, UInt16 commandId = 0)
-    {
-        CommandId  = commandId;
-        AccelScale = SelectSensorRampValue(AccelRangeRamp, sizeof(AccelRangeRamp)/sizeof(AccelRangeRamp[0]),
-                                           r.MaxAcceleration, (1.0f / 9.81f), "MaxAcceleration");
-        GyroScale  = SelectSensorRampValue(GyroRangeRamp, sizeof(GyroRangeRamp)/sizeof(GyroRangeRamp[0]),
-                                           r.MaxRotationRate, Math<float>::RadToDegreeFactor, "MaxRotationRate");
-        MagScale   = SelectSensorRampValue(MagRangeRamp, sizeof(MagRangeRamp)/sizeof(MagRangeRamp[0]),
-                                           r.MaxMagneticField, 1000.0f, "MaxMagneticField");
-        Pack();
-    }
-
-    void GetSensorRange(SensorRange* r)
-    {
-        r->MaxAcceleration = AccelScale * 9.81f;
-        r->MaxRotationRate = DegreeToRad((float)GyroScale);
-        r->MaxMagneticField= MagScale * 0.001f;
-    }
-
-    static SensorRange GetMaxSensorRange()
-    {
-        return SensorRange(AccelRangeRamp[sizeof(AccelRangeRamp)/sizeof(AccelRangeRamp[0]) - 1] * 9.81f,
-                           GyroRangeRamp[sizeof(GyroRangeRamp)/sizeof(GyroRangeRamp[0]) - 1] *
-                                Math<float>::DegreeToRadFactor,
-                           MagRangeRamp[sizeof(MagRangeRamp)/sizeof(MagRangeRamp[0]) - 1] * 0.001f);
-    }
-
-    void  Pack()
-    {
-        Buffer[0] = 4;
-        Buffer[1] = UByte(CommandId & 0xFF);
-        Buffer[2] = UByte(CommandId >> 8);
-        Buffer[3] = UByte(AccelScale);
-        Buffer[4] = UByte(GyroScale & 0xFF);
-        Buffer[5] = UByte(GyroScale >> 8);
-        Buffer[6] = UByte(MagScale & 0xFF);
-        Buffer[7] = UByte(MagScale >> 8);
-    }
-
-    void Unpack()
-    {
-        CommandId = Buffer[1] | (UInt16(Buffer[2]) << 8);
-        AccelScale= Buffer[3];
-        GyroScale = Buffer[4] | (UInt16(Buffer[5]) << 8);
-        MagScale  = Buffer[6] | (UInt16(Buffer[7]) << 8);
-    }
-};
-
-
-// Sensor configuration command, ReportId == 2.
-
-struct SensorConfigImpl
-{
-    enum  { PacketSize = 7 };
-    UByte   Buffer[PacketSize];
-
-    // Flag values for Flags.
-    enum {
-        Flag_RawMode            = 0x01,
-        Flag_CallibrationTest   = 0x02, // Internal test mode
-        Flag_UseCallibration    = 0x04,
-        Flag_AutoCallibration   = 0x08,
-        Flag_MotionKeepAlive    = 0x10,
-        Flag_CommandKeepAlive   = 0x20,
-        Flag_SensorCoordinates  = 0x40
-    };
-
-    UInt16  CommandId;
-    UByte   Flags;
-    UInt16  PacketInterval;
-    UInt16  KeepAliveIntervalMs;
-
-    SensorConfigImpl() : CommandId(0), Flags(0), PacketInterval(0), KeepAliveIntervalMs(0)
-    {
-        memset(Buffer, 0, PacketSize);
-        Buffer[0] = 2;
-    }
-
-    void    SetSensorCoordinates(bool sensorCoordinates)
-    { Flags = (Flags & ~Flag_SensorCoordinates) | (sensorCoordinates ? Flag_SensorCoordinates : 0); }
-    bool    IsUsingSensorCoordinates() const
-    { return (Flags & Flag_SensorCoordinates) != 0; }
-
-    void Pack()
-    {
-        Buffer[0] = 2;
-        Buffer[1] = UByte(CommandId & 0xFF);
-        Buffer[2] = UByte(CommandId >> 8);
-        Buffer[3] = Flags;
-        Buffer[4] = UByte(PacketInterval);
-        Buffer[5] = UByte(KeepAliveIntervalMs & 0xFF);
-        Buffer[6] = UByte(KeepAliveIntervalMs >> 8);
-    }
-
-    void Unpack()
-    {
-        CommandId          = Buffer[1] | (UInt16(Buffer[2]) << 8);
-        Flags              = Buffer[3];
-        PacketInterval     = Buffer[4];
-        KeepAliveIntervalMs= Buffer[5] | (UInt16(Buffer[6]) << 8);
-    }
-
-};
-
-
-// SensorKeepAlive - feature report that needs to be sent at regular intervals for sensor
-// to receive commands.
-struct SensorKeepAliveImpl
-{
-    enum  { PacketSize = 5 };
-    UByte   Buffer[PacketSize];
-
-    UInt16  CommandId;
-    UInt16  KeepAliveIntervalMs;
-
-    SensorKeepAliveImpl(UInt16 interval = 0, UInt16 commandId = 0)
-        : CommandId(commandId), KeepAliveIntervalMs(interval)
-    {
-        Pack();
-    }
-
-    void  Pack()
-    {
-        Buffer[0] = 8;
-        Buffer[1] = UByte(CommandId & 0xFF);
-        Buffer[2] = UByte(CommandId >> 8);
-        Buffer[3] = UByte(KeepAliveIntervalMs & 0xFF);
-        Buffer[4] = UByte(KeepAliveIntervalMs >> 8);
-    }
-
-    void Unpack()
-    {
-        CommandId          = Buffer[1] | (UInt16(Buffer[2]) << 8);
-        KeepAliveIntervalMs= Buffer[3] | (UInt16(Buffer[4]) << 8);
-    }
-};
-
 
 //-------------------------------------------------------------------------------------
 // ***** SensorDisplayInfoImpl
@@ -370,22 +127,39 @@ SensorDisplayInfoImpl::SensorDisplayInfoImpl()
 
 void SensorDisplayInfoImpl::Unpack()
 {
-    CommandId               = Buffer[1] | (UInt16(Buffer[2]) << 8);
-    DistortionType          = Buffer[3];
-    HResolution             = DecodeUInt16(Buffer+4);
-    VResolution             = DecodeUInt16(Buffer+6);
-    HScreenSize             = DecodeUInt32(Buffer+8) *  (1/1000000.f);
-    VScreenSize             = DecodeUInt32(Buffer+12) * (1/1000000.f);
-    VCenter                 = DecodeUInt32(Buffer+16) * (1/1000000.f);
-    LensSeparation          = DecodeUInt32(Buffer+20) * (1/1000000.f);
-    EyeToScreenDistance[0]  = DecodeUInt32(Buffer+24) * (1/1000000.f);
-    EyeToScreenDistance[1]  = DecodeUInt32(Buffer+28) * (1/1000000.f);
-    DistortionK[0]          = DecodeFloat(Buffer+32);
-    DistortionK[1]          = DecodeFloat(Buffer+36);
-    DistortionK[2]          = DecodeFloat(Buffer+40);
-    DistortionK[3]          = DecodeFloat(Buffer+44);
-    DistortionK[4]          = DecodeFloat(Buffer+48);
-    DistortionK[5]          = DecodeFloat(Buffer+52);
+    CommandId                       = Buffer[1] | (UInt16(Buffer[2]) << 8);
+    DistortionType                  = Buffer[3];
+    HResolution                     = DecodeUInt16(Buffer+4);
+    VResolution                     = DecodeUInt16(Buffer+6);
+    HScreenSize                     = DecodeUInt32(Buffer+8) *  (1/1000000.f);
+    VScreenSize                     = DecodeUInt32(Buffer+12) * (1/1000000.f);
+    VCenter                         = DecodeUInt32(Buffer+16) * (1/1000000.f);
+    LensSeparation                  = DecodeUInt32(Buffer+20) * (1/1000000.f);
+
+#if 0
+    // These are not well-measured on most devices - probably best to ignore them.
+    OutsideLensSurfaceToScreen[0]   = DecodeUInt32(Buffer+24) * (1/1000000.f);
+    OutsideLensSurfaceToScreen[1]   = DecodeUInt32(Buffer+28) * (1/1000000.f);
+    // TODO: add spline-based distortion.
+    // TODO: currently these values are all zeros in the HMD itself.
+    DistortionK[0]                  = DecodeFloat(Buffer+32);
+    DistortionK[1]                  = DecodeFloat(Buffer+36);
+    DistortionK[2]                  = DecodeFloat(Buffer+40);
+    DistortionK[3]                  = DecodeFloat(Buffer+44);
+    DistortionK[4]                  = DecodeFloat(Buffer+48);
+    DistortionK[5]                  = DecodeFloat(Buffer+52);
+#else
+    // The above are either measured poorly, or don't have values at all.
+    // To remove the temptation to use them, set them to junk.
+    OutsideLensSurfaceToScreen[0]   = -1.0f;
+    OutsideLensSurfaceToScreen[1]   = -1.0f;
+    DistortionK[0]                  = -1.0f;
+    DistortionK[1]                  = -1.0f;
+    DistortionK[2]                  = -1.0f;
+    DistortionK[3]                  = -1.0f;
+    DistortionK[4]                  = -1.0f;
+    DistortionK[5]                  = -1.0f;
+#endif
 }
 
 
@@ -403,7 +177,7 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
         void operator = (const SensorEnumerator&) { }
 
         DeviceFactory*     pFactory;
-        EnumerateVisitor&  ExternalVisitor;
+        EnumerateVisitor&  ExternalVisitor;   
     public:
         SensorEnumerator(DeviceFactory* factory, EnumerateVisitor& externalVisitor)
             : pFactory(factory), ExternalVisitor(externalVisitor) { }
@@ -431,7 +205,7 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
             // Check if the sensor returns DisplayInfo. If so, try to use it to override potentially
             // mismatching monitor information (in case wrong EDID is reported by splitter),
             // or to create a new "virtualized" HMD Device.
-
+            
             SensorDisplayInfoImpl displayInfo;
 
             if (device.GetFeatureReport(displayInfo.Buffer, SensorDisplayInfoImpl::PacketSize))
@@ -453,15 +227,14 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     SensorEnumerator sensorEnumerator(this, visitor);
     GetManagerImpl()->GetHIDDeviceManager()->Enumerate(&sensorEnumerator);
 
-    //double totalSeconds = Timer::GetProfileSeconds() - start;
+    //double totalSeconds = Timer::GetProfileSeconds() - start; 
 }
 
 bool SensorDeviceFactory::MatchVendorProduct(UInt16 vendorId, UInt16 productId) const
 {
-    // search for a tracker sensor or a tracker boot loader device
-    return ((vendorId == Sensor_VendorId) && (productId == Sensor_ProductId)) ||
-        ((vendorId == Sensor_OldVendorId) && (productId == Sensor_OldProductId)) ||
-        ((vendorId == Sensor_VendorId) && (productId == Sensor_BootLoader));
+    return 	((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker_ProductId)) ||
+    		((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker2_ProductId)) ||
+    		((vendorId == Sensor_VendorId) && (productId == Sensor_KTracker_ProductId));
 }
 
 bool SensorDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr, const HIDDeviceDesc& desc)
@@ -490,6 +263,11 @@ bool SensorDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr, const HIDDevic
 
 DeviceBase* SensorDeviceCreateDesc::NewDeviceInstance()
 {
+    if (HIDDesc.ProductId == Sensor_Tracker2_ProductId)
+    {
+        return new Sensor2DeviceImpl(this);
+    }
+
     return new SensorDeviceImpl(this);
 }
 
@@ -499,18 +277,18 @@ bool SensorDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
         (info->InfoClassType != Device_None))
         return false;
 
-    OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength, HIDDesc.Product.ToCStr());
-    OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, HIDDesc.Manufacturer.ToCStr());
-    info->Type    = Device_Sensor;
+    info->Type =            Device_Sensor;
+    info->ProductName =     HIDDesc.Product;
+    info->Manufacturer =    HIDDesc.Manufacturer;
+    info->Version =         HIDDesc.VersionNumber;
 
     if (info->InfoClassType == Device_Sensor)
     {
         SensorInfo* sinfo = (SensorInfo*)info;
         sinfo->VendorId  = HIDDesc.VendorId;
         sinfo->ProductId = HIDDesc.ProductId;
-        sinfo->Version   = HIDDesc.VersionNumber;
         sinfo->MaxRanges = SensorRangeImpl::GetMaxSensorRange();
-        OVR_strcpy(sinfo->SerialNumber, sizeof(sinfo->SerialNumber),HIDDesc.SerialNumber.ToCStr());
+        sinfo->SerialNumber = HIDDesc.SerialNumber;
     }
     return true;
 }
@@ -522,21 +300,30 @@ SensorDeviceImpl::SensorDeviceImpl(SensorDeviceCreateDesc* createDesc)
     : OVR::HIDDeviceImpl<OVR::SensorDevice>(createDesc, 0),
       Coordinates(SensorDevice::Coord_Sensor),
       HWCoordinates(SensorDevice::Coord_HMD), // HW reports HMD coordinates by default.
-      NextKeepAliveTicks(0),
-      MaxValidRange(SensorRangeImpl::GetMaxSensorRange())
+      NextKeepAliveTickSeconds(0),
+      FullTimestamp(0),      
+      MaxValidRange(SensorRangeImpl::GetMaxSensorRange()),
+      magCalibrated(false)
 {
-    SequenceValid  = false;
-    LastSampleCount= 0;
+    SequenceValid   = false;
+    LastSampleCount = 0;
     LastTimestamp   = 0;
 
     OldCommandId = 0;
+
+    PrevAbsoluteTime = 0.0;
+
+#ifdef OVR_OS_ANDROID
+    pPhoneSensors = PhoneSensors::Create();
+#endif
 }
 
 SensorDeviceImpl::~SensorDeviceImpl()
 {
     // Check that Shutdown() was called.
-    OVR_ASSERT(!pCreateDesc->pDevice);
+    OVR_ASSERT(!pCreateDesc->pDevice);    
 }
+
 
 // Internal creation APIs.
 bool SensorDeviceImpl::Initialize(DeviceBase* parent)
@@ -544,9 +331,6 @@ bool SensorDeviceImpl::Initialize(DeviceBase* parent)
     if (HIDDeviceImpl<OVR::SensorDevice>::Initialize(parent))
     {
         openDevice();
-
-        LogText("OVR::SensorDevice initialized.\n");
-
         return true;
     }
 
@@ -568,6 +352,17 @@ void SensorDeviceImpl::openDevice()
         setRange(CurrentRange);
     }
 
+    // Read the currently configured calibration from sensor.
+    SensorFactoryCalibrationImpl sc;
+    if (GetInternalDevice()->GetFeatureReport(sc.Buffer, SensorFactoryCalibrationImpl::PacketSize))
+    {
+        sc.Unpack();
+        AccelCalibrationOffset = sc.AccelOffset;
+        GyroCalibrationOffset  = sc.GyroOffset;
+        AccelCalibrationMatrix = sc.AccelMatrix;
+        GyroCalibrationMatrix  = sc.GyroMatrix;
+        CalibrationTemperature = sc.Temperature;
+    }
 
     // If the sensor has "DisplayInfo" data, use HMD coordinate frame by default.
     SensorDisplayInfoImpl displayInfo;
@@ -585,31 +380,38 @@ void SensorDeviceImpl::openDevice()
     // Set Keep-alive at 10 seconds.
     SensorKeepAliveImpl skeepAlive(10 * 1000);
     GetInternalDevice()->SetFeatureReport(skeepAlive.Buffer, SensorKeepAliveImpl::PacketSize);
+
+    // Load mag calibration
+    MagCalibrationReport report;
+    bool res = GetMagCalibrationReport(&report);
+    if (res && report.Version > 0)
+    {
+        magCalibration = report.Calibration;
+        magCalibrated = true;
+    }
 }
 
 void SensorDeviceImpl::closeDeviceOnError()
 {
     LogText("OVR::SensorDevice - Lost connection to '%s'\n", getHIDDesc()->Path.ToCStr());
-    NextKeepAliveTicks = 0;
+    NextKeepAliveTickSeconds = 0;
 }
 
 void SensorDeviceImpl::Shutdown()
-{
+{   
     HIDDeviceImpl<OVR::SensorDevice>::Shutdown();
 
     LogText("OVR::SensorDevice - Closed '%s'\n", getHIDDesc()->Path.ToCStr());
 }
 
-
-void SensorDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
+void SensorDeviceImpl::OnInputReport(UByte* pData, UInt32 length)
 {
 
-    bool processed = false;
+	bool processed = false;
     if (!processed)
     {
-
         TrackerMessage message;
-        if (DecodeTrackerMessage(&message, pData, length))
+        if (decodeTrackerMessage(&message, pData, length))
         {
             processed = true;
             onTrackerMessage(&message);
@@ -617,12 +419,12 @@ void SensorDeviceImpl::OnInputReport(const UByte* pData, UInt32 length)
     }
 }
 
-UInt64 SensorDeviceImpl::OnTicks(UInt64 ticksMks)
+double SensorDeviceImpl::OnTicks(double tickSeconds)
 {
-    if (ticksMks >= NextKeepAliveTicks)
+    if (tickSeconds >= NextKeepAliveTickSeconds)
     {
         // Use 3-seconds keep alive by default.
-        UInt64 keepAliveDelta = Timer::MksPerSecond * 3;
+        double keepAliveDelta = 3.0;
 
         // Set Keep-alive at 10 seconds.
         SensorKeepAliveImpl skeepAlive(10 * 1000);
@@ -630,9 +432,9 @@ UInt64 SensorDeviceImpl::OnTicks(UInt64 ticksMks)
         GetInternalDevice()->SetFeatureReport(skeepAlive.Buffer, SensorKeepAliveImpl::PacketSize);
 
 		// Emit keep-alive every few seconds.
-        NextKeepAliveTicks = ticksMks + keepAliveDelta;
+        NextKeepAliveTickSeconds = tickSeconds + keepAliveDelta;
     }
-    return NextKeepAliveTicks - ticksMks;
+    return NextKeepAliveTickSeconds - tickSeconds;
 }
 
 bool SensorDeviceImpl::SetRange(const SensorRange& range, bool waitFlag)
@@ -644,10 +446,10 @@ bool SensorDeviceImpl::SetRange(const SensorRange& range, bool waitFlag)
     {
         return threadQueue->PushCall(this, &SensorDeviceImpl::setRange, range);
     }
-
-    if (!threadQueue->PushCallAndWaitResult(this,
+    
+    if (!threadQueue->PushCallAndWaitResult(this, 
                                             &SensorDeviceImpl::setRange,
-                                            &result,
+                                            &result, 
                                             range))
     {
         return false;
@@ -665,19 +467,19 @@ void SensorDeviceImpl::GetRange(SensorRange* range) const
 bool SensorDeviceImpl::setRange(const SensorRange& range)
 {
     SensorRangeImpl sr(range);
-
+    
     if (GetInternalDevice()->SetFeatureReport(sr.Buffer, SensorRangeImpl::PacketSize))
     {
         Lock::Locker lockScope(GetLock());
         sr.GetSensorRange(&CurrentRange);
         return true;
     }
-
+    
     return false;
 }
 
 void SensorDeviceImpl::SetCoordinateFrame(CoordinateFrame coordframe)
-{
+{ 
     // Push call with wait.
     GetManagerImpl()->GetThreadQueue()->
         PushCall(this, &SensorDeviceImpl::setCoordinateFrame, coordframe, true);
@@ -704,7 +506,7 @@ Void SensorDeviceImpl::setCoordinateFrame(CoordinateFrame coordframe)
     scfg.Pack();
 
     GetInternalDevice()->SetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize);
-
+    
     // Re-read the state, in case of older firmware that doesn't support Sensor coordinates.
     if (GetInternalDevice()->GetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize))
     {
@@ -719,7 +521,7 @@ Void SensorDeviceImpl::setCoordinateFrame(CoordinateFrame coordframe)
 }
 
 void SensorDeviceImpl::SetReportRate(unsigned rateHz)
-{
+{ 
     // Push call with wait.
     GetManagerImpl()->GetThreadQueue()->
         PushCall(this, &SensorDeviceImpl::setReportRate, rateHz, true);
@@ -759,17 +561,49 @@ Void SensorDeviceImpl::setReportRate(unsigned rateHz)
     return 0;
 }
 
-void SensorDeviceImpl::SetMessageHandler(MessageHandler* handler)
+void SensorDeviceImpl::GetFactoryCalibration(Vector3f* AccelOffset, Vector3f* GyroOffset,
+                                             Matrix4f* AccelMatrix, Matrix4f* GyroMatrix, 
+                                             float* Temperature)
+{
+    *AccelOffset = AccelCalibrationOffset;
+    *GyroOffset  = GyroCalibrationOffset;
+    *AccelMatrix = AccelCalibrationMatrix;
+    *GyroMatrix  = GyroCalibrationMatrix;
+    *Temperature = CalibrationTemperature;
+}
+
+void SensorDeviceImpl::SetOnboardCalibrationEnabled(bool enabled)
+{
+    // Push call with wait.
+    GetManagerImpl()->GetThreadQueue()->
+        PushCall(this, &SensorDeviceImpl::setOnboardCalibrationEnabled, enabled, true);
+}
+
+Void SensorDeviceImpl::setOnboardCalibrationEnabled(bool enabled)
+{
+    // Read the original configuration
+    SensorConfigImpl scfg;
+    if (GetInternalDevice()->GetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize))
+    {
+        scfg.Unpack();
+    }
+
+    if (enabled)
+        scfg.Flags |= (SensorConfigImpl::Flag_AutoCalibration | SensorConfigImpl::Flag_UseCalibration);
+    else
+        scfg.Flags &= ~(SensorConfigImpl::Flag_AutoCalibration | SensorConfigImpl::Flag_UseCalibration);
+
+    scfg.Pack();
+
+    GetInternalDevice()->SetFeatureReport(scfg.Buffer, SensorConfigImpl::PacketSize);
+    return 0;
+}
+
+void SensorDeviceImpl::AddMessageHandler(MessageHandler* handler)
 {
     if (handler)
-    {
         SequenceValid = false;
-        DeviceBase::SetMessageHandler(handler);
-    }
-    else
-    {
-        DeviceBase::SetMessageHandler(handler);
-    }
+    DeviceBase::AddMessageHandler(handler);
 }
 
 // Sensor reports data in the following coordinate system:
@@ -794,20 +628,18 @@ Vector3f AccelFromBodyFrameUpdate(const TrackerSensors& update, UByte sampleNumb
 
 
 Vector3f MagFromBodyFrameUpdate(const TrackerSensors& update,
+                                Matrix4f magCalibration,
                                 bool convertHMDToSensor = false)
-{
-    // Note: Y and Z are swapped in comparison to the Accel.
+{   
+    float mx = (float)update.MagX;
+    float my = (float)update.MagY;
+    float mz = (float)update.MagZ;
+    // Note: Y and Z are swapped in comparison to the Accel.  
     // This accounts for DK1 sensor firmware axis swap, which should be undone in future releases.
-    if (!convertHMDToSensor)
-    {
-        return Vector3f( (float)update.MagX,
-                         (float)update.MagZ,
-                         (float)update.MagY) * 0.0001f;
-    }
-
-    return Vector3f( (float)update.MagX,
-                     (float)update.MagY,
-                    -(float)update.MagZ) * 0.0001f;
+    Vector3f mag = convertHMDToSensor ? Vector3f(mx, my, -mz) : Vector3f(mx, mz, my);
+    mag *= 0.0001f;
+    // Apply calibration
+    return magCalibration.Transform(mag);
 }
 
 Vector3f EulerFromBodyFrameUpdate(const TrackerSensors& update, UByte sampleNumber,
@@ -822,42 +654,86 @@ Vector3f EulerFromBodyFrameUpdate(const TrackerSensors& update, UByte sampleNumb
     return val * 0.0001f;
 }
 
+bool  SensorDeviceImpl::decodeTrackerMessage(TrackerMessage* message, UByte* buffer, int size)
+{
+    memset(message, 0, sizeof(TrackerMessage));
+
+    if (size < 4)
+    {
+        message->Type = TrackerMessage_SizeError;
+        return false;
+    }
+
+    switch (buffer[0])
+    {
+    case TrackerMessage_Sensors:
+        message->Type = message->Sensors.Decode(buffer, size);
+        break;
+
+    default:
+        message->Type = TrackerMessage_Unknown;
+        break;
+    }
+
+    return (message->Type < TrackerMessage_Unknown) && (message->Type != TrackerMessage_None);
+}
 
 void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
 {
     if (message->Type != TrackerMessage_Sensors)
         return;
+    
+    const double    timeUnit        = (1.0 / 1000.0);
+    double          scaledTimeUnit  = timeUnit;
+    TrackerSensors& s               = message->Sensors;
+    // DK1 timestamps the first sample, so the actual device time will be later
+    // by the time we get the message if there are multiple samples.
+    int             timestampAdjust = (s.SampleCount > 0) ? s.SampleCount-1 : 0;
 
-    const float     timeUnit   = (1.0f / 1000.f);
-    TrackerSensors& s = message->Sensors;
-
-
-    // Call OnMessage() within a lock to avoid conflicts with handlers.
-    Lock::Locker scopeLock(HandlerRef.GetLock());
-
+    const double now                 = Timer::GetSeconds();
+    double       absoluteTimeSeconds = 0.0;
+    
 
     if (SequenceValid)
     {
         unsigned timestampDelta;
 
         if (s.Timestamp < LastTimestamp)
+        {
+        	// The timestamp rolled around the 16 bit counter, so FullTimeStamp
+        	// needs a high word increment.
+        	FullTimestamp += 0x10000;
             timestampDelta = ((((int)s.Timestamp) + 0x10000) - (int)LastTimestamp);
+        }
         else
+        {
             timestampDelta = (s.Timestamp - LastTimestamp);
+        }
+        // Update the low word of FullTimeStamp
+        FullTimestamp = ( FullTimestamp & ~0xffff ) | s.Timestamp;       
 
-        // If we missed a small number of samples, replicate the last sample.
+        double deviceTime   = (FullTimestamp + timestampAdjust) * timeUnit;
+        absoluteTimeSeconds = TimeFilter.SampleToSystemTime(deviceTime, now, PrevAbsoluteTime);
+        scaledTimeUnit      = TimeFilter.ScaleTimeUnit(timeUnit);
+        PrevAbsoluteTime    = absoluteTimeSeconds;
+        
+        // If we missed a small number of samples, generate the sample that would have immediately
+        // proceeded the current one. Re-use the IMU values from the last processed sample.
         if ((timestampDelta > LastSampleCount) && (timestampDelta <= 254))
         {
-            if (HandlerRef.GetHandler())
+            if (HandlerRef.HasHandlers())
             {
                 MessageBodyFrame sensors(this);
-                sensors.TimeDelta     = (timestampDelta - LastSampleCount) * timeUnit;
-                sensors.Acceleration  = LastAcceleration;
-                sensors.RotationRate  = LastRotationRate;
-                sensors.MagneticField = LastMagneticField;
-                sensors.Temperature   = LastTemperature;
 
-                HandlerRef.GetHandler()->OnMessage(sensors);
+                sensors.AbsoluteTimeSeconds = absoluteTimeSeconds - s.SampleCount * scaledTimeUnit;
+                sensors.TimeDelta           = (float)((timestampDelta - LastSampleCount) * scaledTimeUnit);
+                sensors.Acceleration        = LastAcceleration;
+                sensors.RotationRate        = LastRotationRate;
+                sensors.MagneticField       = LastMagneticField;
+                sensors.Temperature         = LastTemperature;
+                sensors.MagCalibrated       = magCalibrated;
+
+                HandlerRef.Call(sensors);
             }
         }
     }
@@ -868,37 +744,58 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
         LastMagneticField= Vector3f(0);
         LastTemperature  = 0;
         SequenceValid    = true;
+
+        // This is our baseline sensor to host time delta,
+        // it will be adjusted with each new message.
+        FullTimestamp = s.Timestamp;
+
+        double deviceTime   = (FullTimestamp + timestampAdjust) * timeUnit;
+        absoluteTimeSeconds = TimeFilter.SampleToSystemTime(deviceTime, now, PrevAbsoluteTime);
+        scaledTimeUnit      = TimeFilter.ScaleTimeUnit(timeUnit);
+        PrevAbsoluteTime    = absoluteTimeSeconds;
     }
 
     LastSampleCount = s.SampleCount;
     LastTimestamp   = s.Timestamp;
 
     bool convertHMDToSensor = (Coordinates == Coord_Sensor) && (HWCoordinates == Coord_HMD);
+	
+#ifdef OVR_OS_ANDROID
+    // LDC - Normally we get the coordinate system from the tracker.
+    // Since KTracker doesn't store it we'll always assume HMD coordinate system.
+    convertHMDToSensor = false;
+#endif
 
-    if (HandlerRef.GetHandler())
+    if (HandlerRef.HasHandlers())
     {
         MessageBodyFrame sensors(this);
+        sensors.MagCalibrated = magCalibrated;
         UByte            iterations = s.SampleCount;
 
         if (s.SampleCount > 3)
         {
             iterations        = 3;
-            sensors.TimeDelta = (s.SampleCount - 2) * timeUnit;
+            sensors.TimeDelta = (float)((s.SampleCount - 2) * scaledTimeUnit);
         }
         else
         {
-            sensors.TimeDelta = timeUnit;
+            sensors.TimeDelta = (float)scaledTimeUnit;
         }
 
         for (UByte i = 0; i < iterations; i++)
-        {
-            sensors.Acceleration = AccelFromBodyFrameUpdate(s, i, convertHMDToSensor);
-            sensors.RotationRate = EulerFromBodyFrameUpdate(s, i, convertHMDToSensor);
-            sensors.MagneticField= MagFromBodyFrameUpdate(s, convertHMDToSensor);
-            sensors.Temperature  = s.Temperature * 0.01f;
-            HandlerRef.GetHandler()->OnMessage(sensors);
+        {     
+            sensors.AbsoluteTimeSeconds = absoluteTimeSeconds - ( iterations - 1 - i ) * scaledTimeUnit;
+            sensors.Acceleration        = AccelFromBodyFrameUpdate(s, i, convertHMDToSensor);
+            sensors.RotationRate        = EulerFromBodyFrameUpdate(s, i, convertHMDToSensor);
+            sensors.MagneticField       = MagFromBodyFrameUpdate(s, magCalibration, convertHMDToSensor);
+
+#ifdef OVR_OS_ANDROID
+            replaceWithPhoneMag(&(sensors.MagneticField));
+#endif
+            sensors.Temperature   = s.Temperature * 0.01f;
+            HandlerRef.Call(sensors);
             // TimeDelta for the last two sample is always fixed.
-            sensors.TimeDelta = timeUnit;
+            sensors.TimeDelta = (float)scaledTimeUnit;
         }
 
         LastAcceleration = sensors.Acceleration;
@@ -911,9 +808,307 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
         UByte i = (s.SampleCount > 3) ? 2 : (s.SampleCount - 1);
         LastAcceleration  = AccelFromBodyFrameUpdate(s, i, convertHMDToSensor);
         LastRotationRate  = EulerFromBodyFrameUpdate(s, i, convertHMDToSensor);
-        LastMagneticField = MagFromBodyFrameUpdate(s, convertHMDToSensor);
+        LastMagneticField = MagFromBodyFrameUpdate(s, magCalibration, convertHMDToSensor);
+
+#ifdef OVR_OS_ANDROID
+        replaceWithPhoneMag(&LastMagneticField);
+#endif
         LastTemperature   = s.Temperature * 0.01f;
     }
+}
+
+
+#ifdef OVR_OS_ANDROID
+
+void SensorDeviceImpl::replaceWithPhoneMag(Vector3f* val)
+{
+
+	// Native calibrated.
+	pPhoneSensors->SetMagSource(PhoneSensors::MagnetometerSource_Native);
+
+	Vector3f magPhone;
+	pPhoneSensors->GetLatestMagValue(&magPhone);
+
+	// Phone value is in micro-Tesla. Convert it to Gauss and flip axes.
+	magPhone *= 10000.0f/1000000.0f;
+
+	Vector3f res;
+	res.x = -magPhone.y;
+	res.y = magPhone.x;
+	res.z = magPhone.z;
+
+	*val = res;
+}
+#endif 
+
+const int MAX_DEVICE_PROFILE_MAJOR_VERSION = 1;
+
+// Writes the current calibration for a particular device to a device profile file
+bool SensorDeviceImpl::SetMagCalibrationReport(const MagCalibrationReport &data)
+{
+    // Get device info
+    SensorInfo sinfo;
+    GetDeviceInfo(&sinfo);
+    
+    // A named calibration may be specified for calibration in different
+    // environments, otherwise the default calibration is used
+    const char* calibrationName = "default";
+
+    // Generate a mag calibration event
+    JSON* calibration = JSON::CreateObject();
+    // (hardcoded for now) the measurement and representation method 
+    calibration->AddStringItem("Version", "2.0");   
+    calibration->AddStringItem("Name", "default");
+
+    // time stamp the calibration
+    char time_str[64];
+   
+#ifdef OVR_OS_WIN32
+    struct tm caltime;
+    time_t now = time(0);
+    localtime_s(&caltime, &now);
+    strftime(time_str, 64, "%Y-%m-%d %H:%M:%S", &caltime);
+#else
+    struct tm* caltime;
+    time_t now = time(0);
+    caltime = localtime(&now);
+    strftime(time_str, 64, "%Y-%m-%d %H:%M:%S", caltime);
+#endif
+   
+    calibration->AddStringItem("Time", time_str);
+
+    // write the full calibration matrix
+    char matrix[256];
+    data.Calibration.ToString(matrix, 256);
+    calibration->AddStringItem("CalibrationMatrix", matrix);
+    // save just the offset, for backwards compatibility
+    // this can be removed when we don't want to support 0.2.4 anymore
+    Vector3f center(data.Calibration.M[0][3], data.Calibration.M[1][3], data.Calibration.M[2][3]);
+    Matrix4f tmp = data.Calibration; tmp.M[0][3] = tmp.M[1][3] = tmp.M[2][3] = 0; tmp.M[3][3] = 1;
+    center = tmp.Inverted().Transform(center);
+    Matrix4f oldcalmat; oldcalmat.M[0][3] = center.x; oldcalmat.M[1][3] = center.y; oldcalmat.M[2][3] = center.z; 
+    oldcalmat.ToString(matrix, 256);
+    calibration->AddStringItem("Calibration", matrix);
+    
+    String path = GetBaseOVRPath(true);
+    path += "/Devices.json";
+
+    // Look for a preexisting device file to edit
+    Ptr<JSON> root = *JSON::Load(path);
+    if (root)
+    {   // Quick sanity check of the file type and format before we parse it
+        JSON* version = root->GetFirstItem();
+        if (version && version->Name == "Oculus Device Profile Version")
+        {   
+            int major = atoi(version->Value.ToCStr());
+            if (major > MAX_DEVICE_PROFILE_MAJOR_VERSION)
+            {
+                // don't use the file on unsupported major version number
+                root->Release();
+                root = NULL;
+            }
+        }
+        else
+        {
+            root->Release();
+            root = NULL;
+        }
+    }
+
+    JSON* device = NULL;
+    if (root)
+    {
+        device = root->GetFirstItem();   // skip the header
+        device = root->GetNextItem(device);
+        while (device)
+        {   // Search for a previous calibration with the same name for this device
+            // and remove it before adding the new one
+            if (device->Name == "Device")
+            {   
+                JSON* item = device->GetItemByName("Serial");
+                if (item && item->Value == sinfo.SerialNumber)
+                {   // found an entry for this device
+                    item = device->GetNextItem(item);
+                    while (item)
+                    {
+                        if (item->Name == "MagCalibration")
+                        {   
+                            JSON* name = item->GetItemByName("Name");
+                            if (name && name->Value == calibrationName)
+                            {   // found a calibration of the same name
+                                item->RemoveNode();
+                                item->Release();
+                                break;
+                            } 
+                        }
+                        item = device->GetNextItem(item);
+                    }
+
+
+                    /*
+                    this is removed temporarily, since this is a sensor fusion setting, not sensor itself
+                    should be moved to the correct place when Brant has finished the user profile implementation
+                    // update the auto-mag flag
+                    item = device->GetItemByName("EnableYawCorrection");
+                    if (item)
+                        item->dValue = (double)EnableYawCorrection;
+                    else
+                        device->AddBoolItem("EnableYawCorrection", EnableYawCorrection);*/
+
+                    break;
+                }
+            }
+
+            device = root->GetNextItem(device);
+        }
+    }
+    else
+    {   // Create a new device root
+        root = *JSON::CreateObject();
+        root->AddStringItem("Oculus Device Profile Version", "1.0");
+    }
+
+    if (device == NULL)
+    {
+        device = JSON::CreateObject();
+        device->AddStringItem("Product", sinfo.ProductName);
+        device->AddNumberItem("ProductID", sinfo.ProductId);
+        device->AddStringItem("Serial", sinfo.SerialNumber);
+        // removed temporarily, see above
+        //device->AddBoolItem("EnableYawCorrection", EnableYawCorrection);
+
+        root->AddItem("Device", device);
+    }
+
+    // Create and the add the new calibration event to the device
+    device->AddItem("MagCalibration", calibration);
+    return root->Save(path);
+}
+
+// Loads a saved calibration for the specified device from the device profile file
+bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
+{
+    data->Version = 0;
+    data->Calibration.SetIdentity();
+
+    // Get device info
+    SensorInfo sinfo;
+    GetDeviceInfo(&sinfo);
+
+    // A named calibration may be specified for calibration in different
+    // environments, otherwise the default calibration is used
+    const char* calibrationName = "default";
+
+    String path = GetBaseOVRPath(true);
+    path += "/Devices.json";
+
+    // Load the device profiles
+    Ptr<JSON> root = *JSON::Load(path);
+    if (root == NULL)
+        return false;
+
+    // Quick sanity check of the file type and format before we parse it
+    JSON* version = root->GetFirstItem();
+    if (version && version->Name == "Oculus Device Profile Version")
+    {   
+        int major = atoi(version->Value.ToCStr());
+        if (major > MAX_DEVICE_PROFILE_MAJOR_VERSION)
+            return false;   // don't parse the file on unsupported major version number
+    }
+    else
+    {
+        return false;
+    }
+
+    JSON* device = root->GetNextItem(version);
+    while (device)
+    {   // Search for a previous calibration with the same name for this device
+        // and remove it before adding the new one
+        if (device->Name == "Device")
+        {   
+            JSON* item = device->GetItemByName("Serial");
+            if (item && item->Value == sinfo.SerialNumber)
+            {   // found an entry for this device
+
+                JSON* autoyaw = device->GetItemByName("EnableYawCorrection");
+                // as a temporary HACK, return no calibration if EnableYawCorrection is off
+                // this will force disable yaw correction in SensorFusion
+                // proper solution would load the value in the Profile, which SensorFusion can access
+                if (autoyaw && autoyaw->dValue == 0)
+                    return true;
+
+                item = device->GetNextItem(item);
+                while (item)
+                {
+                    if (item->Name == "MagCalibration")
+                    {   
+                        JSON* calibration = item;
+                        JSON* name = calibration->GetItemByName("Name");
+                        if (name && name->Value == calibrationName)
+                        {   // found a calibration with this name
+                            
+                            int major = 0;
+                            JSON* version = calibration->GetItemByName("Version");
+                            if (version)
+                                major = atoi(version->Value.ToCStr());
+
+                            if (major > data->Version && major <= 2)
+                            {
+                                time_t now;
+                                time(&now);
+
+                                // parse the calibration time
+                                time_t calibration_time = now;
+                                JSON* caltime = calibration->GetItemByName("Time");
+                                if (caltime)
+                                {
+                                    const char* caltime_str = caltime->Value.ToCStr();
+
+                                    tm ct;
+                                    memset(&ct, 0, sizeof(tm));
+                            
+#ifdef OVR_OS_WIN32
+                                    struct tm nowtime;
+                                    localtime_s(&nowtime, &now);
+                                    ct.tm_isdst = nowtime.tm_isdst;
+                                    sscanf_s(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                        &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                        &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+#else
+                                    struct tm* nowtime = localtime(&now);
+                                    ct.tm_isdst = nowtime->tm_isdst;
+                                    sscanf(caltime_str, "%d-%d-%d %d:%d:%d", 
+                                        &ct.tm_year, &ct.tm_mon, &ct.tm_mday,
+                                        &ct.tm_hour, &ct.tm_min, &ct.tm_sec);
+#endif
+                                    ct.tm_year -= 1900;
+                                    ct.tm_mon--;
+                                    calibration_time = mktime(&ct);
+                                }
+                                                        
+                                // parse the calibration matrix
+                                JSON* cal = calibration->GetItemByName("CalibrationMatrix");
+                                if (!cal)
+                                    cal = calibration->GetItemByName("Calibration");
+                                if (cal)
+                                {
+                                    data->Calibration = Matrix4f::FromString(cal->Value.ToCStr());
+                                    data->Version = (UByte)major;
+                                }
+                            }
+                        } 
+                    }
+                    item = device->GetNextItem(item);
+                }
+
+                return true;
+            }
+        }
+
+        device = root->GetNextItem(device);
+    }
+    
+    return true;
 }
 
 } // namespace OVR

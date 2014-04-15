@@ -7,16 +7,16 @@ Content     :   String UTF8 string implementation with copy-on-write semantics
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -236,7 +236,7 @@ public:
 //  String&    Insert(const UInt32* substr, UPInt posAt, SPInt size = -1);
 
     // Get Byte index of the character at position = index
-    UPInt       GetByteIndex(UPInt index) const { return (UPInt)UTF8Util::GetByteIndex(static_cast<SPInt>(index), GetData()->Data); }
+    UPInt       GetByteIndex(UPInt index) const { return (UPInt)UTF8Util::GetByteIndex(index, GetData()->Data); }
 
     // Utility: case-insensitive string compare.  stricmp() & strnicmp() are not
     // ANSI or POSIX, do not seem to appear in Linux.
@@ -286,7 +286,7 @@ public:
     void        operator += (const String& src);
     void        operator += (const char* psrc)       { AppendString(psrc); }
     void        operator += (const wchar_t* psrc)    { AppendString(psrc); }
-    void        operator += (char  ch)               { AppendChar( static_cast<UInt32>(ch) ); }
+    void        operator += (char  ch)               { AppendChar(ch); }
     String      operator +  (const char* str) const;
     String      operator +  (const String& src)  const;
 
@@ -476,10 +476,10 @@ public:
     void        operator =  (const String& src);
 
     // Addition
-    void        operator += (const String& src)      { AppendString(src.ToCStr(),static_cast<SPInt>(src.GetSize())); }
+    void        operator += (const String& src)      { AppendString(src.ToCStr(),src.GetSize()); }
     void        operator += (const char* psrc)       { AppendString(psrc); }
     void        operator += (const wchar_t* psrc)    { AppendString(psrc); }
-    void        operator += (char  ch)               { AppendChar( static_cast<SPInt>(ch) ); }
+    void        operator += (char  ch)               { AppendChar(ch); }
     //String   operator +  (const char* str) const ;
     //String   operator +  (const String& src)  const ;
 

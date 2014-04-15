@@ -5,16 +5,16 @@ Content     :   Win32 HID device implementation.
 Created     :   February 22, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,8 +24,6 @@ limitations under the License.
 
 *************************************************************************************/
 
-#pragma comment(lib, "setupapi.lib")
-
 #include "OVR_Win32_HIDDevice.h"
 #include "OVR_Win32_DeviceManager.h"
 
@@ -33,7 +31,6 @@ limitations under the License.
 #include "Kernel/OVR_Log.h"
 
 namespace OVR { namespace Win32 {
-
 
 //-------------------------------------------------------------------------------------
 // HIDDevicePathWrapper is a simple class used to extract HID device file path
@@ -171,10 +168,10 @@ bool HIDDeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevD
         return false;
 
     pdevDesc->Path = path;
-    getFullDesc(hidDev, pdevDesc);
+    bool succ = getFullDesc(hidDev, pdevDesc);
 
     ::CloseHandle(hidDev);
-    return true;
+    return succ;
 }
 
 OVR::HIDDevice* HIDDeviceManager::Open(const String& path)
@@ -292,7 +289,7 @@ bool HIDDevice::HIDInitialize(const String& path)
 
     if (!openDevice())
     {
-        LogText("OVR::Win32::HIDDevice - Failed to open HIDDevice: ", path.ToCStr());
+        LogText("OVR::Win32::HIDDevice - Failed to open HIDDevice: ", path);
         return false;
     }
 
@@ -301,10 +298,11 @@ bool HIDDevice::HIDInitialize(const String& path)
     HIDManager->Manager->pThread->AddMessageNotifier(this);
 
     LogText("OVR::Win32::HIDDevice - Opened '%s'\n"
-        "                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'\n",
+		"                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'  Version:'%x'\n",
         DevDesc.Path.ToCStr(),
         DevDesc.Manufacturer.ToCStr(), DevDesc.Product.ToCStr(),
-        DevDesc.SerialNumber.ToCStr());
+        DevDesc.SerialNumber.ToCStr(),
+        DevDesc.VersionNumber);
 
     return true;
 }
@@ -503,18 +501,20 @@ void HIDDevice::closeDeviceOnIOError()
 
 bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
 {
-    if (!ReadRequested)
+	if (!ReadRequested)
         return false;
 
-    return HIDManager->HidD_SetFeature(Device, data, (ULONG) length) != FALSE;
+	BOOLEAN res = HIDManager->HidD_SetFeature(Device, data, (ULONG) length);
+	return (res == TRUE);
 }
 
 bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
 {
-    if (!ReadRequested)
+	if (!ReadRequested)
         return false;
 
-	return HIDManager->HidD_GetFeature(Device, data, (ULONG) length) != FALSE;
+	BOOLEAN res = HIDManager->HidD_GetFeature(Device, data, (ULONG) length);
+	return (res == TRUE);
 }
 
 void HIDDevice::OnOverlappedEvent(HANDLE hevent)
@@ -529,14 +529,14 @@ void HIDDevice::OnOverlappedEvent(HANDLE hevent)
     }
 }
 
-UInt64 HIDDevice::OnTicks(UInt64 ticksMks)
+double HIDDevice::OnTicks(double tickSeconds)
 {
     if (Handler)
     {
-        return Handler->OnTicks(ticksMks);
+        return Handler->OnTicks(tickSeconds);
     }
 
-    return DeviceManagerThread::Notifier::OnTicks(ticksMks);
+    return DeviceManagerThread::Notifier::OnTicks(tickSeconds);
 }
 
 bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType, 

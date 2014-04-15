@@ -5,7 +5,7 @@ Content     :   Cross platform Gamepad interface.
 Created     :   May 6, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ struct GamepadState
     {
         return !(*this == b);
     }
-	void Debug()
+	void Debug() const
 	{
 		OVR_DEBUG_LOG(("Buttons:0x%4x LX:%.2f LY:%.2f RX:%.2f RY:%.2f LT:%.2f RT:%.2f", Buttons, LX, LY, RX, RY, LT, RT));
 	}
