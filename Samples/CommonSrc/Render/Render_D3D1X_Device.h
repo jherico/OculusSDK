@@ -42,7 +42,7 @@ limitations under the License.
 
 #if (OVR_D3D_VERSION == 10)
 #define _OVR_RENDERER_D3D10
-#include <d3d10.h>
+#include <d3d10_1.h>
 
 namespace OVR { namespace Render { namespace D3D10 {
 
@@ -64,8 +64,8 @@ class RenderDevice;
 #endif
 
 #if (OVR_D3D_VERSION == 10)
-typedef ID3D10Device            ID3D1xDevice;
-typedef ID3D10Device            ID3D1xDeviceContext;
+typedef ID3D10Device1           ID3D1xDevice;
+typedef ID3D10Device1           ID3D1xDeviceContext;
 typedef ID3D10RenderTargetView  ID3D1xRenderTargetView;
 typedef ID3D10Texture2D         ID3D1xTexture2D;
 typedef ID3D10ShaderResourceView ID3D1xShaderResourceView;
@@ -73,6 +73,7 @@ typedef ID3D10DepthStencilView  ID3D1xDepthStencilView;
 typedef ID3D10DepthStencilState ID3D1xDepthStencilState;
 typedef ID3D10InputLayout       ID3D1xInputLayout;
 typedef ID3D10Buffer            ID3D1xBuffer;
+typedef ID3D10Resource          ID3D1xResource;
 typedef ID3D10VertexShader      ID3D1xVertexShader;
 typedef ID3D10PixelShader       ID3D1xPixelShader;
 typedef ID3D10GeometryShader    ID3D1xGeometryShader;
@@ -96,6 +97,7 @@ typedef ID3D11DepthStencilView  ID3D1xDepthStencilView;
 typedef ID3D11DepthStencilState ID3D1xDepthStencilState;
 typedef ID3D11InputLayout       ID3D1xInputLayout;
 typedef ID3D11Buffer            ID3D1xBuffer;
+typedef ID3D11Resource          ID3D1xResource;
 typedef ID3D10Blob              ID3D1xBlob;
 typedef ID3D11VertexShader      ID3D1xVertexShader;
 typedef ID3D11PixelShader       ID3D1xPixelShader;
@@ -201,11 +203,12 @@ public:
 class Texture : public Render::Texture
 {
 public:
-    RenderDevice*                    Ren;
+    RenderDevice*                   Ren;
     Ptr<ID3D1xTexture2D>            Tex;
     Ptr<ID3D1xShaderResourceView>   TexSv;
     Ptr<ID3D1xRenderTargetView>     TexRtv;
     Ptr<ID3D1xDepthStencilView>     TexDsv;
+	Ptr<ID3D1xTexture2D>			TexStaging;
     mutable Ptr<ID3D1xSamplerState> Sampler;
     int                             Width, Height;
     int                             Samples;
@@ -229,6 +232,11 @@ public:
     virtual void SetSampleMode(int sm);
 
     virtual void Set(int slot, Render::ShaderStage stage = Render::Shader_Fragment) const;
+
+	virtual ovrTexture Get_ovrTexture();
+
+	virtual void* GetInternalImplementation();
+
 };
 
 class RenderDevice : public Render::RenderDevice
@@ -251,12 +259,12 @@ public:
     Ptr<Texture>                CurDepthBuffer;
     Ptr<ID3D1xRasterizerState>  Rasterizer;
     Ptr<ID3D1xBlendState>       BlendState;
-    int                         NumViewports;
-    D3D1x_VIEWPORT              Viewports[2];
+    D3D1x_VIEWPORT              D3DViewport;
 
     Ptr<ID3D1xDepthStencilState> DepthStates[1 + 2 * Compare_Count];
     Ptr<ID3D1xDepthStencilState> CurDepthState;
     Ptr<ID3D1xInputLayout>      ModelVertexIL;
+    Ptr<ID3D1xInputLayout>      DistortionVertexIL;
 
     Ptr<ID3D1xSamplerState>     SamplerStates[Sample_Count];
 
@@ -292,18 +300,22 @@ public:
     // and it should be recreated.
     void        UpdateMonitorOutputs(bool needRecreate = false);
 
-    virtual void SetMultipleViewports(int n, const Viewport* vps);
+    virtual void SetViewport(const Recti& vp);
     virtual void SetWindowSize(int w, int h);
     virtual bool SetParams(const RendererParams& newParams);
-    //virtual void SetScissor(int x, int y, int w, int h);
 
-    virtual void Present();
-    virtual void ForceFlushGPU();
+	// Returns details needed by CAPI distortion rendering.
+	virtual ovrRenderAPIConfig Get_ovrRenderAPIConfig() const;
+
+    virtual void Present ( bool withVsync );
+    virtual void WaitUntilGpuIdle();
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
 	virtual UPInt QueryGPUMemorySize();
 
-    virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1);
+    virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1,
+                       float depth = 1,
+                       bool clearColor = true, bool clearDepth = true);
     virtual void Rect(float left, float top, float right, float bottom)
     {
         OVR_UNUSED4(left, top, right, bottom);
@@ -331,7 +343,6 @@ public:
         ExtraShaders = s;
     }
 
-
     // Overrident to apply proper blend state.
     virtual void FillRect(float left, float top, float right, float bottom, Color c);
     virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
@@ -340,7 +351,7 @@ public:
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false);
     virtual void RenderWithAlpha(   const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                     const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
 
@@ -355,6 +366,10 @@ public:
     ID3D1xSamplerState* GetSamplerState(int sm);
 
     void SetTexture(Render::ShaderStage stage, int slot, const Texture* t);
+
+    // GPU Profiling
+    virtual void BeginGpuEvent(const char* markerText, UInt32 markerColor);
+    virtual void EndGpuEvent();
 };
 
 }}}

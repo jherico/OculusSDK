@@ -5,16 +5,16 @@ Content     :   Win32 implementation of DeviceStatus.
 Created     :   January 24, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,6 +35,10 @@ limitations under the License.
 namespace OVR { namespace Win32 {
 
 static TCHAR windowClassName[] = TEXT("LibOVR_DeviceStatus_WindowClass");
+
+#define STATIC_KSCATEGORY_VIDEO_CAMERA \
+	0xe5323777, 0xf976, 0x4f5b, { 0x9b, 0x55, 0xb9, 0x46, 0x99, 0xc4, 0x6e, 0x44 }
+
 
 //-------------------------------------------------------------------------------------
 DeviceStatus::DeviceStatus(Notifier* const pClient)
@@ -259,8 +263,10 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
 			DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
 			String devicePath(hdr->dbcc_name);
 
+			static const GUID videoCamGuid = { STATIC_KSCATEGORY_VIDEO_CAMERA };
             // check if HID device caused the event...
-            if (pDeviceStatus->HidGuid == hdr->dbcc_classguid)
+            if (pDeviceStatus->HidGuid == hdr->dbcc_classguid ||
+				videoCamGuid           == hdr->dbcc_classguid)
             {
                 // check if recovery timer is already running; stop it and 
                 // remove it, if so.

@@ -5,16 +5,16 @@ Content     :   Wraps the lower level LatencyTester interface and adds functiona
 Created     :   February 14, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -73,31 +73,19 @@ bool LatencyTest::SetDevice(LatencyTestDevice* device)
 
     if (device != Device)
     {
-        if (device != NULL)
-        {
-            if (device->GetMessageHandler() != NULL)
-            {
-                OVR_DEBUG_LOG(
-                    ("LatencyTest::AttachToDevice failed - device %p already has handler", device));
-                return false;
-            }
-        }
+        Handler.RemoveHandlerFromDevices();
 
-        if (Device != NULL)
-        {
-            Device->SetMessageHandler(0);
-        }
         Device = device;
 
         if (Device != NULL)
         {
-            Device->SetMessageHandler(&Handler);
+            Device->AddMessageHandler(&Handler);
 
             // Set trigger threshold.
             LatencyTestConfiguration configuration(SENSOR_DETECT_THRESHOLD, false);     // No samples streaming.
             Device->SetConfiguration(configuration, true);
 
-            // Set display to intial (3 dashes).
+            // Set display to initial (3 dashes).
             LatencyTestDisplay ltd(2, 0x40400040);
             Device->SetDisplay(ltd);
         }
@@ -251,7 +239,7 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
             getActiveResult()->TargetColor = RenderColor;
             
             // Record time so we can determine usb roundtrip time.
-            getActiveResult()->StartTestTicksMicroS = Timer::GetTicks();
+            getActiveResult()->StartTestSeconds = Timer::GetSeconds();
 
             Device->SetStartTest(RenderColor);
 
@@ -275,7 +263,7 @@ void LatencyTest::handleMessage(const Message& msg, LatencyTestMessageType laten
             clearTimer();
 
             // Record time so we can determine usb roundtrip time.
-            getActiveResult()->TestStartedTicksMicroS = Timer::GetTicks();
+            getActiveResult()->TestStartedSeconds = Timer::GetSeconds();
             
             State = State_WaitingForColorDetected;
             OVR_DEBUG_LOG(("State_WaitingForTestStarted -> State_WaitingForColorDetected."));
@@ -501,7 +489,7 @@ void LatencyTest::processResults()
                     }
                 }
 
-                float usbRountripElapsedMilliS = 0.001f * (float) (pCurr->TestStartedTicksMicroS - pCurr->StartTestTicksMicroS);
+                float usbRountripElapsedMilliS = Timer::MsPerSecond * (float) (pCurr->TestStartedSeconds - pCurr->StartTestSeconds);
                 minUSBTripMilliS = Alg::Min(usbRountripElapsedMilliS, minUSBTripMilliS);
                 maxUSBTripMilliS = Alg::Max(usbRountripElapsedMilliS, maxUSBTripMilliS);
                 averageUSBTripMilliS += usbRountripElapsedMilliS;

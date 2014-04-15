@@ -5,16 +5,16 @@ Content     :   Partial back-end independent implementation of Device interfaces
 Created     :   October 10, 2012
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,75 +37,6 @@ namespace OVR {
 
 
 //-------------------------------------------------------------------------------------
-// ***** SharedLock
-
-// This is a general purpose globally shared Lock implementation that should probably be
-// moved to Kernel.
-// May in theory busy spin-wait if we hit contention on first lock creation,
-// but this shouldn't matter in practice since Lock* should be cached.
-
-
-enum { LockInitMarker = 0xFFFFFFFF };
-
-Lock* SharedLock::GetLockAddRef()
-{
-    int oldUseCount;
-
-    do {
-        oldUseCount = UseCount;
-        if (oldUseCount == LockInitMarker)
-            continue;
-
-        if (oldUseCount == 0)
-        {
-            // Initialize marker
-            if (AtomicOps<int>::CompareAndSet_Sync(&UseCount, 0, LockInitMarker))
-            {
-                Construct<Lock>(Buffer);
-                do { }
-                while (!AtomicOps<int>::CompareAndSet_Sync(&UseCount, LockInitMarker, 1));
-                return toLock();
-            }
-            continue;
-        }
-
-    } while (!AtomicOps<int>::CompareAndSet_NoSync(&UseCount, oldUseCount, oldUseCount + 1));
-
-    return toLock();
-}
-
-void SharedLock::ReleaseLock(Lock* plock)
-{
-    OVR_UNUSED(plock);
-    OVR_ASSERT(plock == toLock());
-
-    int oldUseCount;
-
-    do {
-        oldUseCount = UseCount;
-        OVR_ASSERT(oldUseCount != LockInitMarker);
-
-        if (oldUseCount == 1)
-        {
-            // Initialize marker
-            if (AtomicOps<int>::CompareAndSet_Sync(&UseCount, 1, LockInitMarker))
-            {
-                Destruct<Lock>(toLock());
-
-                do { }
-                while (!AtomicOps<int>::CompareAndSet_Sync(&UseCount, LockInitMarker, 0));
-
-                return;
-            }
-            continue;
-        }
-
-    } while (!AtomicOps<int>::CompareAndSet_NoSync(&UseCount, oldUseCount, oldUseCount - 1));
-}
-
-
-
-//-------------------------------------------------------------------------------------
 // ***** MessageHandler
 
 // Threading notes:
@@ -119,8 +50,13 @@ static SharedLock MessageHandlerSharedLock;
 class MessageHandlerImpl
 {
 public:
+    enum
+    {
+        MaxHandlerRefsCount = 4
+    };
+
     MessageHandlerImpl()
-        : pLock(MessageHandlerSharedLock.GetLockAddRef())
+        : pLock(MessageHandlerSharedLock.GetLockAddRef()), HandlerRefsCount(0)
     {
     }
     ~MessageHandlerImpl()
@@ -136,14 +72,15 @@ public:
 
     // This lock is held while calling a handler and when we are applied/
     // removed from a device.
-    Lock*                     pLock;
-    // List of device we are applied to.
-    List<MessageHandlerRef>   UseList;
+    Lock*               pLock;
+    // List of devices we are applied to.
+    int                 HandlerRefsCount;
+    MessageHandlerRef*  pHandlerRefs[MaxHandlerRefsCount];
 };
 
 
 MessageHandlerRef::MessageHandlerRef(DeviceBase* device)
-    : pLock(MessageHandlerSharedLock.GetLockAddRef()), pDevice(device), pHandler(0)
+    : pLock(MessageHandlerSharedLock.GetLockAddRef()), pDevice(device), HandlersCount(0)
 {
 }
 
@@ -151,41 +88,87 @@ MessageHandlerRef::~MessageHandlerRef()
 {
     {
         Lock::Locker lockScope(pLock);
-        if (pHandler)
-        {
-            pHandler = 0;
-            RemoveNode();
-        }
+        
+        while (HandlersCount > 0)
+            removeHandler(0);
     }
     MessageHandlerSharedLock.ReleaseLock(pLock);
     pLock = 0;
 }
 
-void MessageHandlerRef::SetHandler(MessageHandler* handler)
+void MessageHandlerRef::Call(const Message& msg)
+{
+    Lock::Locker lockScope(pLock);
+
+    for (int i = 0; i < HandlersCount; i++)
+        pHandlers[i]->OnMessage(msg);
+}
+
+void MessageHandlerRef::AddHandler(MessageHandler* handler)
 {    
     OVR_ASSERT(!handler ||
                MessageHandlerImpl::FromHandler(handler)->pLock == pLock);    
     Lock::Locker lockScope(pLock);
-    SetHandler_NTS(handler);
+    AddHandler_NTS(handler);
 }
 
-void MessageHandlerRef::SetHandler_NTS(MessageHandler* handler)
-{   
-    if (pHandler != handler)
+void MessageHandlerRef::AddHandler_NTS(MessageHandler* handler)
+{
+    OVR_ASSERT(handler != NULL);
+
+    OVR_ASSERT(HandlersCount < MaxHandlersCount);
+    for (int i = 0; i < HandlersCount; i++)
+        if (pHandlers[i] == handler)
+            // handler already installed - do nothing
+            return;
+    pHandlers[HandlersCount] = handler;
+    HandlersCount++;
+
+    MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(handler);
+    OVR_ASSERT(handlerImpl->HandlerRefsCount < MessageHandlerImpl::MaxHandlerRefsCount);
+    handlerImpl->pHandlerRefs[handlerImpl->HandlerRefsCount] = this;
+    handlerImpl->HandlerRefsCount++;
+
+    // TBD: Call notifier on device?
+}
+
+bool MessageHandlerRef::RemoveHandler(MessageHandler* handler)
+{
+    Lock::Locker lockScope(pLock);
+
+    for (int i = 0; i < HandlersCount; i++)
     {
-        if (pHandler)
-            RemoveNode();
-        pHandler = handler;
-
-        if (handler)
-        {
-            MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(handler);
-            handlerImpl->UseList.PushBack(this);
-        }
-        // TBD: Call notifier on device?
+        if (pHandlers[i] == handler)
+            return removeHandler(i);
     }
+    return false;
 }
 
+bool MessageHandlerRef::removeHandler(int idx)
+{
+    OVR_ASSERT(idx < HandlersCount);
+
+    MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(pHandlers[idx]);
+    for (int i = 0; i < handlerImpl->HandlerRefsCount; i++)
+        if (handlerImpl->pHandlerRefs[i] == this)
+        {
+            handlerImpl->pHandlerRefs[i] = handlerImpl->pHandlerRefs[handlerImpl->HandlerRefsCount - 1];
+            handlerImpl->HandlerRefsCount--;
+
+            pHandlers[idx] = pHandlers[HandlersCount - 1];
+            HandlersCount--;
+
+            return true;
+        }
+
+    // couldn't find a link in the opposite direction, assert in Debug
+    OVR_ASSERT(0);
+
+    pHandlers[idx] = pHandlers[HandlersCount - 1];
+    HandlersCount--;
+    
+    return true;
+}
 
 MessageHandler::MessageHandler()
 {    
@@ -198,7 +181,7 @@ MessageHandler::~MessageHandler()
     MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(this);
     {
         Lock::Locker lockedScope(handlerImpl->pLock);
-        OVR_ASSERT_LOG(handlerImpl->UseList.IsEmpty(),
+        OVR_ASSERT_LOG(handlerImpl->HandlerRefsCount == 0,
             ("~MessageHandler %p - Handler still active; call RemoveHandlerFromDevices", this));
     }
 
@@ -209,19 +192,19 @@ bool MessageHandler::IsHandlerInstalled() const
 {
     const MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(this);    
     Lock::Locker lockedScope(handlerImpl->pLock);
-    return handlerImpl->UseList.IsEmpty() != true;
-}
 
+    return handlerImpl->HandlerRefsCount > 0;
+}
 
 void MessageHandler::RemoveHandlerFromDevices()
 {
     MessageHandlerImpl* handlerImpl = MessageHandlerImpl::FromHandler(this);
     Lock::Locker lockedScope(handlerImpl->pLock);
 
-    while(!handlerImpl->UseList.IsEmpty())
+    while (handlerImpl->HandlerRefsCount > 0)
     {
-        MessageHandlerRef* use = handlerImpl->UseList.GetFirst();
-        use->SetHandler_NTS(0);
+        MessageHandlerRef* use = handlerImpl->pHandlerRefs[0];
+        use->RemoveHandler(this);
     }
 }
 
@@ -255,13 +238,9 @@ DeviceManager* DeviceBase::GetManager() const
     return getDeviceCommon()->pCreateDesc->GetManagerImpl();
 }
 
-void DeviceBase::SetMessageHandler(MessageHandler* handler)
+void DeviceBase::AddMessageHandler(MessageHandler* handler)
 {
-    getDeviceCommon()->HandlerRef.SetHandler(handler);
-}
-MessageHandler* DeviceBase::GetMessageHandler() const
-{
-    return getDeviceCommon()->HandlerRef.GetHandler();
+    getDeviceCommon()->HandlerRef.AddHandler(handler);
 }
 
 DeviceType DeviceBase::GetType() const
@@ -274,6 +253,12 @@ bool DeviceBase::GetDeviceInfo(DeviceInfo* info) const
     return getDeviceCommon()->pCreateDesc->GetDeviceInfo(info);
     //info->Name[0] = 0;
     //return false;
+}
+
+// Returns true if device is connected and usable
+bool DeviceBase::IsConnected()
+{
+    return getDeviceCommon()->ConnectedFlag;
 }
 
 // returns the MessageHandler's lock

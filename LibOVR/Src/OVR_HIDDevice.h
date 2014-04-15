@@ -5,16 +5,16 @@ Content     :   Cross platform HID device interface.
 Created     :   February 22, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -129,8 +129,8 @@ public:
         virtual void OnInputReport(UByte* pData, UInt32 length)
         { OVR_UNUSED2(pData, length); }
 
-        virtual UInt64 OnTicks(UInt64 ticksMks)
-        { OVR_UNUSED1(ticksMks);  return Timer::MksPerSecond * 1000; ; }
+        virtual double OnTicks(double tickSeconds)
+        { OVR_UNUSED1(tickSeconds);  return 1000.0 ; }
 
         enum HIDDeviceMessageType
         {

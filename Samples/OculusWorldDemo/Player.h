@@ -1,7 +1,7 @@
 /************************************************************************************
 
 Filename    :   Player.h
-Content     :   Player location and hit-testing logic
+Content     :   Avatar movement and collision detection
 Created     :   October 4, 2012
 
 Copyright   :   Copyright 2012 Oculus, Inc. All Rights reserved.
@@ -25,23 +25,20 @@ limitations under the License.
 #define OVR_WorldDemo_Player_h
 
 #include "OVR.h"
+#include "Kernel/OVR_KeyCodes.h"
 #include "../CommonSrc/Render/Render_Device.h"
 
 using namespace OVR;
 using namespace OVR::Render;
 
 //-------------------------------------------------------------------------------------
-// The RHS coordinate system is defines as follows (as seen in perspective view):
-//  Y - Up
-//  Z - Back
-//  X - Right
-const Vector3f	UpVector(0.0f, 1.0f, 0.0f);
-const Vector3f	ForwardVector(0.0f, 0.0f, -1.0f);
+// The RHS coordinate system is assumed.  
 const Vector3f	RightVector(1.0f, 0.0f, 0.0f);
+const Vector3f	UpVector(0.0f, 1.0f, 0.0f);
+const Vector3f	ForwardVector(0.0f, 0.0f, -1.0f); // -1 because HMD looks along -Z at identity orientation
 
-// We start out looking in the positive Z (180 degree rotation).
-const float		YawInitial	= 3.141592f;
-const float		Sensitivity	= 1.0f;
+const float		YawInitial	= 0.0f;
+const float		Sensitivity	= 0.3f; // low sensitivity to ease people into it gently.
 const float		MoveSpeed	= 3.0f; // m/s
 
 // These are used for collision detection
@@ -58,24 +55,37 @@ public:
 
 	float				UserEyeHeight;
 
-	// Position and look. The following apply:
-    Vector3f            EyePos;
-    float               EyeYaw;         // Rotation around Y, CCW positive when looking at RHS (X,Z) plane.
-    float               EyePitch;       // Pitch. If sensor is plugged in, only read from sensor.
-    float               EyeRoll;        // Roll, only accessible from Sensor.
-    float               LastSensorYaw;  // Stores previous Yaw value from to support computing delta.
+	// Where the avatar coordinate system (and body) is positioned and oriented in the virtual world
+    // Modified by gamepad/mouse input
+	Vector3f			BodyPos;
+	Anglef				BodyYaw;
 
-	// Movement state; different bits may be set based on the state of keys.
+    // Where the player head is positioned and oriented in the real world
+    Posef               HeadPose;
+
+    // Where the avatar head is positioned and oriented in the virtual world
+    Vector3f            GetPosition();
+    Quatf               GetOrientation(bool baseOnly = false);
+
+    // Returns virtual world position based on a real world head pose.
+    // Allows predicting eyes separately based on scanout time.
+    Posef               VirtualWorldPoseFromRealPose(const Posef &sensorHeadPose);
+
+    // Handle directional movement. Returns 'true' if movement was processed.
+    bool                HandleMoveKey(OVR::KeyCode key, bool down);
+
+    // Movement state; different bits may be set based on the state of keys.
     UByte               MoveForward;
     UByte               MoveBack;
     UByte               MoveLeft;
     UByte               MoveRight;
     Vector3f            GamepadMove, GamepadRotate;
+    bool                bMotionRelativeToBody;
 
 	Player();
 	~Player();
-	void HandleCollision(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-		                 Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
+	void HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
+		                Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
 };
 
 #endif

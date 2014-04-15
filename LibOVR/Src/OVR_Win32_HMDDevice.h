@@ -5,16 +5,16 @@ Content     :   Win32 HMDDevice implementation
 Created     :   September 21, 2012
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,16 +63,23 @@ protected:
     {
         Contents_Screen     = 1,
         Contents_Distortion = 2,
-        Contents_7Inch      = 4,
     };
-    String      DeviceId;
-    String      DisplayDeviceName;
-    int         DesktopX, DesktopY;
-    unsigned    Contents;
-    unsigned    HResolution, VResolution;
-    float       HScreenSize, VScreenSize;
-    float       DistortionK[4];
-    float       EyeToScreenDistance;
+    String              DeviceId;
+    String              DisplayDeviceName;
+    struct
+    {
+        int             X, Y;
+    }                   Desktop;
+    unsigned int        Contents;
+
+    Sizei               ResolutionInPixels;
+    Sizef               ScreenSizeInMeters;
+    float               VCenterFromTopInMeters;
+    float               LensSeparationInMeters;
+
+    // TODO: update these to splines.
+    DistortionEqnType   DistortionEqn;
+    float               DistortionK[4];
 
 public:
     HMDDeviceCreateDesc(DeviceFactory* factory, 
@@ -96,38 +103,13 @@ public:
 
     virtual bool GetDeviceInfo(DeviceInfo* info) const;
 
-    // Requests the currently used default profile. This profile affects the
-    // settings reported by HMDInfo. 
-    Profile* GetProfileAddRef() const;
-
-    ProfileType GetProfileType() const
-    {
-        return (HResolution >= 1920) ? Profile_RiftDKHD : Profile_RiftDK1;
-    }
-
-
-    void  SetScreenParameters(int x, int y, unsigned hres, unsigned vres, float hsize, float vsize)
-    {
-        DesktopX = x;
-        DesktopY = y;
-        HResolution = hres;
-        VResolution = vres;
-        HScreenSize = hsize;
-        VScreenSize = vsize;
-        Contents |= Contents_Screen;
-    }
-    void SetDistortion(float eye2screen, const float* dks)
-    {
-        EyeToScreenDistance = eye2screen;
-
-        for (int i = 0; i < 4; i++)
-            DistortionK[i] = dks[i];
-        Contents |= Contents_Distortion;
-    }
-
-    void Set7Inch() { Contents |= Contents_7Inch; }
-
-    bool Is7Inch() const;
+    void  SetScreenParameters(int x, int y,
+                              int hres, int vres,
+                              float hsize, float vsize,
+                              float vCenterFromTopInMeters, float lensSeparationInMeters);
+    void SetDistortion(const float* dks);
+   
+    HmdTypeEnum GetHmdType() const;
 };
 
 
@@ -149,8 +131,8 @@ public:
 
     // Requests the currently used default profile. This profile affects the
     // settings reported by HMDInfo. 
-    virtual Profile*    GetProfile() const;
-    virtual const char* GetProfileName() const;
+    virtual Profile*    GetProfile();
+    virtual const char* GetProfileName();
     virtual bool        SetProfileName(const char* name);
 
     // Query associated sensor.

@@ -1,6 +1,6 @@
 /************************************************************************************
 
-Filename    :   Win32_OculusRoomTiny.cpp
+Filename    :   Win32_OculusRoomTiny2.cpp
 Content     :   First-person view test application for Oculus Rift
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse
@@ -18,695 +18,273 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 *************************************************************************************/
 
-#include "Win32_OculusRoomTiny.h"
-#include "RenderTiny_D3D1X_Device.h"
-
 //-------------------------------------------------------------------------------------
-// ***** OculusRoomTiny Class
+// This app renders a simple flat-shaded room allowing the user to move along the 
+// floor and look around with an HMD and mouse/keyboard. 
+// The following keys work:
+//  'W', 'S', 'A', 'D', 'F' - Move forward, back; strafe left/right, toggle freeze in timewarp.
+// The world right handed coordinate system is defined as  Y -> Up, Z -> Back, X -> Right
 
-// Static pApp simplifies routing the window function.
-OculusRoomTinyApp* OculusRoomTinyApp::pApp = 0;
+//Include the OculusVR SDK
+#include "OVR_CAPI.h"
 
+// ***** Choices and settings
 
-OculusRoomTinyApp::OculusRoomTinyApp(HINSTANCE hinst)
-    : pRender(0),
-      LastUpdate(0),
-            
-      // Win32
-      hWnd(NULL),
-      hInstance(hinst), Quit(0), MouseCaptured(true),    
-      hXInputModule(0), pXInputGetState(0),
-      
-      // Initial location
-      EyePos(0.0f, 1.6f, -5.0f),
-      EyeYaw(YawInitial), EyePitch(0), EyeRoll(0),
-      LastSensorYaw(0),
-      SConfig(),
-      PostProcess(PostProcess_Distortion),
-      ShiftDown(false),
-      ControlDown(false)
-{
-    pApp = this;
+// Whether the SDK performs rendering/distortion, or the app.
+//#define          SDK_RENDER       1
 
-    Width  = 1280;
-    Height = 800;
+const unsigned   DistortionCaps = ovrDistortion_Chromatic | ovrDistortion_TimeWarp;
+const bool       VSyncEnabled  = true;
+const bool       FullScreen    = true;
 
-    StartupTicks = OVR::Timer::GetTicks();
-    LastPadPacketNo = 0;
+// Include Non-SDK supporting Utilities from other files
+#include "RenderTiny_D3D11_Device.h"
+
+RenderDevice   * Util_InitWindowAndGraphics    (Recti vp, int fullscreen, int multiSampleCount);
+void             Util_ReleaseWindowAndGraphics (RenderDevice* pRender);
+bool             Util_RespondToControls        (float & EyeYaw, Vector3f & EyePos,
+                                                float deltaTime, Quatf PoseOrientation);
+void             PopulateRoomScene             (Scene* scene, RenderDevice* render);
+
+//Structures for the application
+ovrHmd           HMD;
+ovrHmdDesc       HMDDesc;
+ovrEyeRenderDesc EyeRenderDesc[2];
+RenderDevice*    pRender; 
+Texture*         pRendertargetTexture;
+Scene*           pRoomScene;
+
+// Specifics for whether the SDK or the app is doing the distortion.
+#if SDK_RENDER
+	#define OVR_D3D_VERSION 11
+	#include "OVR_CAPI_D3D.h"
+	ovrD3D11Texture      EyeTexture[2];
+#else
+	void DistortionMeshInit  (unsigned distortionCaps, ovrHmd HMD,
+                              ovrEyeRenderDesc eyeRenderDesc[2], RenderDevice * pRender);
+	void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
+                              double timwarpTimePoint, ovrPosef eyeRenderPoses[2],
+                              RenderDevice * pRender, Texture* pRendertargetTexture);
+#endif
    
-    MoveForward   = MoveBack = MoveLeft = MoveRight = 0;
-    GamepadMove   = Vector3f(0);
-    GamepadRotate = Vector3f(0);
-}
+//-------------------------------------------------------------------------------------
 
-OculusRoomTinyApp::~OculusRoomTinyApp()
+int Init()
 {
-	RemoveHandlerFromDevices();
-    pSensor.Clear();
-    pHMD.Clear();
-    destroyWindow();
-    pApp = 0;
-}
+    // Initializes LibOVR. 
+    ovr_Initialize();
 
-
-int OculusRoomTinyApp::OnStartup(const char* args)
-{
-    OVR_UNUSED(args);
-
-
-    // *** Oculus HMD & Sensor Initialization
-
-    // Create DeviceManager and first available HMDDevice from it.
-    // Sensor object is created from the HMD, to ensure that it is on the
-    // correct device.
-
-    pManager = *DeviceManager::Create();
-
-	// We'll handle it's messages in this case.
-	pManager->SetMessageHandler(this);
-
-
-    int         detectionResult = IDCONTINUE;
-    const char* detectionMessage;
-
-    do 
+	HMD = ovrHmd_Create(0);
+    if (!HMD)
     {
-        // Release Sensor/HMD in case this is a retry.
-        pSensor.Clear();
-        pHMD.Clear();
-        RenderParams.MonitorName.Clear();
-
-        pHMD  = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
-        if (pHMD)
-        {
-            pSensor = *pHMD->GetSensor();
-
-            // This will initialize HMDInfo with information about configured IPD,
-            // screen size and other variables needed for correct projection.
-            // We pass HMD DisplayDeviceName into the renderer to select the
-            // correct monitor in full-screen mode.
-            if (pHMD->GetDeviceInfo(&HMDInfo))
-            {            
-                RenderParams.MonitorName = HMDInfo.DisplayDeviceName;
-                RenderParams.DisplayId = HMDInfo.DisplayId;
-                SConfig.SetHMDInfo(HMDInfo);
-            }
-        }
-        else
-        {            
-            // If we didn't detect an HMD, try to create the sensor directly.
-            // This is useful for debugging sensor interaction; it is not needed in
-            // a shipping app.
-            pSensor = *pManager->EnumerateDevices<SensorDevice>().CreateDevice();
-        }
-
-
-        // If there was a problem detecting the Rift, display appropriate message.
-        detectionResult  = IDCONTINUE;        
-
-        if (!pHMD && !pSensor)
-            detectionMessage = "Oculus Rift not detected.";
-        else if (!pHMD)
-            detectionMessage = "Oculus Sensor detected; HMD Display not detected.";
-        else if (!pSensor)
-            detectionMessage = "Oculus HMD Display detected; Sensor not detected.";
-        else if (HMDInfo.DisplayDeviceName[0] == '\0')
-            detectionMessage = "Oculus Sensor detected; HMD display EDID not detected.";
-        else
-            detectionMessage = 0;
-
-        if (detectionMessage)
-        {
-            String messageText(detectionMessage);
-            messageText += "\n\n"
-                           "Press 'Try Again' to run retry detection.\n"
-                           "Press 'Continue' to run full-screen anyway.";
-
-            detectionResult = ::MessageBoxA(0, messageText.ToCStr(), "Oculus Rift Detection",
-                                            MB_CANCELTRYCONTINUE|MB_ICONWARNING);
-
-            if (detectionResult == IDCANCEL)
-                return 1;
-        }
-
-    } while (detectionResult != IDCONTINUE);
-
-    
-    if (HMDInfo.HResolution > 0)
-    {
-        Width  = HMDInfo.HResolution;
-        Height = HMDInfo.VResolution;
+        MessageBoxA(NULL,"Oculus Rift not detected.","", MB_OK);
+        return(1);
     }
+	//Get more details about the HMD	
+	ovrHmd_GetDesc(HMD, &HMDDesc);
+	if (HMDDesc.DisplayDeviceName[0] == '\0')
+        MessageBoxA(NULL,"Rift detected, display not enabled.","", MB_OK);
 
+	//Setup Window and Graphics
+	const int backBufferMultisample = 1;
+    pRender = Util_InitWindowAndGraphics(Recti(HMDDesc.WindowsPos, HMDDesc.Resolution),
+                                         FullScreen, backBufferMultisample);
+	if (!pRender) return 1;
+     
+    //Configure Stereo settings.
+    Sizei recommenedTex0Size = ovrHmd_GetFovTextureSize(HMD, ovrEye_Left,  HMDDesc.DefaultEyeFov[0], 1.0f);
+    Sizei recommenedTex1Size = ovrHmd_GetFovTextureSize(HMD, ovrEye_Right, HMDDesc.DefaultEyeFov[1], 1.0f);
+	Sizei RenderTargetSize;
+    RenderTargetSize.w = recommenedTex0Size.w + recommenedTex1Size.w;
+    RenderTargetSize.h = max ( recommenedTex0Size.h, recommenedTex1Size.h );
 
-    if (!setupWindow())
-        return 1;
+    const int eyeRenderMultisample = 1;
+    pRendertargetTexture = pRender->CreateTexture(Texture_RGBA | Texture_RenderTarget |
+                                                  eyeRenderMultisample,
+                                                  RenderTargetSize.w, RenderTargetSize.h, NULL);
+    // The actual RT size may be different due to HW limits.
+    RenderTargetSize.w = pRendertargetTexture->GetWidth();
+    RenderTargetSize.h = pRendertargetTexture->GetHeight();
+
+    // Initialize eye rendering information for ovrHmd_Configure.
+    // The viewport sizes are re-computed in case RenderTargetSize changed due to HW limitations.
+    ovrEyeDesc eyes[2];
+    eyes[0].Eye                 = ovrEye_Left;
+    eyes[1].Eye                 = ovrEye_Right;
+    eyes[0].Fov                 = HMDDesc.DefaultEyeFov[0];
+    eyes[1].Fov                 = HMDDesc.DefaultEyeFov[1];
+    eyes[0].TextureSize         = RenderTargetSize;
+    eyes[1].TextureSize         = RenderTargetSize;
+    eyes[0].RenderViewport.Pos  = Vector2i(0,0);
+    eyes[0].RenderViewport.Size = Sizei(RenderTargetSize.w / 2, RenderTargetSize.h);
+    eyes[1].RenderViewport.Pos  = Vector2i((RenderTargetSize.w + 1) / 2, 0);
+    eyes[1].RenderViewport.Size = eyes[0].RenderViewport.Size;
+
+#if SDK_RENDER
+	// Query D3D texture data.
+    Texture* rtt = (Texture*)pRendertargetTexture;
+    EyeTexture[0].D3D11.Header.API            = ovrRenderAPI_D3D11;
+    EyeTexture[0].D3D11.Header.TextureSize    = RenderTargetSize;
+    EyeTexture[0].D3D11.Header.RenderViewport = eyes[0].RenderViewport;
+    EyeTexture[0].D3D11.pTexture              = rtt->Tex.GetPtr();
+    EyeTexture[0].D3D11.pSRView               = rtt->TexSv.GetPtr();
+
+    // Right eye uses the same texture, but different rendering viewport.
+    EyeTexture[1] = EyeTexture[0];
+    EyeTexture[1].D3D11.Header.RenderViewport = eyes[1].RenderViewport;    
+
+    // Configure d3d11.
+    RenderDevice* render = (RenderDevice*)pRender;
+    ovrD3D11Config d3d11cfg;
+    d3d11cfg.D3D11.Header.API         = ovrRenderAPI_D3D11;
+    d3d11cfg.D3D11.Header.RTSize      = Sizei(HMDDesc.Resolution.w, HMDDesc.Resolution.h);
+    d3d11cfg.D3D11.Header.Multisample = backBufferMultisample;
+    d3d11cfg.D3D11.pDevice            = render->Device;
+    d3d11cfg.D3D11.pDeviceContext     = render->Context;
+    d3d11cfg.D3D11.pBackBufferRT      = render->BackBufferRT;
+    d3d11cfg.D3D11.pSwapChain         = render->SwapChain;
+
+    if (!ovrHmd_ConfigureRendering(HMD, &d3d11cfg.Config,
+		                           (VSyncEnabled ? 0 : ovrHmdCap_NoVSync), DistortionCaps,
+                                   eyes, EyeRenderDesc)) return(1);
+#else // !SDK_RENDER
+    EyeRenderDesc[0] = ovrHmd_GetRenderDesc(HMD, eyes[0]);
+    EyeRenderDesc[1] = ovrHmd_GetRenderDesc(HMD, eyes[1]);
     
-    if (pSensor)
-    {
-        // We need to attach sensor to SensorFusion object for it to receive 
-        // body frame messages and update orientation. SFusion.GetOrientation() 
-        // is used in OnIdle() to orient the view.
-        SFusion.AttachToSensor(pSensor);
-        SFusion.SetDelegateMessageHandler(this);
-        SFusion.SetPredictionEnabled(true);
-    }
+ 	// Create our own distortion mesh and shaders
+    DistortionMeshInit(DistortionCaps, HMD, EyeRenderDesc, pRender);
+#endif
 
-    
-    // *** Initialize Rendering
-   
-    // Enable multi-sampling by default.
-    RenderParams.Multisample = 4;
-    RenderParams.Fullscreen  = true;
-
-    // Setup Graphics.
-    pRender = *RenderTiny::D3D10::RenderDevice::CreateDevice(RenderParams, (void*)hWnd);
-    if (!pRender)
-        return 1;
-
-
-    // *** Configure Stereo settings.
-
-    SConfig.SetFullViewport(Viewport(0,0, Width, Height));
-    SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-
-    // Configure proper Distortion Fit.
-    // For 7" screen, fit to touch left side of the view, leaving a bit of invisible
-    // screen on the top (saves on rendering cost).
-    // For smaller screens (5.5"), fit to the top.
-    if (HMDInfo.HScreenSize > 0.0f)
-    {
-        if (HMDInfo.HScreenSize > 0.140f) // 7"
-            SConfig.SetDistortionFitPointVP(-1.0f, 0.0f);
-        else
-            SConfig.SetDistortionFitPointVP(0.0f, 1.0f);
-    }
-
-    pRender->SetSceneRenderScale(SConfig.GetDistortionScale());
-
-    SConfig.Set2DAreaFov(DegreeToRad(85.0f));
-
-
-    // *** Populate Room Scene
+	// Start the sensor which informs of the Rift's pose and motion
+    ovrHmd_StartSensor(HMD, ovrHmdCap_Orientation |
+                            ovrHmdCap_YawCorrection |
+                            ovrHmdCap_Position |
+                            ovrHmdCap_LowPersistence |
+                            ovrHmdCap_LatencyTest, 0);
 
     // This creates lights and models.
-    PopulateRoomScene(&Scene, pRender);
+  	pRoomScene = new Scene;
+    PopulateRoomScene(pRoomScene, pRender);
 
-
-    LastUpdate = GetAppTime();
     return 0;
 }
 
-void OculusRoomTinyApp::OnMessage(const Message& msg)
+//-------------------------------------------------------------------------------------
+
+void ProcessAndRender()
 {
-	if (msg.Type == Message_DeviceAdded && msg.pDevice == pManager)
-	{
-		LogText("DeviceManager reported device added.\n");
-	}
-	else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pManager)
-	{
-		LogText("DeviceManager reported device removed.\n");
-	}
-	else if (msg.Type == Message_DeviceAdded && msg.pDevice == pSensor)
-	{
-		LogText("Sensor reported device added.\n");
-	}
-	else if (msg.Type == Message_DeviceRemoved && msg.pDevice == pSensor)
-	{
-		LogText("Sensor reported device removed.\n");
-	}
-}
+#if SDK_RENDER
+    ovrFrameTiming frameTiming = ovrHmd_BeginFrame(HMD, 0); 
+#else
+    ovrFrameTiming frameTiming = ovrHmd_BeginFrameTiming(HMD, 0); 
+#endif
 
+	//Adjust eye position and rotation from controls, maintaining y position from HMD.
+	static Vector3f EyePos(0.0f, 1.6f, -5.0f);
+	static float    EyeYaw(3.141592f);
 
-void OculusRoomTinyApp::OnGamepad(float padLx, float padLy, float padRx, float padRy)
-{
-    GamepadMove   = Vector3f(padLx * padLx * (padLx > 0 ? 1 : -1),
-                             0,
-                             padLy * padLy * (padLy > 0 ? -1 : 1));
-    GamepadRotate = Vector3f(2 * padRx, -2 * padRy, 0);
-}
+    Posef     movePose = ovrHmd_GetSensorState(HMD, frameTiming.ScanoutMidpointSeconds).Predicted.Pose;
+    ovrPosef  eyeRenderPose[2];
 
-void OculusRoomTinyApp::OnMouseMove(int x, int y, int modifiers)
-{
-    OVR_UNUSED(modifiers);
+	EyePos.y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, EyePos.y);
+	bool freezeEyeRender = Util_RespondToControls(EyeYaw, EyePos,
+                                frameTiming.DeltaSeconds, movePose.Orientation);
 
-    // Mouse motion here is always relative.
-    int         dx = x, dy = y; 
-    const float maxPitch = ((3.1415f/2)*0.98f);
-
-    // Apply to rotation. Subtract for right body frame rotation,
-    // since yaw rotation is positive CCW when looking down on XZ plane.
-    EyeYaw   -= (Sensitivity * dx)/ 360.0f;
-
-    if (!pSensor)
-    {
-        EyePitch -= (Sensitivity * dy)/ 360.0f;
-        
-        if (EyePitch > maxPitch)
-            EyePitch = maxPitch;
-        if (EyePitch < -maxPitch)
-            EyePitch = -maxPitch;
-    }    
-}
-
-void OculusRoomTinyApp::OnKey(unsigned vk, bool down)
-{
-    switch (vk)
-    {
-    case 'Q':
-        if (down && ControlDown)
-            Quit = true;
-        break;
-    case VK_ESCAPE:
-        if (!down)
-            Quit = true;
-        break;
-
-    // Handle player movement keys.
-    // We just update movement state here, while the actual translation is done in OnIdle()
-    // based on time.
-    case 'W':      MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); break;
-    case 'S':      MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); break;
-    case 'A':      MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); break;
-    case 'D':      MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); break;
-    case VK_UP:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); break;
-    case VK_DOWN:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); break;
-
-    case 'R':
-        SFusion.Reset();
-        break;
+    pRender->BeginScene();
     
-    case 'P':
-        if (down)
-        {
-            // Toggle chromatic aberration correction on/off.
-            RenderDevice::PostProcessShader shader = pRender->GetPostProcessShader();
-
-            if (shader == RenderDevice::PostProcessShader_Distortion)
-            {
-                pRender->SetPostProcessShader(RenderDevice::PostProcessShader_DistortionAndChromAb);                
-            }
-            else if (shader == RenderDevice::PostProcessShader_DistortionAndChromAb)
-            {
-                pRender->SetPostProcessShader(RenderDevice::PostProcessShader_Distortion);                
-            }
-            else
-                OVR_ASSERT(false);
-        }
-        break;
-
-    // Switch rendering modes/distortion.
-    case VK_F1:
-        SConfig.SetStereoMode(Stereo_None);
-        PostProcess = PostProcess_None;
-        break;
-    case VK_F2:
-        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-        PostProcess = PostProcess_None;
-        break;
-    case VK_F3:
-        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-        PostProcess = PostProcess_Distortion;
-        break;
-
-    // Stereo IPD adjustments, in meter (default IPD is 64mm).    
-    case VK_OEM_PLUS:    
-    case VK_INSERT:
-        if (down)
-            SConfig.SetIPD(SConfig.GetIPD() + 0.0005f * (ShiftDown ? 5.0f : 1.0f));
-        break;
-    case VK_OEM_MINUS:
-    case VK_DELETE:
-        if (down)
-            SConfig.SetIPD(SConfig.GetIPD() - 0.0005f * (ShiftDown ? 5.0f : 1.0f));
-        break;
-
-    // Holding down Shift key accelerates adjustment velocity.
-    case VK_SHIFT:
-        ShiftDown = down;
-        break;
-    case VK_CONTROL:
-        ControlDown = down;
-        break;
-    }
-}
-
-
-void OculusRoomTinyApp::OnIdle()
-{
-    double curtime = GetAppTime();
-    float  dt      = float(curtime - LastUpdate);
-    LastUpdate     = curtime;
-
-
-    // Handle Sensor motion.
-    // We extract Yaw, Pitch, Roll instead of directly using the orientation
-    // to allow "additional" yaw manipulation with mouse/controller.
-    if (pSensor)
-    {        
-        Quatf    hmdOrient = SFusion.GetOrientation();
-        float    yaw = 0.0f;
-
-        hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&yaw, &EyePitch, &EyeRoll);
-
-        EyeYaw += (yaw - LastSensorYaw);
-        LastSensorYaw = yaw;    
-    }    
-
-
-    // Gamepad rotation.
-    EyeYaw -= GamepadRotate.x * dt;
-
-    if (!pSensor)
+	//Render the two undistorted eye views into their render buffers.
+    if (!freezeEyeRender) // freeze to debug, especially for time warp
     {
-        // Allow gamepad to look up/down, but only if there is no Rift sensor.
-        EyePitch -= GamepadRotate.y * dt;
+        pRender->SetRenderTarget ( pRendertargetTexture );
+        pRender->SetViewport (Recti(0,0, pRendertargetTexture->GetWidth(),
+                                         pRendertargetTexture->GetHeight() ));  
+        pRender->Clear();
+		for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
+		{
+            ovrEyeType eye = HMDDesc.EyeRenderOrder[eyeIndex];
+#if SDK_RENDER
+		    eyeRenderPose[eye] = ovrHmd_BeginEyeRender(HMD, eye);
+#else
+            eyeRenderPose[eye] = ovrHmd_GetEyePose(HMD, eye);
+#endif
 
-        const float maxPitch = ((3.1415f/2)*0.98f);
-        if (EyePitch > maxPitch)
-            EyePitch = maxPitch;
-        if (EyePitch < -maxPitch)
-            EyePitch = -maxPitch;
+			// Get view matrix
+			Matrix4f rollPitchYaw       = Matrix4f::RotationY(EyeYaw);
+			Matrix4f finalRollPitchYaw  = rollPitchYaw * Matrix4f(eyeRenderPose[eye].Orientation);
+			Vector3f finalUp            = finalRollPitchYaw.Transform(Vector3f(0,1,0));
+			Vector3f finalForward       = finalRollPitchYaw.Transform(Vector3f(0,0,-1));
+			Vector3f shiftedEyePos      = EyePos + rollPitchYaw.Transform(eyeRenderPose[eye].Position);
+			
+            Matrix4f view = Matrix4f::LookAtRH(shiftedEyePos,
+                                               shiftedEyePos + finalForward, finalUp); 
+
+			Matrix4f proj = ovrMatrix4f_Projection(EyeRenderDesc[eye].Desc.Fov, 0.01f, 10000.0f, true);
+
+			pRender->SetViewport(EyeRenderDesc[eye].Desc.RenderViewport.Pos.x,
+								 EyeRenderDesc[eye].Desc.RenderViewport.Pos.y,
+								 EyeRenderDesc[eye].Desc.RenderViewport.Size.w,
+								 EyeRenderDesc[eye].Desc.RenderViewport.Size.h);
+			pRender->SetProjection(proj);
+			pRender->SetDepthMode(true, true);
+			pRoomScene->Render(pRender, Matrix4f::Translation(EyeRenderDesc[eye].ViewAdjust) * view);
+
+		#if SDK_RENDER
+			ovrHmd_EndEyeRender(HMD, eye, eyeRenderPose[eye], &EyeTexture[eye].Texture);
+		#endif
+		}
     }
-    
-    // Handle keyboard movement.
-    // This translates EyePos based on Yaw vector direction and keys pressed.
-    // Note that Pitch and Roll do not affect movement (they only affect view).
-    if (MoveForward || MoveBack || MoveLeft || MoveRight)
-    {
-        Vector3f localMoveVector(0,0,0);
-        Matrix4f yawRotate = Matrix4f::RotationY(EyeYaw);
-
-        if (MoveForward)
-            localMoveVector = ForwardVector;
-        else if (MoveBack)
-            localMoveVector = -ForwardVector;
-
-        if (MoveRight)
-            localMoveVector += RightVector;
-        else if (MoveLeft)
-            localMoveVector -= RightVector;
-
-        // Normalize vector so we don't move faster diagonally.
-        localMoveVector.Normalize();
-        Vector3f orientationVector = yawRotate.Transform(localMoveVector);
-        orientationVector *= MoveSpeed * dt * (ShiftDown ? 3.0f : 1.0f);
-
-        EyePos += orientationVector;
-    }
-
-    else if (GamepadMove.LengthSq() > 0)
-    {
-        Matrix4f yawRotate = Matrix4f::RotationY(EyeYaw);
-        Vector3f orientationVector = yawRotate.Transform(GamepadMove);
-        orientationVector *= MoveSpeed * dt;
-        EyePos += orientationVector;
-    }
-
-
-    // Rotate and position View Camera, using YawPitchRoll in BodyFrame coordinates.
-    // 
-    Matrix4f rollPitchYaw = Matrix4f::RotationY(EyeYaw) * Matrix4f::RotationX(EyePitch) *
-                            Matrix4f::RotationZ(EyeRoll);
-    Vector3f up      = rollPitchYaw.Transform(UpVector);
-    Vector3f forward = rollPitchYaw.Transform(ForwardVector);
-
-    
-    // Minimal head modelling.
-    float headBaseToEyeHeight     = 0.15f;  // Vertical height of eye from base of head
-    float headBaseToEyeProtrusion = 0.09f;  // Distance forward of eye from base of head
-
-    Vector3f eyeCenterInHeadFrame(0.0f, headBaseToEyeHeight, -headBaseToEyeProtrusion);
-    Vector3f shiftedEyePos = EyePos + rollPitchYaw.Transform(eyeCenterInHeadFrame);
-    shiftedEyePos.y -= eyeCenterInHeadFrame.y; // Bring the head back down to original height
-
-    View = Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + forward, up); 
-
-    // This is what transformation would be without head modeling.    
-    // View = Matrix4f::LookAtRH(EyePos, EyePos + forward, up);    
-
-    switch(SConfig.GetStereoMode())
-    {
-    case Stereo_None:
-        Render(SConfig.GetEyeRenderParams(StereoEye_Center));
-        break;
-
-    case Stereo_LeftRight_Multipass:
-        Render(SConfig.GetEyeRenderParams(StereoEye_Left));
-        Render(SConfig.GetEyeRenderParams(StereoEye_Right));
-        break;
-    }
-     
-    pRender->Present();
-    // Force GPU to flush the scene, resulting in the lowest possible latency.
-    pRender->ForceFlushGPU();
-}
-
-
-// Render the scene for one eye.
-void OculusRoomTinyApp::Render(const StereoEyeParams& stereo)
-{
-    pRender->BeginScene(PostProcess);
-
-    // Apply Viewport/Projection for the eye.
-    pRender->ApplyStereoParams(stereo);    
-    pRender->Clear();
-    pRender->SetDepthMode(true, true);
-    
-    Scene.Render(pRender, stereo.ViewAdjust * View);
-
     pRender->FinishScene();
+
+	// Now render the distorted view and finish.
+#if SDK_RENDER
+    // Let OVR do distortion rendering, Present and flush/sync
+    ovrHmd_EndFrame(HMD);
+
+#else
+    DistortionMeshRender(DistortionCaps, HMD, frameTiming.TimewarpPointSeconds,
+                         eyeRenderPose, pRender, pRendertargetTexture);	
+    pRender->Present( VSyncEnabled );
+    pRender->WaitUntilGpuIdle();  //for lowest latency
+    ovrHmd_EndFrameTiming(HMD);
+#endif 
 }
 
-
-//-------------------------------------------------------------------------------------
-// ***** Win32-Specific Logic
-
-bool OculusRoomTinyApp::setupWindow()
-{
-
-    WNDCLASS wc;
-    memset(&wc, 0, sizeof(wc));
-    wc.lpszClassName = L"OVRAppWindow";
-    wc.style         = CS_OWNDC;
-    wc.lpfnWndProc   = systemWindowProc;
-    wc.cbWndExtra    = sizeof(OculusRoomTinyApp*);
-    RegisterClass(&wc);
-   
-
-    RECT winSize = { 0, 0, Width, Height };
-    AdjustWindowRect(&winSize, WS_POPUP, false);
-    hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny", WS_POPUP|WS_VISIBLE,
-                         HMDInfo.DesktopX, HMDInfo.DesktopY,
-                         winSize.right-winSize.left, winSize.bottom-winSize.top,
-                         NULL, NULL, hInstance, (LPVOID)this);
-
-
-    // Initialize Window center in screen coordinates
-    POINT center = { Width / 2, Height / 2 };
-    ::ClientToScreen(hWnd, &center);
-    WindowCenter = center;
-
-
-    return (hWnd != NULL);
-}
-
-void OculusRoomTinyApp::destroyWindow()
+/*
+void RenderFramePseudoCode()
 {    
-    pRender.Clear();
+ovrFrame hmdFrameState = ovrHmd_BeginFrame(hmd); 
 
-    if (hWnd)
-    {
-        // Release window resources.
-        ::DestroyWindow(hWnd);
-        UnregisterClass(L"OVRAppWindow", hInstance);
-        hWnd = 0;
-        Width = Height = 0; 
-    }
-}
-
-
-LRESULT CALLBACK OculusRoomTinyApp::systemWindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
+for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
 {
-    if (msg == WM_NCCREATE)
-        pApp->hWnd = hwnd;
-    return pApp->windowProc(msg, wp, lp);
+    ovrEyeType eye           = HMDDesc.EyeRenderOrder[eyeIndex];
+    ovrPosef   eyeRenderPose = ovrHmd_BeginEyeRender(hmd, eye);
+
+    RenderGameView(RenderViewports[eye], eyeRenderPose);
+
+    ovrHmd_EndEyeRender(hmd, eye, &EyeTexture[eye].Texture);
 }
 
-void OculusRoomTinyApp::giveUsFocus(bool setFocus)
-{
-    if (setFocus)    
-    {
-        ::SetCursorPos(WindowCenter.x, WindowCenter.y);
-
-        MouseCaptured = true;
-        ::SetCapture(hWnd);
-        ::ShowCursor(FALSE);
-
-    }
-    else
-    {
-        MouseCaptured = false;
-        ::ReleaseCapture();
-        ::ShowCursor(TRUE);
-    }
+// Let OVR do distortion rendering, Present and Flush+Sync.
+ovrHmd_EndFrame(hmd);
 }
-
-LRESULT OculusRoomTinyApp::windowProc(UINT msg, WPARAM wp, LPARAM lp)
-{
-    switch (msg)
-    {
-    case WM_MOUSEMOVE:
-        {
-            if (MouseCaptured)
-            {
-                // Convert mouse motion to be relative (report the offset and re-center).
-                POINT newPos = { LOWORD(lp), HIWORD(lp) };
-                ::ClientToScreen(hWnd, &newPos);
-                if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
-                    break;
-                ::SetCursorPos(WindowCenter.x, WindowCenter.y);
-
-                LONG dx = newPos.x - WindowCenter.x;
-                LONG dy = newPos.y - WindowCenter.y;           
-                pApp->OnMouseMove(dx, dy, 0);
-            }
-        }
-        break;
-
-    case WM_MOVE:
-        {
-            RECT r;
-            GetClientRect(hWnd, &r);
-            WindowCenter.x = r.right/2;
-            WindowCenter.y = r.bottom/2;
-            ::ClientToScreen(hWnd, &WindowCenter);
-        }
-        break;
-
-    case WM_KEYDOWN:
-        OnKey((unsigned)wp, true);
-        break;
-    case WM_KEYUP:
-        OnKey((unsigned)wp, false);
-        break;
-
-    case WM_SETFOCUS:
-        giveUsFocus(true);
-        break;
-
-    case WM_KILLFOCUS:
-        giveUsFocus(false);
-        break;
-
-    case WM_CREATE:
-        // Hack to position mouse in fullscreen window shortly after startup.
-        SetTimer(hWnd, 0, 100, NULL);
-        break;
-
-    case WM_TIMER:
-        KillTimer(hWnd, 0);
-        giveUsFocus(true);
-        break;
-
-    case WM_QUIT:
-    case WM_CLOSE:
-        Quit = true;
-        return 0;
-    }
-
-    return DefWindowProc(hWnd, msg, wp, lp);
-}
-
-static inline float GamepadStick(short in)
-{
-    float v;
-    if (abs(in) < 9000)
-        return 0;
-    else if (in > 9000)
-        v = (float) in - 9000;
-    else
-        v = (float) in + 9000;
-    return v / (32767 - 9000);
-}
-
-static inline float GamepadTrigger(BYTE in)
-{
-    return (in < 30) ? 0.0f : (float(in-30) / 225);
-}
-
-
-int OculusRoomTinyApp::Run()
-{
-    // Loop processing messages until Quit flag is set,
-    // rendering game scene inside of OnIdle().
-
-    while (!Quit)
-    {
-        MSG msg;
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        else
-        {
-            // Read game-pad.
-            XINPUT_STATE xis;
-
-            if (pXInputGetState && !pXInputGetState(0, &xis) &&
-                (xis.dwPacketNumber != LastPadPacketNo))
-            {
-                OnGamepad(GamepadStick(xis.Gamepad.sThumbLX),
-                          GamepadStick(xis.Gamepad.sThumbLY),
-                          GamepadStick(xis.Gamepad.sThumbRX),
-                          GamepadStick(xis.Gamepad.sThumbRY));
-                //pad.LT = GamepadTrigger(xis.Gamepad.bLeftTrigger);
-                LastPadPacketNo = xis.dwPacketNumber;
-            }
-
-            pApp->OnIdle();
-
-            // Keep sleeping when we're minimized.
-            if (IsIconic(hWnd))
-                Sleep(10);
-        }
-    }
-
-    return 0;
-}
-
+*/ 
 
 //-------------------------------------------------------------------------------------
-// ***** Program Startup
-
-int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR inArgs, int)
+void Release(void)
 {
-    int exitCode = 0;
-
-    // Initializes LibOVR. This LogMask_All enables maximum logging.
-    // Custom allocator can also be specified here.
-    OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
-
-    // Scope to force application destructor before System::Destroy.
+    pRendertargetTexture->Release();
+    pRendertargetTexture = 0;
+    ovrHmd_Destroy(HMD);
+    Util_ReleaseWindowAndGraphics(pRender);
+    pRender = 0;
+    if (pRoomScene)
     {
-        OculusRoomTinyApp app(hinst);
-        //app.hInstance = hinst;
-
-        exitCode = app.OnStartup(inArgs);
-        if (!exitCode)
-        {
-            // Processes messages and calls OnIdle() to do rendering.
-            exitCode = app.Run();
-        }
-    }
-
+        delete pRoomScene;
+        pRoomScene = 0;
+    }    
     // No OVR functions involving memory are allowed after this.
-    OVR::System::Destroy();
-  
-    OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
-    return exitCode;
+    ovr_Shutdown(); 
 }
+

@@ -2,20 +2,20 @@
 
 PublicHeader:   OVR.h
 Filename    :   OVR_SensorFilter.cpp
-Content     :   Basic filtering of sensor data
+Content     :   Basic filtering of sensor this->Data
 Created     :   March 7, 2013
 Authors     :   Steve LaValle, Anna Yershova, Max Katsev
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,95 +29,66 @@ limitations under the License.
 
 namespace OVR {
 
-Vector3f SensorFilter::Median() const
+template <typename T>
+Vector3<T> SensorFilter<T>::Median() const
 {
-    int half_window = Count / 2;
-    float* sortx = (float*) OVR_ALLOC(Count * sizeof(float));
-    float* sorty = (float*) OVR_ALLOC(Count * sizeof(float));
-    float* sortz = (float*) OVR_ALLOC(Count * sizeof(float));
-    float resultx = 0.0f, resulty = 0.0f, resultz = 0.0f;
+    Vector3<T> result;
+    T* slice = (T*) OVR_ALLOC(this->ElemCount * sizeof(T));
 
-    for (int i = 0; i < Count; i++) 
+    for (int coord = 0; coord < 3; coord++)
     {
-        sortx[i] = Elements[i].x;
-        sorty[i] = Elements[i].y;
-        sortz[i] = Elements[i].z;
+        for (int i = 0; i < this->ElemCount; i++)
+            slice[i] = this->Data[i][coord];
+        result[coord] = Alg::Median(ArrayAdaptor(slice, this->ElemCount));
     }
-    for (int j = 0; j <= half_window; j++) 
-    {
-        int minx = j;
-        int miny = j;
-        int minz = j;
-        for (int k = j + 1; k < Count; k++) 
-        {
-            if (sortx[k] < sortx[minx]) minx = k;
-            if (sorty[k] < sorty[miny]) miny = k;
-            if (sortz[k] < sortz[minz]) minz = k;
-        }
-        const float tempx = sortx[j];
-        const float tempy = sorty[j];
-        const float tempz = sortz[j];
-        sortx[j] = sortx[minx];
-        sortx[minx] = tempx;
 
-        sorty[j] = sorty[miny];
-        sorty[miny] = tempy;
-
-        sortz[j] = sortz[minz];
-        sortz[minz] = tempz;
-    }
-    resultx = sortx[half_window];
-    resulty = sorty[half_window];
-    resultz = sortz[half_window];
-
-    OVR_FREE(sortx);
-    OVR_FREE(sorty);
-    OVR_FREE(sortz);
-
-    return Vector3f(resultx, resulty, resultz);
+    OVR_FREE(slice);
+    return result;
 }
 
 //  Only the diagonal of the covariance matrix.
-Vector3f SensorFilter::Variance() const
+template <typename T>
+Vector3<T> SensorFilter<T>::Variance() const
 {
-    Vector3f mean = Mean();
-    Vector3f total = Vector3f(0.0f, 0.0f, 0.0f);
-    for (int i = 0; i < Count; i++) 
+    Vector3<T> mean = this->Mean();
+    Vector3<T> total;
+    for (int i = 0; i < this->ElemCount; i++) 
     {
-        total.x += (Elements[i].x - mean.x) * (Elements[i].x - mean.x);
-        total.y += (Elements[i].y - mean.y) * (Elements[i].y - mean.y);
-        total.z += (Elements[i].z - mean.z) * (Elements[i].z - mean.z);
+        total.x += (this->Data[i].x - mean.x) * (this->Data[i].x - mean.x);
+        total.y += (this->Data[i].y - mean.y) * (this->Data[i].y - mean.y);
+        total.z += (this->Data[i].z - mean.z) * (this->Data[i].z - mean.z);
     }
-    return total / (float) Count;
+    return total / (float) this->ElemCount;
 }
 
-// Should be a 3x3 matrix returned, but OVR_math.h doesn't have one
-Matrix4f SensorFilter::Covariance() const
+template <typename T>
+Matrix3<T> SensorFilter<T>::Covariance() const
 {
-    Vector3f mean = Mean();
-    Matrix4f total = Matrix4f(0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0);
-    for (int i = 0; i < Count; i++) 
+    Vector3<T> mean = this->Mean();
+    Matrix3<T> total;
+    for (int i = 0; i < this->ElemCount; i++) 
     {
-        total.M[0][0] += (Elements[i].x - mean.x) * (Elements[i].x - mean.x);
-        total.M[1][0] += (Elements[i].y - mean.y) * (Elements[i].x - mean.x);
-        total.M[2][0] += (Elements[i].z - mean.z) * (Elements[i].x - mean.x);
-        total.M[1][1] += (Elements[i].y - mean.y) * (Elements[i].y - mean.y);
-        total.M[2][1] += (Elements[i].z - mean.z) * (Elements[i].y - mean.y);
-        total.M[2][2] += (Elements[i].z - mean.z) * (Elements[i].z - mean.z);
+        total.M[0][0] += (this->Data[i].x - mean.x) * (this->Data[i].x - mean.x);
+        total.M[1][0] += (this->Data[i].y - mean.y) * (this->Data[i].x - mean.x);
+        total.M[2][0] += (this->Data[i].z - mean.z) * (this->Data[i].x - mean.x);
+        total.M[1][1] += (this->Data[i].y - mean.y) * (this->Data[i].y - mean.y);
+        total.M[2][1] += (this->Data[i].z - mean.z) * (this->Data[i].y - mean.y);
+        total.M[2][2] += (this->Data[i].z - mean.z) * (this->Data[i].z - mean.z);
     }
     total.M[0][1] = total.M[1][0];
     total.M[0][2] = total.M[2][0];
     total.M[1][2] = total.M[2][1];
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
-            total.M[i][j] *= 1.0f / Count;
+            total.M[i][j] /= (float) this->ElemCount;
     return total;
 }
 
-Vector3f SensorFilter::PearsonCoefficient() const
+template <typename T>
+Vector3<T> SensorFilter<T>::PearsonCoefficient() const
 {
-    Matrix4f cov = Covariance();
-    Vector3f pearson = Vector3f();
+    Matrix3<T> cov = this->Covariance();
+    Vector3<T> pearson;
     pearson.x = cov.M[0][1]/(sqrt(cov.M[0][0])*sqrt(cov.M[1][1]));
     pearson.y = cov.M[1][2]/(sqrt(cov.M[1][1])*sqrt(cov.M[2][2]));
     pearson.z = cov.M[2][0]/(sqrt(cov.M[2][2])*sqrt(cov.M[0][0]));

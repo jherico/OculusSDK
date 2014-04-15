@@ -23,135 +23,138 @@ limitations under the License.
 #include "Player.h"
 #include <Kernel/OVR_Alg.h>
 
-Player::Player(void)
-	: UserEyeHeight(1.8f),
-	  EyePos(7.7f, 1.8f, -1.0f),
-      EyeYaw(YawInitial), EyePitch(0), EyeRoll(0),
-      LastSensorYaw(0)
+Player::Player()
+    : UserEyeHeight(1.76f - 0.15f),        // 1.76 meters height (ave US male, Wikipedia), less 15 centimeters (TomF's top-of-head-to-eye distance).
+    BodyPos(7.7f, 1.76f - 0.15f, -1.0f),
+    BodyYaw(YawInitial)
 {
 	MoveForward = MoveBack = MoveLeft = MoveRight = 0;
     GamepadMove = Vector3f(0);
     GamepadRotate = Vector3f(0);
 }
 
-
-Player::~Player(void)
+Player::~Player()
 {
 }
 
-void Player::HandleCollision(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-	                         Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
+Vector3f Player::GetPosition()
 {
-	if(MoveForward || MoveBack || MoveLeft || MoveRight || GamepadMove.LengthSq() > 0)
+    return BodyPos + Quatf(Vector3f(0,1,0), BodyYaw.Get()).Rotate(HeadPose.Position);
+}
+
+Quatf Player::GetOrientation(bool baseOnly)
+{
+    Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
+    return baseOnly ? baseQ : baseQ * HeadPose.Orientation;
+}
+
+Posef Player::VirtualWorldPoseFromRealPose(const Posef &sensorHeadPose)
+{
+    Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
+
+    return Posef(baseQ * sensorHeadPose.Orientation,
+                 BodyPos + baseQ.Rotate(sensorHeadPose.Position));
+}
+
+
+void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
+	                        Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
+{
+    // Handle keyboard movement.
+    // This translates BasePos based on the orientation and keys pressed.
+    // Note that Pitch and Roll do not affect movement (they only affect view).
+    Vector3f controllerMove;
+    if(MoveForward || MoveBack || MoveLeft || MoveRight)
     {
-        Vector3f orientationVector;
-        // Handle keyboard movement.
-        // This translates EyePos based on Yaw vector direction and keys pressed.
-        // Note that Pitch and Roll do not affect movement (they only affect view).
-        if(MoveForward || MoveBack || MoveLeft || MoveRight)
+        if (MoveForward)
         {
-            Vector3f localMoveVector(0, 0, 0);
-            Matrix4f yawRotate = Matrix4f::RotationY(EyeYaw);
-            
-            if (MoveForward)
-            {
-                localMoveVector = ForwardVector;
-            }
-            else if (MoveBack)
-            {
-                localMoveVector = -ForwardVector;
-            }
-
-            if (MoveRight)
-            {
-                localMoveVector += RightVector;
-            }
-            else if (MoveLeft)
-            {
-                localMoveVector -= RightVector;
-            }
-
-            // Normalize vector so we don't move faster diagonally.
-            localMoveVector.Normalize();
-            orientationVector = yawRotate.Transform(localMoveVector);
+            controllerMove += ForwardVector;
         }
-        else if (GamepadMove.LengthSq() > 0)
+        else if (MoveBack)
         {
-            Matrix4f yawRotate = Matrix4f::RotationY(EyeYaw);
-            GamepadMove.Normalize();
-            orientationVector = yawRotate.Transform(GamepadMove);
+            controllerMove -= ForwardVector;
         }
 
-        float moveLength = OVR::Alg::Min<float>(MoveSpeed * (float)dt * (shiftDown ? 3.0f : 1.0f), 1.0f);
-
-        float   checkLengthForward = moveLength;
-        Planef  collisionPlaneForward;
-        float   checkLengthLeft = moveLength;
-        Planef  collisionPlaneLeft;
-        float   checkLengthRight = moveLength;
-        Planef  collisionPlaneRight;
-        bool    gotCollision = false;
-        bool    gotCollisionLeft = false;
-        bool    gotCollisionRight = false;
-
-        for(unsigned int i = 0; i < collisionModels->GetSize(); ++i)
+        if (MoveRight)
         {
-            // Checks for collisions at eye level, which should prevent us from
-			// slipping under walls
-            if (collisionModels->At(i)->TestRay(EyePos, orientationVector, checkLengthForward,
-				                                &collisionPlaneForward))
-            {
-                gotCollision = true;
-            }
+            controllerMove += RightVector;
+        }
+        else if (MoveLeft)
+        {
+            controllerMove -= RightVector;
+        }
+    }
+    else if (GamepadMove.LengthSq() > 0)
+    {
+        controllerMove = GamepadMove;
+    }
+    controllerMove = GetOrientation(bMotionRelativeToBody).Rotate(controllerMove);    
+    controllerMove.y = 0; // Project to the horizontal plane
+    if (controllerMove.LengthSq() > 0)
+    {
+        // Normalize vector so we don't move faster diagonally.
+        controllerMove.Normalize();
+        controllerMove *= OVR::Alg::Min<float>(MoveSpeed * (float)dt * (shiftDown ? 3.0f : 1.0f), 1.0f);
+    }
 
-            Matrix4f leftRotation = Matrix4f::RotationY(45 * (Math<float>::Pi / 180.0f));
-            Vector3f leftVector   = leftRotation.Transform(orientationVector);
-            if (collisionModels->At(i)->TestRay(EyePos, leftVector, checkLengthLeft,
-				                                &collisionPlaneLeft))
+    // Compute total move direction vector and move length
+    Vector3f orientationVector = controllerMove;
+    float moveLength = orientationVector.Length();
+    if (moveLength > 0)
+        orientationVector.Normalize();
+        
+    float   checkLengthForward = moveLength;
+    Planef  collisionPlaneForward;
+    bool    gotCollision = false;
+
+    for(unsigned int i = 0; i < collisionModels->GetSize(); ++i)
+    {
+        // Checks for collisions at model base level, which should prevent us from
+		// slipping under walls
+        if (collisionModels->At(i)->TestRay(BodyPos, orientationVector, checkLengthForward,
+				                            &collisionPlaneForward))
+        {
+            gotCollision = true;
+            break;
+        }
+    }
+
+    if (gotCollision)
+    {
+        // Project orientationVector onto the plane
+        Vector3f slideVector = orientationVector - collisionPlaneForward.N
+			* (orientationVector.Dot(collisionPlaneForward.N));
+
+        // Make sure we aren't in a corner
+        for(unsigned int j = 0; j < collisionModels->GetSize(); ++j)
+        {
+            if (collisionModels->At(j)->TestPoint(BodyPos - Vector3f(0.0f, RailHeight, 0.0f) +
+					                                (slideVector * (moveLength))) )
             {
-                gotCollisionLeft = true;
-            }
-            Matrix4f rightRotation = Matrix4f::RotationY(-45 * (Math<float>::Pi / 180.0f));
-            Vector3f rightVector   = rightRotation.Transform(orientationVector);
-            if (collisionModels->At(i)->TestRay(EyePos, rightVector, checkLengthRight,
-				                                &collisionPlaneRight))
-            {
-                gotCollisionRight = true;
+                moveLength = 0;
+                break;
             }
         }
-
-        if (gotCollision)
+        if (moveLength != 0)
         {
-            // Project orientationVector onto the plane
-            Vector3f slideVector = orientationVector - collisionPlaneForward.N
-				* (orientationVector.Dot(collisionPlaneForward.N));
-
-            // Make sure we aren't in a corner
-            for(unsigned int j = 0; j < collisionModels->GetSize(); ++j)
-            {
-                if (collisionModels->At(j)->TestPoint(EyePos - Vector3f(0.0f, RailHeight, 0.0f) +
-					                                  (slideVector * (moveLength))) )
-                {
-                    moveLength = 0;
-                }
-            }
-            if (moveLength != 0)
-            {
-                orientationVector = slideVector;
-            }
+            orientationVector = slideVector;
         }
-        // Checks for collisions at foot level, which allows us to follow terrain
-        orientationVector *= moveLength;
-        EyePos += orientationVector;
+    }
+    // Checks for collisions at foot level, which allows us to follow terrain
+    orientationVector *= moveLength;
+    BodyPos += orientationVector;
 
-        Planef collisionPlaneDown;
-        float finalDistanceDown = 10;
+    Planef collisionPlaneDown;
+    float finalDistanceDown = 10;
 
+    // Only apply down if there is collision model (otherwise we get jitter).
+    if (groundCollisionModels->GetSize())
+    {
         for(unsigned int i = 0; i < groundCollisionModels->GetSize(); ++i)
         {
             float checkLengthDown = 10;
-            if (groundCollisionModels->At(i)->TestRay(EyePos, Vector3f(0.0f, -1.0f, 0.0f),
-				                                      checkLengthDown, &collisionPlaneDown))
+            if (groundCollisionModels->At(i)->TestRay(BodyPos, Vector3f(0.0f, -1.0f, 0.0f),
+                checkLengthDown, &collisionPlaneDown))
             {
                 finalDistanceDown = Alg::Min(finalDistanceDown, checkLengthDown);
             }
@@ -160,7 +163,32 @@ void Player::HandleCollision(double dt, Array<Ptr<CollisionModel> >* collisionMo
         // Maintain the minimum camera height
         if (UserEyeHeight - finalDistanceDown < 1.0f)
         {
-            EyePos.y += UserEyeHeight - finalDistanceDown;
+            BodyPos.y += UserEyeHeight - finalDistanceDown;
         }
     }
+
 }
+
+
+
+// Handle directional movement. Returns 'true' if movement was processed.
+bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
+{
+    switch(key)
+    {
+        // Handle player movement keys.
+        // We just update movement state here, while the actual translation is done in OnIdle()
+        // based on time.
+    case OVR::Key_W:     MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1); return true;
+    case OVR::Key_S:     MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); return true;
+    case OVR::Key_A:     MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); return true;
+    case OVR::Key_D:     MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); return true;
+    case OVR::Key_Up:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); return true;
+    case OVR::Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); return true;
+    case OVR::Key_Left:  MoveLeft    = down ? (MoveLeft    | 2) : (MoveLeft    & ~2); return true;
+    case OVR::Key_Right: MoveRight   = down ? (MoveRight   | 2) : (MoveRight   & ~2); return true;
+    }
+    return false;
+}
+
+

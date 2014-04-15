@@ -21,6 +21,8 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include <Windows.h>
+
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_String.h"
@@ -177,7 +179,7 @@ static UByte KeyMap[][2] =
     { VK_OEM_MINUS, Key_Minus },
     { VK_OEM_PERIOD,Key_Period },
     { VK_OEM_2,     Key_Slash },
-    { VK_OEM_3,     Key_Bar },
+    { VK_OEM_3,     Key_Backtick },
     { VK_OEM_4,     Key_BracketLeft },
     { VK_OEM_5,     Key_Backslash },
     { VK_OEM_6,     Key_BracketRight },
@@ -418,8 +420,8 @@ int PlatformCore::Run()
             if (IsIconic(hWnd))
             {
                 Sleep(10);
+            }
         }
-    }
     }
 
     return ExitCode;
@@ -544,6 +546,7 @@ Render::DisplayId PlatformCore::GetDisplay(int screen)
 }}}
 
 OVR::Platform::Application*     g_app;
+
 
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 {

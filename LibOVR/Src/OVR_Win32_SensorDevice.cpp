@@ -5,16 +5,16 @@ Content     :   Win32 SensorDevice implementation
 Created     :   March 12, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -43,13 +43,15 @@ void SensorDeviceImpl::EnumerateHMDFromSensorDisplayInfo
     Win32::HMDDeviceCreateDesc hmdCreateDesc(&Win32::HMDDeviceFactory::Instance, String(), String());
     hmdCreateDesc.SetScreenParameters(  0, 0,
                                         displayInfo.HResolution, displayInfo.VResolution,
-                                        displayInfo.HScreenSize, displayInfo.VScreenSize);
+                                        displayInfo.HScreenSize, displayInfo.VScreenSize,
+                                        displayInfo.VCenter, displayInfo.LensSeparation);
 
-    if ((displayInfo.DistortionType & SensorDisplayInfoImpl::Mask_BaseFmt) & SensorDisplayInfoImpl::Base_Distortion)
-        hmdCreateDesc.SetDistortion(displayInfo.EyeToScreenDistance[0], displayInfo.DistortionK);
-    if (displayInfo.HScreenSize > 0.14f)
-        hmdCreateDesc.Set7Inch();
-
+    if ((displayInfo.DistortionType & SensorDisplayInfoImpl::Mask_BaseFmt) == SensorDisplayInfoImpl::Base_Distortion)
+    {
+        // TODO: update to spline system.
+        hmdCreateDesc.SetDistortion(displayInfo.DistortionK);
+    }
+   
     visitor.Visit(hmdCreateDesc);
 }
 

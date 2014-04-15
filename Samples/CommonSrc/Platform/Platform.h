@@ -111,7 +111,7 @@ protected:
     Application*        pApp;
     Ptr<RenderDevice>   pRender;
     Ptr<GamepadManager> pGamepadManager;
-    UInt64              StartupTicks; 
+    double              StartupSeconds; 
 
 public:
     PlatformCore(Application *app);

@@ -5,7 +5,7 @@ Content     :   Imports and exports XML files - implementation
 Created     :   January 21, 2013
 Authors     :   Robotic Arm Software - Peter Hoff, Dan Goodman, Bryan Croteau
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -121,6 +121,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 			OVR_DEBUG_LOG_TEXT(("%i models remaining...", modelCount - i));
 		}
 		Models.PushBack(*new Model(Prim_Triangles));
+        const char* name = pXmlModel->Attribute("name");
         bool isCollisionModel = false;
         pXmlModel->QueryBoolAttribute("isCollisionModel", &isCollisionModel);
         Models[i]->IsCollisionModel = isCollisionModel;
@@ -128,6 +129,8 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 		{
 			Models[i]->Visible = false;
 		}
+
+        bool tree_c = (strcmp(name, "tree_C") == 0) || (strcmp(name, "Object03") == 0);
 
         //read the vertices
         OVR::Array<Vector3f> *vertices = new OVR::Array<Vector3f>();
@@ -137,6 +140,11 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 		for (unsigned int vertexIndex = 0; vertexIndex < vertices->GetSize(); ++vertexIndex)
 		{
 			vertices->At(vertexIndex).x *= -1.0f;
+
+            if (tree_c)
+            {   // Move the terrace tree closer to the house
+                vertices->At(vertexIndex).z += 0.5;
+            }
 		}
 
         //read the normals
@@ -237,6 +245,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         // Read the vertex indices for the triangles
         const char* indexStr = pXmlModel->FirstChildElement("indices")->
                                           FirstChild()->ToText()->Value();
+        
         UPInt stringLength = strlen(indexStr);
 
         for(UPInt j = 0; j < stringLength; )
@@ -306,6 +315,8 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
             float D;
             pXmlPlane->QueryFloatAttribute("d", &D);
             D -= 0.5f;
+            if (i == 26)
+                D += 0.5f;  // tighten the terrace collision so player can move right up to rail
             Planef p(norm.z, norm.y, norm.x * -1.0f, D);
             cm->Add(p);
             pXmlPlane = pXmlPlane->NextSiblingElement("plane");

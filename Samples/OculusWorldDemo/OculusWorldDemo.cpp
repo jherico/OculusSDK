@@ -1,10 +1,10 @@
 /************************************************************************************
 
 Filename    :   OculusWorldDemo.cpp
-Content     :   First-person view test application for Oculus Rift
+Content     :   First-person view test application for Oculus Rift - Implementation
 Created     :   October 4, 2012
-Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle
-				Peter Hoff, Dan Goodman, Bryan Croteau
+Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
+				Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -22,285 +22,81 @@ limitations under the License.
 
 *************************************************************************************/
 
-#include "OVR.h"
+#include "OculusWorldDemo.h"
 
-#include "../CommonSrc/Platform/Platform_Default.h"
-#include "../CommonSrc/Render/Render_Device.h"
-#include "../CommonSrc/Render/Render_XmlSceneLoader.h"
-#include "../CommonSrc/Render/Render_FontEmbed_DejaVu48.h"
-#include "../CommonSrc/Platform/Gamepad.h"
-
-#include <Kernel/OVR_SysFile.h>
-#include <Kernel/OVR_Log.h>
-#include <Kernel/OVR_Timer.h>
-
-#include "Player.h"
-
-// Filename to be loaded by default, searching specified paths.
-#define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
-#define WORLDDEMO_ASSET_PATH1 "Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
-// This path allows the shortcut to work.
-#define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
-
-
-using namespace OVR;
-using namespace OVR::Platform;
-using namespace OVR::Render;
 
 //-------------------------------------------------------------------------------------
-// ***** OculusWorldDemo Description
-
-// This app renders a simple flat-shaded room allowing the user to move along the
-// floor and look around with an HMD, mouse and keyboard. The following keys work:
-//
-//  'W', 'S', 'A', 'D' and Arrow Keys - Move forward, back; strafe left/right.
-//  F1 - No stereo, no distortion.
-//  F2 - Stereo, no distortion.
-//  F3 - Stereo and distortion.
-//  F4 - Toggle MSAA.
-//  F9 - Cycle through fullscreen and windowed modes. Necessary for previewing content with Rift.
-//
-// Important Oculus-specific logic can be found at following locations:
-//
-//  OculusWorldDemoApp::OnStartup - This function will initialize OVR::DeviceManager and HMD,
-//									creating SensorDevice and attaching it to SensorFusion.
-//									This needs to be done before obtaining sensor data.
-//
-//  OculusWorldDemoApp::OnIdle    - Here we poll SensorFusion for orientation, apply it
-//									to the scene and handle movement.
-//									Stereo rendering is also done here, by delegating to
-//									to Render function for each eye.
-//
-
-//-------------------------------------------------------------------------------------
-// ***** OculusWorldDemo Application class
-
-// An instance of this class is created on application startup (main/WinMain).
-// It then works as follows:
-//  - Graphics and HMD setup is done OculusWorldDemoApp::OnStartup(). This function
-//    also creates the room model from Slab declarations.
-//  - Per-frame processing is done in OnIdle(). This function processes
-//    sensor and movement input and then renders the frame.
-//  - Additional input processing is done in OnMouse, OnKey.
-
-class OculusWorldDemoApp : public Application, public MessageHandler
-{
-public:
-    OculusWorldDemoApp();
-    ~OculusWorldDemoApp();
-
-    virtual int  OnStartup(int argc, const char** argv);
-    virtual void OnIdle();
-
-    virtual void OnMouseMove(int x, int y, int modifiers);
-    virtual void OnKey(OVR::KeyCode key, int chr, bool down, int modifiers);
-    virtual void OnResize(int width, int height);
-
-    virtual void OnMessage(const Message& msg);
-
-    void         Render(const StereoEyeParams& stereo);
-
-    // Sets temporarily displayed message for adjustments
-    void         SetAdjustMessage(const char* format, ...);
-    // Overrides current timeout, in seconds (not the future default value);
-    // intended to be called right after SetAdjustMessage.
-    void         SetAdjustMessageTimeout(float timeout);
-
-    // Stereo setting adjustment functions.
-    // Called with deltaTime when relevant key is held.
-    void         AdjustFov(float dt);
-    void         AdjustAspect(float dt);
-    void         AdjustIPD(float dt);
-    void         AdjustEyeHeight(float dt);
-
-    void         AdjustMotionPrediction(float dt);
-
-    void         AdjustDistortion(float dt, int kIndex, const char* label);
-    void         AdjustDistortionK0(float dt)  { AdjustDistortion(dt, 0, "K0"); }
-    void         AdjustDistortionK1(float dt)  { AdjustDistortion(dt, 1, "K1"); }
-    void         AdjustDistortionK2(float dt)  { AdjustDistortion(dt, 2, "K2"); }
-    void         AdjustDistortionK3(float dt)  { AdjustDistortion(dt, 3, "K3"); }
-
-	void		 AdjustDistortion(float val, int kIndex);
-	void		 AdjustEsd(float val);
-
-    // Adds room model to scene.
-    void         PopulateScene(const char* fileName);
-    void         PopulatePreloadScene();
-    void		 ClearScene();
-
-    // Magnetometer calibration procedure
-    void         UpdateManualMagCalibration();
-
-protected:
-    RenderDevice*       pRender;
-    RendererParams      RenderParams;
-    int                 Width, Height;
-    int                 Screen;
-    int                 FirstScreenInCycle;
-
-    // *** Oculus HMD Variables
-    Ptr<DeviceManager>  pManager;
-    Ptr<SensorDevice>   pSensor;
-    Ptr<HMDDevice>      pHMD;
-    Ptr<Profile>        pUserProfile;
-    SensorFusion        SFusion;
-    HMDInfo             TheHMDInfo;
-
-    Ptr<LatencyTestDevice>  pLatencyTester;
-    Util::LatencyTest   LatencyUtil;
-
-    double              LastUpdate;
-    int                 FPS;
-    int                 FrameCounter;
-    double              NextFPSUpdate;
-
-    Array<Ptr<CollisionModel> > CollisionModels;
-    Array<Ptr<CollisionModel> > GroundCollisionModels;
-
-    // Loading process displays screenshot in first frame
-    // and then proceeds to load until finished.
-    enum LoadingStateType
-    {
-        LoadingState_Frame0,
-        LoadingState_DoLoad,
-        LoadingState_Finished
-    };
-
-	// Player
-    Player				ThePlayer;
-    Matrix4f            View;
-    Scene               MainScene;
-    Scene               LoadingScene;
-    Scene               GridScene;
-    Scene               YawMarkGreenScene;
-    Scene               YawMarkRedScene;
-    Scene               YawLinesScene;
-
-    LoadingStateType    LoadingState;
-
-    Ptr<ShaderFill>     LitSolid, LitTextures[4];
-
-    // Stereo view parameters.
-    StereoConfig        SConfig;
-    PostProcessType     PostProcess;
-
-    // LOD
-    String	            MainFilePath;
-    Array<String>       LODFilePaths;
-    int					ConsecutiveLowFPSFrames;
-    int					CurrentLODFileIndex;
-
-    float               DistortionK0;
-    float               DistortionK1;
-    float               DistortionK2;
-    float               DistortionK3;
-
-    String              AdjustMessage;
-    double              AdjustMessageTimeout;
-
-    // Saved distortion state.
-    float               SavedK0, SavedK1, SavedK2, SavedK3;
-    float               SavedESD, SavedAspect, SavedEyeDistance;
-
-    // Allows toggling color around distortion.
-    Color               DistortionClearColor;
-
-    // Stereo settings adjustment state.
-    typedef void (OculusWorldDemoApp::*AdjustFuncType)(float);
-    bool                ShiftDown;
-    AdjustFuncType      pAdjustFunc;
-    float               AdjustDirection;
-
-    enum SceneRenderMode
-    {
-        Scene_World,
-        Scene_Grid,
-        Scene_Both,
-        Scene_YawView
-    };
-    SceneRenderMode    SceneMode;
-
-
-    enum TextScreen
-    {
-        Text_None,
-        Text_Orientation,
-        Text_Config,
-        Text_Help,
-        Text_Count
-    };
-    TextScreen          TextScreen;
-
-    struct DeviceStatusNotificationDesc
-    {
-        DeviceHandle    Handle;
-        MessageType     Action;
-
-        DeviceStatusNotificationDesc():Action(Message_None) {}
-        DeviceStatusNotificationDesc(MessageType mt, const DeviceHandle& dev) 
-            : Handle(dev), Action(mt) {}
-    };
-    Array<DeviceStatusNotificationDesc> DeviceStatusNotificationsQueue; 
-
-
-    Model* CreateModel(Vector3f pos, struct SlabModel* sm);
-    Model* CreateBoundingModel(CollisionModel &cm);
-    void PopulateLODFileNames();
-    void DropLOD();
-    void RaiseLOD();
-    void CycleDisplay();
-    void GamepadStateChanged(const GamepadState& pad);
-};
-
-//-------------------------------------------------------------------------------------
+// ***** OculusWorldDemoApp
 
 OculusWorldDemoApp::OculusWorldDemoApp()
     : pRender(0),
-      LastUpdate(0),
+      WindowSize(1280,800),
+      ScreenNumber(0),
+      FirstScreenInCycle(0),
+      Hmd(0),
+      StartSensorCaps(0),
+      UsingDebugHmd(false),
       LoadingState(LoadingState_Frame0),
+      HaveVisionTracking(false),
+      HmdStatus(0),
+      
       // Initial location
-      SConfig(),
-      PostProcess(PostProcess_Distortion),
-      DistortionClearColor(0, 0, 0),
-
+      DistortionClearBlue(0),      
       ShiftDown(false),
-      pAdjustFunc(0),
-      AdjustDirection(1.0f),
+      CtrlDown(false),
+      HmdSettingsChanged(false),
+      
+      // Modifiable options.
+      RendertargetIsSharedByBothEyes(false),
+      DynamicRezScalingEnabled(false),
+      ForceZeroIpd(false),
+      DesiredPixelDensity(1.0f),
+      FovSideTanMax(1.0f), // Updated based on Hmd.
+      TimewarpEnabled(true),
+      TimewarpRenderIntervalInSeconds(0.0f),
+      FreezeEyeUpdate(false),
+      FreezeEyeOneFrameRendered(false),
+      CenterPupilDepthMeters(0.05f),
+      ForceZeroHeadMovement(false),
+      VsyncEnabled(true),
+      MultisampleEnabled(true),
+      IsLowPersistence(true),
+      DynamicPrediction(true),
+      PositionTrackingEnabled(true),
+
+      // Scene state
       SceneMode(Scene_World),
-      TextScreen(Text_None)
+      GridDisplayMode(GridDisplay_None),
+      GridMode(Grid_Lens),
+      TextScreen(Text_None),
+      BlocksShowType(0),
+      BlocksCenter(0.0f, 0.0f, 0.0f)     
 {
-    Width  = 1280;
-    Height = 800;
-    Screen = 0;
-    FirstScreenInCycle = 0;
 
-    FPS = 0;
-    FrameCounter = 0;
-    NextFPSUpdate = 0;
+    FPS             = 0.0f;
+    SecondsPerFrame = 0.0f;
+    FrameCounter    = 0;
+    LastFpsUpdate   = 0;
 
-    ConsecutiveLowFPSFrames = 0;
-    CurrentLODFileIndex = 0;
-
-    AdjustMessageTimeout = 0;
+    DistortionClearBlue = false;
 }
 
 OculusWorldDemoApp::~OculusWorldDemoApp()
 {
-    RemoveHandlerFromDevices();
+    CleanupDrawTextFont();
 
-    if(DejaVu.fill)
+    if (Hmd)
     {
-        DejaVu.fill->Release();
+        ovrHmd_Destroy(Hmd);
+        Hmd = 0;
     }
-    pLatencyTester.Clear();
-    pSensor.Clear();
-    pHMD.Clear();
-    
+	    
 	CollisionModels.ClearAndRelease();
 	GroundCollisionModels.ClearAndRelease();
+
+    ovr_Shutdown();
 }
+
 
 int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 {
@@ -311,106 +107,84 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     // Sensor object is created from the HMD, to ensure that it is on the
     // correct device.
 
-    pManager = *DeviceManager::Create();
+    ovr_Initialize();
 
-    // We'll handle it's messages in this case.
-    pManager->SetMessageHandler(this);
+    Hmd = ovrHmd_Create(0);
     
-
-    pHMD = *pManager->EnumerateDevices<HMDDevice>().CreateDevice();
-    if (pHMD)
+    if (!Hmd)
     {
-        pSensor = *pHMD->GetSensor();
-
-        // This will initialize HMDInfo with information about configured IPD,
-        // screen size and other variables needed for correct projection.
-        // We pass HMD DisplayDeviceName into the renderer to select the
-        // correct monitor in full-screen mode.
-        if(pHMD->GetDeviceInfo(&TheHMDInfo))
-        {
-            //RenderParams.MonitorName = hmd.DisplayDeviceName;
-            SConfig.SetHMDInfo(TheHMDInfo);
-        }
-
-        // Retrieve relevant profile settings. 
-        pUserProfile = pHMD->GetProfile();
-        if (pUserProfile)
-        {
-            ThePlayer.UserEyeHeight = pUserProfile->GetEyeHeight();
-            ThePlayer.EyePos.y = ThePlayer.UserEyeHeight;
+        // If we didn't detect an Hmd, create a simulated one for debugging.
+        Hmd           = ovrHmd_CreateDebug(ovrHmd_DK1);
+        UsingDebugHmd = true; 
+        if (!Hmd)
+        {   // Failed Hmd creation.
+            return 1;
         }
     }
-    else
-    {
-        // If we didn't detect an HMD, try to create the sensor directly.
-        // This is useful for debugging sensor interaction; it is not needed in
-        // a shipping app.
-        pSensor = *pManager->EnumerateDevices<SensorDevice>().CreateDevice();
-    }
-        
-    // Create the Latency Tester device and assign it to the LatencyTesterUtil object.
-    pLatencyTester = *pManager->EnumerateDevices<LatencyTestDevice>().CreateDevice();
-    if (pLatencyTester)
-    {
-        LatencyUtil.SetDevice(pLatencyTester);
-    }
-    // Make the user aware which devices are present.
-    if(pHMD == NULL && pSensor == NULL)
-    {
-        SetAdjustMessage("---------------------------------\nNO HMD DETECTED\nNO SENSOR DETECTED\n---------------------------------");
-    }
-    else if(pHMD == NULL)
-    {
-        SetAdjustMessage("----------------------------\nNO HMD DETECTED\n----------------------------");
-    }
-    else if(pSensor == NULL)
-    {
-        SetAdjustMessage("---------------------------------\nNO SENSOR DETECTED\n---------------------------------");
-    }
-    else
-    {
-        SetAdjustMessage("--------------------------------------------\n"
-                         "Press F9 for Full-Screen on Rift\n"
-                         "--------------------------------------------");
-    }
 
-    // First message should be extra-long.
-    SetAdjustMessageTimeout(10.0f);
+    // Get more details about the HMD.
+    ovrHmd_GetDesc(Hmd, &HmdDesc);
+
+    WindowSize = HmdDesc.Resolution;
 
 
-    if(TheHMDInfo.HResolution > 0)
-    {
-        Width  = TheHMDInfo.HResolution;
-        Height = TheHMDInfo.VResolution;
-    }
+    // ***** Setup System Window & rendering.
 
-    if(!pPlatform->SetupWindow(Width, Height))
-    {
+    if (!SetupWindowAndRendering(argc, argv))
         return 1;
-    }
 
-    String Title = "Oculus World Demo";
-    if(TheHMDInfo.ProductName[0])
-    {
-        Title += " : ";
-        Title += TheHMDInfo.ProductName;
-    }
-    pPlatform->SetWindowTitle(Title);
+    // Initialize FovSideTanMax, which allows us to change all Fov sides at once - Fov
+    // starts at default and is clamped to this value.
+    FovSideTanLimit = FovPort::Max(HmdDesc.MaxEyeFov[0], HmdDesc.MaxEyeFov[1]).GetMaxSideTan();
+    FovSideTanMax   = FovPort::Max(HmdDesc.DefaultEyeFov[0], HmdDesc.DefaultEyeFov[1]).GetMaxSideTan();
+
+    PositionTrackingEnabled = (HmdDesc.Caps & ovrHmdCap_Position) ? true : false;
+
+
+    // *** Configure HMD Stereo settings.
+    
+    CalculateHmdValues();
+
+    // Query eye height.
+    ThePlayer.UserEyeHeight = ovrHmd_GetFloat(Hmd, OVR_KEY_EYE_HEIGHT, ThePlayer.UserEyeHeight);
+    ThePlayer.BodyPos.y     = ThePlayer.UserEyeHeight;
+    // Center pupil for customization; real game shouldn't need to adjust this.
+    CenterPupilDepthMeters  = ovrHmd_GetFloat(Hmd, "CenterPupilDepth", 0.0f);
+
+
+    ThePlayer.bMotionRelativeToBody = false;  // Default to head-steering for DK1
+    
+    if (UsingDebugHmd)
+        Menu.SetPopupMessage("NO HMD DETECTED");
+    else if (!(ovrHmd_GetSensorState(Hmd, 0.0f).StatusFlags & ovrStatus_OrientationTracked))
+        Menu.SetPopupMessage("NO SENSOR DETECTED");    
+    else
+        Menu.SetPopupMessage("Press F9 for Full-Screen on Rift");
+    // Give first message 10 sec timeout, add border lines.
+    Menu.SetPopupTimeout(10.0f, true);
+
+    PopulateOptionMenu();
+
+    // *** Identify Scene File & Prepare for Loading
+
+    InitMainFilePath();  
+    PopulatePreloadScene();
+    
+    LastUpdate = ovr_GetTimeInSeconds();
+	
+    return 0;
+}
+
+
+bool OculusWorldDemoApp::SetupWindowAndRendering(int argc, const char** argv)
+{
+    // *** Window creation
+
+    if (!pPlatform->SetupWindow(WindowSize.w, WindowSize.h))    
+        return false;    
 
     // Report relative mouse motion in OnMouseMove
     pPlatform->SetMouseMode(Mouse_Relative);
-    
-    if(pSensor)
-    {
-        // We need to attach sensor to SensorFusion object for it to receive
-        // body frame messages and update orientation. SFusion.GetOrientation()
-        // is used in OnIdle() to orient the view.
-        SFusion.AttachToSensor(pSensor);
-
-        SFusion.SetDelegateMessageHandler(this);
-
-        SFusion.SetPredictionEnabled(true);
-    }
 
 
     // *** Initialize Rendering
@@ -430,250 +204,395 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
         }
     }
 
+    String title = "Oculus World Demo ";
+    title += graphics;
+
+    if (HmdDesc.ProductName[0])
+    {
+        title += " : ";
+        title += HmdDesc.ProductName;
+    }
+    pPlatform->SetWindowTitle(title);
+
     // Enable multi-sampling by default.
-    RenderParams.Multisample = 4;
+    RenderParams.Display     = DisplayId(HmdDesc.DisplayDeviceName, HmdDesc.DisplayId);    
+    RenderParams.Multisample = 1;
+    //RenderParams.Fullscreen = true;
     pRender = pPlatform->SetupGraphics(OVR_DEFAULT_RENDER_DEVICE_SET,
                                        graphics, RenderParams);
+    if (!pRender)
+        return false;
+
+    return true;
+}
+
+// Custom formatter for Timewarp interval message.
+static String FormatTimewarp(OptionVar* var)
+{    
+    char    buff[64];
+    float   timewarpInterval = *var->AsFloat();
+    OVR_sprintf(buff, sizeof(buff), "%.1fms, %.1ffps",
+                timewarpInterval * 1000.0f,
+                ( timewarpInterval > 0.000001f ) ? 1.0f / timewarpInterval : 10000.0f);
+    return String(buff);
+}
+
+static String FormatMaxFromSideTan(OptionVar* var)
+{
+    char   buff[64];
+    float  degrees = 2.0f * atan(*var->AsFloat()) * (180.0f / Math<float>::Pi);
+    OVR_sprintf(buff, sizeof(buff), "%.1f Degrees", degrees);
+    return String(buff);
+}
 
 
+void OculusWorldDemoApp::PopulateOptionMenu()
+{
+    // For shortened function member access.
+    typedef OculusWorldDemoApp OWD;
 
-    // *** Configure Stereo settings.
+    // *** Scene Content Sub-Menu
+      
+    // Test
+    /*
+        Menu.AddEnum("Scene Content.EyePoseMode", &FT_EyePoseState).AddShortcutKey(Key_Y).
+        AddEnumValue("Separate Pose",  0).
+        AddEnumValue("Same Pose",      1).
+        AddEnumValue("Same Pose+TW",   2);
+    */
 
-    SConfig.SetFullViewport(Viewport(0, 0, Width, Height));
-    SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
+    // Navigate between scenes.
+    Menu.AddEnum("Scene Content.Rendered Scene ';'", &SceneMode).AddShortcutKey(Key_Semicolon).
+                 AddEnumValue("World",        Scene_World).
+                 AddEnumValue("Cubes",        Scene_Cubes).
+                 AddEnumValue("Oculus Cubes", Scene_OculusCubes);  
+    // Animating blocks    
+    Menu.AddEnum("Scene Content.Animated Blocks", &BlocksShowType).
+                 AddShortcutKey(Key_B).SetNotify(this, &OWD::BlockShowChange).
+                 AddEnumValue("None",  0).
+                 AddEnumValue("Horizontal Circle", 1).
+                 AddEnumValue("Vertical Circle",   2).
+                 AddEnumValue("Bouncing Blocks",   3);  
+    // Toggle grid
+    Menu.AddEnum("Scene Content.Grid Display 'G'",  &GridDisplayMode).AddShortcutKey(Key_G).
+                 AddEnumValue("No Grid",             GridDisplay_None).
+                 AddEnumValue("Grid Only",           GridDisplay_GridOnly).
+                 AddEnumValue("Grid And Scene",      GridDisplay_GridAndScene);  
+    Menu.AddEnum("Scene Content.Grid Mode 'H'",     &GridMode).AddShortcutKey(Key_H).
+                 AddEnumValue("4-pixel RT-centered", Grid_Rendertarget4).
+                 AddEnumValue("16-pixel RT-centered",Grid_Rendertarget16).
+                 AddEnumValue("Lens-centered grid",  Grid_Lens);  
 
-    // Configure proper Distortion Fit.
-    // For 7" screen, fit to touch left side of the view, leaving a bit of
-    // invisible screen on the top (saves on rendering cost).
-    // For smaller screens (5.5"), fit to the top.
-    if (TheHMDInfo.HScreenSize > 0.0f)
+    // *** Scene Content Sub-Menu
+    Menu.AddBool( "Render Target.Share RenderTarget",  &RendertargetIsSharedByBothEyes).
+                                                        AddShortcutKey(Key_F8).SetNotify(this, &OWD::HmdSettingChange);
+    Menu.AddBool( "Render Target.Dynamic Res Scaling", &DynamicRezScalingEnabled).
+                                                        AddShortcutKey(Key_F8, ShortcutKey::Shift_RequireOn);
+    Menu.AddBool( "Render Target.Zero IPD 'F7'",       &ForceZeroIpd).
+                                                        AddShortcutKey(Key_F7).
+                                                        SetNotify(this, &OWD::HmdSettingChangeFreeRTs);
+    Menu.AddFloat("Render Target.Max Fov",             &FovSideTanMax, 0.2f, FovSideTanLimit, 0.02f,
+                                                        "%.1f Degrees", 1.0f, &FormatMaxFromSideTan).
+                                                        SetNotify(this, &OWD::HmdSettingChange).
+                                                        AddShortcutUpKey(Key_I).AddShortcutDownKey(Key_K);
+    Menu.AddFloat("Render Target.Pixel Density",    &DesiredPixelDensity, 0.5f, 1.5, 0.025f, "%3.2f", 1.0f).
+                                                        SetNotify(this, &OWD::HmdSettingChange);
+    Menu.AddEnum( "Render Target.Distortion Clear Color",  &DistortionClearBlue).
+                                                        SetNotify(this, &OWD::DistortionClearColorChange).
+                                                        AddEnumValue("Black",  0).
+                                                        AddEnumValue("Blue", 1);    
+
+    // Timewarp
+    Menu.AddBool( "Timewarp.TimewarpEnabled 'O'",   &TimewarpEnabled).AddShortcutKey(Key_O).
+    																SetNotify(this, &OWD::HmdSettingChange);
+    Menu.AddBool( "Timewarp.FreezeEyeUpdate 'C'",   &FreezeEyeUpdate).AddShortcutKey(Key_C);
+    Menu.AddFloat("Timewarp.RenderIntervalSeconds", &TimewarpRenderIntervalInSeconds,
+                                                    0.0001f, 1.00f, 0.0001f, "%.1f", 1.0f, &FormatTimewarp).
+                                                    AddShortcutUpKey(Key_J).AddShortcutDownKey(Key_U);
+    
+    // First page properties
+    Menu.AddFloat("User Eye Height",    &ThePlayer.UserEyeHeight, 0.2f, 2.5f, 0.02f,
+                                        "%4.2f m").SetNotify(this, &OWD::EyeHeightChange).
+                                        AddShortcutUpKey(Key_Equal).AddShortcutDownKey(Key_Minus);
+    Menu.AddFloat("Center Pupil Depth", &CenterPupilDepthMeters, 0.0f, 0.2f, 0.001f,
+                                        "%4.3f m").SetNotify(this, &OWD::CenterPupilDepthChange);
+    Menu.AddBool("Body Relative Motion",&ThePlayer.bMotionRelativeToBody).AddShortcutKey(Key_E);    
+    Menu.AddBool("Zero Head Movement",  &ForceZeroHeadMovement) .AddShortcutKey(Key_F7, ShortcutKey::Shift_RequireOn);
+    Menu.AddBool("VSync 'V'",           &VsyncEnabled)          .AddShortcutKey(Key_V).SetNotify(this, &OWD::HmdSettingChange);
+    Menu.AddBool("MultiSample 'F4'",    &MultisampleEnabled)    .AddShortcutKey(Key_F4).SetNotify(this, &OWD::MultisampleChange);
+    
+    // Add DK2 options to menu only for that headset.
+    if (HmdDesc.Caps & ovrHmdCap_Position)
     {
-        if (TheHMDInfo.HScreenSize > 0.140f)  // 7"
-            SConfig.SetDistortionFitPointVP(-1.0f, 0.0f);        
-        else        
-            SConfig.SetDistortionFitPointVP(0.0f, 1.0f);        
+        Menu.AddBool("Low Persistence 'P'",      &IsLowPersistence).     
+                                                  AddShortcutKey(Key_P).SetNotify(this, &OWD::HmdSettingChange);
+        Menu.AddBool("Dynamic Prediction",      &DynamicPrediction).     
+                                                  SetNotify(this, &OWD::HmdSettingChange);
+        Menu.AddBool("Positional Tracking 'X'",  &PositionTrackingEnabled).
+                                                  AddShortcutKey(Key_X).SetNotify(this, &OWD::HmdSettingChange);
+    }
+}
+
+
+void OculusWorldDemoApp::CalculateHmdValues()
+{
+    // Initialize eye rendering information for ovrHmd_Configure.
+    // The viewport sizes are re-computed in case RenderTargetSize changed due to HW limitations.
+    ovrEyeDesc eyes[2];
+    eyes[0].Eye = ovrEye_Left;
+    eyes[1].Eye = ovrEye_Right;
+    eyes[0].Fov = HmdDesc.DefaultEyeFov[0];
+    eyes[1].Fov = HmdDesc.DefaultEyeFov[1];
+
+    // Clamp Fov based on our dynamically adjustable FovSideTanMax.
+    // Most apps should use the default, but reducing Fov does reduce rendering cost.
+    eyes[0].Fov = FovPort::Min(eyes[0].Fov, FovPort(FovSideTanMax));
+    eyes[1].Fov = FovPort::Min(eyes[1].Fov, FovPort(FovSideTanMax));
+
+
+    if (ForceZeroIpd)
+    {
+        // ForceZeroIpd does three things:
+        //  1) Sets FOV to maximum symmetrical FOV based on both eyes
+        //  2) Sets eye ViewAdjust values to 0.0 (effective IPD == 0)
+        //  3) Uses only the Left texture for rendering.
+        
+        eyes[0].Fov = FovPort::Max(eyes[0].Fov, eyes[1].Fov);
+        eyes[1].Fov = eyes[0].Fov;
+
+        Sizei recommenedTexSize = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Left,
+                                                           eyes[0].Fov, DesiredPixelDensity);
+
+        eyes[0].TextureSize         = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTexSize);
+        eyes[1].TextureSize         = eyes[0].TextureSize;
+        eyes[0].RenderViewport.Pos  = Vector2i(0,0);
+        eyes[0].RenderViewport.Size = Sizei::Min(eyes[0].TextureSize, recommenedTexSize);
+        eyes[1].RenderViewport      = eyes[0].RenderViewport;
+
+        // Store texture pointers that will be passed for rendering.
+        EyeTexture[0] = RenderTargets[Rendertarget_Left].Tex;
+        EyeTexture[1] = RenderTargets[Rendertarget_Left].Tex;
     }
 
-    pRender->SetSceneRenderScale(SConfig.GetDistortionScale());
-    //pRender->SetSceneRenderScale(1.0f);
+    else
+    {
+        // Configure Stereo settings. Default pixel density is 1.0f.
+        Sizei recommenedTex0Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Left,  eyes[0].Fov, DesiredPixelDensity);
+        Sizei recommenedTex1Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Right, eyes[1].Fov, DesiredPixelDensity);
 
-    SConfig.Set2DAreaFov(DegreeToRad(85.0f));
+        if (RendertargetIsSharedByBothEyes)
+        {
+            Sizei  rtSize(recommenedTex0Size.w + recommenedTex1Size.w,
+                          Alg::Max(recommenedTex0Size.h, recommenedTex1Size.h));
+
+            // Use returned size as the actual RT size may be different due to HW limits.
+            rtSize = EnsureRendertargetAtLeastThisBig(Rendertarget_BothEyes, rtSize);
+
+            // Don't draw more then recommended size; this also ensures that resolution reported
+            // in the overlay HUD size is updated correctly for FOV/pixel density change.            
+            Sizei leftSize  = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex0Size);
+            Sizei rightSize = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex1Size);
+
+            eyes[0].TextureSize     = rtSize;
+            eyes[1].TextureSize     = rtSize;
+            eyes[0].RenderViewport  = Recti(Vector2i(0), leftSize);            
+            eyes[1].RenderViewport  = Recti(Vector2i((rtSize.w+1)/2, 0), rightSize);
+
+            // Store texture pointers that will be passed for rendering.
+            // Same texture is used, but with different viewports.
+            EyeTexture[0] = RenderTargets[Rendertarget_BothEyes].Tex;
+            EyeTexture[1] = RenderTargets[Rendertarget_BothEyes].Tex;
+            EyeTexture[0].Header.RenderViewport = eyes[0].RenderViewport;
+            EyeTexture[1].Header.RenderViewport = eyes[1].RenderViewport;
+        }
+
+        else
+        {
+            eyes[0].TextureSize     = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTex0Size);
+            eyes[1].TextureSize     = EnsureRendertargetAtLeastThisBig(Rendertarget_Right, recommenedTex1Size);
+            eyes[0].RenderViewport  = Recti(Sizei::Min(eyes[0].TextureSize, recommenedTex0Size));
+            eyes[1].RenderViewport  = Recti(Sizei::Min(eyes[1].TextureSize, recommenedTex1Size));
+
+            // Store texture pointers that will be passed for rendering.
+            EyeTexture[0] = RenderTargets[Rendertarget_Left].Tex;
+            EyeTexture[1] = RenderTargets[Rendertarget_Right].Tex;
+        }
+    }
 
 
-    // *** Identify Scene File & Prepare for Loading
-   
-    // This creates lights and models.
-    if (argc == 2)
-    {        
-        MainFilePath = argv[1];
-        PopulateLODFileNames();
+    unsigned hmdCaps = ovrHmdCap_Orientation | (VsyncEnabled ? 0 : ovrHmdCap_NoVSync); 
+    unsigned distortionCaps = ovrDistortion_Chromatic;
+
+	ovrRenderAPIConfig config = pRender->Get_ovrRenderAPIConfig();
+
+    if (TimewarpEnabled)
+        distortionCaps |= ovrDistortion_TimeWarp;
+
+    if (!ovrHmd_ConfigureRendering( Hmd, &config, hmdCaps, distortionCaps,
+                                    eyes, EyeRenderDesc ))
+    {
+        // Fail exit? TBD
+        return;
+    }
+
+    if (ForceZeroIpd)
+    {
+        // Remove IPD adjust
+        EyeRenderDesc[0].ViewAdjust = Vector3f(0);
+        EyeRenderDesc[1].ViewAdjust = Vector3f(0);
+    }
+
+    // ovrHmdCap_LatencyTest - enables internal latency feedback
+    unsigned sensorCaps =  ovrHmdCap_Orientation|ovrHmdCap_YawCorrection|ovrHmdCap_LatencyTest;
+    if (PositionTrackingEnabled)
+        sensorCaps |= ovrHmdCap_Position;
+    if (IsLowPersistence)
+        sensorCaps |= ovrHmdCap_LowPersistence;
+    if (DynamicPrediction)
+        sensorCaps |= ovrHmdCap_DynamicPrediction;
+    
+    if (StartSensorCaps != sensorCaps)
+    {
+        ovrHmd_StartSensor(Hmd, sensorCaps, 0);
+        StartSensorCaps = sensorCaps;
+    }    
+
+    // Calculate projections
+    Projection[0] = ovrMatrix4f_Projection(EyeRenderDesc[0].Desc.Fov,  0.01f, 10000.0f, true);
+    Projection[1] = ovrMatrix4f_Projection(EyeRenderDesc[1].Desc.Fov,  0.01f, 10000.0f, true);
+
+    float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
+    Vector2f orthoScale0   = Vector2f(1.0f) / Vector2f(EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
+    Vector2f orthoScale1   = Vector2f(1.0f) / Vector2f(EyeRenderDesc[1].PixelsPerTanAngleAtCenter);
+    
+    OrthoProjection[0] = ovrMatrix4f_OrthoSubProjection(Projection[0], orthoScale0, orthoDistance,
+                                                        EyeRenderDesc[0].ViewAdjust.x);
+    OrthoProjection[1] = ovrMatrix4f_OrthoSubProjection(Projection[1], orthoScale1, orthoDistance,
+                                                        EyeRenderDesc[1].ViewAdjust.x);
+}
+
+
+
+// Returns the actual size present.
+Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requestedSize)
+{
+    OVR_ASSERT((rtNum >= 0) && (rtNum < Rendertarget_LAST));
+
+    // Texture size that we already have might be big enough.
+    Sizei newRTSize;
+
+    RenderTarget& rt = RenderTargets[rtNum];
+    if (!rt.pTex)
+    {
+        // Hmmm... someone nuked my texture. Rez change or similar. Make sure we reallocate.
+        rt.Tex.Header.TextureSize = Sizei(0);
+        newRTSize = requestedSize;
     }
     else
     {
-        fprintf(stderr, "Usage: OculusWorldDemo [input XML]\n");
-        MainFilePath = WORLDDEMO_ASSET_FILE;	
+        newRTSize = rt.Tex.Header.TextureSize;
     }
 
-    // Try to modify path for correctness in case specified file is not found.
-    if (!SysFile(MainFilePath).IsValid())
+    // %50 linear growth each time is a nice balance between being too greedy
+    // for a 2D surface and too slow to prevent fragmentation.
+    while ( newRTSize.w < requestedSize.w )
     {
-        String prefixPath1(pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1),
-               prefixPath2(WORLDDEMO_ASSET_PATH2),
-               prefixPath3(WORLDDEMO_ASSET_PATH3);
-        if (SysFile(prefixPath1 + MainFilePath).IsValid())
-            MainFilePath = prefixPath1 + MainFilePath;
-        else if (SysFile(prefixPath2 + MainFilePath).IsValid())
-            MainFilePath = prefixPath2 + MainFilePath;
-        else if (SysFile(prefixPath3 + MainFilePath).IsValid())
-            MainFilePath = prefixPath3 + MainFilePath;
+        newRTSize.w += newRTSize.w/2;
+    }
+    while ( newRTSize.h < requestedSize.h )
+    {
+        newRTSize.h += newRTSize.h/2;
     }
 
-    PopulatePreloadScene();
+    // Put some sane limits on it. 4k x 4k is fine for most modern video cards.
+    // Nobody should be messing around with surfaces smaller than 4k pixels these days.
+    newRTSize = Sizei::Max(Sizei::Min(newRTSize, Sizei(4096)), Sizei(64));
 
-    LastUpdate = pPlatform->GetAppTime();
-	//pPlatform->PlayMusicFile(L"Loop.wav");
-    
-    return 0;
+    // Does that require actual reallocation?
+    if (Sizei(rt.Tex.Header.TextureSize) != newRTSize)        
+    {        
+        rt.pTex = *pRender->CreateTexture(Texture_RGBA | Texture_RenderTarget | (MultisampleEnabled ? 4 : 1),
+                                          newRTSize.w, newRTSize.h, NULL);
+        rt.pTex->SetSampleMode(Sample_ClampBorder | Sample_Linear);
+
+
+        // Configure texture for SDK Rendering.
+        rt.Tex = rt.pTex->Get_ovrTexture();
+    }
+
+    return newRTSize;
 }
 
-void OculusWorldDemoApp::OnMessage(const Message& msg)
-{
-    if (msg.Type == Message_DeviceAdded || msg.Type == Message_DeviceRemoved)
-    {
-        if (msg.pDevice == pManager)
-        {
-            const MessageDeviceStatus& statusMsg =
-                static_cast<const MessageDeviceStatus&>(msg);
 
-            { // limit the scope of the lock
-                Lock::Locker lock(pManager->GetHandlerLock());
-                DeviceStatusNotificationsQueue.PushBack(
-                    DeviceStatusNotificationDesc(statusMsg.Type, statusMsg.Handle));
-            }
-
-            switch (statusMsg.Type)
-            {
-                case OVR::Message_DeviceAdded:
-                    LogText("DeviceManager reported device added.\n");
-                    break;
-                
-                case OVR::Message_DeviceRemoved:
-                    LogText("DeviceManager reported device removed.\n");
-                    break;
-                
-                default: OVR_ASSERT(0); // unexpected type
-            }
-        }
-    }
-}
+//-----------------------------------------------------------------------------
+// ***** Message Handlers
 
 void OculusWorldDemoApp::OnResize(int width, int height)
 {
-    Width  = width;
-    Height = height;
-    SConfig.SetFullViewport(Viewport(0, 0, Width, Height));
+    WindowSize = Sizei(width, height);
+    // Re-calculate?
 }
 
 void OculusWorldDemoApp::OnMouseMove(int x, int y, int modifiers)
 {
+    OVR_UNUSED(y);
     if(modifiers & Mod_MouseRelative)
     {
         // Get Delta
-        int dx = x, dy = y;
-
-        const float maxPitch = ((3.1415f / 2) * 0.98f);
+        int dx = x;
 
         // Apply to rotation. Subtract for right body frame rotation,
         // since yaw rotation is positive CCW when looking down on XZ plane.
-        ThePlayer.EyeYaw   -= (Sensitivity * dx) / 360.0f;
-
-        if(!pSensor)
-        {
-            ThePlayer.EyePitch -= (Sensitivity * dy) / 360.0f;
-
-            if(ThePlayer.EyePitch > maxPitch)
-            {
-                ThePlayer.EyePitch = maxPitch;
-            }
-            if(ThePlayer.EyePitch < -maxPitch)
-            {
-                ThePlayer.EyePitch = -maxPitch;
-            }
-        }
+        ThePlayer.BodyYaw   -= (Sensitivity * dx) / 360.0f;
     }
 }
 
 
 void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifiers)
 {
-    OVR_UNUSED(chr);
+    if (Menu.OnKey(key, chr, down, modifiers))
+        return;
+
+    // Handle player movement keys.
+    if (ThePlayer.HandleMoveKey(key, down))
+        return;
 
     switch(key)
     {
     case Key_Q:
         if (down && (modifiers & Mod_Control))
-        {
             pPlatform->Exit(0);
-        }
+        break;
+        
+    case Key_Escape:
+        // Back to primary windowed
+        if (!down) ChangeDisplay ( true, false, false );
         break;
 
-        // Handle player movement keys.
-        // We just update movement state here, while the actual translation is done in OnIdle()
-        // based on time.
-    case Key_W:
-        ThePlayer.MoveForward = down ? (ThePlayer.MoveForward | 1) : (ThePlayer.MoveForward & ~1);
+    case Key_F9:
+#ifndef OVR_OS_LINUX
+        // Cycle through displays, going fullscreen on each one.
+        if (!down) ChangeDisplay ( false, true, false );
         break;
-    case Key_S:
-        ThePlayer.MoveBack    = down ? (ThePlayer.MoveBack    | 1) : (ThePlayer.MoveBack    & ~1);
+#else
+        // On Linux, fallthrough to F10/F11
+#endif
+        
+#ifdef OVR_OS_MAC
+     // F11 is reserved on Mac, F10 doesn't work on Windows
+    case Key_F10:  
+#else
+    case Key_F11:
+#endif
+        if (!down) ChangeDisplay ( false, false, true );
         break;
-    case Key_A:
-        ThePlayer.MoveLeft    = down ? (ThePlayer.MoveLeft    | 1) : (ThePlayer.MoveLeft    & ~1);
-        break;
-    case Key_D:
-        ThePlayer.MoveRight   = down ? (ThePlayer.MoveRight   | 1) : (ThePlayer.MoveRight   & ~1);
-        break;
-    case Key_Up:
-        ThePlayer.MoveForward = down ? (ThePlayer.MoveForward | 2) : (ThePlayer.MoveForward & ~2);
-        break;
-    case Key_Down:
-        ThePlayer.MoveBack    = down ? (ThePlayer.MoveBack    | 2) : (ThePlayer.MoveBack    & ~2);
-        break;
-    case Key_Left:
-        ThePlayer.MoveLeft    = down ? (ThePlayer.MoveLeft    | 2) : (ThePlayer.MoveLeft    & ~2);
-        break;
-    case Key_Right:
-        ThePlayer.MoveRight   = down ? (ThePlayer.MoveRight   | 2) : (ThePlayer.MoveRight   & ~2);
-        break;
-
-    case Key_Minus:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustEyeHeight  : 0;
-        AdjustDirection = -1;
-        break;
-    case Key_Equal:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustEyeHeight  : 0;
-        AdjustDirection = 1;
-        break;
-
-    case Key_B:
-        if (down)
-        {
-            if(SConfig.GetDistortionScale() == 1.0f)
-            {
-                if(SConfig.GetHMDInfo().HScreenSize > 0.140f)  // 7"
-                {
-                    SConfig.SetDistortionFitPointVP(-1.0f, 0.0f);
-                }
-                else
-                {
-                 SConfig.SetDistortionFitPointVP(0.0f, 1.0f);
-                }
-            }
-            else
-            {
-                // No fitting; scale == 1.0.
-                SConfig.SetDistortionFitPointVP(0, 0);
-            }
-        }
-        break;
-
-    // Support toggling background color for distortion so that we can see
-    // the effect on the periphery.
-    case Key_V:
-        if (down)
-        {
-            if(DistortionClearColor.B == 0)
-            {
-                DistortionClearColor = Color(0, 128, 255);
-            }
-            else
-            {
-                DistortionClearColor = Color(0, 0, 0);
-            }
-
-            pRender->SetDistortionClearColor(DistortionClearColor);
-        }
-        break;
-
-
-    case Key_F1:
-        SConfig.SetStereoMode(Stereo_None);
-        PostProcess = PostProcess_None;
-        SetAdjustMessage("StereoMode: None");
-        break;
-    case Key_F2:
-        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-        PostProcess = PostProcess_None;
-        SetAdjustMessage("StereoMode: Stereo + No Distortion");
-        break;
-    case Key_F3:
-        SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-        PostProcess = PostProcess_Distortion;
-        SetAdjustMessage("StereoMode: Stereo + Distortion");
-        break;
-
+        
     case Key_R:
-        SFusion.Reset();
-        SetAdjustMessage("Sensor Fusion Reset");
+        if (!down)
+        {
+            ovrHmd_ResetSensor(Hmd);
+            Menu.SetPopupMessage("Sensor Fusion Reset");
+        }
         break;
 
     case Key_Space:
@@ -683,347 +602,104 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
         }
         break;
 
-    case Key_F4:
-        if (!down)
-        {
-			RenderParams = pRender->GetParams();
-            RenderParams.Multisample = RenderParams.Multisample > 1 ? 1 : 4;
-            pRender->SetParams(RenderParams);
-            if(RenderParams.Multisample > 1)
-            {
-                SetAdjustMessage("Multisampling On");
-            }
-            else
-            {
-                SetAdjustMessage("Multisampling Off");
-            }
-        }
+    // Distortion correction adjustments
+    case Key_Backslash:        
         break;
-    case Key_F9:
-#ifndef OVR_OS_LINUX    // On Linux F9 does the same as F11.
-        if (!down)
-        {
-            CycleDisplay();
-        }
-        break;
-#endif
-#ifdef OVR_OS_MAC
-    case Key_F10:  // F11 is reserved on Mac
-#else
-    case Key_F11:
-#endif
-        if (!down)
-        {
-            RenderParams = pRender->GetParams();
-            RenderParams.Display = DisplayId(SConfig.GetHMDInfo().DisplayDeviceName,SConfig.GetHMDInfo().DisplayId);
-            pRender->SetParams(RenderParams);
-
-            pPlatform->SetMouseMode(Mouse_Normal);            
-            pPlatform->SetFullscreen(RenderParams, pRender->IsFullscreen() ? Display_Window : Display_FakeFullscreen);
-            pPlatform->SetMouseMode(Mouse_Relative); // Avoid mode world rotation jump.
-            // If using an HMD, enable post-process (for distortion) and stereo.
-            if(RenderParams.IsDisplaySet() && pRender->IsFullscreen())
-            {
-                SConfig.SetStereoMode(Stereo_LeftRight_Multipass);
-                PostProcess = PostProcess_Distortion;
-            }
-        }
-        break;
-
-    case Key_Escape:
-        if(!down)
-        {
-            // switch to primary screen windowed mode
-            pPlatform->SetFullscreen(RenderParams, Display_Window);
-            RenderParams.Display = pPlatform->GetDisplay(0);
-            pRender->SetParams(RenderParams);
-            Screen = 0;
-        }
-        break;
-
-        // Stereo adjustments.
-    case Key_BracketLeft:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustFov    : 0;
-        AdjustDirection = 1;
-        break;
-    case Key_BracketRight:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustFov    : 0;
-        AdjustDirection = -1;
-        break;
-
-    case Key_Insert:
-    case Key_Num0:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustIPD    : 0;
-        AdjustDirection = 1;
-        break;
-    case Key_Delete:
-    case Key_Num9:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustIPD    : 0;
-        AdjustDirection = -1;
-        break;
-
-    case Key_PageUp:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustAspect : 0;
-        AdjustDirection = 1;
-        break;
-    case Key_PageDown:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustAspect : 0;
-        AdjustDirection = -1;
-        break;
-
-        // Distortion correction adjustments
-    case Key_H:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK0 : NULL;
-        AdjustDirection = -1;
-        break;
-    case Key_Y:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK0 : NULL;
-        AdjustDirection = 1;
-        break;
-    case Key_J:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK1 : NULL;
-        AdjustDirection = -1;
-        break;
-    case Key_U:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK1 : NULL;
-        AdjustDirection = 1;
-        break;
-    case Key_K:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK2 : NULL;
-        AdjustDirection = -1;
-        break;
-    case Key_I:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK2 : NULL;
-        AdjustDirection = 1;
-        break;
-    case Key_L:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK3 : NULL;
-        AdjustDirection = -1;
-        break;
-    case Key_O:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustDistortionK3 : NULL;
-        AdjustDirection = 1;
-        break;
-
-    case Key_Tab:
-        if (down)
-        {
-            float t0      = SConfig.GetDistortionK(0),
-                  t1      = SConfig.GetDistortionK(1),
-                  t2      = SConfig.GetDistortionK(2),
-                  t3      = SConfig.GetDistortionK(3);
-            float tESD    = SConfig.GetEyeToScreenDistance(),
-                  taspect = SConfig.GetAspectMultiplier(),
-                  tipd    = SConfig.GetIPD();
-
-            if(SavedK0 > 0.0f)
-            {
-				SConfig.SetDistortionK(0, SavedK0);
-				SConfig.SetDistortionK(1, SavedK1);
-				SConfig.SetDistortionK(2, SavedK2);
-				SConfig.SetDistortionK(3, SavedK3);
-				SConfig.SetEyeToScreenDistance(SavedESD);
-				SConfig.SetAspectMultiplier(SavedAspect);
-				SConfig.SetIPD(SavedEyeDistance);
-
-				if ( ShiftDown )
-				{
-					// Swap saved and current values. Good for doing direct comparisons.
-					SetAdjustMessage("Swapped current and saved. New settings:\n"
-									 "ESD:\t120 %.3f\t350 Eye:\t490 %.3f\n"
-									 "K0: \t120 %.4f\t350 K2: \t490 %.4f\n"
-									 "K1: \t120 %.4f\t350 K3: \t490 %.4f\n",
-									 SavedESD, SavedEyeDistance,
-									 SavedK0, SavedK2,
-									 SavedK1, SavedK3);
-					SavedK0 = t0;
-					SavedK1 = t1;
-					SavedK2 = t2;
-					SavedK3 = t3;
-					SavedESD = tESD;
-					SavedAspect = taspect;
-					SavedEyeDistance = tipd;
-				}
-				else
-				{
-					SetAdjustMessage("Restored:\n"
-									 "ESD:\t120 %.3f\t350 Eye:\t490 %.3f\n"
-									 "K0: \t120 %.4f\t350 K2: \t490 %.4f\n"
-									 "K1: \t120 %.4f\t350 K3: \t490 %.4f\n",
-									 SavedESD, SavedEyeDistance,
-									 SavedK0, SavedK2,
-									 SavedK1, SavedK3);
-				}
-            }
-            else
-            {
-                SetAdjustMessage("Setting Saved");
-				SavedK0 = t0;
-				SavedK1 = t1;
-				SavedK2 = t2;
-				SavedK3 = t3;
-				SavedESD = tESD;
-				SavedAspect = taspect;
-				SavedEyeDistance = tipd;
-            }
-
-        }
-        break; 
- 
-    case Key_G:
-        if (down)
-        {
-            if(SceneMode == Scene_World)
-            {
-                SceneMode = Scene_Grid;
-                SetAdjustMessage("Grid Only");
-            }
-            else if(SceneMode == Scene_Grid)
-            {
-                SceneMode = Scene_Both;
-                SetAdjustMessage("Grid Overlay");
-            }
-            else if(SceneMode == Scene_Both)
-            {
-                SceneMode = Scene_World;
-                SetAdjustMessage("Grid Off");
-            }
-        }
-        break;
-
         // Holding down Shift key accelerates adjustment velocity.
     case Key_Shift:
         ShiftDown = down;
         break;
+    case Key_Control:
+        CtrlDown = down;
+        break;
 
-        // Reset the camera position in case we get stuck
+       // Reset the camera position in case we get stuck
     case Key_T:
-        ThePlayer.EyePos = Vector3f(10.0f, ThePlayer.UserEyeHeight, 10.0f);
-        break;
-
-    case Key_F5:
-        if (!down)
-        {
-            UPInt numNodes = MainScene.Models.GetSize();
-            for(UPInt i = 0; i < numNodes; i++)
-            {
-                Ptr<OVR::Render::Model> nodePtr = MainScene.Models[i];
-                Render::Model*          pNode = nodePtr.GetPtr();
-                if(pNode->IsCollisionModel)
-                {
-                    pNode->Visible = !pNode->Visible;
-                }
-            }
-        }
-        break;
-
-    case Key_N:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustMotionPrediction : NULL;
-        AdjustDirection = -1;
-        break;
-
-    case Key_M:
-        pAdjustFunc = down ? &OculusWorldDemoApp::AdjustMotionPrediction : NULL;
-        AdjustDirection = 1;
-        break;
-
-/*
-    case Key_N:
-        RaiseLOD();
-        break;
-    case Key_M:
-        DropLOD();
-        break;
-*/
-
-        // Cycle through drift correction options
-    case Key_Z:
         if (down)
         {
-            if (SFusion.IsYawCorrectionEnabled())
+            struct {
+                float  x, z;
+                float  YawDegrees;
+            }  Positions[] =
             {
-                SFusion.SetGravityEnabled(false);
-                SFusion.SetYawCorrectionEnabled(false);
-            }
-            else if (SFusion.IsGravityEnabled())
-            {
-                SFusion.SetYawCorrectionEnabled(true);
-            }
-            else
-            {
-                SFusion.SetGravityEnabled(true);
-            }
-            SetAdjustMessage("Tilt Correction %s\nYaw Correction %s", 
-                SFusion.IsGravityEnabled() ? "On" : "Off",
-                SFusion.IsYawCorrectionEnabled() ? "On" : "Off");
+               // x         z           Yaw
+                { 7.7f,     -1.0f,      180.0f },   // The starting position.
+                { 10.0f,    10.0f,      90.0f  },   // Outside, looking at some trees.
+                { 19.26f,   5.43f,      22.0f  },   // Outside, looking at the fountain.
+            };
+
+            static int nextPosition = 0;
+            nextPosition = (nextPosition + 1) % (sizeof(Positions)/sizeof(Positions[0]));
+
+            ThePlayer.BodyPos = Vector3f(Positions[nextPosition].x,
+                                         ThePlayer.UserEyeHeight, Positions[nextPosition].z);
+            ThePlayer.BodyYaw = DegreeToRad( Positions[nextPosition].YawDegrees );
         }
         break;
 
-        // Show view of yaw angles (for mag calibration/analysis)
-    case Key_F6:
-        if (down)
-        {
-            if (SceneMode != Scene_YawView)
-            {
-                SceneMode = Scene_YawView;  
-                SetAdjustMessage("Magnetometer Yaw Angle Marks");
-            }
-            else
-            {
-                SceneMode = Scene_World;               
-                SetAdjustMessage("Magnetometer Marks Off");
-            }
-        }
+    case Key_Num1:
+        ThePlayer.BodyPos = Vector3f(-1.85f, 6.0f, -0.52f);
+        ThePlayer.BodyPos.y += ThePlayer.UserEyeHeight;
+        ThePlayer.BodyYaw = 3.1415f / 2;
+        ThePlayer.HandleMovement(0, &CollisionModels, &GroundCollisionModels, ShiftDown);
         break;
 
-    case Key_C:
-        if (down)
-        {
-            // Toggle chromatic aberration correction on/off.
-            RenderDevice::PostProcessShader shader = pRender->GetPostProcessShader();
-
-            if (shader == RenderDevice::PostProcessShader_Distortion)
-            {
-                pRender->SetPostProcessShader(RenderDevice::PostProcessShader_DistortionAndChromAb);                
-                SetAdjustMessage("Chromatic Aberration Correction On");
-            }
-            else if (shader == RenderDevice::PostProcessShader_DistortionAndChromAb)
-            {
-                pRender->SetPostProcessShader(RenderDevice::PostProcessShader_Distortion);                
-                SetAdjustMessage("Chromatic Aberration Correction Off");
-            }
-            else
-                OVR_ASSERT(false);
-        }
-        break;
-
-    case Key_P:
-        if (down)
-        {
-            // Toggle motion prediction.
-            if (SFusion.IsPredictionEnabled())
-            {
-                SFusion.SetPredictionEnabled(false);
-                SetAdjustMessage("Motion Prediction Off");
-            }
-            else
-            {
-                SFusion.SetPredictionEnabled(true);
-                SetAdjustMessage("Motion Prediction On");
-            }      
-        }
-        break;
      default:
         break;
     }
 }
 
+//-----------------------------------------------------------------------------
+
+
+Matrix4f OculusWorldDemoApp::CalculateViewFromPose(const Posef& pose)
+{
+    Posef worldPose = ThePlayer.VirtualWorldPoseFromRealPose(pose);
+
+    // Rotate and position View Camera
+    Vector3f up      = worldPose.Orientation.Rotate(UpVector);
+    Vector3f forward = worldPose.Orientation.Rotate(ForwardVector);
+
+    // Transform the position of the center eye in the real world (i.e. sitting in your chair)
+    // into the frame of the player's virtual body.
+
+    // It is important to have head movement in scale with IPD.
+    // If you shrink one, you should also shrink the other.
+    // So with zero IPD (i.e. everything at infinity),
+    // head movement should also be zero.
+    Vector3f viewPos = ForceZeroHeadMovement ? ThePlayer.BodyPos : worldPose.Position;
+
+    Matrix4f view = Matrix4f::LookAtRH(viewPos, viewPos + forward, up);
+    return view;
+}
+
+
+
 void OculusWorldDemoApp::OnIdle()
 {
+    double curtime = ovr_GetTimeInSeconds();
+    // If running slower than 10fps, clamp. Helps when debugging, because then dt can be minutes!
+    float  dt      = Alg::Min<float>(float(curtime - LastUpdate), 0.1f);
+    LastUpdate     = curtime;    
 
-    double curtime = pPlatform->GetAppTime();
-    float  dt      = float(curtime - LastUpdate);
-    LastUpdate     = curtime;
+
+    Profiler.RecordSample(RenderProfiler::Sample_FrameStart);
+
+    if (LoadingState == LoadingState_DoLoad)
+    {
+        PopulateScene(MainFilePath.ToCStr());
+        LoadingState = LoadingState_Finished;
+        return;
+    }    
+
+    if (HmdSettingsChanged)
+    {
+        CalculateHmdValues();        
+        HmdSettingsChanged = false;
+    }
+
+    HmdFrameTiming = ovrHmd_BeginFrame(Hmd, 0);
+
 
     // Update gamepad.
     GamepadState gamepadState;
@@ -1032,730 +708,561 @@ void OculusWorldDemoApp::OnIdle()
         GamepadStateChanged(gamepadState);
     }
 
+    SensorState ss = ovrHmd_GetSensorState(Hmd, HmdFrameTiming.ScanoutMidpointSeconds);
+    HmdStatus = ss.StatusFlags;
 
-    if (LoadingState == LoadingState_DoLoad)
-    {
-        PopulateScene(MainFilePath.ToCStr());
-        LoadingState = LoadingState_Finished;
-        return;
-    }
+    // Change message status around positional tracking.
+	bool hadVisionTracking = HaveVisionTracking;
+	HaveVisionTracking = (ss.StatusFlags & Status_PositionTracked) != 0;
+	if (HaveVisionTracking && !hadVisionTracking)
+		Menu.SetPopupMessage("Vision Tracking Acquired");
+    if (!HaveVisionTracking && hadVisionTracking)
+		Menu.SetPopupMessage("Lost Vision Tracking");
     
     // Check if any new devices were connected.
+    ProcessDeviceNotificationQueue();
+    // FPS count and timing.
+    UpdateFrameRateCounter(curtime);
+
+    
+    // Update pose based on frame!
+    ThePlayer.HeadPose = ss.Predicted.Transform;
+    // Movement/rotation with the gamepad.
+    ThePlayer.BodyYaw -= ThePlayer.GamepadRotate.x * dt;
+    ThePlayer.HandleMovement(dt, &CollisionModels, &GroundCollisionModels, ShiftDown);
+
+
+    // Record after processing time.
+    Profiler.RecordSample(RenderProfiler::Sample_AfterGameProcessing);
+
+
+    // Determine if we are rendering this frame. Frame rendering may be
+    // skipped based on FreezeEyeUpdate and Time-warp timing state.
+    bool bupdateRenderedView = FrameNeedsRendering(curtime);
+    
+    if (bupdateRenderedView)
     {
-        bool queueIsEmpty = false;
-        while (!queueIsEmpty)
-        {
-            DeviceStatusNotificationDesc desc;
+        // If render texture size is changing, apply dynamic changes to viewport.
+        ApplyDynamicResolutionScaling();
 
-            {
-                Lock::Locker lock(pManager->GetHandlerLock());
-                if (DeviceStatusNotificationsQueue.GetSize() == 0)
-                    break;
-                desc = DeviceStatusNotificationsQueue.Front();
-             
-                // We can't call Clear under the lock since this may introduce a dead lock:
-                // this thread is locked by HandlerLock and the Clear might cause 
-                // call of Device->Release, which will use Manager->DeviceLock. The bkg
-                // thread is most likely locked by opposite way: 
-                // Manager->DeviceLock ==> HandlerLock, therefore - a dead lock.
-                // So, just grab the first element, save a copy of it and remove
-                // the element (Device->Release won't be called since we made a copy).
-                
-                DeviceStatusNotificationsQueue.RemoveAt(0);
-                queueIsEmpty = (DeviceStatusNotificationsQueue.GetSize() == 0);
-            }
+        pRender->BeginScene(PostProcess_None);
 
-            bool wasAlreadyCreated = desc.Handle.IsCreated();
+        if (ForceZeroIpd)
+        {             
+            // Zero IPD eye rendering: draw into left eye only,
+            // re-use  texture for right eye.
+            pRender->SetRenderTarget(RenderTargets[Rendertarget_Left].pTex);
+            pRender->Clear();
+        
+            ovrPosef eyeRenderPose = ovrHmd_BeginEyeRender(Hmd, ovrEye_Left);
+        
+            View = CalculateViewFromPose(eyeRenderPose);
+            RenderEyeView(ovrEye_Left);
+            ovrHmd_EndEyeRender(Hmd, ovrEye_Left, eyeRenderPose, &EyeTexture[ovrEye_Left]);
 
-            if (desc.Action == Message_DeviceAdded)
-            {
-                switch(desc.Handle.GetType())
-                {
-                case Device_Sensor:
-                    if (desc.Handle.IsAvailable() && !desc.Handle.IsCreated())
-                    {
-                        if (!pSensor)
-                        {
-                            pSensor = *desc.Handle.CreateDeviceTyped<SensorDevice>();
-							if (pSensor)
-							{
-								SFusion.AttachToSensor(pSensor);
-
-								SetAdjustMessage("---------------------------\n"
-												 "SENSOR connected\n"
-												 "---------------------------");
-							}
-							else
-							{
-								SetAdjustMessage("----------------------------\n"
-												 "SENSOR connect failed\n"
-												 "Unplug and reconnect it.\n"
-												 "----------------------------");
-							}
-                        }
-                        else if (!wasAlreadyCreated)
-                        {
-                            LogText("A new SENSOR has been detected, but it is not currently used.");
-                        }
-                    }
-                    break;
-                case Device_LatencyTester:
-                    if (desc.Handle.IsAvailable() && !desc.Handle.IsCreated())
-                    {
-                        if (!pLatencyTester)
-                        {
-                            pLatencyTester = *desc.Handle.CreateDeviceTyped<LatencyTestDevice>();
-                            LatencyUtil.SetDevice(pLatencyTester);
-                            if (!wasAlreadyCreated)
-                                SetAdjustMessage("----------------------------------------\n"
-                                                 "LATENCY TESTER connected\n"
-                                                 "----------------------------------------");
-                        }
-                    }
-                    break;
-                case Device_HMD:
-                    {
-                        OVR::HMDInfo info;
-                        desc.Handle.GetDeviceInfo(&info);
-                        // if strlen(info.DisplayDeviceName) == 0 then
-                        // this HMD is 'fake' (created using sensor).
-                        if (strlen(info.DisplayDeviceName) > 0 && (!pHMD || !info.IsSameDisplay(TheHMDInfo)))
-                        {
-                            SetAdjustMessage("------------------------\n"
-                                             "HMD connected\n"
-                                             "------------------------");
-                            if (!pHMD || !desc.Handle.IsDevice(pHMD))
-                                pHMD = *desc.Handle.CreateDeviceTyped<HMDDevice>();
-                            // update stereo config with new HMDInfo
-                            if (pHMD && pHMD->GetDeviceInfo(&TheHMDInfo))
-                            {
-                                //RenderParams.MonitorName = hmd.DisplayDeviceName;
-                                SConfig.SetHMDInfo(TheHMDInfo);
-                            }
-                            LogText("HMD device added.\n");
-                        }
-                        break;
-                    }
-                default:;
-                }
-            }
-            else if (desc.Action == Message_DeviceRemoved)
-            {
-                if (desc.Handle.IsDevice(pSensor))
-                {
-                    LogText("Sensor reported device removed.\n");
-                    SFusion.AttachToSensor(NULL);
-                    pSensor.Clear();
-                    SetAdjustMessage("-------------------------------\n"
-                                     "SENSOR disconnected.\n"
-                                     "-------------------------------");
-                }
-                else if (desc.Handle.IsDevice(pLatencyTester))
-                {
-                    LogText("Latency Tester reported device removed.\n");
-                    LatencyUtil.SetDevice(NULL);
-                    pLatencyTester.Clear();
-                    SetAdjustMessage("---------------------------------------------\n"
-                                     "LATENCY SENSOR disconnected.\n"
-                                     "---------------------------------------------");
-                }
-                else if (desc.Handle.IsDevice(pHMD))
-                {
-                    if (pHMD && !pHMD->IsDisconnected())
-                    {
-                        SetAdjustMessage("---------------------------\n"
-                                         "HMD disconnected\n"
-                                         "---------------------------");
-                        // Disconnect HMD. pSensor is used to restore 'fake' HMD device
-                        // (can be NULL).
-                        pHMD = pHMD->Disconnect(pSensor);
-
-                        // This will initialize TheHMDInfo with information about configured IPD,
-                        // screen size and other variables needed for correct projection.
-                        // We pass HMD DisplayDeviceName into the renderer to select the
-                        // correct monitor in full-screen mode.
-                        if (pHMD && pHMD->GetDeviceInfo(&TheHMDInfo))
-                        {
-                            //RenderParams.MonitorName = hmd.DisplayDeviceName;
-                            SConfig.SetHMDInfo(TheHMDInfo);
-                        }
-                        LogText("HMD device removed.\n");
-                    }
-                }
-            }
-            else 
-                OVR_ASSERT(0); // unexpected action
+            // Second eye gets the same texture (initialized to same value above).
+            ovrHmd_BeginEyeRender(Hmd, ovrEye_Right); 
+            ovrHmd_EndEyeRender(Hmd, ovrEye_Right, eyeRenderPose, &EyeTexture[ovrEye_Right]);
         }
+
+        else if (RendertargetIsSharedByBothEyes)
+        {
+            // Shared render target eye rendering; set up RT once for both eyes.
+            pRender->SetRenderTarget(RenderTargets[Rendertarget_BothEyes].pTex);
+            pRender->Clear();
+
+            for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
+            {      
+                ovrEyeType eye = HmdDesc.EyeRenderOrder[eyeIndex];
+                ovrPosef   eyeRenderPose = ovrHmd_BeginEyeRender(Hmd, eye);
+
+                View = CalculateViewFromPose(eyeRenderPose);
+                RenderEyeView(eye); 
+                ovrHmd_EndEyeRender(Hmd, eye, eyeRenderPose, &EyeTexture[eye]);
+            }
+        }
+
+        else
+        {
+            // Separate eye rendering - each eye gets its own render target.
+            for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
+            {      
+                ovrEyeType eye = HmdDesc.EyeRenderOrder[eyeIndex];
+                pRender->SetRenderTarget(
+                    RenderTargets[(eye == 0) ? Rendertarget_Left : Rendertarget_Right].pTex);
+                pRender->Clear();
+            
+                ovrPosef eyeRenderPose = ovrHmd_BeginEyeRender(Hmd, eye);
+
+                View = CalculateViewFromPose(eyeRenderPose);
+                RenderEyeView(eye);            
+                ovrHmd_EndEyeRender(Hmd, eye, eyeRenderPose, &EyeTexture[eye]);
+            }
+        }   
+
+        pRender->SetRenderTarget(0);
+        pRender->FinishScene();        
     }
 
-    // If one of Stereo setting adjustment keys is pressed, adjust related state.
-    if (pAdjustFunc)
+    Profiler.RecordSample(RenderProfiler::Sample_AfterEyeRender);
+
+    // TODO: These happen inside ovrHmd_EndFrame; need to hook into it.
+    //Profiler.RecordSample(RenderProfiler::Sample_BeforeDistortion);
+    ovrHmd_EndFrame(Hmd);
+    Profiler.RecordSample(RenderProfiler::Sample_AfterPresent);    
+}
+
+
+
+// Determine whether this frame needs rendering based on time-warp timing and flags.
+bool OculusWorldDemoApp::FrameNeedsRendering(double curtime)
+{    
+    static double   lastUpdate          = 0.0;    
+    double          renderInterval      = TimewarpRenderIntervalInSeconds;
+    double          timeSinceLast       = curtime - lastUpdate;
+    bool            updateRenderedView  = true;
+
+    if (TimewarpEnabled)
     {
-        (this->*pAdjustFunc)(dt * AdjustDirection * (ShiftDown ? 5.0f : 1.0f));
-    }
+        if (FreezeEyeUpdate)
+        {
+            // Draw one frame after (FreezeEyeUpdate = true) to update message text.            
+            if (FreezeEyeOneFrameRendered)
+                updateRenderedView = false;
+            else
+                FreezeEyeOneFrameRendered = true;
+        }
+        else
+        {
+            FreezeEyeOneFrameRendered = false;
 
-    // Process latency tester results.
-    const char* results = LatencyUtil.GetResultsString();
-    if (results != NULL)
+            if ( (timeSinceLast < 0.0) || ((float)timeSinceLast > renderInterval) )
+            {
+                // This allows us to do "fractional" speeds, e.g. 45fps rendering on a 60fps display.
+                lastUpdate += renderInterval;
+                if ( timeSinceLast > 5.0 )
+                {
+                    // renderInterval is probably tiny (i.e. "as fast as possible")
+                    lastUpdate = curtime;
+                }
+
+                updateRenderedView = true;
+            }
+            else
+            {
+                updateRenderedView = false;
+            }
+        }        
+    }
+        
+    return updateRenderedView;
+}
+
+
+void OculusWorldDemoApp::ApplyDynamicResolutionScaling()
+{
+    if (!DynamicRezScalingEnabled)
     {
-        LogText("LATENCY TESTER: %s\n", results); 
+        // Restore viewport rectangle in case dynamic res scaling was enabled before.
+        EyeTexture[0].Header.RenderViewport = EyeRenderDesc[0].Desc.RenderViewport;
+        EyeTexture[1].Header.RenderViewport = EyeRenderDesc[1].Desc.RenderViewport;
+        return;
     }
+   
+    // Demonstrate dynamic-resolution rendering.
+    // This demo is too simple to actually have a framerate that varies that much, so we'll
+    // just pretend this is trying to cope with highly dynamic rendering load.
+    float dynamicRezScale = 1.0f;
 
-    // >>> THIS MUST BE PLACED AS CLOSE AS POSSIBLE TO WHERE THE HMD ORIENTATION IS READ <<<
-    LatencyUtil.ProcessInputs();
-
-    // Handle Sensor motion.
-    // We extract Yaw, Pitch, Roll instead of directly using the orientation
-    // to allow "additional" yaw manipulation with mouse/controller.
-    if(pSensor)
     {
-        Quatf    hmdOrient = SFusion.GetPredictedOrientation();
+        // Hacky stuff to make up a scaling...
+        // This produces value oscillating as follows: 0 -> 1 -> 0.        
+        static double dynamicRezStartTime   = ovr_GetTimeInSeconds();
+        float         dynamicRezPhase       = float ( ovr_GetTimeInSeconds() - dynamicRezStartTime );
+        const float   dynamicRezTimeScale   = 4.0f;
 
-        float    yaw = 0.0f;
-        hmdOrient.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&yaw, &ThePlayer.EyePitch, &ThePlayer.EyeRoll);
+        dynamicRezPhase /= dynamicRezTimeScale;
+        if ( dynamicRezPhase < 1.0f )
+        {
+            dynamicRezScale = dynamicRezPhase;
+        }
+        else if ( dynamicRezPhase < 2.0f )
+        {
+            dynamicRezScale = 2.0f - dynamicRezPhase;
+        }
+        else
+        {
+            // Reset it to prevent creep.
+            dynamicRezStartTime = ovr_GetTimeInSeconds();
+            dynamicRezScale     = 0.0f;
+        }
 
-        ThePlayer.EyeYaw += (yaw - ThePlayer.LastSensorYaw);
-        ThePlayer.LastSensorYaw = yaw;
-
-        // NOTE: We can get a matrix from orientation as follows:
-        // Matrix4f hmdMat(hmdOrient);
-
-        // Test logic - assign quaternion result directly to view:
-        // Quatf hmdOrient = SFusion.GetOrientation();
-        // View = Matrix4f(hmdOrient.Inverted()) * Matrix4f::Translation(-EyePos);
+        // Map oscillation: 0.5 -> 1.0 -> 0.5
+        dynamicRezScale = dynamicRezScale * 0.5f + 0.5f;
     }
 
+    Sizei sizeLeft  = EyeRenderDesc[0].Desc.RenderViewport.Size;
+    Sizei sizeRight = EyeRenderDesc[1].Desc.RenderViewport.Size;
+    
+    // This viewport is used for rendering and passed into ovrHmd_EndEyeRender.
+    EyeTexture[0].Header.RenderViewport.Size = Sizei(int(sizeLeft.w  * dynamicRezScale),
+                                                             int(sizeLeft.h  * dynamicRezScale));
+    EyeTexture[1].Header.RenderViewport.Size = Sizei(int(sizeRight.w * dynamicRezScale),
+                                                             int(sizeRight.h * dynamicRezScale));
+}
 
-    if(curtime >= NextFPSUpdate)
-    {
-        NextFPSUpdate = curtime + 1.0;
-        FPS = FrameCounter;
-        FrameCounter = 0;
-    }
+
+void OculusWorldDemoApp::UpdateFrameRateCounter(double curtime)
+{
     FrameCounter++;
+    float secondsSinceLastMeasurement = (float)( curtime - LastFpsUpdate );
 
-    if(FPS < 40)
+    if (secondsSinceLastMeasurement >= SecondsOfFpsMeasurement)
     {
-        ConsecutiveLowFPSFrames++;
+        SecondsPerFrame = (float)( curtime - LastFpsUpdate ) / (float)FrameCounter;
+        FPS             = 1.0f / SecondsPerFrame;
+        LastFpsUpdate   = curtime;
+        FrameCounter =   0;
     }
-    else
-    {
-        ConsecutiveLowFPSFrames = 0;
-    }
-
-    if(ConsecutiveLowFPSFrames > 200)
-    {
-        DropLOD();
-        ConsecutiveLowFPSFrames = 0;
-    }
-
-    ThePlayer.EyeYaw -= ThePlayer.GamepadRotate.x * dt;
-    ThePlayer.HandleCollision(dt, &CollisionModels, &GroundCollisionModels, ShiftDown);
-
-    if(!pSensor)
-    {
-        ThePlayer.EyePitch -= ThePlayer.GamepadRotate.y * dt;
-
-        const float maxPitch = ((3.1415f / 2) * 0.98f);
-        if(ThePlayer.EyePitch > maxPitch)
-        {
-            ThePlayer.EyePitch = maxPitch;
-        }
-        if(ThePlayer.EyePitch < -maxPitch)
-        {
-            ThePlayer.EyePitch = -maxPitch;
-        }
-    }
-
-    // Rotate and position View Camera, using YawPitchRoll in BodyFrame coordinates.
-    //
-    Matrix4f rollPitchYaw = Matrix4f::RotationY(ThePlayer.EyeYaw) * Matrix4f::RotationX(ThePlayer.EyePitch) *
-                            Matrix4f::RotationZ(ThePlayer.EyeRoll);
-    Vector3f up      = rollPitchYaw.Transform(UpVector);
-    Vector3f forward = rollPitchYaw.Transform(ForwardVector);
-
-
-    // Minimal head modeling; should be moved as an option to SensorFusion.
-    float headBaseToEyeHeight     = 0.15f;  // Vertical height of eye from base of head
-    float headBaseToEyeProtrusion = 0.09f;  // Distance forward of eye from base of head
-
-    Vector3f eyeCenterInHeadFrame(0.0f, headBaseToEyeHeight, -headBaseToEyeProtrusion);
-    Vector3f shiftedEyePos = ThePlayer.EyePos + rollPitchYaw.Transform(eyeCenterInHeadFrame);
-    shiftedEyePos.y -= eyeCenterInHeadFrame.y; // Bring the head back down to original height
-    View = Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + forward, up);
-
-    //  Transformation without head modeling.
-    // View = Matrix4f::LookAtRH(EyePos, EyePos + forward, up);
-
-    // This is an alternative to LookAtRH:
-    // Here we transpose the rotation matrix to get its inverse.
-    //  View = (Matrix4f::RotationY(EyeYaw) * Matrix4f::RotationX(EyePitch) *
-    //                                        Matrix4f::RotationZ(EyeRoll)).Transposed() *
-    //         Matrix4f::Translation(-EyePos);
-
-
-    switch(SConfig.GetStereoMode())
-    {
-    case Stereo_None:
-        Render(SConfig.GetEyeRenderParams(StereoEye_Center));
-        break;
-
-    case Stereo_LeftRight_Multipass:
-        //case Stereo_LeftDouble_Multipass:
-        Render(SConfig.GetEyeRenderParams(StereoEye_Left));
-        Render(SConfig.GetEyeRenderParams(StereoEye_Right));
-        break;
-
-    }
-
-    pRender->Present();
-    // Force GPU to flush the scene, resulting in the lowest possible latency.
-    pRender->ForceFlushGPU();
 }
 
 
-static const char* HelpText = 
-    "F1         \t100 NoStereo\n"
-    "F2         \t100 Stereo                     \t420 Z    \t520 Drift Correction\n"
-    "F3         \t100 StereoHMD                  \t420 F6   \t520 Yaw Drift Info\n" 
-    "F4         \t100 MSAA                       \t420 R    \t520 Reset SensorFusion\n"
-    "F9         \t100 FullScreen                 \t420\n"
-    "F11        \t100 Fast FullScreen                   \t500 - +       \t660 Adj EyeHeight\n"                                           
-    "C          \t100 Chromatic Ab                      \t500 [ ]       \t660 Adj FOV\n"
-    "P          \t100 Motion Pred                       \t500 Shift     \t660 Adj Faster\n"
-    "N/M        \t180 Adj Motion Pred\n"
-    "( / )      \t180 Adj EyeDistance"
-    ;
-
-
-enum DrawTextCenterType
+void OculusWorldDemoApp::RenderEyeView(ovrEyeType eye)
 {
-    DrawText_NoCenter= 0,
-    DrawText_VCenter = 0x1,
-    DrawText_HCenter = 0x2,
-    DrawText_Center  = DrawText_VCenter | DrawText_HCenter
-};
+    Recti    renderViewport = EyeTexture[eye].Header.RenderViewport;
+    Matrix4f viewAdjust     = Matrix4f::Translation(Vector3f(EyeRenderDesc[eye].ViewAdjust));
 
-static void DrawTextBox(RenderDevice* prender, float x, float y,
-                        float textSize, const char* text,
-                        DrawTextCenterType centerType = DrawText_NoCenter)
-{
-    float ssize[2] = {0.0f, 0.0f};
-
-    prender->MeasureText(&DejaVu, text, textSize, ssize);
-
-    // Treat 0 a VCenter.
-    if (centerType & DrawText_HCenter)
-    {
-        x = -ssize[0]/2;
-    }
-    if (centerType & DrawText_VCenter)
-    {
-        y = -ssize[1]/2;
-    }
-
-    prender->FillRect(x-0.02f, y-0.02f, x+ssize[0]+0.02f, y+ssize[1]+0.02f, Color(40,40,100,210));
-    prender->RenderText(&DejaVu, text, x, y, textSize, Color(255,255,0,210));
-}
-
-void OculusWorldDemoApp::Render(const StereoEyeParams& stereo)
-{
-    pRender->BeginScene(PostProcess);
 
     // *** 3D - Configures Viewport/Projection and Render
-    pRender->ApplyStereoParams(stereo);    
-    pRender->Clear();
-
+    
+    pRender->ApplyStereoParams(renderViewport, Projection[eye]);
     pRender->SetDepthMode(true, true);
-    if (SceneMode != Scene_Grid)
+
+    Matrix4f baseTranslate = Matrix4f::Translation(ThePlayer.BodyPos);
+    Matrix4f baseYaw       = Matrix4f::RotationY(ThePlayer.BodyYaw.Get());
+
+
+    if (GridDisplayMode != GridDisplay_GridOnly)
     {
-        MainScene.Render(pRender, stereo.ViewAdjust * View);
+        if (SceneMode != Scene_OculusCubes)
+        {
+            MainScene.Render(pRender, viewAdjust * View);        
+            RenderAnimatedBlocks(eye, ovr_GetTimeInSeconds());
+        }
+	    
+        if (SceneMode == Scene_Cubes)
+	    {
+            // Draw scene cubes overlay. Red if position tracked, blue otherwise.
+            Scene sceneCubes = (HmdStatus & ovrStatus_PositionTracked) ?
+                               RedCubesScene : BlueCubesScene;        
+            sceneCubes.Render(pRender, viewAdjust * View * baseTranslate * baseYaw);
+        }
+
+	    else if (SceneMode == Scene_OculusCubes)
+	    {
+            OculusCubesScene.Render(pRender, viewAdjust * View * baseTranslate * baseYaw);
+        }
+    }   
+
+    if (GridDisplayMode != GridDisplay_None)
+    {
+        RenderGrid(eye);
     }
 
-    if (SceneMode == Scene_YawView)
-    {
-        Matrix4f trackerOnlyOrient = Matrix4f::RotationY(ThePlayer.LastSensorYaw) 
-                                   * Matrix4f::RotationX(ThePlayer.EyePitch)
-                                   * Matrix4f::RotationZ(ThePlayer.EyeRoll);
-        YawLinesScene.Render(pRender, stereo.ViewAdjust * trackerOnlyOrient.Inverted());
-        //YawMarkRedScene.Render(pRender, stereo.ViewAdjust);
-    }
 
-    // *** 2D Text & Grid - Configure Orthographic rendering.
+    // *** 2D Text - Configure Orthographic rendering.
 
     // Render UI in 2D orthographic coordinate system that maps [-1,1] range
     // to a readable FOV area centered at your eye and properly adjusted.
-    pRender->ApplyStereoParams2D(stereo);    
+    pRender->ApplyStereoParams(renderViewport, OrthoProjection[eye]);
     pRender->SetDepthMode(false, false);
 
-    float unitPixel = SConfig.Get2DUnitPixel();
-    float textHeight= unitPixel * 22; 
-
-    if ((SceneMode == Scene_Grid)||(SceneMode == Scene_Both))
-    {   // Draw grid two pixels thick.
-        GridScene.Render(pRender, Matrix4f());
-        GridScene.Render(pRender, Matrix4f::Translation(unitPixel,unitPixel,0));
-    }
+    // We set this scale up in CreateOrthoSubProjection().
+    float textHeight = 22.0f;
 
     // Display Loading screen-shot in frame 0.
     if (LoadingState != LoadingState_Finished)
     {
-        LoadingScene.Render(pRender, Matrix4f());
+        const float scale = textHeight * 25.0f;
+        Matrix4f view ( scale, 0.0f, 0.0f, 0.0f, scale, 0.0f, 0.0f, 0.0f, scale );
+        LoadingScene.Render(pRender, view);
         String loadMessage = String("Loading ") + MainFilePath;
-        DrawTextBox(pRender, 0.0f, 0.0f, textHeight, loadMessage.ToCStr(), DrawText_HCenter);
+        DrawTextBox(pRender, 0.0f, -textHeight, textHeight, loadMessage.ToCStr(), DrawText_HCenter);
         LoadingState = LoadingState_DoLoad;
     }
 
-    if(!AdjustMessage.IsEmpty() && AdjustMessageTimeout > pPlatform->GetAppTime())
-    {
-        DrawTextBox(pRender,0.0f,0.4f, textHeight, AdjustMessage.ToCStr(), DrawText_HCenter);
-    }
+    // HUD overlay brought up by spacebar.
+    RenderTextInfoHud(textHeight);
 
+    // Menu brought up by 
+    Menu.Render(pRender);
+}
+
+
+
+// NOTE - try to keep these in sync with the PDF docs!
+static const char* HelpText1 =
+    "Spacebar 	            \t500 Toggle debug info overlay\n"
+    "W, S            	    \t500 Move forward, back\n"
+    "A, D 		    	    \t500 Strafe left, right\n"
+    "Mouse move 	        \t500 Look left, right\n"
+    "Left gamepad stick     \t500 Move\n"
+    "Right gamepad stick    \t500 Turn\n"
+    "T			            \t500 Reset player position";
+    
+static const char* HelpText2 =        
+    "R              \t250 Reset sensor orientation\n"
+    "G 			    \t250 Cycle grid overlay mode\n"
+    "-, +           \t250 Adjust eye height\n"
+    "Esc            \t250 Cancel full-screen\n"
+    "F4			    \t250 Multisampling toggle\n"    
+    "F9             \t250 Hardware full-screen (low latency)\n"
+    "F11            \t250 Faked full-screen (easier debugging)\n"
+    "Ctrl+Q		    \t250 Quit";
+
+
+void FormatLatencyReading(char* buff, UPInt size, float val)
+{    
+    if (val < 0.000001f)
+        OVR_strcpy(buff, size, "N/A   ");
+    else
+        OVR_sprintf(buff, size, "%4.2fms", val * 1000.0f);    
+}
+
+
+void OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
+{
+    // View port & 2D ortho projection must be set before call.
+    
+    float hmdYaw, hmdPitch, hmdRoll;
     switch(TextScreen)
     {
-    case Text_Orientation:
+    case Text_Info:
     {
-        char buf[256], gpustat[256];
+        char buf[512], gpustat[256];
+
+        // Average FOVs.
+        FovPort leftFov  = EyeRenderDesc[0].Desc.Fov;
+        FovPort rightFov = EyeRenderDesc[1].Desc.Fov;
+        
+        // Rendered size changes based on selected options & dynamic rendering.
+        int pixelSizeWidth = EyeTexture[0].Header.RenderViewport.Size.w +
+                             ((!ForceZeroIpd) ?
+                                        EyeTexture[1].Header.RenderViewport.Size.w : 0);
+        int pixelSizeHeight = ( EyeTexture[0].Header.RenderViewport.Size.h +
+                                EyeTexture[1].Header.RenderViewport.Size.h ) / 2;
+
+        // No DK2, no message.
+        char latency2Text[128] = "";
+        {
+            //float latency2 = ovrHmd_GetMeasuredLatencyTest2(Hmd) * 1000.0f; // show it in ms
+            //if (latency2 > 0)
+            //    OVR_sprintf(latency2Text, sizeof(latency2Text), "%.2fms", latency2);
+
+            float latencies[3] = { 0.0f, 0.0f, 0.0f };
+            if (ovrHmd_GetFloatArray(Hmd, "DK2Latency", latencies, 3) == 3)
+            {
+                char latencyText0[32], latencyText1[32], latencyText2[32];
+                FormatLatencyReading(latencyText0, sizeof(latencyText0), latencies[0]);
+                FormatLatencyReading(latencyText1, sizeof(latencyText1), latencies[1]);
+                FormatLatencyReading(latencyText2, sizeof(latencyText2), latencies[2]);
+
+                OVR_sprintf(latency2Text, sizeof(latency2Text),
+                            " DK2 Latency  Ren: %s  TWrp: %s\n"
+                            " PostPresent: %s  ",
+                            latencyText0, latencyText1, latencyText2);
+            }
+        }
+
+        ThePlayer.HeadPose.Orientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&hmdYaw, &hmdPitch, &hmdRoll);
         OVR_sprintf(buf, sizeof(buf),
-                    " Yaw:%4.0f  Pitch:%4.0f  Roll:%4.0f \n"
-                    " FPS: %d  Frame: %d \n Pos: %3.2f, %3.2f, %3.2f \n"
-                    " EyeHeight: %3.2f",
-                    RadToDegree(ThePlayer.EyeYaw), RadToDegree(ThePlayer.EyePitch), RadToDegree(ThePlayer.EyeRoll),
-                    FPS, FrameCounter, ThePlayer.EyePos.x, ThePlayer.EyePos.y, ThePlayer.EyePos.z, ThePlayer.UserEyeHeight);
+                    " HMD YPR:%4.0f %4.0f %4.0f   Player Yaw: %4.0f\n"
+                    " FPS: %.1f  ms/frame: %.1f Frame: %d\n"
+                    " Pos: %3.2f, %3.2f, %3.2f  HMD: %s\n"
+                    " EyeHeight: %3.2f, IPD: %3.1fmm\n" //", Lens: %s\n"
+                    " FOV %3.1fx%3.1f, Resolution: %ix%i\n"
+                    "%s",
+                    RadToDegree(hmdYaw), RadToDegree(hmdPitch), RadToDegree(hmdRoll),
+                    RadToDegree(ThePlayer.BodyYaw.Get()),
+                    FPS, SecondsPerFrame * 1000.0f, FrameCounter,
+                    ThePlayer.BodyPos.x, ThePlayer.BodyPos.y, ThePlayer.BodyPos.z,
+                    //GetDebugNameHmdType ( TheHmdRenderInfo.HmdType ),
+                    HmdDesc.ProductName,
+                    ThePlayer.UserEyeHeight,
+                    ovrHmd_GetFloat(Hmd, OVR_KEY_IPD, 0) * 1000.0f,
+                    //( EyeOffsetFromNoseLeft + EyeOffsetFromNoseRight ) * 1000.0f,
+                    //GetDebugNameEyeCupType ( TheHmdRenderInfo.EyeCups ),  // Lens/EyeCup not exposed
+                    
+                    (leftFov.GetHorizontalFovDegrees() + rightFov.GetHorizontalFovDegrees()) * 0.5f,
+                    (leftFov.GetVerticalFovDegrees() + rightFov.GetVerticalFovDegrees()) * 0.5f,
+
+                    pixelSizeWidth, pixelSizeHeight,
+
+                    latency2Text
+                    );
+
         size_t texMemInMB = pRender->GetTotalTextureMemoryUsage() / 1058576;
         if (texMemInMB)
         {
-            OVR_sprintf(gpustat, sizeof(gpustat), "\n GPU Tex: %u MB", texMemInMB);
+            OVR_sprintf(gpustat, sizeof(gpustat), " GPU Tex: %u MB", texMemInMB);
             OVR_strcat(buf, sizeof(buf), gpustat);
         }
         
-        DrawTextBox(pRender, 0.0f, -0.15f, textHeight, buf, DrawText_HCenter);
+        DrawTextBox(pRender, 0.0f, 0.0f, textHeight, buf, DrawText_Center);
     }
     break;
-
-    case Text_Config:
-    {
-        char   textBuff[2048];
-         
-        OVR_sprintf(textBuff, sizeof(textBuff),
-                    "Fov\t300 %9.4f\n"
-                    "EyeDistance\t300 %9.4f\n"
-                    "DistortionK0\t300 %9.4f\n"
-                    "DistortionK1\t300 %9.4f\n"
-                    "DistortionK2\t300 %9.4f\n"
-                    "DistortionK3\t300 %9.4f\n"
-                    "TexScale\t300 %9.4f",
-                    SConfig.GetYFOVDegrees(),
-                        SConfig.GetIPD(),
-                    SConfig.GetDistortionK(0),
-                    SConfig.GetDistortionK(1),
-                    SConfig.GetDistortionK(2),
-                    SConfig.GetDistortionK(3),
-                    SConfig.GetDistortionScale());
-
-            DrawTextBox(pRender, 0.0f, 0.0f, textHeight, textBuff, DrawText_Center);
-    }
+    
+    case Text_Timing:    
+        Profiler.DrawOverlay(pRender);    
     break;
-
-    case Text_Help:
-        DrawTextBox(pRender, 0.0f, -0.1f, textHeight, HelpText, DrawText_Center);
-            
-    default:
+    
+    case Text_Help1:
+        DrawTextBox(pRender, 0.0f, 0.0f, textHeight, HelpText1, DrawText_Center);
         break;
-    }
-
-
-    // Display colored quad if we're doing a latency test.
-    Color colorToDisplay;
-    if (LatencyUtil.DisplayScreenColor(colorToDisplay))
-    {
-        pRender->FillRect(-0.4f, -0.4f, 0.4f, 0.4f, colorToDisplay);
-    }
-
-    pRender->FinishScene();
-}
-
-
-// Sets temporarily displayed message for adjustments
-void OculusWorldDemoApp::SetAdjustMessage(const char* format, ...)
-{
-    Lock::Locker lock(pManager->GetHandlerLock());
-    char textBuff[2048];
-    va_list argList;
-    va_start(argList, format);
-    OVR_vsprintf(textBuff, sizeof(textBuff), format, argList);
-    va_end(argList);
-
-    // Message will time out in 4 seconds.
-    AdjustMessage = textBuff;
-    AdjustMessageTimeout = pPlatform->GetAppTime() + 4.0f;
-}
-
-void OculusWorldDemoApp::SetAdjustMessageTimeout(float timeout)
-{
-    AdjustMessageTimeout = pPlatform->GetAppTime() + timeout;
-}
-
-// ***** View Control Adjustments
-
-void OculusWorldDemoApp::AdjustFov(float dt)
-{
-    float esd = SConfig.GetEyeToScreenDistance() + 0.01f * dt;
-    SConfig.SetEyeToScreenDistance(esd);
-    SetAdjustMessage("ESD:%6.3f  FOV: %6.3f", esd, SConfig.GetYFOVDegrees());
-}
-
-void OculusWorldDemoApp::AdjustAspect(float dt)
-{
-    float rawAspect = SConfig.GetAspect() / SConfig.GetAspectMultiplier();
-    float newAspect = SConfig.GetAspect() + 0.01f * dt;
-    SConfig.SetAspectMultiplier(newAspect / rawAspect);
-    SetAdjustMessage("Aspect: %6.3f", newAspect);
-}
-
-void OculusWorldDemoApp::AdjustDistortion(float dt, int kIndex, const char* label)
-{
-    SConfig.SetDistortionK(kIndex, SConfig.GetDistortionK(kIndex) + 0.03f * dt);
-    SetAdjustMessage("%s: %6.4f", label, SConfig.GetDistortionK(kIndex));
-}
-
-void OculusWorldDemoApp::AdjustIPD(float dt)
-{
-    SConfig.SetIPD(SConfig.GetIPD() + 0.025f * dt);
-    SetAdjustMessage("EyeDistance: %6.4f", SConfig.GetIPD());
-}
-
-void OculusWorldDemoApp::AdjustEyeHeight(float dt)
-{
-    float dist = 0.5f * dt;
-
-    ThePlayer.UserEyeHeight += dist;
-    ThePlayer.EyePos.y += dist;
-
-    SetAdjustMessage("UserEyeHeight: %4.2f", ThePlayer.UserEyeHeight);
-}
-
-void OculusWorldDemoApp::AdjustMotionPrediction(float dt)
-{
-    float motionPred = SFusion.GetPredictionDelta() + 0.01f * dt;
-
-    if (motionPred < 0.0f)
-    {
-        motionPred = 0.0f;
-    }
+    case Text_Help2:
+        DrawTextBox(pRender, 0.0f, 0.0f, textHeight, HelpText2, DrawText_Center);
+        break;
     
-    SFusion.SetPrediction(motionPred);
+    case Text_None:
+        break;
 
-    SetAdjustMessage("MotionPrediction: %6.3fs", motionPred);
-}
-
-void OculusWorldDemoApp::AdjustDistortion(float val, int kIndex)
-{
-    SConfig.SetDistortionK(kIndex, val);
-    SetAdjustMessage("K%d: %6.4f", kIndex, SConfig.GetDistortionK(kIndex));
-}
-
-void OculusWorldDemoApp::AdjustEsd(float val)
-{
-    SConfig.SetEyeToScreenDistance(val);
-	float esd = SConfig.GetEyeToScreenDistance();
-    SetAdjustMessage("ESD:%6.3f  FOV: %6.3f", esd, SConfig.GetYFOVDegrees());
-}
-
-// Loads the scene data
-void OculusWorldDemoApp::PopulateScene(const char *fileName)
-{    
-    XmlHandler xmlHandler;     
-    if(!xmlHandler.ReadFile(fileName, pRender, &MainScene, &CollisionModels, &GroundCollisionModels))
-    {
-        SetAdjustMessage("---------------------------------\nFILE LOAD FAILED\n---------------------------------");
-        SetAdjustMessageTimeout(10.0f);
-    }    
-
-    MainScene.SetAmbient(Vector4f(1.0f, 1.0f, 1.0f, 1.0f));
-    
-    // Distortion debug grid (brought up by 'G' key).
-    Ptr<Model> gridModel = *Model::CreateGrid(Vector3f(0,0,0), Vector3f(1.0f/10, 0,0), Vector3f(0,1.0f/10,0),
-                                              10, 10, 5, 
-                                              Color(0, 255, 0, 255), Color(255, 50, 50, 255) );
-    GridScene.World.Add(gridModel);
-
-    // Yaw angle marker and lines (brought up by ';' key).
-    float shifty = -0.5f;
-    Ptr<Model> yawMarkGreenModel = *Model::CreateBox(Color(0, 255, 0, 255), Vector3f(0.0f, shifty, -2.0f), Vector3f(0.05f, 0.05f, 0.05f));
-    YawMarkGreenScene.World.Add(yawMarkGreenModel);
-    Ptr<Model> yawMarkRedModel = *Model::CreateBox(Color(255, 0, 0, 255), Vector3f(0.0f, shifty, -2.0f), Vector3f(0.05f, 0.05f, 0.05f));
-    YawMarkRedScene.World.Add(yawMarkRedModel);
-
-    Ptr<Model> yawLinesModel = *new Model();
-    Color c = Color(255, 200, 200, 255);
-    float r = 1.5f;
-    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(-0.1f, 0, -r), c), 
-                               yawLinesModel->AddVertex(Vector3f(0, 0, -r-0.2f), c),
-                               yawLinesModel->AddVertex(Vector3f(0.1f, 0, -r), c));
-    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(-r-0.1f, 0, -r), c), 
-                               yawLinesModel->AddVertex(Vector3f(-r, 0, -r-0.2f), c),
-                               yawLinesModel->AddVertex(Vector3f(-r+0.1f, 0, -r), c));
-    yawLinesModel->AddTriangle(yawLinesModel->AddVertex(Vector3f(r-0.1f, 0, -r), c), 
-                               yawLinesModel->AddVertex(Vector3f(r, 0, -r-0.2f), c),
-                               yawLinesModel->AddVertex(Vector3f(r+0.1f, 0, -r), c));
-    yawLinesModel->SetPosition(Vector3f(0.0f,-1.2f,0.0f));
-    YawLinesScene.World.Add(yawLinesModel);
-}
-
-
-void OculusWorldDemoApp::PopulatePreloadScene()
-{
-    // Load-screen screen shot image
-    String fileName = MainFilePath;
-    fileName.StripExtension();
-
-    Ptr<File>    imageFile = *new SysFile(fileName + "_LoadScreen.tga");
-    Ptr<Texture> imageTex;
-    if (imageFile->IsValid())
-        imageTex = *LoadTextureTga(pRender, imageFile);
-
-    // Image is rendered as a single quad.
-    if (imageTex)
-    {
-        imageTex->SetSampleMode(Sample_Anisotropic|Sample_Repeat);
-        Ptr<Model> m = *new Model(Prim_Triangles);        
-        m->AddVertex(-0.5f,  0.5f,  0.0f, Color(255,255,255,255), 0.0f, 0.0f);
-        m->AddVertex( 0.5f,  0.5f,  0.0f, Color(255,255,255,255), 1.0f, 0.0f);
-        m->AddVertex( 0.5f, -0.5f,  0.0f, Color(255,255,255,255), 1.0f, 1.0f);
-        m->AddVertex(-0.5f, -0.5f,  0.0f, Color(255,255,255,255), 0.0f, 1.0f);
-        m->AddTriangle(2,1,0);
-        m->AddTriangle(0,3,2);
-
-        Ptr<ShaderFill> fill = *new ShaderFill(*pRender->CreateShaderSet());
-        fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Vertex, VShader_MVP)); 
-        fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Fragment, FShader_Texture)); 
-        fill->SetTexture(0, imageTex);
-        m->Fill = fill;
-
-        LoadingScene.World.Add(m);
+    default:
+        OVR_ASSERT ( !"Missing text screen" );
+        break;    
     }
 }
 
-void OculusWorldDemoApp::ClearScene()
-{
-    MainScene.Clear();
-    GridScene.Clear();
-    YawMarkGreenScene.Clear();
-    YawMarkRedScene.Clear();
-    YawLinesScene.Clear();
-}
-
-void OculusWorldDemoApp::PopulateLODFileNames()
-{
-    //OVR::String mainFilePath = MainFilePath;
-    LODFilePaths.PushBack(MainFilePath);
-    int   LODIndex = 1;
-    SPInt pos = strcspn(MainFilePath.ToCStr(), ".");
-    SPInt len = strlen(MainFilePath.ToCStr());
-    SPInt diff = len - pos;
-
-    if (diff == 0)
-        return;    
-
-    while(true)
-    {
-        char pathWithoutExt[250];
-        char buffer[250];
-        for(SPInt i = 0; i < pos; ++i)
-        {
-            pathWithoutExt[i] = MainFilePath[(int)i];
-        }
-        pathWithoutExt[pos] = '\0';
-        OVR_sprintf(buffer, sizeof(buffer), "%s%i.xml", pathWithoutExt, LODIndex);
-        FILE* fp = 0;
-#if defined(_MSC_VER) && (_MSC_VER >= 1400 )
-        errno_t err = fopen_s(&fp, buffer, "rb");
-        if(!fp || err)
-        {
-#else
-        fp = fopen(buffer, "rb");
-        if(!fp)
-        {
-#endif
-            break;
-        }
-        fclose(fp);
-        OVR::String result = buffer;
-        LODFilePaths.PushBack(result);
-        LODIndex++;
-    }
-}
-
-void OculusWorldDemoApp::DropLOD()
-{
-    if(CurrentLODFileIndex < (int)(LODFilePaths.GetSize() - 1))
-    {
-        ClearScene();
-        CurrentLODFileIndex++;
-        PopulateScene(LODFilePaths[CurrentLODFileIndex].ToCStr());
-    }
-}
-
-void OculusWorldDemoApp::RaiseLOD()
-{
-    if(CurrentLODFileIndex > 0)
-    {
-        ClearScene();
-        CurrentLODFileIndex--;
-        PopulateScene(LODFilePaths[CurrentLODFileIndex].ToCStr());
-    }
-}
 
 //-----------------------------------------------------------------------------
-void OculusWorldDemoApp::CycleDisplay()
+// ***** Callbacks For Menu changes
+
+// Non-trivial callback go here.
+
+void OculusWorldDemoApp::HmdSettingChangeFreeRTs(OptionVar*)
 {
-    int screenCount = pPlatform->GetDisplayCount();
+    HmdSettingsChanged = true;
+    // Cause the RTs to be recreated with the new mode.
+    for ( int rtNum = 0; rtNum < Rendertarget_LAST; rtNum++ )
+        RenderTargets[rtNum].pTex = NULL;        
+}
 
-    // If Windowed, switch to the HMD screen first in Full-Screen Mode.
-    // If already Full-Screen, cycle to next screen until we reach FirstScreenInCycle.
+void OculusWorldDemoApp::MultisampleChange(OptionVar*)
+{
+    HmdSettingChangeFreeRTs();
+}
 
-    if (pRender->IsFullscreen())
+void OculusWorldDemoApp::CenterPupilDepthChange(OptionVar*)
+{
+    ovrHmd_SetFloat(Hmd, "CenterPupilDepth", CenterPupilDepthMeters);
+}
+
+void OculusWorldDemoApp::DistortionClearColorChange(OptionVar*)
+{
+    float clearColor[2][4] = { { 0.0f, 0.0f, 0.0f, 0.0f },
+                               { 0.0f, 0.5f, 1.0f, 0.0f } };
+    ovrHmd_SetFloatArray(Hmd, "DistortionClearColor",
+                         clearColor[(int)DistortionClearBlue], 4);
+}
+
+
+//-----------------------------------------------------------------------------
+
+void OculusWorldDemoApp::ProcessDeviceNotificationQueue()
+{
+    // TBD: Process device plug & Unplug     
+}
+
+
+//-----------------------------------------------------------------------------
+void OculusWorldDemoApp::ChangeDisplay ( bool bBackToWindowed, bool bNextFullscreen,
+                                         bool bFullWindowDebugging )
+{
+    // Exactly one should be set...
+    OVR_ASSERT ( ( bBackToWindowed ? 1 : 0 ) + ( bNextFullscreen ? 1 : 0 ) +
+                 ( bFullWindowDebugging ? 1 : 0 ) == 1 );
+    OVR_UNUSED ( bNextFullscreen );
+
+    if ( bFullWindowDebugging )
     {
-        // Right now, we always need to restore window before going to next screen.
-        pPlatform->SetFullscreen(RenderParams, Display_Window);
+        // Slightly hacky. Doesn't actually go fullscreen, just makes a screen-sized wndow.
+        // This has higher latency than fullscreen, and is not intended for actual use, 
+        // but makes for much nicer debugging on some systems.
+        RenderParams = pRender->GetParams();
+        RenderParams.Display = DisplayId(HmdDesc.DisplayDeviceName, HmdDesc.DisplayId);
+        pRender->SetParams(RenderParams);
 
-        Screen++;
-        if (Screen == screenCount)
-            Screen = 0;
-
-        RenderParams.Display = pPlatform->GetDisplay(Screen);
-
-        if (Screen != FirstScreenInCycle)
-        {
-            pRender->SetParams(RenderParams);
-            pPlatform->SetFullscreen(RenderParams, Display_Fullscreen);
+        pPlatform->SetMouseMode(Mouse_Normal);            
+        pPlatform->SetFullscreen(RenderParams, pRender->IsFullscreen() ? Display_Window : Display_FakeFullscreen);
+        pPlatform->SetMouseMode(Mouse_Relative); // Avoid mode world rotation jump.
+   
+        // If using an HMD, enable post-process (for distortion) and stereo.        
+        if (RenderParams.IsDisplaySet() && pRender->IsFullscreen())
+        {            
+            //SetPostProcessingMode ( PostProcess );
         }
     }
     else
     {
-        // Try to find HMD Screen, making it the first screen in full-screen Cycle.        
-        FirstScreenInCycle = 0;
+        int screenCount = pPlatform->GetDisplayCount();
 
-        if (pHMD)
+        int screenNumberToSwitchTo;
+        if ( bBackToWindowed )
         {
-            DisplayId HMD (SConfig.GetHMDInfo().DisplayDeviceName, SConfig.GetHMDInfo().DisplayId);
-            for (int i = 0; i< screenCount; i++)
-            {   
-                if (pPlatform->GetDisplay(i) == HMD)
+            screenNumberToSwitchTo = -1;
+        }
+        else
+        {
+            if (!pRender->IsFullscreen())
+            {
+                // Currently windowed.
+                // Try to find HMD Screen, making it the first screen in the full-screen cycle.
+                FirstScreenInCycle = 0;
+                if (!UsingDebugHmd)
                 {
-                    FirstScreenInCycle = i;
-                    break;
+                    DisplayId HMD (HmdDesc.DisplayDeviceName, HmdDesc.DisplayId);
+                    for (int i = 0; i< screenCount; i++)
+                    {   
+                        if (pPlatform->GetDisplay(i) == HMD)
+                        {
+                            FirstScreenInCycle = i;
+                            break;
+                        }
+                    }            
                 }
-            }            
+                ScreenNumber = FirstScreenInCycle;
+                screenNumberToSwitchTo = ScreenNumber;
+            }
+            else
+            {
+                // Currently fullscreen, so cycle to the next screen.
+                ScreenNumber++;
+                if (ScreenNumber == screenCount)
+                {
+                    ScreenNumber = 0;
+                }
+                screenNumberToSwitchTo = ScreenNumber;
+                if (ScreenNumber == FirstScreenInCycle)
+                {
+                    // We have cycled through all the fullscreen displays, so go back to windowed mode.
+                    screenNumberToSwitchTo = -1;
+                }
+            }
         }
 
-        // Switch full-screen on the HMD.
-        Screen = FirstScreenInCycle;
-        RenderParams.Display = pPlatform->GetDisplay(Screen);
-        pRender->SetParams(RenderParams);
-        pPlatform->SetFullscreen(RenderParams, Display_Fullscreen);
+        // Always restore windowed mode before going to next screen, even if we were already fullscreen.
+        pPlatform->SetFullscreen(RenderParams, Display_Window);
+        if ( screenNumberToSwitchTo >= 0 )
+        {
+            // Go fullscreen.
+            RenderParams.Display = pPlatform->GetDisplay(screenNumberToSwitchTo);
+            pRender->SetParams(RenderParams);
+            pPlatform->SetFullscreen(RenderParams, Display_Fullscreen);            
+        }
     }
+
+    
+    // Updates render target pointers & sizes.
+    HmdSettingChangeFreeRTs();    
 }
 
 void OculusWorldDemoApp::GamepadStateChanged(const GamepadState& pad)
@@ -1764,6 +1271,15 @@ void OculusWorldDemoApp::GamepadStateChanged(const GamepadState& pad)
                              0,
                              pad.LY * pad.LY * (pad.LY > 0 ? -1 : 1));
     ThePlayer.GamepadRotate = Vector3f(2 * pad.RX, -2 * pad.RY, 0);
+
+    UInt32 gamepadDeltas = (pad.Buttons ^ LastGamepadState.Buttons) & pad.Buttons;
+
+    if (gamepadDeltas)
+    {
+        Menu.OnGamepad(gamepadDeltas);
+    }
+
+    LastGamepadState = pad;
 }
 
 

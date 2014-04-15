@@ -4,7 +4,7 @@ Filename    :   OculusRoomModel.cpp
 Content     :   Creates a simple room scene from hard-coded geometry
 Created     :   October 4, 2012
 
-Copyright   :   Copyright 2012-2013 Oculus, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus, Inc. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,7 @@ limitations under the License.
 
 *************************************************************************************/
 
-#include "RenderTiny_Device.h"
-
-using namespace OVR;
-using namespace OVR::RenderTiny;
-
+#include "RenderTiny_D3D11_Device.h"
 
 //-------------------------------------------------------------------------------------
 // ***** Room Model

@@ -6,16 +6,16 @@ Content     :   Simple general purpose algorithms: Sort, Binary Search, etc.
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -433,7 +433,29 @@ void InsertionSort(Array& arr)
     InsertionSortSliced(arr, 0, arr.GetSize(), OperatorLess<ValueType>::Compare);
 }
 
+//-----------------------------------------------------------------------------------
+// ***** Median
+// Returns a median value of the input array.
+// Caveats: partially sorts the array, returns a reference to the array element
+// TBD: This needs to be optimized and generalized
+//
+template<class Array> 
+typename Array::ValueType& Median(Array& arr)
+{
+    UPInt count = arr.GetSize();
+    UPInt mid = (count - 1) / 2;
+    OVR_ASSERT(count > 0);
 
+    for (int j = 0; j <= mid; j++) 
+    {
+        int min = j;
+        for (int k = j + 1; k < count; k++) 
+            if (arr[k] < arr[min]) 
+                min = k;
+        Swap(arr[j], arr[min]);
+    }
+    return arr[mid];
+}
 
 //-----------------------------------------------------------------------------------
 // ***** LowerBoundSliced
@@ -651,13 +673,13 @@ inline UByte UpperBit(UPInt val)
 
     if (val & 0xFFFF0000)
     {
-        return static_cast<UByte>((val & 0xFF000000) ? 
+        return (val & 0xFF000000) ? 
             UpperBitTable[(val >> 24)       ] + 24: 
-            UpperBitTable[(val >> 16) & 0xFF] + 16);
+            UpperBitTable[(val >> 16) & 0xFF] + 16;
     }
-    return static_cast<UByte>((val & 0xFF00) ?
+    return (val & 0xFF00) ?
         UpperBitTable[(val >> 8) & 0xFF] + 8:
-        UpperBitTable[(val     ) & 0xFF]);
+        UpperBitTable[(val     ) & 0xFF];
 
 #else
 
@@ -696,13 +718,13 @@ inline UByte LowerBit(UPInt val)
 
     if (val & 0xFFFF)
     {
-        return static_cast<UByte>( (val & 0xFF) ?
+        return (val & 0xFF) ?
             LowerBitTable[ val & 0xFF]:
-            LowerBitTable[(val >> 8) & 0xFF] + 8 );
+            LowerBitTable[(val >> 8) & 0xFF] + 8;
     }
-    return static_cast<UByte>( (val & 0xFF0000) ?
+    return (val & 0xFF0000) ?
             LowerBitTable[(val >> 16) & 0xFF] + 16:
-            LowerBitTable[(val >> 24) & 0xFF] + 24 );
+            LowerBitTable[(val >> 24) & 0xFF] + 24;
 
 #else
 
@@ -813,7 +835,7 @@ namespace ByteUtil {
     // Swap the byte order of primitive types
     inline UByte    SwapOrder(UByte v)      { return v; }
     inline SByte    SwapOrder(SByte v)      { return v; }
-    inline UInt16   SwapOrder(UInt16 v)     { return static_cast<UInt16>( UInt16(v>>8)|UInt16(v<<8) ); }
+    inline UInt16   SwapOrder(UInt16 v)     { return UInt16(v>>8)|UInt16(v<<8); }
     inline SInt16   SwapOrder(SInt16 v)     { return SInt16((UInt16(v)>>8)|(v<<8)); }
     inline UInt32   SwapOrder(UInt32 v)     { return (v>>24)|((v&0x00FF0000)>>8)|((v&0x0000FF00)<<8)|(v<<24); }
     inline SInt32   SwapOrder(SInt32 p)     { return (SInt32)SwapOrder(UInt32(p)); }
@@ -957,6 +979,80 @@ namespace ByteUtil {
 
 } // namespace ByteUtil
 
+
+
+// Used primarily for hardware interfacing such as sensor reports, firmware, etc.
+// Reported data is all little-endian.
+inline UInt16 DecodeUInt16(const UByte* buffer)
+{
+    return ByteUtil::LEToSystem ( *(const UInt16*)buffer );
+}
+
+inline SInt16 DecodeSInt16(const UByte* buffer)
+{
+    return ByteUtil::LEToSystem ( *(const SInt16*)buffer );
+}
+
+inline UInt32 DecodeUInt32(const UByte* buffer)
+{    
+    return ByteUtil::LEToSystem ( *(const UInt32*)buffer );
+}
+
+inline SInt32 DecodeSInt32(const UByte* buffer)
+{    
+    return ByteUtil::LEToSystem ( *(const SInt32*)buffer );
+}
+
+inline float DecodeFloat(const UByte* buffer)
+{
+    union {
+        UInt32 U;
+        float  F;
+    };
+
+    U = DecodeUInt32(buffer);
+    return F;
+}
+
+inline void EncodeUInt16(UByte* buffer, UInt16 val)
+{
+    *(UInt16*)buffer = ByteUtil::SystemToLE ( val );
+}
+
+inline void EncodeSInt16(UByte* buffer, SInt16 val)
+{
+    *(SInt16*)buffer = ByteUtil::SystemToLE ( val );
+}
+
+inline void EncodeUInt32(UByte* buffer, UInt32 val)
+{
+    *(UInt32*)buffer = ByteUtil::SystemToLE ( val );
+}
+
+inline void EncodeSInt32(UByte* buffer, SInt32 val)
+{
+    *(SInt32*)buffer = ByteUtil::SystemToLE ( val );
+}
+
+inline void EncodeFloat(UByte* buffer, float val)
+{
+    union {
+        UInt32 U;
+        float  F;
+    };
+
+    F = val;
+    EncodeUInt32(buffer, U);
+}
+
+// Converts an 8-bit binary-coded decimal
+inline SByte DecodeBCD(UByte byte)
+{
+    UByte digit1 = (byte >> 4) & 0x0f;
+    UByte digit2 = byte & 0x0f;
+    int decimal = digit1 * 10 + digit2;   // maximum value = 99
+    return (SByte)decimal;
+}
 
 
 }} // OVR::Alg

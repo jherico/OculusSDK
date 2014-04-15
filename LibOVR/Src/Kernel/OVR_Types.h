@@ -6,16 +6,16 @@ Content     :   Standard library defines and simple types
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -140,6 +140,8 @@ limitations under the License.
 // MSVC 8.0 (VC2005)            = 1400
 // MSVC 9.0 (VC2008)            = 1500
 // MSVC 10.0 (VC2010)           = 1600
+// MSVC 11.0 (VC2012)           = 1700
+// MSVC 12.0 (VC2013)           = 1800
 #  define OVR_CC_MSVC        _MSC_VER
 
 #elif defined(__GNUC__)
@@ -159,11 +161,9 @@ limitations under the License.
 // Disable MSVC warnings
 #if defined(OVR_CC_MSVC)
 #  pragma warning(disable : 4127)    // Inconsistent dll linkage
-#  pragma warning(disable : 4514)    // Unreferenced inline function has been removed
 #  pragma warning(disable : 4530)    // Exception handling
-#  pragma warning(disable : 4711)    // function 'x()' selected for automatic inline expansion
-#  pragma warning(disable : 4820)    // 'n' bytes padding added after data member 'item'
 #  if (OVR_CC_MSVC<1300)
+#    pragma warning(disable : 4514)  // Unreferenced inline function has been removed
 #    pragma warning(disable : 4710)  // Function not inlined
 #    pragma warning(disable : 4714)  // _force_inline not inlined
 #    pragma warning(disable : 4786)  // Debug variable name longer than 255 chars
@@ -195,12 +195,14 @@ limitations under the License.
 #  include <stdlib.h>
 #  include <crtdbg.h>
 
+#if 0
 // Uncomment this to help debug memory leaks under Visual Studio in OVR apps only.
 // This shouldn't be defined in customer releases.
 #  ifndef OVR_DEFINE_NEW
 #    define OVR_DEFINE_NEW new(__FILE__, __LINE__)
 #    define new OVR_DEFINE_NEW
 #  endif
+#endif
 
 #endif
 
@@ -374,6 +376,7 @@ namespace BaseTypes
 // If not in debug build, macros do nothing
 #ifndef OVR_BUILD_DEBUG
 
+#  define OVR_DEBUG_CODE(c) c
 #  define OVR_DEBUG_BREAK  ((void)0)
 #  define OVR_ASSERT(p)    ((void)0)
 
@@ -398,6 +401,8 @@ namespace BaseTypes
 #else
 #  define OVR_DEBUG_BREAK       do { *((int *) 0) = 1; } while(0)
 #endif
+
+#define OVR_DEBUG_CODE(c)
 
 // This will cause compiler breakpoint
 #define OVR_ASSERT(p)           do { if (!(p))  { OVR_DEBUG_BREAK; } } while(0)
