@@ -31,6 +31,7 @@ include_directories(${CMAKE_SOURCE_DIR}/LibOVR/Src/CAPI/D3D1X)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
+add_subdirectory(Bindings/C)
 
 ###############################################################################
 #
@@ -45,7 +46,7 @@ if(OCULUS_BUILD_SAMPLES)
     include_directories(${LibOVR_SOURCE_DIR}/Src)
     include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
     include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
-
+    include_directories(Bindings/C/Include)
     # Cross platform window creation
  #   add_subdirectory(3rdParty/glfw)
  #   include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)

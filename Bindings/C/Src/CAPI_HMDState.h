@@ -27,10 +27,10 @@ limitations under the License.
 #ifndef OVR_CAPI_HMDState_h
 #define OVR_CAPI_HMDState_h
 
+#include "OVR_CAPI.h"
 #include "../Kernel/OVR_Math.h"
 #include "../Kernel/OVR_List.h"
 #include "../Kernel/OVR_Log.h"
-#include "../OVR_CAPI.h"
 #include "../OVR_SensorFusion.h"
 #include "../Util/Util_LatencyTest.h"
 #include "../Util/Util_LatencyTest2.h"

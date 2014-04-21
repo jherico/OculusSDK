@@ -1,7 +1,7 @@
 project(OculusWorldDemo)
 
 set(EXTRA_LIBS 
-	OculusVR
+  OVR_C
 	CommonSrc
 	TinyXML2
 )

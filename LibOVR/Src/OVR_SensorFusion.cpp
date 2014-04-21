@@ -40,6 +40,25 @@ float TPH_CameraPoseOrientationWxyz[4];
 
 
 namespace OVR {
+// ***** SensorState
+
+SensorState::SensorState(const ovrSensorState& s)
+{
+    Predicted       = s.Predicted;
+    Recorded        = s.Recorded;
+    Temperature     = s.Temperature;
+    StatusFlags     = s.StatusFlags;
+}
+
+SensorState::operator const ovrSensorState() const
+{
+    ovrSensorState result;
+    result.Predicted    = Predicted;
+    result.Recorded     = Recorded;
+    result.Temperature  = Temperature;
+    result.StatusFlags  = StatusFlags;
+    return result;
+}
 
 //-------------------------------------------------------------------------------------
 // ***** Sensor Fusion

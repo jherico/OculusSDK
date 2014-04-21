@@ -26,7 +26,7 @@ limitations under the License.
 
 #include "Util_LatencyTest2.h"
 
-#include "../OVR_CAPI.h"
+#include "../../Bindings/C/Include/OVR_CAPI.h"
 #include "../Kernel/OVR_Log.h"
 #include "../Kernel/OVR_Timer.h"
 

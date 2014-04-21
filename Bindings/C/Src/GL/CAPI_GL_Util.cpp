@@ -22,7 +22,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_GL_Util.h"
-#include "../../Kernel/OVR_Log.h"
+#include <Kernel/OVR_Log.h>
 
 namespace OVR { namespace CAPI { namespace GL {
 

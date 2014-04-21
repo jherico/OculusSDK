@@ -27,11 +27,11 @@ limitations under the License.
 #ifndef OVR_CAPI_FrameTimeManager_h
 #define OVR_CAPI_FrameTimeManager_h
 
-#include "../OVR_CAPI.h"
-#include "../Kernel/OVR_Timer.h"
-#include "../Kernel/OVR_Math.h"
-#include "../Util/Util_Render_Stereo.h"
-#include "../Util/Util_LatencyTest2.h"
+#include "OVR_CAPI.h"
+#include <Kernel/OVR_Timer.h>
+#include <Kernel/OVR_Math.h>
+#include <Util/Util_Render_Stereo.h>
+#include <Util/Util_LatencyTest2.h>
 
 namespace OVR { namespace CAPI {
 

@@ -24,12 +24,12 @@ limitations under the License.
 #ifndef INC_OVR_CAPI_GL_Util_h
 #define INC_OVR_CAPI_GL_Util_h
 
-#include "../../OVR_CAPI.h"  
-#include "../../Kernel/OVR_Array.h"
-#include "../../Kernel/OVR_Math.h"
-#include "../../Kernel/OVR_RefCount.h"
-#include "../../Kernel/OVR_String.h"
-#include "../../Kernel/OVR_Types.h"
+#include "OVR_CAPI.h"
+#include <Kernel/OVR_Array.h>
+#include <Kernel/OVR_Math.h>
+#include <Kernel/OVR_RefCount.h>
+#include <Kernel/OVR_String.h>
+#include <Kernel/OVR_Types.h>
 
 #if defined(OVR_OS_WIN32)
 #include <Windows.h>

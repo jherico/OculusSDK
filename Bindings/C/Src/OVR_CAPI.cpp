@@ -31,69 +31,13 @@ limitations under the License.
 #include "OVR_Stereo.h"
 #include "OVR_Profile.h"
 
-#include "CAPI/CAPI_GlobalState.h"
-#include "CAPI/CAPI_HMDState.h"
-#include "CAPI/CAPI_FrameTimeManager.h"
+#include "CAPI_GlobalState.h"
+#include "CAPI_HMDState.h"
+#include "CAPI_FrameTimeManager.h"
 
 
 using namespace OVR;
 using namespace OVR::Util::Render;
-
-//-------------------------------------------------------------------------------------
-// Math
-namespace OVR {
-
-
-// ***** FovPort
-
-// C-interop support: FovPort <-> ovrFovPort
-FovPort::FovPort(const ovrFovPort &src)
-    : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
-{ }    
-
-FovPort::operator const ovrFovPort () const
-{
-    ovrFovPort result;
-    result.LeftTan  = LeftTan;
-    result.RightTan = RightTan;
-    result.UpTan    = UpTan;
-    result.DownTan  = DownTan;
-    return result;
-}
-
-// Converts Fov Tan angle units to [-1,1] render target NDC space
-Vector2f FovPort::TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle)
-{  
-    ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(*this);
-    return tanEyeAngle * eyeToSourceNDC.Scale + eyeToSourceNDC.Offset;
-}
-
-
-// ***** SensorState
-
-SensorState::SensorState(const ovrSensorState& s)
-{
-    Predicted       = s.Predicted;
-    Recorded        = s.Recorded;
-    Temperature     = s.Temperature;
-    StatusFlags     = s.StatusFlags;
-}
-
-SensorState::operator const ovrSensorState() const
-{
-    ovrSensorState result;
-    result.Predicted    = Predicted;
-    result.Recorded     = Recorded;
-    result.Temperature  = Temperature;
-    result.StatusFlags  = StatusFlags;
-    return result;
-}
-
-
-} // namespace OVR
-
-//-------------------------------------------------------------------------------------
-
 using namespace OVR::CAPI;
 
 #ifdef __cplusplus 

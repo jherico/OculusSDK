@@ -15,8 +15,8 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "CAPI_GL_DistortionRenderer.h"
 
-#include "../../OVR_CAPI_GL.h"
-
+#include <OVR_CAPI_GL.h>
+#include <fstream>
 namespace OVR { namespace CAPI { namespace GL {
 
 
@@ -725,16 +725,73 @@ void DistortionRenderer::initBuffersAndShaders()
 void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture)
 {    
     setViewport( Recti(0,0, RParams.RTSize.w, RParams.RTSize.h) );
-        
-	glClearColor(
-		RState.ClearColor[0],
-		RState.ClearColor[1],
-		RState.ClearColor[2],
-		RState.ClearColor[3] );
 
-	glClearDepth(0);
+    size_t rowSize = leftEyeTexture->Width * 3;
+    //while (rowSize % 4) {
+    //  ++rowSize;
+    //}
+    size_t dataSize = rowSize * leftEyeTexture->Height;
+    unsigned char * pData = new unsigned char[dataSize];
+    glFlush();
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glPixelStorei(GL_PACK_ROW_LENGTH, 1202);
 
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+    {
+      glBindTexture(GL_TEXTURE_2D, leftEyeTexture->TexId);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_BGR, GL_UNSIGNED_BYTE, pData);
+      std::ofstream of("f:/left.bin", std::ios::binary);
+      of.write((char*)pData, dataSize);
+      of.close();
+    }
+    {
+      glBindTexture(GL_TEXTURE_2D, rightEyeTexture->TexId);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_BGR, GL_UNSIGNED_BYTE, pData);
+      std::ofstream of("f:/right.bin", std::ios::binary);
+      of.write((char*)pData, dataSize);
+      of.close();
+    }
+    delete[] pData;
+    glClearColor(
+        0.2,
+        0.2,
+        0.2,
+        1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glUseProgram(0);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glColor3f(1, 1, 1);
+    glEnable(GL_TEXTURE_2D);
+
+    glBindTexture(GL_TEXTURE_2D, leftEyeTexture->TexId);
+    glBegin(GL_QUADS);
+      glTexCoord2d(0, 0);
+      glVertex2f(-1, -1);
+      glTexCoord2d(1, 0);
+      glVertex2f(+0, -1);
+      glTexCoord2d(1, 1);
+      glVertex2f(+0, +1);
+      glTexCoord2d(0, 1);
+      glVertex2f(-1, +1);
+    glEnd();
+
+    glBindTexture(GL_TEXTURE_2D, rightEyeTexture->TexId);
+    glBegin(GL_QUADS);
+      glTexCoord2d(0, 0);
+      glVertex2f(+0, -1);
+      glTexCoord2d(1, 0);
+      glVertex2f(+1, -1);
+      glTexCoord2d(1, 1);
+      glVertex2f(+1, +1);
+      glTexCoord2d(0, 1);
+      glVertex2f(+0, +1);
+    glEnd();
+    return;
+
 
     for (int eyeNum = 0; eyeNum < 2; eyeNum++)
     {        
@@ -927,18 +984,7 @@ void DistortionRenderer::renderPrimitives(
 
 void DistortionRenderer::setViewport(const Recti& vp)
 {
-    int wh;
-    if (CurRenderTarget)
-        wh = CurRenderTarget->Height;
-    else
-	{
-		RECT rect;
-		BOOL success = GetWindowRect(RParams.Window, &rect);
-		OVR_ASSERT(success);
-        OVR_UNUSED(success);
-		wh = rect.bottom - rect.top;
-	}
-    glViewport(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
+    glViewport(vp.x, vp.y, vp.w, vp.h);
 
     //glEnable(GL_SCISSOR_TEST);
     //glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
