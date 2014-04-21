@@ -95,6 +95,8 @@ PFNGLGENRENDERBUFFERSEXTPROC             glGenRenderbuffersEXT;
 PFNGLDELETERENDERBUFFERSEXTPROC          glDeleteRenderbuffersEXT;
 
 PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
+PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
+PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 
 void InitGLExtensions()
 {
@@ -168,8 +170,9 @@ void InitGLExtensions()
     glGenRenderbuffersEXT =             (PFNGLGENRENDERBUFFERSEXTPROC)             wglGetProcAddress("glGenRenderbuffersEXT");
     glDeleteRenderbuffersEXT =          (PFNGLDELETERENDERBUFFERSEXTPROC)          wglGetProcAddress("glDeleteRenderbuffersEXT");
 
-
     glGenVertexArrays =                 (PFNGLGENVERTEXARRAYSPROC)                 wglGetProcAddress("glGenVertexArrays");
+    glBindVertexArray =                 (PFNGLBINDVERTEXARRAYPROC)                 wglGetProcAddress("glBindVertexArray");
+    glDeleteVertexArrays =              (PFNGLDELETEVERTEXARRAYSPROC)              wglGetProcAddress("glDeleteVertexArrays");
 }
 
 #endif
@@ -227,10 +230,22 @@ bool Buffer::Unmap(void*)
     return r != 0;
 }
 
+static const char * VertexAttribNames[] = {
+  "Position",
+  "Color",
+  "TexCoord0",
+  "TexCoord1",
+  "TexCoord2",
+};
+
 ShaderSet::ShaderSet()
 {
     Prog = glCreateProgram();
+    for (int i = 0; i < VA_Count; ++i) {
+      glBindAttribLocation(Prog, i, VertexAttribNames[i]);
+    }
 }
+
 ShaderSet::~ShaderSet()
 {
     glDeleteProgram(Prog);

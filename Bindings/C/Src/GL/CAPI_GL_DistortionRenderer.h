@@ -88,7 +88,7 @@ private:
 
     void renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture);
 
-    void renderPrimitives(const ShaderFill* fill, Buffer* vertices, Buffer* indices,
+    void renderPrimitives(const ShaderFill* fill, GLuint * vao, Buffer* vertices, Buffer* indices,
                           Matrix4f* viewMatrix, int offset, int count,
                           PrimitiveType rprim, bool useDistortionVertex);
 

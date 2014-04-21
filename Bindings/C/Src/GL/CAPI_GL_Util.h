@@ -128,9 +128,9 @@ extern PFNGLRENDERBUFFERSTORAGEEXTPROC          glRenderbufferStorageEXT;
 extern PFNGLBINDRENDERBUFFEREXTPROC             glBindRenderbufferEXT;
 extern PFNGLGENRENDERBUFFERSEXTPROC             glGenRenderbuffersEXT;
 extern PFNGLDELETERENDERBUFFERSEXTPROC          glDeleteRenderbuffersEXT;
-
-// For testing
 extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
+extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
+extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 
 extern void InitGLExtensions();
 
@@ -201,6 +201,15 @@ enum SampleMode
     Sample_Count        =13,
 };
 
+enum VertexAttributes 
+{
+  VA_Position = 0,
+  VA_Color = 1,
+  VA_TexCoord0 = 2,
+  VA_TexCoord1 = 3,
+  VA_TexCoord2 = 4,
+  VA_Count = 5,
+};
 
 // Rendering parameters/pointers describing GL rendering setup.
 struct RenderParams
