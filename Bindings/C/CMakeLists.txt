@@ -3,6 +3,7 @@ project (OVR_C)
 include_directories(Include Src)
 
 # Make sure to set up the OVR include paths
+include_directories(../../3rdParty/glext)
 include_directories(${LibOVR_SOURCE_DIR}/Include)
 include_directories(${LibOVR_SOURCE_DIR}/Src)
 include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
@@ -42,5 +43,5 @@ else()
     )
 endif()
 
-add_library(OVR_C STATIC ${SOURCE_FILES} ${HEADER_FILES})
+add_library(OVR_C SHARED ${SOURCE_FILES} ${HEADER_FILES})
 target_link_libraries(OVR_C OculusVR ${OculusVR_EXTRA_LIBS})

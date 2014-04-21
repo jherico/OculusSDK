@@ -3,7 +3,7 @@ project (LibOVR)
 include_directories(Include Src Src/Kernel Src/Util)
 include_directories(../3rdParty/glext)
 
-file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h)
+file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h Include/*.h)
 list(REMOVE_ITEM SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Src/OVR_Common_HMDDevice.cpp)
 
 if(WIN32)

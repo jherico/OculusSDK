@@ -346,7 +346,7 @@ static const char DistortionTimewarpChroma_vs[] =
     "   oTexCoord2 = SrcCoordB;\n"
     "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
 
-    "   oColor = Color.r;\n"              // Used for vignette fade.
+    "   oColor = vec4(Color.r);\n"              // Used for vignette fade.
     "}\n";
 
 const OVR::CAPI::GL::ShaderBase::Uniform DistortionTimewarpChroma_vs_refl[] =
@@ -643,8 +643,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
 
 void DistortionRenderer::WaitUntilGpuIdle()
 {
-    glFlush();
-    glFinish();
+    //glFlush();
+    //glFinish();
 }
 
 double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
