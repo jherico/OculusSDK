@@ -2,80 +2,31 @@ package com.oculusvr.rift;
 
 import java.io.IOException;
 
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.ObjectWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codeminders.hidapi.HIDDevice;
-import com.google.common.base.Predicate;
-import com.oculusvr.rift.RiftTracker;
-import com.oculusvr.rift.hid.DisplayInfo;
-import com.oculusvr.rift.hid.SensorConfig;
-import com.oculusvr.rift.hid.SensorRange;
-import com.oculusvr.rift.tracker.TrackerMessage;
+import com.oculusvr.api.OvrLibrary;
+import com.oculusvr.api.OvrLibrary.ovrHmd;
+import com.oculusvr.api.ovrSensorState_;
 
 public class RiftTest {
-    private static final Logger LOG = LoggerFactory.getLogger(RiftTest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RiftTest.class);
 
-    public static void main(String... args) throws IOException, InterruptedException {
-        final ObjectMapper mapper = new ObjectMapper();
-        final ObjectWriter writer = mapper.writerWithDefaultPrettyPrinter();
-        RiftTracker tracker = RiftTracker.getInstance();
-        DisplayInfo di = tracker.getDisplayInfo();
-        LOG.info(writer.writeValueAsString(di));
-        SensorConfig sc = tracker.getSensorConfig();
-        LOG.info(writer.writeValueAsString(sc));
-        SensorRange sr = tracker.getSensorRange();
-        LOG.info(writer.writeValueAsString(sr));
-        RiftTracker.startListening(new Predicate<TrackerMessage>() {
-            @Override
-            public boolean apply(TrackerMessage message) {
-                try {
-                    // Just enough data to see we're getting stuff
-                    LOG.info("Sample count: " + message.sampleCount);
-                    LOG.info("Sample 0: " + mapper.writeValueAsString(message.samples.get(0)));
-                } catch (Exception e) {
-                    LOG.error("Failed to serialize sample data", e);
-                }
-                return true;
-            }
-        });
+  public static void main(String... args) throws IOException, InterruptedException {
+    OvrLibrary ovr = OvrLibrary.INSTANCE;
+    ovr.ovr_Initialize();
+    ovrHmd hmd = ovr.ovrHmd_Create(0);
+    ovr.ovrHmd_StartSensor(hmd, 0, 0);
+    for (int i = 0; i < 10; ++i) {
+      ovrSensorState_ sensor = ovr.ovrHmd_GetSensorState(hmd, ovr.ovr_GetTimeInSeconds());
+      LOG.debug(String.format("%f %f %f", 
+          sensor.Recorded.LinearAcceleration.x,
+          sensor.Recorded.LinearAcceleration.y,
+          sensor.Recorded.LinearAcceleration.z));
+      Thread.sleep(1000);
     }
-
-    /**
-     * This is a tool I used to fix my display info report after I accidentally
-     * trashed it by runnig example code here:
-     * http://lxr.free-electrons.com/source/samples/hidraw/hid-example.c -- note
-     * the sample code writes to feature report 9 without actually doing any
-     * verification that that's a good idea.
-     * 
-     * No guaratee that this will not destroy your device. No warranty is
-     * implied or provided.
-     * 
-     * @param device
-     * @throws IOException
-     */
-    public static void fixDisplayInfo(HIDDevice device) throws IOException {
-        DisplayInfo di = new DisplayInfo();
-        // These values are from an earlier dump of my display Info. I have no
-        // idea if they're valid.
-        di.distortion = 1;
-        di.xres = 1280;
-        di.yres = 800;
-        di.xsize = 149760;
-        di.ysize = 93600;
-        di.center = 46800;
-        di.sep = 63500;
-        di.zeye = new int[] { 49800, 49800 };
-        di.distortionCoefficients = new float[] {
-            Float.NaN,
-            1.5946803e-27f,
-            Float.NaN,
-            3.4119901E16f,
-            4.6665167E-38f,
-            -9.6494493E15f
-        };
-        di.write(device);
-    }
+    ovr.ovrHmd_StopSensor(hmd);
+    ovr.ovrHmd_Destroy(hmd);
+    ovr.ovr_Shutdown();
+  }
 }
