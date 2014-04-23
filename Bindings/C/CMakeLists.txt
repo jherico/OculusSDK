@@ -20,12 +20,6 @@ elseif(APPLE)
     list(APPEND OculusVR_EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
 else()
     # Used by the SDK to read the EDID of the monitors
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID 
-        ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID
-    )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID)
-
     find_package(X11 REQUIRED)
     find_package (Threads REQUIRED)
 
