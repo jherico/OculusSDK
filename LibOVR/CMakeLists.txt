@@ -12,7 +12,8 @@ if(WIN32)
     file(GLOB PLATFORM_SOURCE_FILES Platform/Win32/*.cpp Platform/Win32/*.h)
     list(APPEND PLATFORM_SOURCE_FILES 
         Platform/OVR_ThreadsWinAPI.cpp 
-        Platform/OVR_Platform_DeviceManager.cpp)
+        Platform/OVR_Platform.cpp
+        Platform/OVR_Platform.h)
 
     # Extra libs
     list(APPEND OculusVR_EXTRA_LIBS setupapi winmm)

@@ -27,8 +27,8 @@ limitations under the License.
 #ifndef OVR_Win32_HIDDevice_h
 #define OVR_Win32_HIDDevice_h
 
+#include "../OVR_Platform.h"
 #include "OVR_HIDDevice.h"
-#include "OVR_Win32_DeviceManager.h"
 
 #include <windows.h>
 #include <setupapi.h>
@@ -79,23 +79,24 @@ struct HIDP_CAPS
 
 namespace OVR { namespace Platform { 
 
-class HIDDeviceManager;
+class Win32HIDDeviceManager;
+class Win32DeviceManagerThread;
 class DeviceManager;
 
 //-------------------------------------------------------------------------------------
 // ***** Win32 HIDDevice
 
-class HIDDevice : public OVR::HIDDevice, public DeviceManagerThread::Notifier
+class Win32HIDDevice : public HIDDevice
 {
 public:
 
-    HIDDevice(HIDDeviceManager* manager);
+  Win32HIDDevice(HIDDeviceManager* manager);
 
     // This is a minimal constructor used during enumeration for us to pass
     // a HIDDevice to the visit function (so that it can query feature reports). 
-    HIDDevice(HIDDeviceManager* manager, HANDLE device);
+  Win32HIDDevice(HIDDeviceManager* manager, HANDLE device);
 
-    ~HIDDevice();
+  virtual ~Win32HIDDevice();
 
     bool HIDInitialize(const String& path);
     void HIDShutdown();
@@ -106,11 +107,14 @@ public:
     
 
     // DeviceManagerThread::Notifier
-    void OnOverlappedEvent(HANDLE hevent);
+    void OnReadReadyEvent();
     double OnTicks(double tickSeconds);
     bool OnDeviceMessage(DeviceMessageType messageType, const String& devicePath, bool* error);
 
 private:
+    Win32HIDDeviceManager * getHidManager();
+    Win32DeviceManagerThread * getThread();
+
     bool openDevice();
     bool initInfo();
     bool initializeRead();
@@ -118,35 +122,24 @@ private:
     void closeDevice();
     void closeDeviceOnIOError();
 
-    bool                inMinimalMode;
-    HIDDeviceManager*   HIDManager;
 	HANDLE              Device;
     HIDDeviceDesc       DevDesc; 
 
     OVERLAPPED          ReadOverlapped;
     bool                ReadRequested;
 
-    enum { ReadBufferSize = 96 };
-    UByte               ReadBuffer[ReadBufferSize];
-
-    UInt16              InputReportBufferLength;
-    UInt16              OutputReportBufferLength;
-    UInt16              FeatureReportBufferLength;
 };
 
 //-------------------------------------------------------------------------------------
 // ***** Win32 HIDDeviceManager
 
-class HIDDeviceManager : public OVR::HIDDeviceManager
+class Win32HIDDeviceManager : public HIDDeviceManager
 {
-	friend class HIDDevice;
+  friend class Win32HIDDevice;
 public:
 
-	HIDDeviceManager(DeviceManager* manager);
-    virtual ~HIDDeviceManager();
-
-    virtual bool Initialize();
-    virtual void Shutdown();
+  Win32HIDDeviceManager(DeviceManager* manager);
+    virtual ~Win32HIDDeviceManager();
 
     virtual bool Enumerate(HIDEnumerateVisitor* enumVisitor);
     virtual OVR::HIDDevice* Open(const String& path);
@@ -161,15 +154,13 @@ public:
 
 private:
 
-    DeviceManager* Manager;     // Back pointer can just be a raw pointer.
-
     HMODULE hHidLib;
     GUID    HidGuid;
 
     // Macros to declare and resolve needed functions from library.
 #define OVR_DECLARE_HIDFUNC(func, rettype, args)   \
 typedef rettype (__stdcall *PFn_##func) args;  \
-PFn_##func      func;
+static PFn_##func      func;
 #define OVR_RESOLVE_HIDFUNC(func) \
 func = (PFn_##func)::GetProcAddress(hHidLib, #func)
 
@@ -184,13 +175,6 @@ func = (PFn_##func)::GetProcAddress(hHidLib, #func)
     OVR_DECLARE_HIDFUNC(HidD_GetPreparsedData,      BOOLEAN, (HANDLE hidDev, HIDP_PREPARSED_DATA **preparsedData));
     OVR_DECLARE_HIDFUNC(HidD_FreePreparsedData,     BOOLEAN, (HIDP_PREPARSED_DATA *preparsedData));
     OVR_DECLARE_HIDFUNC(HidP_GetCaps,               NTSTATUS,(HIDP_PREPARSED_DATA *preparsedData, HIDP_CAPS* caps));
-
-    HANDLE CreateHIDFile(const char* path, bool exclusiveAccess = true) const
-    {
-        return ::CreateFileA(path, GENERIC_WRITE|GENERIC_READ,
-            (!exclusiveAccess) ? (FILE_SHARE_READ|FILE_SHARE_WRITE) : 0x0, 
-            NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
-    }
 
     // Helper functions to fill in HIDDeviceDesc from open device handle.
     bool initVendorProductVersion(HANDLE hidDev, HIDDeviceDesc* desc) const;

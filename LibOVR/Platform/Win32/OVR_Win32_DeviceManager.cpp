@@ -24,6 +24,7 @@ limitations under the License.
 
 *************************************************************************************/
 
+#include "../OVR_Platform.h"
 #include "OVR_Win32_DeviceManager.h"
 
 // Sensor & HMD Factories
@@ -41,18 +42,12 @@ DWORD Debug_WaitedObjectCount = 0;
 
 namespace OVR { namespace Platform {
 
-bool DeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const
-{
-    if (GetHIDDeviceManager())
-        return static_cast<HIDDeviceManager*>(GetHIDDeviceManager())->GetHIDDeviceDesc(path, pdevDesc);
-    return false;
-}
 
 //-------------------------------------------------------------------------------------
 // ***** DeviceManager Thread 
 
-DeviceManagerThread::DeviceManagerThread(DeviceManager* pdevMgr)
-    : Thread(ThreadStackSize), hCommandEvent(0), pDeviceMgr(pdevMgr)
+Win32DeviceManagerThread::Win32DeviceManagerThread(DeviceManager* pdevMgr)
+  : DeviceManagerThread(pdevMgr), hCommandEvent(0)
 {    
     // Create a non-signaled manual-reset event.
     hCommandEvent = ::CreateEvent(0, TRUE, FALSE, 0);
@@ -60,24 +55,36 @@ DeviceManagerThread::DeviceManagerThread(DeviceManager* pdevMgr)
         return;
 
     // Must add event before starting.
-    AddOverlappedEvent(0, hCommandEvent);
+    WaitNotifiers.PushBack(0);
+    WaitHandles.PushBack(hCommandEvent);
+    OVR_ASSERT(WaitNotifiers.GetSize() <= MAXIMUM_WAIT_OBJECTS);
 
     // Create device messages object.
     pStatusObject = *new DeviceStatus(this);
 }
 
-DeviceManagerThread::~DeviceManagerThread()
+Win32DeviceManagerThread::~Win32DeviceManagerThread()
 {
     // Remove overlapped event [0], after thread service exit.
     if (hCommandEvent)
     {
-        RemoveOverlappedEvent(0, hCommandEvent);    
+        // [0] is reserved for thread commands with notify of null, but we still
+        // can use this function to remove it.
+        for (UPInt i = 0; i < WaitNotifiers.GetSize(); i++)
+        {
+            if ((WaitNotifiers[i] == 0) && (WaitHandles[i] == hCommandEvent))
+            {
+                WaitNotifiers.RemoveAt(i);
+                WaitHandles.RemoveAt(i);
+            }
+        }
+
         ::CloseHandle(hCommandEvent);
         hCommandEvent = 0;
     }
 }
 
-int DeviceManagerThread::Run()
+int Win32DeviceManagerThread::Run()
 {
     ThreadCommand::PopBuffer command;
 
@@ -162,38 +169,14 @@ int DeviceManagerThread::Run()
     return 0;
 }
 
-bool DeviceManagerThread::AddOverlappedEvent(Notifier* notify, HANDLE hevent)
-{
-    WaitNotifiers.PushBack(notify);
-    WaitHandles.PushBack(hevent);
 
-    OVR_ASSERT(WaitNotifiers.GetSize() <= MAXIMUM_WAIT_OBJECTS);
-    return true;
-}
-
-bool DeviceManagerThread::RemoveOverlappedEvent(Notifier* notify, HANDLE hevent)
-{
-    // [0] is reserved for thread commands with notify of null, but we still
-    // can use this function to remove it.
-    for (UPInt i = 0; i < WaitNotifiers.GetSize(); i++)
-    {
-        if ((WaitNotifiers[i] == notify) && (WaitHandles[i] == hevent))
-        {
-            WaitNotifiers.RemoveAt(i);
-            WaitHandles.RemoveAt(i);
-            return true;
-        }
-    }
-    return false;
-}
-
-bool DeviceManagerThread::AddMessageNotifier(Notifier* notify)
+bool Win32DeviceManagerThread::AddMessageNotifier(Notifier* notify)
 {
     MessageNotifiers.PushBack(notify);
     return true;
 }
 
-bool DeviceManagerThread::RemoveMessageNotifier(Notifier* notify)
+bool Win32DeviceManagerThread::RemoveMessageNotifier(Notifier* notify)
 {
     for (UPInt i = 0; i < MessageNotifiers.GetSize(); i++)
     {
@@ -206,7 +189,7 @@ bool DeviceManagerThread::RemoveMessageNotifier(Notifier* notify)
     return false;
 }
 
-bool DeviceManagerThread::OnMessage(MessageType type, const String& devicePath)
+bool Win32DeviceManagerThread::OnMessage(MessageType type, const String& devicePath)
 {
     Notifier::DeviceMessageType notifierMessageType = Notifier::DeviceMessage_DeviceAdded;
     if (type == DeviceAdded)
@@ -272,7 +255,7 @@ bool DeviceManagerThread::OnMessage(MessageType type, const String& devicePath)
     return !error;
 }
 
-void DeviceManagerThread::DetachDeviceManager()
+void Win32DeviceManagerThread::DetachDeviceManager()
 {
     Lock::Locker devMgrLock(&DevMgrLock);
     pDeviceMgr = NULL;

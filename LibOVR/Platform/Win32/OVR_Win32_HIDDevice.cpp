@@ -30,6 +30,12 @@ limitations under the License.
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Log.h"
 
+HANDLE CreateHIDFile(const char* path, bool exclusiveAccess = true) {
+  return ::CreateFileA(path, GENERIC_WRITE | GENERIC_READ,
+    (!exclusiveAccess) ? (FILE_SHARE_READ | FILE_SHARE_WRITE) : 0x0,
+    NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+}
+
 namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
@@ -64,11 +70,22 @@ bool HIDDevicePathWrapper::InitPathFromInterfaceData(HDEVINFO hdevInfoSet, SP_DE
 }
 
 
+Win32HIDDeviceManager * Win32HIDDevice::getHidManager() {
+  return (Win32HIDDeviceManager*)HIDManager;
+}
+
+
+Win32DeviceManagerThread * Win32HIDDevice::getThread() {
+  return (Win32DeviceManagerThread *)(getHidManager()->Manager->pThread);
+}
+
+
+
 //-------------------------------------------------------------------------------------
 // **** Win32::DeviceManager
 
-HIDDeviceManager::HIDDeviceManager(DeviceManager* manager)
- :  Manager(manager)
+Win32HIDDeviceManager::Win32HIDDeviceManager(DeviceManager* manager)
+  : HIDDeviceManager(manager)
 {
     hHidLib = ::LoadLibraryA("hid.dll");
     OVR_ASSERT_LOG(hHidLib, ("Couldn't load Win32 'hid.dll'."));
@@ -89,22 +106,12 @@ HIDDeviceManager::HIDDeviceManager(DeviceManager* manager)
         HidD_GetHidGuid(&HidGuid);
 }
 
-HIDDeviceManager::~HIDDeviceManager()
+Win32HIDDeviceManager::~Win32HIDDeviceManager()
 {
     ::FreeLibrary(hHidLib);
 }
 
-bool HIDDeviceManager::Initialize()
-{
-    return true;
-}
-
-void HIDDeviceManager::Shutdown()
-{   
-    LogText("OVR::Win32::HIDDeviceManager - shutting down.\n");
-}
-
-bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
+bool Win32HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
 {
     HDEVINFO                 hdevInfoSet;
     SP_DEVICE_INTERFACE_DATA interfaceData;
@@ -149,7 +156,7 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
             initStrings(hidDev, &devDesc);
 
             // Construct minimal device that the visitor callback can get feature reports from.
-            HIDDevice device(this, hidDev);
+            Win32HIDDevice device(this, hidDev);
             enumVisitor->Visit(device, devDesc);
         }
 
@@ -160,7 +167,7 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
     return true;
 }
 
-bool HIDDeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const
+bool Win32HIDDeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const
 {
     // open device in non-exclusive mode for detection...
     HANDLE hidDev = CreateHIDFile(path, false);
@@ -174,10 +181,10 @@ bool HIDDeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevD
     return succ;
 }
 
-OVR::HIDDevice* HIDDeviceManager::Open(const String& path)
+OVR::HIDDevice* Win32HIDDeviceManager::Open(const String& path)
 {
 
-  Ptr<HIDDevice> device = *new HIDDevice(this);
+  Ptr<HIDDevice> device = *new Win32HIDDevice(this);
 
     if (device->HIDInitialize(path))
     {
@@ -188,7 +195,7 @@ OVR::HIDDevice* HIDDeviceManager::Open(const String& path)
     return NULL;
 }
 
-bool HIDDeviceManager::getFullDesc(HANDLE hidDev, HIDDeviceDesc* desc) const
+bool Win32HIDDeviceManager::getFullDesc(HANDLE hidDev, HIDDeviceDesc* desc) const
 {
 
     if (!initVendorProductVersion(hidDev, desc))
@@ -206,7 +213,7 @@ bool HIDDeviceManager::getFullDesc(HANDLE hidDev, HIDDeviceDesc* desc) const
     return true;
 }
 
-bool HIDDeviceManager::initVendorProductVersion(HANDLE hidDev, HIDDeviceDesc* desc) const
+bool Win32HIDDeviceManager::initVendorProductVersion(HANDLE hidDev, HIDDeviceDesc* desc) const
 {
     HIDD_ATTRIBUTES attr;
     attr.Size = sizeof(attr);
@@ -218,7 +225,7 @@ bool HIDDeviceManager::initVendorProductVersion(HANDLE hidDev, HIDDeviceDesc* de
     return true;
 }
 
-bool HIDDeviceManager::initUsage(HANDLE hidDev, HIDDeviceDesc* desc) const
+bool Win32HIDDeviceManager::initUsage(HANDLE hidDev, HIDDeviceDesc* desc) const
 {
     bool                 result = false;
     HIDP_CAPS            caps;
@@ -237,7 +244,7 @@ bool HIDDeviceManager::initUsage(HANDLE hidDev, HIDDeviceDesc* desc) const
     return result;
 }
 
-void HIDDeviceManager::initStrings(HANDLE hidDev, HIDDeviceDesc* desc) const
+void Win32HIDDeviceManager::initStrings(HANDLE hidDev, HIDDeviceDesc* desc) const
 {
     // Documentation mentions 126 as being the max for USB.
     wchar_t strBuffer[196];
@@ -260,29 +267,29 @@ void HIDDeviceManager::initStrings(HANDLE hidDev, HIDDeviceDesc* desc) const
 //-------------------------------------------------------------------------------------
 // **** Win32::HIDDevice
 
-HIDDevice::HIDDevice(HIDDeviceManager* manager)
- : HIDManager(manager), inMinimalMode(false), Device(0), ReadRequested(false)
+Win32HIDDevice::Win32HIDDevice(HIDDeviceManager* manager)
+  : HIDDevice(manager), Device(0), ReadRequested(false)
 {
     memset(&ReadOverlapped, 0, sizeof(OVERLAPPED));
 }
 
 // This is a minimal constructor used during enumeration for us to pass
 // a HIDDevice to the visit function (so that it can query feature reports). 
-HIDDevice::HIDDevice(HIDDeviceManager* manager, HANDLE device)
- : HIDManager(manager), inMinimalMode(true), Device(device), ReadRequested(true)
+Win32HIDDevice::Win32HIDDevice(HIDDeviceManager* manager, HANDLE device)
+  : HIDDevice(manager, true), Device(device), ReadRequested(true)
 {
     memset(&ReadOverlapped, 0, sizeof(OVERLAPPED));
 }
 
-HIDDevice::~HIDDevice()
+Win32HIDDevice::~Win32HIDDevice()
 {
-    if (!inMinimalMode)
+    if (!InMinimalMode)
     {
         HIDShutdown();
     }
 }
 
-bool HIDDevice::HIDInitialize(const String& path)
+bool Win32HIDDevice::HIDInitialize(const String& path)
 {
 
     DevDesc.Path = path;
@@ -294,8 +301,8 @@ bool HIDDevice::HIDInitialize(const String& path)
     }
 
 
-    HIDManager->Manager->pThread->AddTicksNotifier(this);
-    HIDManager->Manager->pThread->AddMessageNotifier(this);
+    getThread()->AddTicksNotifier(this);
+    getThread()->AddMessageNotifier(this);
 
     LogText("OVR::Win32::HIDDevice - Opened '%s'\n"
 		"                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'  Version:'%x'\n",
@@ -307,29 +314,29 @@ bool HIDDevice::HIDInitialize(const String& path)
     return true;
 }
 
-bool HIDDevice::initInfo()
+bool Win32HIDDevice::initInfo()
 {
     // Device must have been successfully opened.
     OVR_ASSERT(Device);
 
     // Get report lengths.
     HIDP_PREPARSED_DATA* preparsedData = 0;
-    if (!HIDManager->HidD_GetPreparsedData(Device, &preparsedData))
+    if (!Win32HIDDeviceManager::HidD_GetPreparsedData(Device, &preparsedData))
     {
         return false;
     }
 
     HIDP_CAPS caps;
-    if (HIDManager->HidP_GetCaps(preparsedData, &caps) != HIDP_STATUS_SUCCESS)
+    if (Win32HIDDeviceManager::HidP_GetCaps(preparsedData, &caps) != HIDP_STATUS_SUCCESS)
     {
-        HIDManager->HidD_FreePreparsedData(preparsedData);
+      Win32HIDDeviceManager::HidD_FreePreparsedData(preparsedData);
         return false;
     }
 
     InputReportBufferLength  = caps.InputReportByteLength;
     OutputReportBufferLength = caps.OutputReportByteLength;
     FeatureReportBufferLength= caps.FeatureReportByteLength;
-    HIDManager->HidD_FreePreparsedData(preparsedData);
+    Win32HIDDeviceManager::HidD_FreePreparsedData(preparsedData);
 
     if (ReadBufferSize < InputReportBufferLength)
     {
@@ -338,7 +345,7 @@ bool HIDDevice::initInfo()
     }
 
     // Get device desc.
-    if (!HIDManager->getFullDesc(Device, &DevDesc))
+    if (!getHidManager()->getFullDesc(Device, &DevDesc))
     {
         OVR_ASSERT_LOG(false, ("Failed to get device desc while initializing device."));
         return false;
@@ -347,11 +354,12 @@ bool HIDDevice::initInfo()
     return true;
 }
 
-bool HIDDevice::openDevice()
+
+bool Win32HIDDevice::openDevice()
 {
     memset(&ReadOverlapped, 0, sizeof(OVERLAPPED));
 
-    Device = HIDManager->CreateHIDFile(DevDesc.Path.ToCStr());
+    Device = CreateHIDFile(DevDesc.Path.ToCStr());
     if (Device == INVALID_HANDLE_VALUE)
     {
         OVR_DEBUG_LOG(("Failed 'CreateHIDFile' while opening device, error = 0x%X.", 
@@ -360,7 +368,7 @@ bool HIDDevice::openDevice()
         return false;
     }
 
-    if (!HIDManager->HidD_SetNumInputBuffers(Device, 128))
+    if (!Win32HIDDeviceManager::HidD_SetNumInputBuffers(Device, 128))
     {
         OVR_ASSERT_LOG(false, ("Failed 'HidD_SetNumInputBuffers' while initializing device."));
         ::CloseHandle(Device);
@@ -407,22 +415,22 @@ bool HIDDevice::openDevice()
     return true;
 }
 
-void HIDDevice::HIDShutdown()
+void Win32HIDDevice::HIDShutdown()
 {   
 
-    HIDManager->Manager->pThread->RemoveTicksNotifier(this);
-    HIDManager->Manager->pThread->RemoveMessageNotifier(this);
+    getThread()->RemoveTicksNotifier(this);
+    getThread()->RemoveMessageNotifier(this);
 
     closeDevice();
     LogText("OVR::Win32::HIDDevice - Closed '%s'\n", DevDesc.Path.ToCStr());
 }
 
-bool HIDDevice::initializeRead()
+bool Win32HIDDevice::initializeRead()
 {
 
     if (!ReadRequested)
     {        
-        HIDManager->Manager->pThread->AddOverlappedEvent(this, ReadOverlapped.hEvent);
+        getThread()->AddOverlappedEvent(this, ReadOverlapped.hEvent);
         ReadRequested = true;
     }
 
@@ -442,7 +450,7 @@ bool HIDDevice::initializeRead()
     return true;
 }
 
-bool HIDDevice::processReadResult()
+bool Win32HIDDevice::processReadResult()
 {
 
     OVR_ASSERT(ReadRequested);
@@ -476,11 +484,11 @@ bool HIDDevice::processReadResult()
     return false;
 }
 
-void HIDDevice::closeDevice()
+void Win32HIDDevice::closeDevice()
 {
     if (ReadRequested)
     {
-        HIDManager->Manager->pThread->RemoveOverlappedEvent(this, ReadOverlapped.hEvent);
+        getThread()->RemoveOverlappedEvent(this, ReadOverlapped.hEvent);
         ReadRequested = false;
         // Must call this to avoid Win32 assertion; CloseHandle is not enough.
         ::CancelIo(Device);
@@ -493,35 +501,32 @@ void HIDDevice::closeDevice()
     Device = 0;
 }
 
-void HIDDevice::closeDeviceOnIOError()
+void Win32HIDDevice::closeDeviceOnIOError()
 {
     LogText("OVR::Win32::HIDDevice - Lost connection to '%s'\n", DevDesc.Path.ToCStr());
     closeDevice();
 }
 
-bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
+bool Win32HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
 {
 	if (!ReadRequested)
         return false;
 
-	BOOLEAN res = HIDManager->HidD_SetFeature(Device, data, (ULONG) length);
+  BOOLEAN res = Win32HIDDeviceManager::HidD_SetFeature(Device, data, (ULONG)length);
 	return (res == TRUE);
 }
 
-bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
+bool Win32HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
 {
 	if (!ReadRequested)
         return false;
 
-	BOOLEAN res = HIDManager->HidD_GetFeature(Device, data, (ULONG) length);
+  BOOLEAN res = Win32HIDDeviceManager::HidD_GetFeature(Device, data, (ULONG)length);
 	return (res == TRUE);
 }
 
-void HIDDevice::OnOverlappedEvent(HANDLE hevent)
+void Win32HIDDevice::OnReadReadyEvent()
 {
-    OVR_UNUSED(hevent);
-    OVR_ASSERT(hevent == ReadOverlapped.hEvent);
-
     if (processReadResult()) 
     {
         // Proceed to read again.
@@ -529,17 +534,7 @@ void HIDDevice::OnOverlappedEvent(HANDLE hevent)
     }
 }
 
-double HIDDevice::OnTicks(double tickSeconds)
-{
-    if (Handler)
-    {
-        return Handler->OnTicks(tickSeconds);
-    }
-
-    return DeviceManagerThread::Notifier::OnTicks(tickSeconds);
-}
-
-bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType, 
+bool Win32HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
 								const String& devicePath,
 								bool* error)
 {
@@ -585,7 +580,7 @@ bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
     return true;
 }
 
-HIDDeviceManager* HIDDeviceManager::CreateInternal(Platform::DeviceManager* devManager)
+HIDDeviceManager* Win32HIDDeviceManager::CreateInternal(Platform::DeviceManager* devManager)
 {
 
     if (!System::IsInitialized())
@@ -596,7 +591,7 @@ HIDDeviceManager* HIDDeviceManager::CreateInternal(Platform::DeviceManager* devM
         return 0;
     }
 
-    Ptr<HIDDeviceManager> manager = *new HIDDeviceManager(devManager);
+    Ptr<Win32HIDDeviceManager> manager = *new Win32HIDDeviceManager(devManager);
 
     if (manager)
     {
@@ -631,7 +626,7 @@ HIDDeviceManager* HIDDeviceManager::Create()
         return 0;
     }
 
-    Ptr<Platform::HIDDeviceManager> manager = *new Platform::HIDDeviceManager(NULL);
+    Ptr<Platform::Win32HIDDeviceManager> manager = *new Platform::Win32HIDDeviceManager(NULL);
 
     if (manager)
     {

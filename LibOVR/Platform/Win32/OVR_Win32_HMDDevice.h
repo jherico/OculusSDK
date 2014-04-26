@@ -27,7 +27,7 @@ limitations under the License.
 #ifndef OVR_Win32_HMDDevice_h
 #define OVR_Win32_HMDDevice_h
 
-#include "OVR_Win32_DeviceManager.h"
+#include "../OVR_Platform.h"
 #include "OVR_Profile.h"
 
 namespace OVR { namespace Platform {

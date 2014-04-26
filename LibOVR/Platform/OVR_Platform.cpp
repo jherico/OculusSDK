@@ -24,9 +24,9 @@ limitations under the License.
 
 *************************************************************************************/
 
-#if 1 
-//defined(OVR_OS_WIN32)
-#include "Win32/OVR_Win32_DeviceManager.h"
+#include "OVR_Platform.h"
+
+#if defined(OVR_OS_WIN32)
 #include "Win32/OVR_Win32_HIDDevice.h"
 #include "Win32/OVR_Win32_HMDDevice.h"
 #elif defined(OVR_OS_LINUX)
@@ -66,12 +66,19 @@ DeviceManager::~DeviceManager()
   OVR_ASSERT(!pThread);
 }
 
+bool DeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevDesc) const
+{
+    if (GetHIDDeviceManager())
+        return static_cast<HIDDeviceManager*>(GetHIDDeviceManager())->GetHIDDeviceDesc(path, pdevDesc);
+    return false;
+}
+
 bool DeviceManager::Initialize(DeviceBase*)
 {
     if (!DeviceManagerImpl::Initialize(0))
         return false;
 
-    pThread = *new DeviceManagerThread(this);
+    pThread = DeviceManagerThread::Create(this);
     if (!pThread || !pThread->Start())
         return false;
 

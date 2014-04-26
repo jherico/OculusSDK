@@ -26,7 +26,7 @@ limitations under the License.
 
 #ifndef OVR_Win32_DeviceStatus_h
 #define OVR_Win32_DeviceStatus_h
-
+#include "../OVR_Platform.h"
 #include <windows.h>
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_RefCount.h"
@@ -43,33 +43,16 @@ namespace OVR { namespace Platform {
 // in the constructor. That thread is also responsible for periodically calling 'ProcessMessages'
 // to process queued windows messages. The client is notified via the 'OnMessage' method
 // declared in the 'DeviceMessages::Notifier' interface.
-class DeviceStatus : public RefCountBase<DeviceStatus>
+class Win32DeviceStatus : public DeviceStatus
 {
 public:
+  Win32DeviceStatus(Notifier* const pClient);
+  virtual ~Win32DeviceStatus();
 
-	// Notifier used for device messages.
-	class Notifier  
-	{
-	public:
-		enum MessageType
-		{
-			DeviceAdded     = 0,
-			DeviceRemoved   = 1,
-		};
+  bool Initialize();
+  void ShutDown();
 
-		virtual bool OnMessage(MessageType type, const String& devicePath) 
-        { OVR_UNUSED2(type, devicePath); return true; }
-	};
-
-	DeviceStatus(Notifier* const pClient);
-	~DeviceStatus();
-
-	void operator = (const DeviceStatus&);	// No assignment implementation.
-
-	bool Initialize();
-	void ShutDown();
-
-	void ProcessMessages();
+  void ProcessMessages();
 
 private:	
     enum 
@@ -96,7 +79,6 @@ private:
     void FindAndCleanupRecoveryTimer(const String& devicePath);
 
 private: // data
-    Notifier* const     pNotificationClient;	// Don't reference count a back-pointer.
 
     HWND                hMessageWindow;
     HDEVNOTIFY          hDeviceNotify;

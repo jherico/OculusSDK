@@ -41,12 +41,12 @@ static TCHAR windowClassName[] = TEXT("LibOVR_DeviceStatus_WindowClass");
 
 
 //-------------------------------------------------------------------------------------
-DeviceStatus::DeviceStatus(Notifier* const pClient)
-	: pNotificationClient(pClient), LastTimerId(0)
+Win32DeviceStatus::Win32DeviceStatus(Notifier* const pClient)
+: DeviceStatus(pClient), LastTimerId(0)
 {	
 }
 
-bool DeviceStatus::Initialize()
+bool Win32DeviceStatus::Initialize()
 {
 
 	WNDCLASS wndClass;
@@ -95,7 +95,7 @@ bool DeviceStatus::Initialize()
 
 
 	// Register notification for additional HID messages.
-    HIDDeviceManager* hidDeviceManager = new HIDDeviceManager(NULL);
+    Win32HIDDeviceManager* hidDeviceManager = new Win32HIDDeviceManager(NULL);
 	HidGuid = hidDeviceManager->GetHIDGuid();
     hidDeviceManager->Release();
 
@@ -122,7 +122,7 @@ bool DeviceStatus::Initialize()
 	return true;
 }
 
-void DeviceStatus::ShutDown()
+void Win32DeviceStatus::ShutDown()
 {
 	OVR_ASSERT(hMessageWindow);
 
@@ -145,12 +145,12 @@ void DeviceStatus::ShutDown()
     }
 }
 
-DeviceStatus::~DeviceStatus()
+Win32DeviceStatus::~Win32DeviceStatus()
 {    
 	OVR_ASSERT_LOG(hMessageWindow == NULL, ("Need to call 'ShutDown' from DeviceManagerThread."));
 }
 
-void DeviceStatus::ProcessMessages()
+void Win32DeviceStatus::ProcessMessages()
 {
 	OVR_ASSERT_LOG(hMessageWindow != NULL, ("Need to call 'Initialize' before first use."));
 
@@ -165,7 +165,7 @@ void DeviceStatus::ProcessMessages()
 	}
 }
 
-bool DeviceStatus::MessageCallback(WORD messageType, const String& devicePath)
+bool Win32DeviceStatus::MessageCallback(WORD messageType, const String& devicePath)
 {
 	bool rv = true;
 	if (messageType == DBT_DEVICEARRIVAL)
@@ -183,14 +183,14 @@ bool DeviceStatus::MessageCallback(WORD messageType, const String& devicePath)
 	return rv;
 }
 
-void DeviceStatus::CleanupRecoveryTimer(UPInt index)
+void Win32DeviceStatus::CleanupRecoveryTimer(UPInt index)
 {
     ::KillTimer(hMessageWindow, RecoveryTimers[index].TimerId);
     RecoveryTimers.RemoveAt(index);
 }
     
-DeviceStatus::RecoveryTimerDesc* 
-DeviceStatus::FindRecoveryTimer(UINT_PTR timerId, UPInt* pindex)
+Win32DeviceStatus::RecoveryTimerDesc*
+Win32DeviceStatus::FindRecoveryTimer(UINT_PTR timerId, UPInt* pindex)
 {
     for (UPInt i = 0, n = RecoveryTimers.GetSize(); i < n; ++i)
     {
@@ -204,7 +204,7 @@ DeviceStatus::FindRecoveryTimer(UINT_PTR timerId, UPInt* pindex)
     return NULL;
 }
 
-void DeviceStatus::FindAndCleanupRecoveryTimer(const String& devicePath)
+void Win32DeviceStatus::FindAndCleanupRecoveryTimer(const String& devicePath)
 {
     for (UPInt i = 0, n = RecoveryTimers.GetSize(); i < n; ++i)
     {
@@ -217,7 +217,7 @@ void DeviceStatus::FindAndCleanupRecoveryTimer(const String& devicePath)
     }
 }
 
-LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd, 
+LRESULT CALLBACK Win32DeviceStatus::WindowsMessageCallback(HWND hwnd,
                                                         UINT message, 
                                                         WPARAM wParam, 
                                                         LPARAM lParam)
@@ -260,7 +260,7 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
 			OVR_ASSERT(userData != NULL);
 
 			// Call callback on device messages object with the device path.
-			DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+      Win32DeviceStatus* pDeviceStatus = (Win32DeviceStatus*)userData;
 			String devicePath(hdr->dbcc_name);
 
 			static const GUID videoCamGuid = { STATIC_KSCATEGORY_VIDEO_CAMERA };
@@ -313,7 +313,7 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
 				OVR_ASSERT(userData != NULL);
 
 				// Call callback on device messages object with the device path.
-				DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+        Win32DeviceStatus* pDeviceStatus = (Win32DeviceStatus*)userData;
 
                 // Check if we have recovery timer running (actually, we must be!)
                 UPInt rtIndex;
@@ -349,7 +349,7 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
 		{
 			LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
 			OVR_ASSERT(userData != NULL);
-			DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+      Win32DeviceStatus* pDeviceStatus = (Win32DeviceStatus*)userData;
 			pDeviceStatus->hMessageWindow = NULL;
 
 			DestroyWindow(hwnd);
