@@ -31,9 +31,6 @@ typedef struct ovrGLConfigData_s
 {
     // General device settings.
     ovrRenderAPIConfigHeader Header;
-    HWND   Window;
-    HGLRC  WglContext;
-    HDC    GdiDc;
 } ovrGLConfigData;
 
 union ovrGLConfig

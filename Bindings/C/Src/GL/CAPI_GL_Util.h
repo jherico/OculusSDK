@@ -214,12 +214,6 @@ enum VertexAttributes
 // Rendering parameters/pointers describing GL rendering setup.
 struct RenderParams
 {
-#ifdef OVR_OS_WIN32
-    HWND   Window;
-    HGLRC  WglContext;
-    HDC    GdiDc;
-#endif
-
     ovrSizei  RTSize;
     int    Multisample;
 };

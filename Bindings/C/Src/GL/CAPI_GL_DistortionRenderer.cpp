@@ -17,6 +17,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include <OVR_CAPI_GL.h>
 #include <fstream>
+
 namespace OVR { namespace CAPI { namespace GL {
 
 
@@ -540,14 +541,8 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
         return true;
     }
 
-    if (!config->OGL.WglContext || !config->OGL.GdiDc)
-        return false;
-
-    RParams.GdiDc       = config->OGL.GdiDc;
     RParams.Multisample = config->OGL.Header.Multisample;
     RParams.RTSize      = config->OGL.Header.RTSize;
-    RParams.WglContext  = config->OGL.WglContext;
-    RParams.Window      = config->OGL.Window;
 
     DistortionCaps = distortionCaps;
 
@@ -582,7 +577,6 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
         ovrEyeDesc     ed = RState.EyeRenderDesc[eyeId].Desc;
         ed.TextureSize    = tex->OGL.Header.TextureSize;
         ed.RenderViewport = tex->OGL.Header.RenderViewport;
-
         ovrHmd_GetRenderScaleAndOffset(HMD, ed, DistortionCaps, eachEye[eyeId].UVScaleOffset);
 
         pEyeTextures[eyeId]->UpdatePlaceholderTexture(tex->OGL.TexId,
@@ -622,22 +616,6 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
     else if(latencyTester2DrawColor)
     {
         renderLatencyPixel(latencyTester2DrawColor);
-    }
-
-    if (swapBuffers)
-    {
-        bool useVsync = ((RState.HMDCaps & ovrHmdCap_NoVSync) == 0);
-        BOOL success;
-        int swapInterval = (useVsync) ? 1 : 0;
-        if (wglGetSwapIntervalEXT() != swapInterval)
-            wglSwapIntervalEXT(swapInterval);
-
-        success = SwapBuffers(RParams.GdiDc);
-        OVR_ASSERT(success);
-
-        // Force GPU to flush the scene, resulting in the lowest possible latency.
-        // It's critical that this flush is *after* present.
-        WaitUntilGpuIdle();
     }
 }
 
