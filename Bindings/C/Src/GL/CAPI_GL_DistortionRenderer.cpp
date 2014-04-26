@@ -518,7 +518,9 @@ CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
                                                      FrameTimeManager& timeManager,
                                                      const HMDRenderState& renderState)
 {
+#ifdef OVR_OS_WIN32
     InitGLExtensions();
+#endif
 
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
@@ -691,7 +693,7 @@ void DistortionRenderer::initBuffersAndShaders()
         DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
         DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
         DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index, meshData.pIndexData, ( sizeof(INT16) * meshData.IndexCount ) );
+        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index, meshData.pIndexData, ( sizeof(uint16_t) * meshData.IndexCount ) );
 
         OVR_FREE ( pVBVerts );
         ovrHmd_DestroyDistortionMesh( &meshData );
@@ -701,7 +703,7 @@ void DistortionRenderer::initBuffersAndShaders()
 }
 
 void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture)
-{    
+{
     setViewport( Recti(0,0, RParams.RTSize.w, RParams.RTSize.h) );
 
     glClearColor(
@@ -715,16 +717,16 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     static GLuint distortionVAOs[2] = { 0, 0 };
     for (int eyeNum = 0; eyeNum < 2; eyeNum++)
-    {        
+    {
         ShaderFill distortionShaderFill(DistortionShader);
         distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture);
 
         DistortionShader->SetUniform2f("EyeToSourceUVScale",  UVScaleOffset[eyeNum][0].x, UVScaleOffset[eyeNum][0].y);
         DistortionShader->SetUniform2f("EyeToSourceUVOffset", UVScaleOffset[eyeNum][1].x, UVScaleOffset[eyeNum][1].y);
-        
+
         if (DistortionCaps & ovrDistortion_TimeWarp)
         {
-            ovrMatrix4f timeWarpMatrices[2];            
+            ovrMatrix4f timeWarpMatrices[2];
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
                                           RState.EyeRenderPoses[eyeNum], timeWarpMatrices);
 
@@ -783,7 +785,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
     {
         createDrawQuad();
     }
-       
+
     ShaderFill quadFill(SimpleQuadShader);
     //quadFill.SetInputLayout(SimpleQuadVertexIL);
 
@@ -797,7 +799,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
-        SimpleQuadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.4f : 0.4f, 0.0f);    
+        SimpleQuadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.4f : 0.4f, 0.0f);
         renderPrimitives(&quadFill, &latencyQuatVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);
     }
 }
@@ -821,7 +823,7 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
                                             (float)latencyTesterPixelColor[0] / 255.99f,
                                             1.0f);
 
-    Vector2f scale(2.0f / RParams.RTSize.w, 2.0f / RParams.RTSize.h); 
+    Vector2f scale(2.0f / RParams.RTSize.w, 2.0f / RParams.RTSize.h);
     SimpleQuadShader->SetUniform2f("Scale", scale.x, scale.y);
     SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f, 1.0f);
     renderPrimitives(&quadFill, &latencyVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);

@@ -7,16 +7,16 @@ Authors     :   Dean Beeler
 
 Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.1
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -25,6 +25,7 @@ limitations under the License.
 *************************************************************************************/
 #include "../../Include/OVR.h"
 
+#if OVR_OS_WIN32
 #include "Util_ImageWindow.h"
 
 #include <Windows.h>
@@ -38,7 +39,7 @@ typedef HRESULT (WINAPI *D2D1CreateFactoryFn)(
 
 
 namespace OVR { namespace Util {
-	
+
 ID2D1Factory* ImageWindow::pD2DFactory = NULL;
 ImageWindow* ImageWindow::globalWindow = NULL;
 
@@ -48,12 +49,12 @@ LRESULT CALLBACK MainWndProc(
 	WPARAM wParam,
 	LPARAM lParam)
 {
-	switch (uMsg) 
-	{ 
-	case WM_CREATE: 
-		return 0; 
+	switch (uMsg)
+	{
+	case WM_CREATE:
+		return 0;
 
-	case WM_PAINT: 
+	case WM_PAINT:
 		{
 			LONG_PTR ptr = GetWindowLongPtr( hwnd, GWLP_USERDATA );
 			if( ptr )
@@ -62,25 +63,25 @@ LRESULT CALLBACK MainWndProc(
 				iw->OnPaint();
 			}
 		}
-		
-		return 0; 
 
-	case WM_SIZE: 
-		// Set the size and position of the window. 
-		return 0; 
+		return 0;
 
-	case WM_DESTROY: 
-		// Clean up window-specific data objects. 
-		return 0; 
+	case WM_SIZE:
+		// Set the size and position of the window.
+		return 0;
 
-		// 
-		// Process other messages. 
-		// 
+	case WM_DESTROY:
+		// Clean up window-specific data objects.
+		return 0;
 
-	default: 
-		return DefWindowProc(hwnd, uMsg, wParam, lParam); 
-	} 
-	//return 0; 
+		//
+		// Process other messages.
+		//
+
+	default:
+		return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	}
+	//return 0;
 }
 
 ImageWindow::ImageWindow() :
@@ -103,7 +104,7 @@ ImageWindow::ImageWindow() :
 
 	if( pD2DFactory == NULL && createFactory )
 	{
-		createFactory( 
+		createFactory(
 			D2D1_FACTORY_TYPE_MULTI_THREADED,
 			__uuidof(ID2D1Factory),
 			NULL,
@@ -142,16 +143,16 @@ ImageWindow::ImageWindow( UINT width, UINT height ) :
 	RegisterClass(&wc);
 
 	hWindow = CreateWindow(
-		L"ImageWindowClass", 
-		L"ImageWindow", 
-		WS_OVERLAPPEDWINDOW & ~WS_SYSMENU, 
-		CW_USEDEFAULT, 
-		CW_USEDEFAULT, 
-		width, 
-		height, 
-		NULL, 
-		NULL, 
-		hInstance, 
+		L"ImageWindowClass",
+		L"ImageWindow",
+		WS_OVERLAPPEDWINDOW & ~WS_SYSMENU,
+		CW_USEDEFAULT,
+		CW_USEDEFAULT,
+		width,
+		height,
+		NULL,
+		NULL,
+		hInstance,
 		NULL);
 
 	resolution = D2D1::SizeU( width, height );
@@ -170,8 +171,8 @@ ImageWindow::ImageWindow( UINT width, UINT height ) :
 		);
 
 	ID2D1HwndRenderTarget* hwndTarget = NULL;
-	// Create a Direct2D render target			
-	pRT = NULL;			
+	// Create a Direct2D render target
+	pRT = NULL;
 	pD2DFactory->CreateHwndRenderTarget(
 		&props,
 		&hwndProps,
@@ -231,7 +232,7 @@ void ImageWindow::AssociateSurface( void* surface )
 			);
 
 
-		pRT = NULL;			
+		pRT = NULL;
 		ID2D1RenderTarget* tmpTarget;
 
 		hr = pD2DFactory->CreateDxgiSurfaceRenderTarget( pDxgiSurface, &props, &tmpTarget );
@@ -329,7 +330,7 @@ void ImageWindow::OnPaint()
 
 	if( !frames.IsEmpty() )
 		nextFrame = frames.PeekFront(0);
-	
+
 	while( nextFrame.ready )
 	{
 		// Free up the current frame since it's been removed from the deque
@@ -353,7 +354,7 @@ void ImageWindow::OnPaint()
 
 	pRT->BeginDraw();
 
-	pRT->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED); 
+	pRT->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
 
 	pRT->Clear( D2D1::ColorF(D2D1::ColorF::Black) );
 
@@ -370,9 +371,9 @@ void ImageWindow::OnPaint()
 
 	if( currentFrame.imageData )
 	{
-		pRT->FillOpacityMask( greyBitmap, whiteBrush, 
-			D2D1_OPACITY_MASK_CONTENT_TEXT_NATURAL, 
-			D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ), 
+		pRT->FillOpacityMask( greyBitmap, whiteBrush,
+			D2D1_OPACITY_MASK_CONTENT_TEXT_NATURAL,
+			D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ),
 			D2D1::RectF( 0.0f, 0.0f, (FLOAT)resolution.width, (FLOAT)resolution.height ) );
 	}
 	else if( currentFrame.colorImageData )
@@ -471,3 +472,4 @@ void ImageWindow::addCircle( float x, float y, float radius, float r, float g, f
 }
 
 }}
+#endif

@@ -25,6 +25,7 @@ limitations under the License.
 #define INC_OVR_CAPI_GL_Util_h
 
 #include "OVR_CAPI.h"
+#include <Kernel/OVR_Log.h>
 #include <Kernel/OVR_Array.h>
 #include <Kernel/OVR_Math.h>
 #include <Kernel/OVR_RefCount.h>
@@ -201,7 +202,7 @@ enum SampleMode
     Sample_Count        =13,
 };
 
-enum VertexAttributes 
+enum VertexAttributes
 {
   VA_Position = 0,
   VA_Color = 1,
@@ -302,7 +303,7 @@ protected:
         int    Type; // currently number of floats in vector
     };
     Array<Uniform> UniformInfo;
-	
+
 public:
 	GLuint Prog;
     GLint     ProjLoc, ViewLoc;
@@ -328,7 +329,7 @@ public:
 
     // Set a uniform (other than the standard matrices). It is undefined whether the
     // uniforms from one shader occupy the same space as those in other shaders
-    // (unless a buffer is used, then each buffer is independent).     
+    // (unless a buffer is used, then each buffer is independent).
     virtual bool SetUniform(const char* name, int n, const float* v);
     bool SetUniform1f(const char* name, float x)
     {
@@ -356,7 +357,7 @@ public:
         const float a[] = {v.x,v.y,v.z,1};
         return SetUniform(name, 4, a);
     }
- 
+
     virtual bool SetUniform4x4f(const char* name, const Matrix4f& m)
     {
         Matrix4f mt = m.Transposed();
@@ -379,7 +380,7 @@ class ShaderFill : public RefCountBase<ShaderFill>
 
 public:
     ShaderFill(ShaderSet* sh) : Shaders(sh) { InputLayout = NULL; }
-    ShaderFill(ShaderSet& sh) : Shaders(sh) { InputLayout = NULL; }    
+    ShaderFill(ShaderSet& sh) : Shaders(sh) { InputLayout = NULL; }
 
     ShaderSet*  GetShaders() const      { return Shaders; }
     void*       GetInputLayout() const  { return InputLayout; }
@@ -398,24 +399,24 @@ public:
     virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
 };
 
-    
+
 struct DisplayId
 {
     // Windows
     String MonitorName; // Monitor name for fullscreen mode
-    
+
     // MacOS
     long   CgDisplayId; // CGDirectDisplayID
-    
+
     DisplayId() : CgDisplayId(0) {}
     DisplayId(long id) : CgDisplayId(id) {}
     DisplayId(String m, long id=0) : MonitorName(m), CgDisplayId(id) {}
-    
+
     operator bool () const
     {
         return MonitorName.GetLength() || CgDisplayId;
     }
-    
+
     bool operator== (const DisplayId& b) const
     {
         return CgDisplayId == b.CgDisplayId &&
@@ -427,7 +428,7 @@ struct DisplayId
 
 class ShaderBase : public Shader
 {
-public:    
+public:
     RenderParams*   pParams;
     unsigned char*  UniformData;
     int             UniformsSize;
@@ -451,14 +452,14 @@ public:
 	ShaderBase(RenderParams* rp, ShaderStage stage) : Shader(stage), pParams(rp), UniformData(0), UniformsSize(0) {}
 	~ShaderBase()
 	{
-		if (UniformData)    
+		if (UniformData)
 			OVR_FREE(UniformData);
 	}
 
     void InitUniforms(const Uniform* refl, size_t reflSize);
 	bool SetUniform(const char* name, int n, const float* v);
 	bool SetUniformBool(const char* name, int n, const bool* v);
- 
+
     void UpdateBuffer(Buffer* b);
 };
 
@@ -473,20 +474,21 @@ public:
 		: ShaderBase(rp, SStage)
 		, GLShader(0)
     {
-		BOOL success;
+        bool success;
         OVR_UNUSED(size);
         success = Compile((const char*) s);
         OVR_ASSERT(success);
 		InitUniforms(refl, reflSize);
     }
     ~ShaderImpl()
-    {      
+    {
 		if (GLShader)
 		{
 			glDeleteShader(GLShader);
 			GLShader = 0;
 		}
     }
+
     bool Compile(const char* src)
 	{
 		if (!GLShader)
@@ -507,7 +509,7 @@ public:
 		}
 		return 1;
 	}
-	
+
     GLenum GLStage() const
     {
 		return SType;
