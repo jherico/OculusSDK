@@ -104,9 +104,6 @@ ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 	cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
 	cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
 	cfg.OGL.Header.Multisample = Params.Multisample;
-	cfg.OGL.WglContext         = WglContext;
-	cfg.OGL.Window             = Window;
-	cfg.OGL.GdiDc              = GdiDc;
 
 	return cfg.Config;
 }
