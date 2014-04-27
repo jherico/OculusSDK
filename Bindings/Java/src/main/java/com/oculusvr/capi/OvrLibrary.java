@@ -23,13 +23,21 @@ import com.sun.jna.ptr.FloatByReference;
  * href="http://jna.dev.java.net/">JNA</a>.
  */
 public interface OvrLibrary extends Library {
-  public static final String JNA_LIBRARY_NAME = "OVR_C";
-  static {
-    NativeLibrary.addSearchPath(OvrLibrary.JNA_LIBRARY_NAME, "");
+  public static final String JNA_LIBRARY_NAME = "OVR_Cd";
+
+  static class Loader {
+    static {
+      NativeLibrary.addSearchPath(OvrLibrary.JNA_LIBRARY_NAME, "c:/Users/bdavis/git/OculusSDK/Build/Debug");
+    }
+
+    private Loader() {};
+    public static final NativeLibrary JNA_NATIVE_LIB = NativeLibrary.getInstance(OvrLibrary.JNA_LIBRARY_NAME);
+    OvrLibrary getLibrary() {
+      return (OvrLibrary) Native.loadLibrary(OvrLibrary.JNA_LIBRARY_NAME,OvrLibrary.class);
+    }
   }
-  public static final NativeLibrary JNA_NATIVE_LIB = NativeLibrary.getInstance(OvrLibrary.JNA_LIBRARY_NAME);
-  public static final OvrLibrary INSTANCE = (OvrLibrary) Native.loadLibrary(OvrLibrary.JNA_LIBRARY_NAME,
-      OvrLibrary.class);
+
+  public static final OvrLibrary INSTANCE = new Loader().getLibrary(); 
 
   public static interface ovrHmdType {
     public static final int ovrHmd_None = 0;
