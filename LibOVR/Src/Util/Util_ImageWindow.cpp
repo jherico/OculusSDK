@@ -25,7 +25,7 @@ limitations under the License.
 *************************************************************************************/
 #include "../../Include/OVR.h"
 
-#if OVR_OS_WIN32
+#ifdef OVR_OS_WIN32
 #include "Util_ImageWindow.h"
 
 #include <Windows.h>
