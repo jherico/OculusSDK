@@ -298,7 +298,7 @@ bool HIDDevice::HIDInitialize(const String& path)
     HIDManager->Manager->pThread->AddMessageNotifier(this);
 
     LogText("OVR::Win32::HIDDevice - Opened '%s'\n"
-		"                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'  Version:'%x'\n",
+        "                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'  Version:'%x'\n",
         DevDesc.Path.ToCStr(),
         DevDesc.Manufacturer.ToCStr(), DevDesc.Product.ToCStr(),
         DevDesc.SerialNumber.ToCStr(),
@@ -355,7 +355,7 @@ bool HIDDevice::openDevice()
     if (Device == INVALID_HANDLE_VALUE)
     {
         OVR_DEBUG_LOG(("Failed 'CreateHIDFile' while opening device, error = 0x%X.", 
-			::GetLastError()));
+            ::GetLastError()));
         Device = 0;
         return false;
     }
@@ -501,20 +501,20 @@ void HIDDevice::closeDeviceOnIOError()
 
 bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
 {
-	if (!ReadRequested)
+    if (!ReadRequested)
         return false;
 
-	BOOLEAN res = HIDManager->HidD_SetFeature(Device, data, (ULONG) length);
-	return (res == TRUE);
+    BOOLEAN res = HIDManager->HidD_SetFeature(Device, data, (ULONG) length);
+    return (res == TRUE);
 }
 
 bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
 {
-	if (!ReadRequested)
+    if (!ReadRequested)
         return false;
 
-	BOOLEAN res = HIDManager->HidD_GetFeature(Device, data, (ULONG) length);
-	return (res == TRUE);
+    BOOLEAN res = HIDManager->HidD_GetFeature(Device, data, (ULONG) length);
+    return (res == TRUE);
 }
 
 void HIDDevice::OnOverlappedEvent(HANDLE hevent)
@@ -540,8 +540,8 @@ double HIDDevice::OnTicks(double tickSeconds)
 }
 
 bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType, 
-								const String& devicePath,
-								bool* error)
+                                const String& devicePath,
+                                bool* error)
 {
 
     // Is this the correct device?
@@ -556,7 +556,7 @@ bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
         if (!openDevice())
         {
             LogError("OVR::Win32::HIDDevice - Failed to reopen a device '%s' that was re-added.\n", devicePath.ToCStr());
-			*error = true;
+            *error = true;
             return true;
         }
 
@@ -573,7 +573,7 @@ bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
     }
     else
     {
-        OVR_ASSERT(0);		
+        OVR_ASSERT(0);        
     }
 
     if (Handler)
@@ -581,7 +581,7 @@ bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
         Handler->OnDeviceMessage(handlerMessageType);
     }
 
-	*error = false;
+    *error = false;
     return true;
 }
 

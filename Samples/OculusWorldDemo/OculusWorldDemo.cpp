@@ -4,7 +4,7 @@ Filename    :   OculusWorldDemo.cpp
 Content     :   First-person view test application for Oculus Rift - Implementation
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
-				Peter Hoff, Dan Goodman, Bryan Croteau                
+                Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -90,9 +90,9 @@ OculusWorldDemoApp::~OculusWorldDemoApp()
         ovrHmd_Destroy(Hmd);
         Hmd = 0;
     }
-	    
-	CollisionModels.ClearAndRelease();
-	GroundCollisionModels.ClearAndRelease();
+        
+    CollisionModels.ClearAndRelease();
+    GroundCollisionModels.ClearAndRelease();
 
     ovr_Shutdown();
 }
@@ -171,7 +171,7 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     PopulatePreloadScene();
     
     LastUpdate = ovr_GetTimeInSeconds();
-	
+    
     return 0;
 }
 
@@ -304,7 +304,7 @@ void OculusWorldDemoApp::PopulateOptionMenu()
 
     // Timewarp
     Menu.AddBool( "Timewarp.TimewarpEnabled 'O'",   &TimewarpEnabled).AddShortcutKey(Key_O).
-    																SetNotify(this, &OWD::HmdSettingChange);
+                                                                    SetNotify(this, &OWD::HmdSettingChange);
     Menu.AddBool( "Timewarp.FreezeEyeUpdate 'C'",   &FreezeEyeUpdate).AddShortcutKey(Key_C);
     Menu.AddFloat("Timewarp.RenderIntervalSeconds", &TimewarpRenderIntervalInSeconds,
                                                     0.0001f, 1.00f, 0.0001f, "%.1f", 1.0f, &FormatTimewarp).
@@ -423,7 +423,7 @@ void OculusWorldDemoApp::CalculateHmdValues()
     unsigned hmdCaps = ovrHmdCap_Orientation | (VsyncEnabled ? 0 : ovrHmdCap_NoVSync); 
     unsigned distortionCaps = ovrDistortion_Chromatic;
 
-	ovrRenderAPIConfig config = pRender->Get_ovrRenderAPIConfig();
+    ovrRenderAPIConfig config = pRender->Get_ovrRenderAPIConfig();
 
     if (TimewarpEnabled)
         distortionCaps |= ovrDistortion_TimeWarp;
@@ -712,12 +712,12 @@ void OculusWorldDemoApp::OnIdle()
     HmdStatus = ss.StatusFlags;
 
     // Change message status around positional tracking.
-	bool hadVisionTracking = HaveVisionTracking;
-	HaveVisionTracking = (ss.StatusFlags & Status_PositionTracked) != 0;
-	if (HaveVisionTracking && !hadVisionTracking)
-		Menu.SetPopupMessage("Vision Tracking Acquired");
+    bool hadVisionTracking = HaveVisionTracking;
+    HaveVisionTracking = (ss.StatusFlags & Status_PositionTracked) != 0;
+    if (HaveVisionTracking && !hadVisionTracking)
+        Menu.SetPopupMessage("Vision Tracking Acquired");
     if (!HaveVisionTracking && hadVisionTracking)
-		Menu.SetPopupMessage("Lost Vision Tracking");
+        Menu.SetPopupMessage("Lost Vision Tracking");
     
     // Check if any new devices were connected.
     ProcessDeviceNotificationQueue();
@@ -950,17 +950,17 @@ void OculusWorldDemoApp::RenderEyeView(ovrEyeType eye)
             MainScene.Render(pRender, viewAdjust * View);        
             RenderAnimatedBlocks(eye, ovr_GetTimeInSeconds());
         }
-	    
+        
         if (SceneMode == Scene_Cubes)
-	    {
+        {
             // Draw scene cubes overlay. Red if position tracked, blue otherwise.
             Scene sceneCubes = (HmdStatus & ovrStatus_PositionTracked) ?
                                RedCubesScene : BlueCubesScene;        
             sceneCubes.Render(pRender, viewAdjust * View * baseTranslate * baseYaw);
         }
 
-	    else if (SceneMode == Scene_OculusCubes)
-	    {
+        else if (SceneMode == Scene_OculusCubes)
+        {
             OculusCubesScene.Render(pRender, viewAdjust * View * baseTranslate * baseYaw);
         }
     }   
@@ -1003,23 +1003,23 @@ void OculusWorldDemoApp::RenderEyeView(ovrEyeType eye)
 
 // NOTE - try to keep these in sync with the PDF docs!
 static const char* HelpText1 =
-    "Spacebar 	            \t500 Toggle debug info overlay\n"
-    "W, S            	    \t500 Move forward, back\n"
-    "A, D 		    	    \t500 Strafe left, right\n"
-    "Mouse move 	        \t500 Look left, right\n"
+    "Spacebar                 \t500 Toggle debug info overlay\n"
+    "W, S                    \t500 Move forward, back\n"
+    "A, D                     \t500 Strafe left, right\n"
+    "Mouse move             \t500 Look left, right\n"
     "Left gamepad stick     \t500 Move\n"
     "Right gamepad stick    \t500 Turn\n"
-    "T			            \t500 Reset player position";
+    "T                        \t500 Reset player position";
     
 static const char* HelpText2 =        
     "R              \t250 Reset sensor orientation\n"
-    "G 			    \t250 Cycle grid overlay mode\n"
+    "G                 \t250 Cycle grid overlay mode\n"
     "-, +           \t250 Adjust eye height\n"
     "Esc            \t250 Cancel full-screen\n"
-    "F4			    \t250 Multisampling toggle\n"    
+    "F4                \t250 Multisampling toggle\n"    
     "F9             \t250 Hardware full-screen (low latency)\n"
     "F11            \t250 Faked full-screen (easier debugging)\n"
-    "Ctrl+Q		    \t250 Quit";
+    "Ctrl+Q            \t250 Quit";
 
 
 void FormatLatencyReading(char* buff, UPInt size, float val)

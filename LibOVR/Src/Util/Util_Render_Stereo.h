@@ -65,7 +65,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                            bool bRendertargetSharedByBothEyes,
                                            bool bRightHanded = true,
                                            float zNear = 0.01f, float zFar = 10000.0f,
-										   Sizei const *pOverrideRenderedPixelSize = NULL,
+                                           Sizei const *pOverrideRenderedPixelSize = NULL,
                                            FovPort const *pOverrideFovport = NULL,
                                            float zoomFactor = 1.0f );
 
@@ -201,7 +201,7 @@ public:
     // Supply just left = set both to the same.
     // Supply neither = remove override.
     void        SetFov ( FovPort const *pfovLeft  = NULL,
-					     FovPort const *pfovRight = NULL );
+                         FovPort const *pfovRight = NULL );
     
     void        SetFovPortRadians ( float horizontal, float vertical )
     {

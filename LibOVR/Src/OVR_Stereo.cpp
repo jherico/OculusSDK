@@ -211,11 +211,11 @@ float LensConfig::DistortionFnScaleRadiusSquared (float rsq) const
         scale = EvalCatmullRom10Spline ( K, scaledRsq );
 
 
-		//Intercept, and overrule if needed
-		if (CustomDistortion)
-		{
-			scale = CustomDistortion(rsq);
-		}
+        //Intercept, and overrule if needed
+        if (CustomDistortion)
+        {
+            scale = CustomDistortion(rsq);
+        }
 
         }break;
     default:
@@ -299,11 +299,11 @@ float LensConfig::DistortionFnInverseApprox(float r) const
         float scaledRsq = (float)(NumSegments-1) * rsq / ( MaxInvR * MaxInvR );
         scale = EvalCatmullRom10Spline ( InvK, scaledRsq );
 
-		//Intercept, and overrule if needed
-		if (CustomDistortionInv)
-		{
-			scale = CustomDistortionInv(rsq);
-		}
+        //Intercept, and overrule if needed
+        if (CustomDistortionInv)
+        {
+            scale = CustomDistortionInv(rsq);
+        }
 
         }break;
     default:
@@ -1548,7 +1548,7 @@ ScaleAndOffset2D CreateUVScaleAndOffsetfromNDCScaleandOffset ( ScaleAndOffset2D 
     Vector2f offset( (float)renderedViewport.x / (float)renderTargetSize.w,
                      (float)renderedViewport.y / (float)renderTargetSize.h );
 
-	result.Scale  = result.Scale.EntrywiseMultiply(scale);
+    result.Scale  = result.Scale.EntrywiseMultiply(scale);
     result.Offset  = result.Offset.EntrywiseMultiply(scale) + offset;
     return result;
 }
@@ -1814,7 +1814,7 @@ Vector2f TransformRendertargetNDCToTanFovSpace( const ScaleAndOffset2D &eyeToSou
 //Just want to make a copy disentangled from all these namespaces!
 float ExtEvalCatmullRom10Spline ( float const *K, float scaledVal )
 {
-	return(OVR::EvalCatmullRom10Spline ( K, scaledVal ));
+    return(OVR::EvalCatmullRom10Spline ( K, scaledVal ));
 }
 
 

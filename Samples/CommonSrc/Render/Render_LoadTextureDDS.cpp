@@ -46,20 +46,20 @@ struct OVR_DDS_PIXELFORMAT
 
 struct OVR_DDS_HEADER
 {
-    UInt32				Size;
-    UInt32				Flags;
-    UInt32				Height;
-    UInt32				Width;
-    UInt32				PitchOrLinearSize;
-    UInt32				Depth;
-    UInt32				MipMapCount;
-    UInt32				Reserved1[11];
+    UInt32                Size;
+    UInt32                Flags;
+    UInt32                Height;
+    UInt32                Width;
+    UInt32                PitchOrLinearSize;
+    UInt32                Depth;
+    UInt32                MipMapCount;
+    UInt32                Reserved1[11];
     OVR_DDS_PIXELFORMAT PixelFormat;
-    UInt32				Caps;
-    UInt32				Caps2;
-    UInt32				Caps3;
-    UInt32				Caps4;
-    UInt32				Reserved2;
+    UInt32                Caps;
+    UInt32                Caps2;
+    UInt32                Caps3;
+    UInt32                Caps4;
+    UInt32                Reserved2;
 };
 
 Texture* LoadTextureDDS(RenderDevice* ren, File* f)

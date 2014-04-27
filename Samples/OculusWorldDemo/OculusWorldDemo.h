@@ -4,7 +4,7 @@ Filename    :   OculusWorldDemo.h
 Content     :   First-person view test application for Oculus Rift - Header file
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
-				Peter Hoff, Dan Goodman, Bryan Croteau                
+                Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -75,12 +75,12 @@ using namespace OVR::Render;
 // Important Oculus-specific logic can be found at following locations:
 //
 //  OculusWorldDemoApp::OnStartup - This function will initialize the SDK, creating the Hmd
-//									and delegating to CalculateHmdValues to initialize it.
+//                                    and delegating to CalculateHmdValues to initialize it.
 //
 //  OculusWorldDemoApp::OnIdle    - Here we poll SensorFusion for orientation, apply it
-//									to the scene and handle movement.
-//									Stereo rendering is also done here, by delegating to
-//									to the RenderEyeView() function for each eye.
+//                                    to the scene and handle movement.
+//                                    Stereo rendering is also done here, by delegating to
+//                                    to the RenderEyeView() function for each eye.
 //
 
 //-------------------------------------------------------------------------------------
@@ -116,7 +116,7 @@ public:
     void         InitMainFilePath();
     void         PopulateScene(const char* fileName);
     void         PopulatePreloadScene();
-    void		 ClearScene();
+    void         ClearScene();
     void         PopulateOptionMenu();
 
 
@@ -201,7 +201,7 @@ protected:
     // Frame timing logic.
     enum { SecondsOfFpsMeasurement = 1 };
     int                 FrameCounter;
-    double              NextFPSUpdate;	
+    double              NextFPSUpdate;    
     float               SecondsPerFrame;
     float               FPS;
     double              LastFpsUpdate;
@@ -210,7 +210,7 @@ protected:
     double              LastUpdate;         
   
     // Loaded data.
-    String	                    MainFilePath;
+    String                        MainFilePath;
     Array<Ptr<CollisionModel> > CollisionModels;
     Array<Ptr<CollisionModel> > GroundCollisionModels;
 
@@ -228,15 +228,15 @@ protected:
     
     GamepadState        LastGamepadState;
 
-    Player				ThePlayer;
+    Player                ThePlayer;
     Matrix4f            View;
     Scene               MainScene;
     Scene               LoadingScene;
     Scene               SmallGreenCube;
 
-	Scene				OculusCubesScene;
-	Scene               RedCubesScene;
-	Scene				BlueCubesScene;
+    Scene                OculusCubesScene;
+    Scene               RedCubesScene;
+    Scene                BlueCubesScene;
 
     // Last frame asn sensor data reported by BeginFrame().
     ovrFrameTiming      HmdFrameTiming;
@@ -286,8 +286,8 @@ protected:
     enum SceneRenderMode
     {
         Scene_World,
-		Scene_Cubes,
-		Scene_OculusCubes
+        Scene_Cubes,
+        Scene_OculusCubes
     };
     SceneRenderMode    SceneMode;
 

@@ -130,7 +130,7 @@ typedef enum
     ovrHmdCap_YawCorrection     = 0x0020,   //  Supports yaw correction through magnetometer or other means.
     ovrHmdCap_Position          = 0x0040,   //  Supports positional tracking.
     ovrHmdCap_LowPersistence    = 0x0080,   //  Supports low persistence mode.
-	ovrHmdCap_LatencyTest       = 0x0100,   //  Supports pixel reading for continous latency testing.
+    ovrHmdCap_LatencyTest       = 0x0100,   //  Supports pixel reading for continous latency testing.
     ovrHmdCap_DynamicPrediction = 0x0200,   //  Adjust prediction dynamically based on DK2 Latency.
 
     // Support rendering without VSync for debugging
@@ -142,7 +142,7 @@ typedef enum
 typedef enum
 {        
     ovrDistortion_Chromatic = 0x01,
-    ovrDistortion_TimeWarp	= 0x02,
+    ovrDistortion_TimeWarp    = 0x02,
     ovrDistortion_Vignette  = 0x08
 } ovrDistortionCaps;
 
@@ -258,7 +258,7 @@ typedef struct ovrFrameTiming_
     // BeginFrameSeconds value, usable for movement scaling.
     // This will be clamped to no more than 0.1 seconds to prevent
     // excessive movement after pauses for loading or initialization.
-    float			DeltaSeconds;
+    float            DeltaSeconds;
 
     // It is generally expected that the following hold:
     // ThisFrameSeconds < TimewarpPointSeconds < NextFrameSeconds < 
@@ -267,17 +267,17 @@ typedef struct ovrFrameTiming_
     // Absolute time value of when rendering of this frame began or is expected to
     // begin; generally equal to NextFrameSeconds of the previous frame. Can be used
     // for animation timing.
-    double			ThisFrameSeconds;
+    double            ThisFrameSeconds;
     // Absolute point when IMU expects to be sampled for this frame.
-    double			TimewarpPointSeconds;
+    double            TimewarpPointSeconds;
     // Absolute time when frame Present + GPU Flush will finish, and the next frame starts.
-    double			NextFrameSeconds;
+    double            NextFrameSeconds;
 
     // Time when when half of the screen will be scanned out. Can be passes as a prediction
     // value to ovrHmd_GetSensorState() go get general orientation.
-    double		    ScanoutMidpointSeconds;
+    double            ScanoutMidpointSeconds;
     // Timing points when each eye will be scanned out to display. Used for rendering each eye. 
-    double			EyeScanoutSeconds[2];    
+    double            EyeScanoutSeconds[2];    
 
 } ovrFrameTiming;
 
@@ -304,9 +304,9 @@ typedef struct ovrEyeDesc_
 typedef struct ovrEyeRenderDesc_
 {    
     ovrEyeDesc  Desc;        
-	ovrRecti	DistortedViewport; 	        // Distortion viewport 
+    ovrRecti    DistortedViewport;             // Distortion viewport 
     ovrVector2f PixelsPerTanAngleAtCenter;  // How many display pixels will fit in tan(angle) = 1.
-    ovrVector3f ViewAdjust;  		        // Translation to be applied to view matrix.
+    ovrVector3f ViewAdjust;                  // Translation to be applied to view matrix.
 } ovrEyeRenderDesc;
 
 
@@ -759,4 +759,4 @@ OVR_EXPORT unsigned int ovrHmd_GetArraySize(ovrHmd hmd, const char* propertyName
 #endif
 
 
-#endif	// OVR_CAPI_h
+#endif    // OVR_CAPI_h

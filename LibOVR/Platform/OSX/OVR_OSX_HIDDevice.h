@@ -57,7 +57,7 @@ public:
     void HIDShutdown();
     
     virtual bool SetFeatureReport(UByte* data, UInt32 length);
-	virtual bool GetFeatureReport(UByte* data, UInt32 length);
+    virtual bool GetFeatureReport(UByte* data, UInt32 length);
 
     bool Write(UByte* data, UInt32 length);
 
@@ -115,7 +115,7 @@ private:
 
 class HIDDeviceManager : public OVR::HIDDeviceManager
 {
-	friend class HIDDevice;
+    friend class HIDDevice;
 
 public:
     HIDDeviceManager(OSX::DeviceManager* Manager);

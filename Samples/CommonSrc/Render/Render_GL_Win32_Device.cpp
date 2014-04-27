@@ -41,9 +41,9 @@ RenderDevice::RenderDevice(const Render::RendererParams& p, HWND win, HDC dc, HG
     , Window(win)
     , WglContext(gl)
     , GdiDc(dc)
-	, PreFullscreen(0, 0, 0, 0)
+    , PreFullscreen(0, 0, 0, 0)
     , HMonitor(0)
-	, FSDesktop(0, 0, 0, 0)
+    , FSDesktop(0, 0, 0, 0)
 {
     OVR_UNUSED(p);
 }
@@ -55,8 +55,8 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
     
     if (!DwmEnableComposition)
     {
-	    HINSTANCE hInst = LoadLibrary( L"dwmapi.dll" );
-	    OVR_ASSERT(hInst);
+        HINSTANCE hInst = LoadLibrary( L"dwmapi.dll" );
+        OVR_ASSERT(hInst);
         DwmEnableComposition = (PFNDWMENABLECOMPOSITIONPROC)GetProcAddress( hInst, "DwmEnableComposition" );
         OVR_ASSERT(DwmEnableComposition);
     }
@@ -100,22 +100,22 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
 
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
-	static ovrGLConfig cfg;
-	cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
-	cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-	cfg.OGL.Header.Multisample = Params.Multisample;
+    static ovrGLConfig cfg;
+    cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
+    cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
+    cfg.OGL.Header.Multisample = Params.Multisample;
 
-	return cfg.Config;
+    return cfg.Config;
 }
 
 void RenderDevice::Present(bool useVsync)
 {
-	BOOL success;
-	int swapInterval = (useVsync) ? 1 : 0;
-	if (wglGetSwapIntervalEXT() != swapInterval)
-		wglSwapIntervalEXT(swapInterval);
+    BOOL success;
+    int swapInterval = (useVsync) ? 1 : 0;
+    if (wglGetSwapIntervalEXT() != swapInterval)
+        wglSwapIntervalEXT(swapInterval);
 
-	success = SwapBuffers(GdiDc);
+    success = SwapBuffers(GdiDc);
     OVR_ASSERT(success);
 }
 
@@ -139,7 +139,7 @@ bool RenderDevice::SetParams(const RendererParams& newParams)
 {
     Params = newParams;
     //TODO: Apply changes now.
-	return true;
+    return true;
 }
 
 BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
@@ -162,8 +162,8 @@ BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
                 renderer->HMonitor = hMonitor;
                 renderer->FSDesktop.x = monitor.rcMonitor.left;
                 renderer->FSDesktop.y = monitor.rcMonitor.top;
-				renderer->FSDesktop.w = monitor.rcMonitor.right - monitor.rcMonitor.left;
-				renderer->FSDesktop.h = monitor.rcMonitor.bottom - monitor.rcMonitor.top;
+                renderer->FSDesktop.w = monitor.rcMonitor.right - monitor.rcMonitor.left;
+                renderer->FSDesktop.h = monitor.rcMonitor.bottom - monitor.rcMonitor.top;
                 return FALSE;
             }
         }
@@ -174,7 +174,7 @@ BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 
 bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
 {
-	if (fullscreen == Params.Fullscreen)
+    if (fullscreen == Params.Fullscreen)
     {
         return true;
     }
@@ -203,7 +203,7 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
         {
             // Restore the window styles
             DWORD style = (DWORD)GetWindowLongPtr(Window, GWL_STYLE);
-			DWORD exstyle = (DWORD)GetWindowLongPtr(Window, GWL_EXSTYLE);
+            DWORD exstyle = (DWORD)GetWindowLongPtr(Window, GWL_EXSTYLE);
             SetWindowLongPtr(Window, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
             SetWindowLongPtr(Window, GWL_EXSTYLE, exstyle & (~(WS_EX_APPWINDOW | WS_EX_TOPMOST)));
             
@@ -217,7 +217,7 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
                             SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOOWNERZORDER | SWP_NOREPOSITION | SWP_NOZORDER);
         }
     }
-	
+    
 
     if (!Params.Display.MonitorName.IsEmpty())
     {
@@ -265,7 +265,7 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
         bool foundMode = false;
         memset(&dmode, 0, sizeof(DEVMODE));
         dmode.dmSize = sizeof(DEVMODE);
-		Recti vp = VP;
+        Recti vp = VP;
         for(int i=0 ; EnumDisplaySettings(monInfo.szDevice, i, &dmode); ++i)
         {
             foundMode = (dmode.dmPelsWidth==(DWORD)vp.w) &&

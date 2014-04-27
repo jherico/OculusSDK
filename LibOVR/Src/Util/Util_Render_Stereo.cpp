@@ -280,7 +280,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                            bool bRendertargetSharedByBothEyes,
                                            bool bRightHanded /*= true*/,
                                            float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/,
-										   Sizei const *pOverrideRenderedPixelSize /* = NULL*/,
+                                           Sizei const *pOverrideRenderedPixelSize /* = NULL*/,
                                            FovPort const *pOverrideFovport /*= NULL*/,
                                            float zoomFactor /*= 1.0f*/ )
 {
@@ -391,10 +391,10 @@ StereoConfig::StereoConfig(StereoMode mode)
     Hmd.EyeLeft.Distortion.K[2]                         = 0.2408f;
     Hmd.EyeLeft.Distortion.K[3]                         = -0.4589f;
     Hmd.EyeLeft.Distortion.MaxR                         = 1.0f;
-	Hmd.EyeLeft.Distortion.ChromaticAberration[0]		= 0.006f;
-	Hmd.EyeLeft.Distortion.ChromaticAberration[1]		= 0.0f;
-	Hmd.EyeLeft.Distortion.ChromaticAberration[2]		= -0.014f;
-	Hmd.EyeLeft.Distortion.ChromaticAberration[3]		= 0.0f;
+    Hmd.EyeLeft.Distortion.ChromaticAberration[0]        = 0.006f;
+    Hmd.EyeLeft.Distortion.ChromaticAberration[1]        = 0.0f;
+    Hmd.EyeLeft.Distortion.ChromaticAberration[2]        = -0.014f;
+    Hmd.EyeLeft.Distortion.ChromaticAberration[3]        = 0.0f;
     Hmd.EyeLeft.NoseToPupilInMeters                     = 0.62f;
     Hmd.EyeLeft.ReliefInMeters                          = 0.013f;
     Hmd.EyeRight = Hmd.EyeLeft;
@@ -877,11 +877,11 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
             Vector2f tanEyeAnglesR, tanEyeAnglesG, tanEyeAnglesB;
             TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
                                                     distortion, screenNDC );
-			
-			pcurVert->TanEyeAnglesR = tanEyeAnglesR;
-			pcurVert->TanEyeAnglesG = tanEyeAnglesG;
-			pcurVert->TanEyeAnglesB = tanEyeAnglesB;
-			
+            
+            pcurVert->TanEyeAnglesR = tanEyeAnglesR;
+            pcurVert->TanEyeAnglesG = tanEyeAnglesG;
+            pcurVert->TanEyeAnglesB = tanEyeAnglesB;
+            
 
             HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
             switch ( shutterType )

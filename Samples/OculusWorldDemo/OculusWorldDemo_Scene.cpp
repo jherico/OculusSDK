@@ -5,7 +5,7 @@ Content     :   Logic for loading, and creating rendered scene components,
                 cube and grid overlays, etc.
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
-				Peter Hoff, Dan Goodman, Bryan Croteau                
+                Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -32,7 +32,7 @@ limitations under the License.
 void OculusWorldDemoApp::InitMainFilePath()
 {
 
-    MainFilePath = WORLDDEMO_ASSET_FILE;	
+    MainFilePath = WORLDDEMO_ASSET_FILE;    
 
     // Try to modify path for correctness in case specified file is not found.
     if (!SysFile(MainFilePath).IsValid())
@@ -139,18 +139,18 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
     Ptr<Fill> fillB = *CreateTexureFill(pRender, mainFilePathNoExtension + "_blueCube.tga");
     PopulateCubeFieldScene(&BlueCubesScene, fillB.GetPtr(), 10, 10, 10, Vector3f(0.0f, 0.0f, 0.0f), 0.4f);
 
-	// Anna: OculusWorldDemo/Assets/Tuscany/Tuscany_OculusCube.tga file needs to be added    
+    // Anna: OculusWorldDemo/Assets/Tuscany/Tuscany_OculusCube.tga file needs to be added    
     Ptr<Fill> imageFill = *CreateTexureFill(pRender, mainFilePathNoExtension + "_OculusCube.tga");
     PopulateCubeFieldScene(&OculusCubesScene, imageFill.GetPtr(), 11, 4, 35, Vector3f(0.0f, 0.0f, -6.0f), 0.5f);
 
-	
+    
     float r = 0.01f;
     Ptr<Model> purpleCubesModel = *new Model(Prim_Triangles);
-	for (int i = 0; i < 10; i++)
-		for (int j = 0; j < 10; j++)
-			for (int k = 0; k < 10; k++)
-	            purpleCubesModel->AddSolidColorBox(i*0.25f-1.25f-r,j*0.25f-1.25f-r,k*0.25f-1.25f-r,
-				                                   i*0.25f-1.25f+r,j*0.25f-1.25f+r,k*0.25f-1.25f+r,0xFF9F009F);
+    for (int i = 0; i < 10; i++)
+        for (int j = 0; j < 10; j++)
+            for (int k = 0; k < 10; k++)
+                purpleCubesModel->AddSolidColorBox(i*0.25f-1.25f-r,j*0.25f-1.25f-r,k*0.25f-1.25f-r,
+                                                   i*0.25f-1.25f+r,j*0.25f-1.25f+r,k*0.25f-1.25f+r,0xFF9F009F);
 }
 
 

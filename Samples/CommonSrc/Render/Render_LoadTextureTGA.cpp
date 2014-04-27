@@ -92,13 +92,13 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
         return NULL;
     }
 
-	Texture* out = ren->CreateTexture(Texture_RGBA|Texture_GenMipmaps, width, height, imgdata);
+    Texture* out = ren->CreateTexture(Texture_RGBA|Texture_GenMipmaps, width, height, imgdata);
 
-	// check for clamp based on texture name
-	if(strstr(f->GetFilePath(), "_c."))
-	{
-		out->SetSampleMode(Sample_Clamp);
-	}
+    // check for clamp based on texture name
+    if(strstr(f->GetFilePath(), "_c."))
+    {
+        out->SetSampleMode(Sample_Clamp);
+    }
 
     OVR_FREE(imgdata);
     return out;

@@ -3,9 +3,9 @@
 PublicHeader:   OVR.h
 Filename    :   Util_Interface.h
 Content     :   Simple interface, utilised by internal demos,
-				with access to wider SDK as needed. 
-				Located in the body of the SDK to ensure updated
-				when new SDK features are added.
+                with access to wider SDK as needed. 
+                Located in the body of the SDK to ensure updated
+                when new SDK features are added.
 Created     :   February 20, 2014
 Authors     :   Tom Heath
 

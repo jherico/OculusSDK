@@ -741,9 +741,9 @@ OVR_EXPORT float ovrHmd_GetFloat(ovrHmd hmd, const char* propertyName, float def
 {
     HMDState* hmds = (HMDState*)hmd;
     if (hmds)
-	{
-		return hmds->getFloatValue(propertyName, defaultVal);
-	}
+    {
+        return hmds->getFloatValue(propertyName, defaultVal);
+    }
 
     return defaultVal;
 }
@@ -766,7 +766,7 @@ OVR_EXPORT unsigned int ovrHmd_GetFloatArray(ovrHmd hmd, const char* propertyNam
     HMDState* hmds = (HMDState*)hmd;
     if (hmds)
     {
-		return hmds->getFloatArray(propertyName, values, arraySize);
+        return hmds->getFloatArray(propertyName, values, arraySize);
     }
 
     return 0;
@@ -792,7 +792,7 @@ OVR_EXPORT const char* ovrHmd_GetString(ovrHmd hmd, const char* propertyName,
     HMDState* hmds = (HMDState*)hmd;
     if (hmds)
     {
-		return hmds->getString(propertyName, defaultVal);
+        return hmds->getString(propertyName, defaultVal);
     }
 
     return defaultVal;

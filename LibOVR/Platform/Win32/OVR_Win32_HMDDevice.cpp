@@ -167,18 +167,18 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
                 {   // DK2 prototypes and variants (default to HmdType_DK2)
                     hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12576f, 0.07074f, 0.12576f*0.5f, 0.0635f );
                 }
-				else if (wcsstr(ddm.DeviceID, L"OVR0002"))
-				{   // HD Prototypes (default to HmdType_DKHDProto)
-					hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12096f, 0.06804f, 0.06804f*0.5f, 0.0635f );
-				}
-				else if (wcsstr(ddm.DeviceID, L"OVR0001"))
-				{   // DK1
+                else if (wcsstr(ddm.DeviceID, L"OVR0002"))
+                {   // HD Prototypes (default to HmdType_DKHDProto)
+                    hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12096f, 0.06804f, 0.06804f*0.5f, 0.0635f );
+                }
+                else if (wcsstr(ddm.DeviceID, L"OVR0001"))
+                {   // DK1
                     hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.14976f, 0.0936f, 0.0936f*0.5f, 0.0635f);
                 }
                 else if (wcsstr(ddm.DeviceID, L"OVR00"))
                 {   // Future Oculus HMD devices (default to DK1 dimensions)
-					hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.14976f, 0.0936f, 0.0936f*0.5f, 0.0635f);
-				}
+                    hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.14976f, 0.0936f, 0.0936f*0.5f, 0.0635f);
+                }
                 else
                 {   // Duct-tape prototype
                     hmdCreateDesc.SetScreenParameters(mx, my, mwidth, mheight, 0.12096f, 0.0756f, 0.0756f*0.5f, 0.0635f);

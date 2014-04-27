@@ -212,25 +212,25 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
             HMDDeviceCreateDesc hmdCreateDesc(this, vendor, product, idstring, Displays[i]);
             
-			if (product == 2)
-			{
+            if (product == 2)
+            {
                 hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
                                                   mwidth, mheight, 0.12096f, 0.06804f);
-			}
-			else
-			{
-				if (hmdCreateDesc.Is7Inch())
-				{
-					// Physical dimension of SLA screen.
-					hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
+            }
+            else
+            {
+                if (hmdCreateDesc.Is7Inch())
+                {
+                    // Physical dimension of SLA screen.
+                    hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
                                                       mwidth, mheight, 0.14976f, 0.0936f);
-				}
-				else
-				{
-					hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
+                }
+                else
+                {
+                    hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
                                                       mwidth, mheight, 0.12096f, 0.0756f);
-				}
-			}
+                }
+            }
 
             OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %x:%x\n", vendor, product));
             
@@ -276,7 +276,7 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
 
     OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength,
                is7Inch ? "Oculus Rift DK1" :
-			   ((HResolution >= 1920) ? "Oculus Rift DK HD" : "Oculus Rift DK1-Prototype") );
+               ((HResolution >= 1920) ? "Oculus Rift DK HD" : "Oculus Rift DK1-Prototype") );
     OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, "Oculus VR");
     info->Type    = Device_HMD;
     info->Version = 0;

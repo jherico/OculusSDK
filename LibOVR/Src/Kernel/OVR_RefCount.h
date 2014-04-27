@@ -208,28 +208,28 @@ template<class Base>
 class RefCountBaseStatVImpl : virtual public Base
 {
 public:
-	RefCountBaseStatVImpl() { }
+    RefCountBaseStatVImpl() { }
 
-	// *** Override New and Delete
+    // *** Override New and Delete
 
-	// DOM-IGNORE-BEGIN
-	// Undef new temporarily if it is being redefined
+    // DOM-IGNORE-BEGIN
+    // Undef new temporarily if it is being redefined
 #ifdef OVR_DEFINE_NEW
 #undef new
 #endif
 
 #define OVR_REFCOUNTALLOC_CHECK_DELETE(class_name, p)
 
-	// Redefine all new & delete operators.
-	OVR_MEMORY_REDEFINE_NEW_IMPL(Base, OVR_REFCOUNTALLOC_CHECK_DELETE)
+    // Redefine all new & delete operators.
+    OVR_MEMORY_REDEFINE_NEW_IMPL(Base, OVR_REFCOUNTALLOC_CHECK_DELETE)
 
 #undef OVR_REFCOUNTALLOC_CHECK_DELETE
 
 #ifdef OVR_DEFINE_NEW
 #define new OVR_DEFINE_NEW
 #endif
-		// OVR_BUILD_DEFINE_NEW
-		// DOM-IGNORE-END
+        // OVR_BUILD_DEFINE_NEW
+        // DOM-IGNORE-END
 };
 
 

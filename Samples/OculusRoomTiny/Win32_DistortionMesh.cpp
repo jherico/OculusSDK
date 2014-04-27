@@ -33,11 +33,11 @@ limitations under the License.
 // actually render the distortion mesh, while this struct only stores the data in a logical group
 struct DistortionRenderData
 { 
- 	ShaderSet *            Shaders;  
-	ID3D11InputLayout    * VertexIL;
-	Vector2f               UVScaleOffset[2][2];
-	Ptr<Buffer>            MeshVBs[2];
-	Ptr<Buffer>            MeshIBs[2]; 
+     ShaderSet *            Shaders;  
+    ID3D11InputLayout    * VertexIL;
+    Vector2f               UVScaleOffset[2][2];
+    Ptr<Buffer>            MeshVBs[2];
+    Ptr<Buffer>            MeshIBs[2]; 
 } DistortionData;
 
 //Format for mesh and shaders
@@ -53,8 +53,8 @@ static D3D11_INPUT_ELEMENT_DESC DistortionMeshVertexDesc[] =
 {
     {"Position", 0, DXGI_FORMAT_R32G32_FLOAT,   0, 0,   D3D11_INPUT_PER_VERTEX_DATA, 0},
     {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT,   0, 8,   D3D11_INPUT_PER_VERTEX_DATA, 0},
-    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,   0, 16,	D3D11_INPUT_PER_VERTEX_DATA, 0},
-    {"TexCoord", 2, DXGI_FORMAT_R32G32_FLOAT,   0, 24,	D3D11_INPUT_PER_VERTEX_DATA, 0},
+    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,   0, 16,    D3D11_INPUT_PER_VERTEX_DATA, 0},
+    {"TexCoord", 2, DXGI_FORMAT_R32G32_FLOAT,   0, 24,    D3D11_INPUT_PER_VERTEX_DATA, 0},
     {"Color",    0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 32,  D3D11_INPUT_PER_VERTEX_DATA, 0},
 };
 
@@ -100,87 +100,87 @@ void DistortionMeshInit(unsigned distortionCaps, ovrHmd HMD,
         ovrHmd_DestroyDistortionMesh( &meshData );
     }
 
-	// Pixel shader for the mesh
-	//-------------------------------------------------------------------------------------------
+    // Pixel shader for the mesh
+    //-------------------------------------------------------------------------------------------
     const char* pixelShader =
-		"Texture2D Texture   : register(t0);                                                    \n"
-		"SamplerState Linear : register(s0);                                                    \n"
+        "Texture2D Texture   : register(t0);                                                    \n"
+        "SamplerState Linear : register(s0);                                                    \n"
 
-		"float4 main(in float4 oPosition  : SV_Position, in float4 oColor : COLOR,              \n"
-		"            in float2 oTexCoord0 : TEXCOORD0,   in float2 oTexCoord1 : TEXCOORD1,      \n"
-		"            in float2 oTexCoord2 : TEXCOORD2)   : SV_Target                            \n"
-		"{                                                                                      \n"
-		// 3 samples for fixing chromatic aberrations
-		"    float ResultR = Texture.Sample(Linear, oTexCoord0.xy).r;                           \n"
-		"    float ResultG = Texture.Sample(Linear, oTexCoord1.xy).g;                           \n"
-		"    float ResultB = Texture.Sample(Linear, oTexCoord2.xy).b;                           \n"
-		"    return float4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);    \n"
-		"}";
+        "float4 main(in float4 oPosition  : SV_Position, in float4 oColor : COLOR,              \n"
+        "            in float2 oTexCoord0 : TEXCOORD0,   in float2 oTexCoord1 : TEXCOORD1,      \n"
+        "            in float2 oTexCoord2 : TEXCOORD2)   : SV_Target                            \n"
+        "{                                                                                      \n"
+        // 3 samples for fixing chromatic aberrations
+        "    float ResultR = Texture.Sample(Linear, oTexCoord0.xy).r;                           \n"
+        "    float ResultG = Texture.Sample(Linear, oTexCoord1.xy).g;                           \n"
+        "    float ResultB = Texture.Sample(Linear, oTexCoord2.xy).b;                           \n"
+        "    return float4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);    \n"
+        "}";
 
 
     // Choose the vertex shader, according to if you have timewarp enabled
-	if (distortionCaps & ovrDistortion_TimeWarp)
-	{   // TIMEWARP
-		//--------------------------------------------------------------------------------------------
-		const char* vertexShader = 
-			"float2 EyeToSourceUVScale;                                                                \n"
-			"float2 EyeToSourceUVOffset;                                                               \n"
-			"float4x4 EyeRotationStart;                                                             \n"
-			"float4x4 EyeRotationEnd;                                                               \n"
-			"float2 TimewarpTexCoord(float2 TexCoord, float4x4 rotMat)                              \n"
-			"{                                                                                      \n"
-			// Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic 
-			// aberration and distortion). These are now "real world" vectors in direction (x,y,1) 
-			// relative to the eye of the HMD.	Apply the 3x3 timewarp rotation to these vectors.
-			"    float3 transformed = float3( mul ( rotMat, float4(TexCoord.xy, 1, 1) ).xyz);       \n"
-			// Project them back onto the Z=1 plane of the rendered images.
-			"    float2 flattened = (transformed.xy / transformed.z);                               \n"
-			// Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
-			"    return(EyeToSourceUVScale * flattened + EyeToSourceUVOffset);                             \n"
-			"}                                                                                      \n"
-			"void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,         \n"
-			"          in float2 TexCoord0   : TEXCOORD0,   in float2 TexCoord1   : TEXCOORD1,      \n"
-			"          in float2 TexCoord2   : TEXCOORD2,                                           \n"
-			"          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,          \n"
-			"          out float2 oTexCoord0 : TEXCOORD0,   out float2 oTexCoord1 : TEXCOORD1,      \n"
-			"          out float2 oTexCoord2 : TEXCOORD2)                                           \n"
-			"{                                                                                      \n"
-			"    float timewarpLerpFactor = Color.a;                                                \n"
-			"    float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);\n"
-			"    oTexCoord0  = TimewarpTexCoord(TexCoord0,lerpedEyeRot);                            \n"
-			"    oTexCoord1  = TimewarpTexCoord(TexCoord1,lerpedEyeRot);                            \n"
-			"    oTexCoord2  = TimewarpTexCoord(TexCoord2,lerpedEyeRot);                            \n"
-			"    oPosition = float4(Position.xy, 0.5, 1.0);                                         \n"
-			"    oColor = Color.r;  /*For vignette fade*/                                           \n"
-			"}";
-		
-		pRender->InitShaders(vertexShader, pixelShader, &DistortionData.Shaders,
+    if (distortionCaps & ovrDistortion_TimeWarp)
+    {   // TIMEWARP
+        //--------------------------------------------------------------------------------------------
+        const char* vertexShader = 
+            "float2 EyeToSourceUVScale;                                                                \n"
+            "float2 EyeToSourceUVOffset;                                                               \n"
+            "float4x4 EyeRotationStart;                                                             \n"
+            "float4x4 EyeRotationEnd;                                                               \n"
+            "float2 TimewarpTexCoord(float2 TexCoord, float4x4 rotMat)                              \n"
+            "{                                                                                      \n"
+            // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic 
+            // aberration and distortion). These are now "real world" vectors in direction (x,y,1) 
+            // relative to the eye of the HMD.    Apply the 3x3 timewarp rotation to these vectors.
+            "    float3 transformed = float3( mul ( rotMat, float4(TexCoord.xy, 1, 1) ).xyz);       \n"
+            // Project them back onto the Z=1 plane of the rendered images.
+            "    float2 flattened = (transformed.xy / transformed.z);                               \n"
+            // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
+            "    return(EyeToSourceUVScale * flattened + EyeToSourceUVOffset);                             \n"
+            "}                                                                                      \n"
+            "void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,         \n"
+            "          in float2 TexCoord0   : TEXCOORD0,   in float2 TexCoord1   : TEXCOORD1,      \n"
+            "          in float2 TexCoord2   : TEXCOORD2,                                           \n"
+            "          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,          \n"
+            "          out float2 oTexCoord0 : TEXCOORD0,   out float2 oTexCoord1 : TEXCOORD1,      \n"
+            "          out float2 oTexCoord2 : TEXCOORD2)                                           \n"
+            "{                                                                                      \n"
+            "    float timewarpLerpFactor = Color.a;                                                \n"
+            "    float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);\n"
+            "    oTexCoord0  = TimewarpTexCoord(TexCoord0,lerpedEyeRot);                            \n"
+            "    oTexCoord1  = TimewarpTexCoord(TexCoord1,lerpedEyeRot);                            \n"
+            "    oTexCoord2  = TimewarpTexCoord(TexCoord2,lerpedEyeRot);                            \n"
+            "    oPosition = float4(Position.xy, 0.5, 1.0);                                         \n"
+            "    oColor = Color.r;  /*For vignette fade*/                                           \n"
+            "}";
+        
+        pRender->InitShaders(vertexShader, pixelShader, &DistortionData.Shaders,
                              &DistortionData.VertexIL,DistortionMeshVertexDesc,5);
-	}
-	else
-	{
-		//-------------------------------------------------------------------------------------------
-		const char* vertexShader = 
-			"float2 EyeToSourceUVScale;                                                                \n"
-			"float2 EyeToSourceUVOffset;                                                               \n"
-			"void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,         \n"
-			"          in float2 TexCoord0   : TEXCOORD0,   in float2 TexCoord1   : TEXCOORD1,      \n"
-			"          in float2 TexCoord2   : TEXCOORD2,                                           \n"
-			"          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,          \n"
-			"          out float2 oTexCoord0 : TEXCOORD0,   out float2 oTexCoord1 : TEXCOORD1,      \n"
-			"          out float2 oTexCoord2 : TEXCOORD2)                                           \n"
-			"{                                                                                      \n"
-			// Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
-			"    oTexCoord0  = EyeToSourceUVScale * TexCoord0 + EyeToSourceUVOffset;                      \n"
-			"    oTexCoord1  = EyeToSourceUVScale * TexCoord1 + EyeToSourceUVOffset;                      \n"
-			"    oTexCoord2  = EyeToSourceUVScale * TexCoord2 + EyeToSourceUVOffset;                      \n"
-			"    oPosition = float4(Position.xy, 0.5, 1.0);                                         \n"
-			"    oColor = Color.r;  /*For vignette fade*/                                           \n"
-			"}";
-		
-		pRender->InitShaders(vertexShader, pixelShader, &DistortionData.Shaders,
+    }
+    else
+    {
+        //-------------------------------------------------------------------------------------------
+        const char* vertexShader = 
+            "float2 EyeToSourceUVScale;                                                                \n"
+            "float2 EyeToSourceUVOffset;                                                               \n"
+            "void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,         \n"
+            "          in float2 TexCoord0   : TEXCOORD0,   in float2 TexCoord1   : TEXCOORD1,      \n"
+            "          in float2 TexCoord2   : TEXCOORD2,                                           \n"
+            "          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,          \n"
+            "          out float2 oTexCoord0 : TEXCOORD0,   out float2 oTexCoord1 : TEXCOORD1,      \n"
+            "          out float2 oTexCoord2 : TEXCOORD2)                                           \n"
+            "{                                                                                      \n"
+            // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
+            "    oTexCoord0  = EyeToSourceUVScale * TexCoord0 + EyeToSourceUVOffset;                      \n"
+            "    oTexCoord1  = EyeToSourceUVScale * TexCoord1 + EyeToSourceUVOffset;                      \n"
+            "    oTexCoord2  = EyeToSourceUVScale * TexCoord2 + EyeToSourceUVOffset;                      \n"
+            "    oPosition = float4(Position.xy, 0.5, 1.0);                                         \n"
+            "    oColor = Color.r;  /*For vignette fade*/                                           \n"
+            "}";
+        
+        pRender->InitShaders(vertexShader, pixelShader, &DistortionData.Shaders,
                              &DistortionData.VertexIL,DistortionMeshVertexDesc,5);
-	}
+    }
 }
 
 
@@ -188,39 +188,39 @@ void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
                           double timwarpTimePoint, ovrPosef eyeRenderPoses[2],
                           RenderDevice* pRender, Texture* pRendertargetTexture)
 {
- 	if (distortionCaps & ovrDistortion_TimeWarp)
-	{   // TIMEWARP
+     if (distortionCaps & ovrDistortion_TimeWarp)
+    {   // TIMEWARP
         // Wait till time-warp to reduce latency.
-	    ovr_WaitTillTime(timwarpTimePoint);
-	}
+        ovr_WaitTillTime(timwarpTimePoint);
+    }
 
-	// Clear screen
+    // Clear screen
     pRender->SetRenderTarget(NULL);
     pRender->SetFullViewport();
     pRender->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 
-	// Setup shader
-	ShaderFill distortionShaderFill(DistortionData.Shaders);
+    // Setup shader
+    ShaderFill distortionShaderFill(DistortionData.Shaders);
     distortionShaderFill.SetTexture(0, pRendertargetTexture);
     distortionShaderFill.SetInputLayout(DistortionData.VertexIL);
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
-		// Setup shader constants
-		DistortionData.Shaders->SetUniform2f("EyeToSourceUVScale",
+        // Setup shader constants
+        DistortionData.Shaders->SetUniform2f("EyeToSourceUVScale",
             DistortionData.UVScaleOffset[eyeNum][0].x, DistortionData.UVScaleOffset[eyeNum][0].y);
         DistortionData.Shaders->SetUniform2f("EyeToSourceUVOffset",
             DistortionData.UVScaleOffset[eyeNum][1].x, DistortionData.UVScaleOffset[eyeNum][1].y);
 
- 		if (distortionCaps & ovrDistortion_TimeWarp)
-		{   // TIMEWARP - Additional shader constants required
-			ovrMatrix4f timeWarpMatrices[2];
-			ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum, eyeRenderPoses[eyeNum], timeWarpMatrices);
-			DistortionData.Shaders->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
-			DistortionData.Shaders->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
-		}
-		// Perform distortion
-		pRender->Render(&distortionShaderFill,
+         if (distortionCaps & ovrDistortion_TimeWarp)
+        {   // TIMEWARP - Additional shader constants required
+            ovrMatrix4f timeWarpMatrices[2];
+            ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum, eyeRenderPoses[eyeNum], timeWarpMatrices);
+            DistortionData.Shaders->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
+            DistortionData.Shaders->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
+        }
+        // Perform distortion
+        pRender->Render(&distortionShaderFill,
                         DistortionData.MeshVBs[eyeNum], DistortionData.MeshIBs[eyeNum]);
     }
 
@@ -230,15 +230,15 @@ void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
 
 void DistortionMeshRelease(void)  
 {
-	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
-	{
-		DistortionData.MeshVBs[eyeNum].Clear();
-		DistortionData.MeshIBs[eyeNum].Clear();
-	}
+    for(int eyeNum = 0; eyeNum < 2; eyeNum++)
+    {
+        DistortionData.MeshVBs[eyeNum].Clear();
+        DistortionData.MeshIBs[eyeNum].Clear();
+    }
     if (DistortionData.Shaders)
     {
-	    DistortionData.Shaders->UnsetShader(Shader_Vertex);
-	    DistortionData.Shaders->UnsetShader(Shader_Pixel);
-    }	
+        DistortionData.Shaders->UnsetShader(Shader_Vertex);
+        DistortionData.Shaders->UnsetShader(Shader_Pixel);
+    }    
 }
 

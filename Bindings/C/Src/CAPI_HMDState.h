@@ -214,14 +214,14 @@ public:
     HMDState* getThis() { return this; }
 
     void updateLowPersistenceMode(bool lowPersistence) const;
-	void updateLatencyTestForHmd(bool latencyTesting);
+    void updateLatencyTestForHmd(bool latencyTesting);
     
-	// Get properties by name.
-	float    getFloatValue(const char* propertyName, float defaultVal);
+    // Get properties by name.
+    float    getFloatValue(const char* propertyName, float defaultVal);
     bool     setFloatValue(const char* propertyName, float value);
-	unsigned getFloatArray(const char* propertyName, float values[], unsigned arraySize);
+    unsigned getFloatArray(const char* propertyName, float values[], unsigned arraySize);
     bool     setFloatArray(const char* propertyName, float values[], unsigned arraySize);
-	const char* getString(const char* propertyName, const char* defaultVal);
+    const char* getString(const char* propertyName, const char* defaultVal);
 public:
     
     // Wrapper to support 'const'
@@ -267,7 +267,7 @@ public:
     volatile bool           SensorStarted;
     volatile bool           SensorCreated;
     // pSensor may still be null or non-running after start if it wasn't yet available
-    Ptr<SensorDevice>       pSensor;	// Head
+    Ptr<SensorDevice>       pSensor;    // Head
     unsigned                SensorCaps;    
 
     // SensorFusion state may be accessible without a lock.
@@ -281,7 +281,7 @@ public:
     
     // Latency tester
     Ptr<LatencyTestDevice>  pLatencyTester;
-    Util::LatencyTest	    LatencyUtil;
+    Util::LatencyTest        LatencyUtil;
     AtomicInt<int>          AddLatencyTestCount;
 
     bool                    LatencyTestActive;
@@ -290,7 +290,7 @@ public:
     // Using latency tester as debug display
     Ptr<LatencyTestDevice>  pLatencyTesterDisplay;
     AtomicInt<int>          AddLatencyTestDisplayCount;
-    Util::LatencyTest2	    LatencyUtil2;
+    Util::LatencyTest2        LatencyUtil2;
 
     bool                    LatencyTest2Active;
     unsigned char           LatencyTest2DrawColor[3];

@@ -496,7 +496,7 @@ OVR::SensorDevice* HMDDevice::GetSensor()
 {
     // Just return first sensor found since we have no way to match it yet.
 
-	// Create DK2 sensor if it exists otherwise create first DK1 sensor.
+    // Create DK2 sensor if it exists otherwise create first DK1 sensor.
     SensorDevice* sensor = NULL;
 
     DeviceEnumerator<SensorDevice> enumerator = GetManager()->EnumerateDevices<SensorDevice>();
@@ -521,9 +521,9 @@ OVR::SensorDevice* HMDDevice::GetSensor()
     }
 
     if (sensor)
-	{
+    {
         sensor->SetCoordinateFrame(SensorDevice::Coord_HMD);
-	}
+    }
 
     return sensor;
 }

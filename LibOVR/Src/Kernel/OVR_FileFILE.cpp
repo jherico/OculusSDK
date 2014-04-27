@@ -564,7 +564,7 @@ bool    FILEFile::CloseCancel()
 Ptr<File> FileFILEOpen(const String& path, int flags, int mode)
 {
     Ptr<File> result = *new FILEFile(path, flags, mode);
-	return result;
+    return result;
 }
 
 // Helper function: obtain file information time.

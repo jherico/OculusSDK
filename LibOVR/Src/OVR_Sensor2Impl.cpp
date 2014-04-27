@@ -58,51 +58,51 @@ enum Tracker2MessageType
 
 struct Tracker2Sensors
 {
-    UInt16	LastCommandID;
-    UByte	NumSamples;
-    UInt16	RunningSampleCount;				// Named 'SampleCount' in the firmware docs.
-    SInt16	Temperature;
-	UInt32	SampleTimestamp;
+    UInt16    LastCommandID;
+    UByte    NumSamples;
+    UInt16    RunningSampleCount;                // Named 'SampleCount' in the firmware docs.
+    SInt16    Temperature;
+    UInt32    SampleTimestamp;
     TrackerSample Samples[2];
-    SInt16	MagX, MagY, MagZ;
-    UInt16	FrameCount;
-	UInt32	FrameTimestamp;
-    UByte	FrameID;
-    UByte	CameraPattern;
-    UInt16	CameraFrameCount;				// Named 'CameraCount' in the firmware docs.
-	UInt32	CameraTimestamp;
+    SInt16    MagX, MagY, MagZ;
+    UInt16    FrameCount;
+    UInt32    FrameTimestamp;
+    UByte    FrameID;
+    UByte    CameraPattern;
+    UInt16    CameraFrameCount;                // Named 'CameraCount' in the firmware docs.
+    UInt32    CameraTimestamp;
 
     Tracker2MessageType Decode(const UByte* buffer, int size)
     {
         if (size < 64)
             return Tracker2Message_SizeError;
 
-		LastCommandID		= DecodeUInt16(buffer + 1);
-        NumSamples			= buffer[3];
-        RunningSampleCount	= DecodeUInt16(buffer + 4);
-        Temperature			= DecodeSInt16(buffer + 6);
-        SampleTimestamp		= DecodeUInt32(buffer + 8);
+        LastCommandID        = DecodeUInt16(buffer + 1);
+        NumSamples            = buffer[3];
+        RunningSampleCount    = DecodeUInt16(buffer + 4);
+        Temperature            = DecodeSInt16(buffer + 6);
+        SampleTimestamp        = DecodeUInt32(buffer + 8);
         
-		// Only unpack as many samples as there actually are.
+        // Only unpack as many samples as there actually are.
         UByte iterationCount = (NumSamples > 1) ? 2 : NumSamples;
 
         for (UByte i = 0; i < iterationCount; i++)
         {
-			UnpackSensor(buffer + 12 + 16 * i, &Samples[i].AccelX, &Samples[i].AccelY, &Samples[i].AccelZ);
+            UnpackSensor(buffer + 12 + 16 * i, &Samples[i].AccelX, &Samples[i].AccelY, &Samples[i].AccelZ);
             UnpackSensor(buffer + 20 + 16 * i, &Samples[i].GyroX,  &Samples[i].GyroY,  &Samples[i].GyroZ);
-		}
+        }
 
         MagX = DecodeSInt16(buffer + 44);
         MagY = DecodeSInt16(buffer + 46);
         MagZ = DecodeSInt16(buffer + 48);
 
-		FrameCount = DecodeUInt16(buffer + 50);
+        FrameCount = DecodeUInt16(buffer + 50);
 
-		FrameTimestamp		= DecodeUInt32(buffer + 52);
-		FrameID				= buffer[56];
-		CameraPattern		= buffer[57];
-		CameraFrameCount	= DecodeUInt16(buffer + 58);
-		CameraTimestamp		= DecodeUInt32(buffer + 60);
+        FrameTimestamp        = DecodeUInt32(buffer + 52);
+        FrameID                = buffer[56];
+        CameraPattern        = buffer[57];
+        CameraFrameCount    = DecodeUInt16(buffer + 58);
+        CameraTimestamp        = DecodeUInt32(buffer + 60);
         
         return Tracker2Message_Sensors;
     }
@@ -228,7 +228,7 @@ void Sensor2DeviceImpl::openDevice()
         Coordinates = (displayInfo.DistortionType & SensorDisplayInfoImpl::Mask_BaseFmt) ?
                       Coord_HMD : Coord_Sensor;
     }
-	Coordinates = Coord_HMD; // TODO temporary to force it behave
+    Coordinates = Coord_HMD; // TODO temporary to force it behave
 
     // Read/Apply sensor config.
     setCoordinateFrame(Coordinates);
@@ -251,14 +251,14 @@ void Sensor2DeviceImpl::openDevice()
 
 bool Sensor2DeviceImpl::SetTrackingReport(const TrackingReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setTrackingReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setTrackingReport(const TrackingReport& data)
@@ -269,14 +269,14 @@ bool Sensor2DeviceImpl::setTrackingReport(const TrackingReport& data)
 
 bool Sensor2DeviceImpl::GetTrackingReport(TrackingReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getTrackingReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getTrackingReport(TrackingReport* data)
@@ -294,14 +294,14 @@ bool Sensor2DeviceImpl::getTrackingReport(TrackingReport* data)
 
 bool Sensor2DeviceImpl::SetDisplayReport(const DisplayReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setDisplayReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setDisplayReport(const DisplayReport& data)
@@ -312,14 +312,14 @@ bool Sensor2DeviceImpl::setDisplayReport(const DisplayReport& data)
 
 bool Sensor2DeviceImpl::GetDisplayReport(DisplayReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getDisplayReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getDisplayReport(DisplayReport* data)
@@ -337,14 +337,14 @@ bool Sensor2DeviceImpl::getDisplayReport(DisplayReport* data)
 
 bool Sensor2DeviceImpl::SetMagCalibrationReport(const MagCalibrationReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setMagCalibrationReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setMagCalibrationReport(const MagCalibrationReport& data)
@@ -361,14 +361,14 @@ bool Sensor2DeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
         return getMagCalibrationReport(data);
     }
 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getMagCalibrationReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getMagCalibrationReport(MagCalibrationReport* data)
@@ -388,26 +388,26 @@ bool Sensor2DeviceImpl::SetPositionCalibrationReport(const PositionCalibrationRe
 { 
     Lock::Locker lock(&IndexedReportLock);
 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setPositionCalibrationReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setPositionCalibrationReport(const PositionCalibrationReport& data)
 {
-	UByte version = GetDeviceInterfaceVersion();
-	if (version < 5)
-	{
-		PositionCalibrationImpl_Pre5 pci(data);
-		return GetInternalDevice()->SetFeatureReport(pci.Buffer, PositionCalibrationImpl_Pre5::PacketSize);
-	}
-	
-	PositionCalibrationImpl pci(data);
+    UByte version = GetDeviceInterfaceVersion();
+    if (version < 5)
+    {
+        PositionCalibrationImpl_Pre5 pci(data);
+        return GetInternalDevice()->SetFeatureReport(pci.Buffer, PositionCalibrationImpl_Pre5::PacketSize);
+    }
+    
+    PositionCalibrationImpl pci(data);
     return GetInternalDevice()->SetFeatureReport(pci.Buffer, PositionCalibrationImpl::PacketSize);
 }
 
@@ -415,31 +415,31 @@ bool Sensor2DeviceImpl::GetPositionCalibrationReport(PositionCalibrationReport* 
 {
     Lock::Locker lock(&IndexedReportLock);
 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getPositionCalibrationReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getPositionCalibrationReport(PositionCalibrationReport* data)
 {
-	UByte version = GetDeviceInterfaceVersion();
-	if (version < 5)
-	{
-		PositionCalibrationImpl_Pre5 pci;
-		if (GetInternalDevice()->GetFeatureReport(pci.Buffer, PositionCalibrationImpl_Pre5::PacketSize))
-		{
-			pci.Unpack();
-			*data = pci.Settings;
-			return true;
-		}
+    UByte version = GetDeviceInterfaceVersion();
+    if (version < 5)
+    {
+        PositionCalibrationImpl_Pre5 pci;
+        if (GetInternalDevice()->GetFeatureReport(pci.Buffer, PositionCalibrationImpl_Pre5::PacketSize))
+        {
+            pci.Unpack();
+            *data = pci.Settings;
+            return true;
+        }
 
-		return false;
-	}
+        return false;
+    }
 
     PositionCalibrationImpl pci;
     if (GetInternalDevice()->GetFeatureReport(pci.Buffer, PositionCalibrationImpl::PacketSize))
@@ -482,14 +482,14 @@ bool Sensor2DeviceImpl::GetAllPositionCalibrationReports(Array<PositionCalibrati
 
 bool Sensor2DeviceImpl::SetCustomPatternReport(const CustomPatternReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setCustomPatternReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setCustomPatternReport(const CustomPatternReport& data)
@@ -500,14 +500,14 @@ bool Sensor2DeviceImpl::setCustomPatternReport(const CustomPatternReport& data)
 
 bool Sensor2DeviceImpl::GetCustomPatternReport(CustomPatternReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getCustomPatternReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getCustomPatternReport(CustomPatternReport* data)
@@ -525,14 +525,14 @@ bool Sensor2DeviceImpl::getCustomPatternReport(CustomPatternReport* data)
 
 bool Sensor2DeviceImpl::SetManufacturingReport(const ManufacturingReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setManufacturingReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setManufacturingReport(const ManufacturingReport& data)
@@ -543,14 +543,14 @@ bool Sensor2DeviceImpl::setManufacturingReport(const ManufacturingReport& data)
 
 bool Sensor2DeviceImpl::GetManufacturingReport(ManufacturingReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getManufacturingReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getManufacturingReport(ManufacturingReport* data)
@@ -568,14 +568,14 @@ bool Sensor2DeviceImpl::getManufacturingReport(ManufacturingReport* data)
 
 bool Sensor2DeviceImpl::SetLensDistortionReport(const LensDistortionReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setLensDistortionReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setLensDistortionReport(const LensDistortionReport& data)
@@ -586,14 +586,14 @@ bool Sensor2DeviceImpl::setLensDistortionReport(const LensDistortionReport& data
 
 bool Sensor2DeviceImpl::GetLensDistortionReport(LensDistortionReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getLensDistortionReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getLensDistortionReport(LensDistortionReport* data)
@@ -611,14 +611,14 @@ bool Sensor2DeviceImpl::getLensDistortionReport(LensDistortionReport* data)
 
 bool Sensor2DeviceImpl::SetUUIDReport(const UUIDReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setUUIDReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setUUIDReport(const UUIDReport& data)
@@ -629,14 +629,14 @@ bool Sensor2DeviceImpl::setUUIDReport(const UUIDReport& data)
 
 bool Sensor2DeviceImpl::GetUUIDReport(UUIDReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getUUIDReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getUUIDReport(UUIDReport* data)
@@ -654,14 +654,14 @@ bool Sensor2DeviceImpl::getUUIDReport(UUIDReport* data)
 
 bool Sensor2DeviceImpl::SetKeepAliveMuxReport(const KeepAliveMuxReport& data)
 { 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setKeepAliveMuxReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setKeepAliveMuxReport(const KeepAliveMuxReport& data)
@@ -672,14 +672,14 @@ bool Sensor2DeviceImpl::setKeepAliveMuxReport(const KeepAliveMuxReport& data)
 
 bool Sensor2DeviceImpl::GetKeepAliveMuxReport(KeepAliveMuxReport* data)
 {
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getKeepAliveMuxReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getKeepAliveMuxReport(KeepAliveMuxReport* data)
@@ -706,13 +706,13 @@ bool Sensor2DeviceImpl::SetTemperatureReport(const TemperatureReport& data)
     }
 
     bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setTemperatureReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::setTemperatureReport(const TemperatureReport& data)
@@ -731,14 +731,14 @@ bool Sensor2DeviceImpl::GetTemperatureReport(TemperatureReport* data)
         return getTemperatureReport(data);
     }
 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getTemperatureReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::GetAllTemperatureReports(Array<Array<TemperatureReport> >* data)
@@ -791,13 +791,13 @@ bool Sensor2DeviceImpl::GetGyroOffsetReport(GyroOffsetReport* data)
     }
 
     bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
+    if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::getGyroOffsetReport, &result, data))
-	{
-		return false;
-	}
+    {
+        return false;
+    }
 
-	return result;
+    return result;
 }
 
 bool Sensor2DeviceImpl::getGyroOffsetReport(GyroOffsetReport* data)
@@ -948,13 +948,13 @@ void Sensor2DeviceImpl::onTrackerMessage(Tracker2Message* message)
     else
     {
         if (s.NumSamples != 0)
-		{
-			UByte i = (s.NumSamples > 1) ? 1 : 0;
-			LastAcceleration  = AccelFromBodyFrameUpdate(s, i);
-			LastRotationRate  = EulerFromBodyFrameUpdate(s, i);
-			LastMagneticField = MagFromBodyFrameUpdate(s);
-			LastTemperature   = s.Temperature * 0.01f;
-		}
+        {
+            UByte i = (s.NumSamples > 1) ? 1 : 0;
+            LastAcceleration  = AccelFromBodyFrameUpdate(s, i);
+            LastRotationRate  = EulerFromBodyFrameUpdate(s, i);
+            LastMagneticField = MagFromBodyFrameUpdate(s);
+            LastTemperature   = s.Temperature * 0.01f;
+        }
     }
 }
 
@@ -1028,10 +1028,10 @@ void UpdateDK2Timestamps(SensorTimeFilter& tf,
 
 void Sensor2DeviceImpl::OnInputReport(UByte* pData, UInt32 length)
 {
-	bool processed = false;
+    bool processed = false;
     if (!processed)
     {
-		Tracker2Message message;
+        Tracker2Message message;
         if (decodeTracker2Message(&message, pData, length))
         {
             processed = true;
@@ -1118,7 +1118,7 @@ double Sensor2DeviceImpl::OnTicks(double tickSeconds)
         KeepAliveMuxImpl keepAliveImpl(keepAlive);
         GetInternalDevice()->SetFeatureReport(keepAliveImpl.Buffer, KeepAliveMuxImpl::PacketSize);
 
-		// Emit keep-alive every few seconds.
+        // Emit keep-alive every few seconds.
         double keepAliveDelta = 3.0;        // Use 3-second interval.
         NextKeepAliveTickSeconds = tickSeconds + keepAliveDelta;
     }

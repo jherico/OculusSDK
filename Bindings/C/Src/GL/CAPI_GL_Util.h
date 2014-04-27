@@ -140,7 +140,7 @@ public:
 
 class Texture : public RefCountBase<Texture>
 {
-	bool IsUserAllocated;
+    bool IsUserAllocated;
 
 public:
     RenderParams* pParams;
@@ -203,7 +203,7 @@ protected:
     Array<Uniform> UniformInfo;
 
 public:
-	GLuint Prog;
+    GLuint Prog;
     GLint     ProjLoc, ViewLoc;
     GLint     TexLoc[8];
     bool      UsesLighting;
@@ -218,7 +218,7 @@ public:
 
     virtual void Set(PrimitiveType prim) const
     {
-		glUseProgram(Prog);
+        glUseProgram(Prog);
 
         for (int i = 0; i < Shader_Count; i++)
             if (Shaders[i])
@@ -263,7 +263,7 @@ public:
     }
 
 protected:
-	GLint GetGLShader(Shader* s);
+    GLint GetGLShader(Shader* s);
     bool Link();
 };
 
@@ -284,15 +284,15 @@ public:
     void*       GetInputLayout() const  { return InputLayout; }
 
     virtual void Set(PrimitiveType prim = Prim_Unknown) const {
-		Shaders->Set(prim);
-		for(int i = 0; i < 8; i++)
-		{
-			if(Textures[i])
-			{
-				Textures[i]->Set(i);
-			}
-		}
-	}
+        Shaders->Set(prim);
+        for(int i = 0; i < 8; i++)
+        {
+            if(Textures[i])
+            {
+                Textures[i]->Set(i);
+            }
+        }
+    }
 
     virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
 };
@@ -331,32 +331,32 @@ public:
     unsigned char*  UniformData;
     int             UniformsSize;
 
-	enum VarType
-	{
-		VARTYPE_FLOAT,
-		VARTYPE_INT,
-		VARTYPE_BOOL,
-	};
+    enum VarType
+    {
+        VARTYPE_FLOAT,
+        VARTYPE_INT,
+        VARTYPE_BOOL,
+    };
 
-	struct Uniform
-	{
-		const char* Name;
-		VarType Type;
-		int     Offset, Size;
-	};
+    struct Uniform
+    {
+        const char* Name;
+        VarType Type;
+        int     Offset, Size;
+    };
     const Uniform* UniformRefl;
     size_t UniformReflSize;
 
-	ShaderBase(RenderParams* rp, ShaderStage stage) : Shader(stage), pParams(rp), UniformData(0), UniformsSize(0) {}
-	~ShaderBase()
-	{
-		if (UniformData)
-			OVR_FREE(UniformData);
-	}
+    ShaderBase(RenderParams* rp, ShaderStage stage) : Shader(stage), pParams(rp), UniformData(0), UniformsSize(0) {}
+    ~ShaderBase()
+    {
+        if (UniformData)
+            OVR_FREE(UniformData);
+    }
 
     void InitUniforms(const Uniform* refl, size_t reflSize);
-	bool SetUniform(const char* name, int n, const float* v);
-	bool SetUniformBool(const char* name, int n, const bool* v);
+    bool SetUniform(const char* name, int n, const float* v);
+    bool SetUniformBool(const char* name, int n, const bool* v);
 
     void UpdateBuffer(Buffer* b);
 };
@@ -369,52 +369,52 @@ class ShaderImpl : public ShaderBase
 
 public:
     ShaderImpl(RenderParams* rp, void* s, size_t size, const Uniform* refl, size_t reflSize)
-		: ShaderBase(rp, SStage)
-		, GLShader(0)
+        : ShaderBase(rp, SStage)
+        , GLShader(0)
     {
         bool success;
         OVR_UNUSED(size);
         success = Compile((const char*) s);
         OVR_ASSERT(success);
-		InitUniforms(refl, reflSize);
+        InitUniforms(refl, reflSize);
     }
     ~ShaderImpl()
     {
-		if (GLShader)
-		{
-			glDeleteShader(GLShader);
-			GLShader = 0;
-		}
+        if (GLShader)
+        {
+            glDeleteShader(GLShader);
+            GLShader = 0;
+        }
     }
 
     bool Compile(const char* src)
-	{
-		if (!GLShader)
-			GLShader = glCreateShader(GLStage());
+    {
+        if (!GLShader)
+            GLShader = glCreateShader(GLStage());
 
-		glShaderSource(GLShader, 1, &src, 0);
-		glCompileShader(GLShader);
-		GLint r;
-		glGetShaderiv(GLShader, GL_COMPILE_STATUS, &r);
-		if (!r)
-		{
-			GLchar msg[1024];
-			glGetShaderInfoLog(GLShader, sizeof(msg), 0, msg);
-			if (msg[0])
-				OVR_DEBUG_LOG(("Compiling shader\n%s\nfailed: %s\n", src, msg));
+        glShaderSource(GLShader, 1, &src, 0);
+        glCompileShader(GLShader);
+        GLint r;
+        glGetShaderiv(GLShader, GL_COMPILE_STATUS, &r);
+        if (!r)
+        {
+            GLchar msg[1024];
+            glGetShaderInfoLog(GLShader, sizeof(msg), 0, msg);
+            if (msg[0])
+                OVR_DEBUG_LOG(("Compiling shader\n%s\nfailed: %s\n", src, msg));
 
-			return 0;
-		}
-		return 1;
-	}
+            return 0;
+        }
+        return 1;
+    }
 
     GLenum GLStage() const
     {
-		return SType;
-	}
+        return SType;
+    }
 
 private:
-	GLuint GLShader;
+    GLuint GLShader;
 };
 
 typedef ShaderImpl<Shader_Vertex,  GL_VERTEX_SHADER> VertexShader;

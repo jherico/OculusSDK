@@ -212,7 +212,7 @@ public:
           ConnectedFlag(true), HandlerRef(device)
     {
     }
-	virtual ~DeviceCommon() {}
+    virtual ~DeviceCommon() {}
 
     // Device reference counting delegates to Manager thread to actually kill devices.
     void DeviceAddRef();
@@ -238,7 +238,7 @@ public:
     {
     }
 
-	// Convenience method to avoid manager access typecasts.
+    // Convenience method to avoid manager access typecasts.
     DeviceManagerImpl*  GetManagerImpl() const      { return pCreateDesc->pLock->pManager; }
 
     // Inline to avoid warnings.

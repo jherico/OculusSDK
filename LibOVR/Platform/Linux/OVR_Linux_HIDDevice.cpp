@@ -166,7 +166,7 @@ bool HIDDeviceManager::getIntProperty(udev_device* device,
                                       SInt32* pResult)
 {
     const char* str = udev_device_get_sysattr_value(device, propertyName);
-	if (str)
+    if (str)
     {
         *pResult = strtol(str, NULL, 16);
         return true;
@@ -207,11 +207,11 @@ bool HIDDeviceManager::getStringProperty(udev_device* device,
 {
     // Get the attribute in UTF8
     const char* str = udev_device_get_sysattr_value(device, propertyName);
-	if (str)
+    if (str)
     {   // Copy the string into the return value
-		*pResult = String(str);
+        *pResult = String(str);
         return true;
-	}
+    }
     else
     {
         return false;
@@ -299,7 +299,7 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
         }
     }
 
-	// Free the enumerator and udev objects
+    // Free the enumerator and udev objects
     udev_enumerate_unref(devices);
 
     return true;
@@ -666,7 +666,7 @@ bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
     }
 
     int r = ioctl(DeviceHandle, HIDIOCSFEATURE(length), data);
-	return (r >= 0);
+    return (r >= 0);
 }
 
 //-----------------------------------------------------------------------------
@@ -675,7 +675,7 @@ bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
     if (DeviceHandle < 0)
         return false;
 
-	int r = ioctl(DeviceHandle, HIDIOCGFEATURE(length), data);
+    int r = ioctl(DeviceHandle, HIDIOCGFEATURE(length), data);
     return (r >= 0);
 }
 

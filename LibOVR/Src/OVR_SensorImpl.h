@@ -231,8 +231,8 @@ public:
                                                                 DeviceFactory::EnumerateVisitor& visitor);
 
     // These methods actually store data in a JSON file
-    virtual bool		SetMagCalibrationReport(const MagCalibrationReport& data);
-	virtual bool		GetMagCalibrationReport(MagCalibrationReport* data);
+    virtual bool        SetMagCalibrationReport(const MagCalibrationReport& data);
+    virtual bool        GetMagCalibrationReport(MagCalibrationReport* data);
 
 protected:
 
@@ -247,8 +247,8 @@ protected:
     Void            setOnboardCalibrationEnabled(bool enabled);
 
     // Called for decoded messages
-    void			onTrackerMessage(TrackerMessage* message);
-	bool			decodeTrackerMessage(TrackerMessage* message, UByte* buffer, int size);
+    void            onTrackerMessage(TrackerMessage* message);
+    bool            decodeTrackerMessage(TrackerMessage* message, UByte* buffer, int size);
 
     // Helpers to reduce casting.
 /*
@@ -275,7 +275,7 @@ protected:
     Vector3f    LastMagneticField;
 
     // This tracks wrap around, and should be monotonically increasing.
-    UInt32		FullTimestamp;
+    UInt32        FullTimestamp;
 
     // Current sensor range obtained from device. 
     SensorRange MaxValidRange;
@@ -294,9 +294,9 @@ protected:
     double           PrevAbsoluteTime;
 
 #ifdef OVR_OS_ANDROID
-    void 	        replaceWithPhoneMag(Vector3f* val);
+    void             replaceWithPhoneMag(Vector3f* val);
 
-    PhoneSensors* 	pPhoneSensors;
+    PhoneSensors*     pPhoneSensors;
 #endif
 
 private:

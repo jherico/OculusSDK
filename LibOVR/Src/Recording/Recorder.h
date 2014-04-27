@@ -79,11 +79,11 @@ namespace OVR{
             {
             }
 
-            Vision::CameraIntrinsics		 intrinsics;
-            Vision::DistortionCoefficients	 distortion;
+            Vision::CameraIntrinsics         intrinsics;
+            Vision::DistortionCoefficients     distortion;
             Array<PositionCalibrationReport> ledPositions;
-            PositionCalibrationReport		 imuPosition;
-            UByte							 devIfcVersion;
+            PositionCalibrationReport         imuPosition;
+            UByte                             devIfcVersion;
         };
 
         // Global Interface
@@ -171,7 +171,7 @@ namespace OVR{
         bool DoToggleRecording(const RecordingMode mode);
 
         // Keep this up-to-date when the recording format changes
-        static const UInt16	RECORDING_FORMAT_VERSION = 1;
+        static const UInt16    RECORDING_FORMAT_VERSION = 1;
 
     private:
         Ptr<LogDataEntryBase> getNewEntry(const char* label, const float&);
@@ -204,19 +204,19 @@ namespace OVR{
         String getFilePrefix();
 
         // File that will contain simulation/playback data
-        FILE*								recFile;
-        vortex::CMatFile					matFile;
+        FILE*                                recFile;
+        vortex::CMatFile                    matFile;
 
         // Logging data to be written to .mat file
         StringHash<Ptr<LogDataEntryBase> > logDataBuffer;
 
         StartupParams startup; // Startup params.  Must be written before general messages
-        bool		  readyForMessages; // Indicates that the startup params have been written, and we can safely write messages to the .rec file
+        bool          readyForMessages; // Indicates that the startup params have been written, and we can safely write messages to the .rec file
 
         // To preserve ordering of incoming messages
-        Lock								recorderLock;
-        // How/are we currently recording?		
-        UByte								recordingMode;
+        Lock                                recorderLock;
+        // How/are we currently recording?        
+        UByte                                recordingMode;
     };
 
 };

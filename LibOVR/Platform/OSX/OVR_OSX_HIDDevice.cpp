@@ -61,7 +61,7 @@ bool HIDDeviceManager::initializeManager()
         return true;
     }
 
-	HIDManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+    HIDManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
 
     if (!HIDManager)
     {
@@ -313,7 +313,7 @@ bool HIDDeviceManager::getPath(IOHIDDeviceRef device, String* pPath)
     }
 
     String serialNumber;
-	if (!getSerialNumberString(device, &serialNumber))
+    if (!getSerialNumberString(device, &serialNumber))
     {
         return false;
     }
@@ -339,11 +339,11 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
     }
 
 
-	CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager);
+    CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager);
     if (!deviceSet)
         return false;
 
-	CFIndex deviceCount = CFSetGetCount(deviceSet);
+    CFIndex deviceCount = CFSetGetCount(deviceSet);
 
     // Allocate a block of memory and read the set into it.
     IOHIDDeviceRef* devices = (IOHIDDeviceRef*) OVR_ALLOC(sizeof(IOHIDDeviceRef) * deviceCount);
@@ -577,8 +577,8 @@ bool HIDDevice::openDevice()
 {
 
     // Have to iterate through devices again to generate paths.
-	CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager->HIDManager);
-	CFIndex deviceCount = CFSetGetCount(deviceSet);
+    CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager->HIDManager);
+    CFIndex deviceCount = CFSetGetCount(deviceSet);
 
     // Allocate a block of memory and read the set into it.
     IOHIDDeviceRef* devices = (IOHIDDeviceRef*) OVR_ALLOC(sizeof(IOHIDDeviceRef) * deviceCount);
@@ -728,7 +728,7 @@ bool HIDDevice::setupDevicePluggedInNotification()
     // Iterate through to arm.
     while (IOIteratorNext(RepluggedNotification))
     {
-	}
+    }
 
     return true;
 }
@@ -754,7 +754,7 @@ void HIDDevice::closeDevice(bool wasUnplugged)
         IOHIDDeviceClose(Device, kIOHIDOptionsTypeNone);
     }
 
-	CFRelease(Device);
+    CFRelease(Device);
     Device = NULL;
 
     LogText("OVR::OSX::HIDDevice - HID Device Closed '%s'\n", DevDesc.Path.ToCStr());
@@ -824,7 +824,7 @@ bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
         length--;
     }
 
-	IOReturn result = IOHIDDeviceSetReport( Device,
+    IOReturn result = IOHIDDeviceSetReport( Device,
                                             kIOHIDReportTypeFeature,
                                             reportID,
                                             data,
@@ -841,7 +841,7 @@ bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
     CFIndex bufferLength = length;
 
     // Report id is in first byte of the buffer.
-	IOReturn result = IOHIDDeviceGetReport(Device, kIOHIDReportTypeFeature, data[0], data, &bufferLength);
+    IOReturn result = IOHIDDeviceGetReport(Device, kIOHIDReportTypeFeature, data[0], data, &bufferLength);
 
     return (result == kIOReturnSuccess);
 }

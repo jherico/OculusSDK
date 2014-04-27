@@ -68,7 +68,7 @@ public:
     virtual int GetHeight() const { return Height; }
 
     virtual void SetSampleMode(int);
-	virtual ovrTexture Get_ovrTexture();
+    virtual ovrTexture Get_ovrTexture();
 
     virtual void Set(int slot, ShaderStage stage = Shader_Fragment) const;
 };
@@ -84,7 +84,7 @@ public:
         Compile(src);
     }
 
-	~Shader();
+    ~Shader();
     bool Compile(const char* src);
 
     GLenum GLStage() const
@@ -123,7 +123,7 @@ public:
     ~ShaderSet();
 
     virtual void SetShader(Render::Shader *s);
-	virtual void UnsetShader(int stage);
+    virtual void UnsetShader(int stage);
 
     virtual void Set(PrimitiveType prim) const;
 
@@ -167,13 +167,13 @@ public:
     virtual ~RenderDevice();
 
     virtual void Shutdown();
-	
+    
     virtual void FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex);
 
     virtual void SetViewport(const Recti& vp);
 
     //virtual void SetScissor(int x, int y, int w, int h);
-		
+        
     virtual void WaitUntilGpuIdle();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1,

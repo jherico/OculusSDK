@@ -49,9 +49,9 @@ public:
     virtual const Elem&  PeekBack   (int count = 0) const; // Returns count-th Item from the end
     virtual const Elem&  PeekFront  (int count = 0) const; // Returns count-th Item from the beginning
 
-	virtual inline UPInt GetSize    (void)          const; // Returns Number of Elements
+    virtual inline UPInt GetSize    (void)          const; // Returns Number of Elements
     virtual inline UPInt GetCapacity(void)          const; // Returns the maximum possible number of elements
-    virtual void         Clear      (void);				   // Remove all elements
+    virtual void         Clear      (void);                   // Remove all elements
     virtual inline bool  IsEmpty    ()              const;
     virtual inline bool  IsFull     ()              const;
 
@@ -74,12 +74,12 @@ class InPlaceMutableDeque : public Deque<Elem>
 {
 public:
     InPlaceMutableDeque( int capacity = Deque<Elem>::DefaultCapacity ) : Deque<Elem>( capacity ) {}
-	virtual ~InPlaceMutableDeque() {};
+    virtual ~InPlaceMutableDeque() {};
 
-	virtual Elem& PeekBack  (int count = 0); // Returns count-th Item from the end
-	virtual Elem& PeekFront (int count = 0); // Returns count-th Item from the beginning
+    virtual Elem& PeekBack  (int count = 0); // Returns count-th Item from the end
+    virtual Elem& PeekFront (int count = 0); // Returns count-th Item from the beginning
 private:
-	InPlaceMutableDeque& operator=(const InPlaceMutableDeque& q) {};
+    InPlaceMutableDeque& operator=(const InPlaceMutableDeque& q) {};
 };
 
 // Same as Deque, but allows to write more elements than maximum capacity
@@ -179,11 +179,11 @@ Elem Deque<Elem>::PopFront(void)
     // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( ElemCount > 0 );
 
-	Elem ReturnValue = Data[ Beginning ];
+    Elem ReturnValue = Data[ Beginning ];
     Destruct<Elem>(&Data[ Beginning ]);
     Construct<Elem>(&Data[ Beginning ]);
 
-	++Beginning;
+    ++Beginning;
     --ElemCount;
 
     // Check for wrap-around
@@ -242,7 +242,7 @@ const Elem& Deque<Elem>::PeekBack(int count) const
 template <class Elem>
 Elem& InPlaceMutableDeque<Elem>::PeekFront(int count)
 {
-	// Error Check: Make sure we aren't reading from an empty Deque
+    // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( Deque<Elem>::ElemCount > count );
 
     int idx = Deque<Elem>::Beginning + count;
@@ -254,11 +254,11 @@ Elem& InPlaceMutableDeque<Elem>::PeekFront(int count)
 template <class Elem>
 Elem& InPlaceMutableDeque<Elem>::PeekBack(int count)
 {
-	// Error Check: Make sure we aren't reading from an empty Deque
+    // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( Deque<Elem>::ElemCount > count );
 
     int idx = Deque<Elem>::End - count - 1;
-	if (idx < 0)
+    if (idx < 0)
         idx += Deque<Elem>::Capacity;
     return Deque<Elem>::Data[ idx ];
 }

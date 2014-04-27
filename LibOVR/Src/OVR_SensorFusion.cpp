@@ -111,7 +111,7 @@ bool SensorFusion::AttachToSensor(SensorDevice* sensor)
             // convert from vision to the world frame
             IMUPosition.x *= -1.0;
             IMUPosition.z *= -1.0;
-		}
+        }
         else
         {
             // TODO: set up IMUPosition for devices that don't have this report.
@@ -244,11 +244,11 @@ void SensorFusion::OnVisionSuccess(const Pose<double>& pose, UInt32 exposureCoun
     // This is in the world frame, so transform the vision data appropriately
 
     VisionError.Transform.Position    = CameraPose.Orientation.Rotate(VisionState.Transform.Position) + CameraPose.Position - 
-						           LastVisionExposureRecord.State.Transform.Position;
+                                   LastVisionExposureRecord.State.Transform.Position;
     VisionError.LinearVelocity   = CameraPose.Orientation.Rotate(VisionState.LinearVelocity) - 
-        						   LastVisionExposureRecord.State.LinearVelocity;
+                                   LastVisionExposureRecord.State.LinearVelocity;
     VisionError.Transform.Orientation = CameraPose.Orientation * VisionState.Transform.Orientation * 
-	                               LastVisionExposureRecord.State.Transform.Orientation.Inverted();
+                                   LastVisionExposureRecord.State.Transform.Orientation.Inverted();
 }
 
 Pose<double> SensorFusion::GetVisionPrediction(UInt32 exposureCounter)
@@ -313,8 +313,8 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     if (EnableYawCorrection && visionIsRecent)
         applyVisionYawCorrection(DeltaT);
     // Yaw correction based on magnetometer
-	if (EnableYawCorrection && MagCalibrated) // MagCalibrated is always false for DK2 for now
-		applyMagYawCorrection(mag, DeltaT);
+    if (EnableYawCorrection && MagCalibrated) // MagCalibrated is always false for DK2 for now
+        applyMagYawCorrection(mag, DeltaT);
 
     // Update camera orientation
     if (EnableCameraTiltCorrection && visionIsRecent)
@@ -359,14 +359,14 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     CurrentExposureIMUDelta.StoreAndIntegrateGyro(gyro, DeltaT);
     CurrentExposureIMUDelta.StoreAndIntegrateAccelerometer(accelW, DeltaT);
 
-	// If we only compiled the stub version of Recorder, then branch prediction shouldn't
-	// have any problem with this if statement. Actually, it should be optimized out, but need to verify.
-	if(Recorder::GetRecorder())
-	{
+    // If we only compiled the stub version of Recorder, then branch prediction shouldn't
+    // have any problem with this if statement. Actually, it should be optimized out, but need to verify.
+    if(Recorder::GetRecorder())
+    {
         Posed savePose = static_cast<Posed>(GetPoseAtTime(GetTime()));
-		Recorder::LogData("sfTimeSeconds", State.TimeInSeconds);
-		Recorder::LogData("sfPose", savePose);
-	}
+        Recorder::LogData("sfTimeSeconds", State.TimeInSeconds);
+        Recorder::LogData("sfPose", savePose);
+    }
 
     // Store the lockless state.    
     LocklessState lstate;
@@ -448,8 +448,8 @@ Quatd extractYawRotation(const Quatd &error)
 void SensorFusion::applyPositionCorrection(double deltaT)
 {
     // Each component of gainPos is equivalent to a Kalman gain of (sigma_process / sigma_observation)
-	const Vector3d gainPos = Vector3d(10, 10, 8);
-	const Vector3d gainVel = gainPos.EntrywiseMultiply(gainPos) * 0.5;
+    const Vector3d gainPos = Vector3d(10, 10, 8);
+    const Vector3d gainVel = gainPos.EntrywiseMultiply(gainPos) * 0.5;
     const double snapThreshold = 0.1; // Large value (previously 0.01, which caused frequent jumping)
 
     if (LastVisionExposureRecord.ExposureCounter <= FullVisionCorrectionExposureCounter)
@@ -468,7 +468,7 @@ void SensorFusion::applyPositionCorrection(double deltaT)
     {
         State.Transform.Position += VisionError.Transform.Position.EntrywiseMultiply(gainPos) * deltaT;
         State.LinearVelocity += VisionError.Transform.Position.EntrywiseMultiply(gainVel) * deltaT;
-		// Uncomment the line below to try acclerometer bias estimation in filter
+        // Uncomment the line below to try acclerometer bias estimation in filter
         //AccelOffset += VisionError.Pose.Position * gainAccel * deltaT;
     }
 }
@@ -513,7 +513,7 @@ void SensorFusion::applyMagYawCorrection(Vector3d mag, double deltaT)
 
     // Update the reference point if needed
     if (MagRefScore < 0 || MagRefIdx < 0 ||
-		mag.Distance(MagRefsInBodyFrame[MagRefIdx]) > maxMagRefDist)
+        mag.Distance(MagRefsInBodyFrame[MagRefIdx]) > maxMagRefDist)
     {
         // Delete a bad point
         if (MagRefIdx >= 0 && MagRefScore < 0)
@@ -668,11 +668,11 @@ void SensorFusion::applyCameraTiltCorrection(Vector3d accel, double deltaT)
     CameraPose.Orientation = newOrientation;
     CameraPose.Position    = newPosition;
 
-	//Convenient global variable to temporarily extract this data.
-	TPH_CameraPoseOrientationWxyz[0] = (float) newOrientation.w;
-	TPH_CameraPoseOrientationWxyz[1] = (float) newOrientation.x;
-	TPH_CameraPoseOrientationWxyz[2] = (float) newOrientation.y;
-	TPH_CameraPoseOrientationWxyz[3] = (float) newOrientation.z;
+    //Convenient global variable to temporarily extract this data.
+    TPH_CameraPoseOrientationWxyz[0] = (float) newOrientation.w;
+    TPH_CameraPoseOrientationWxyz[1] = (float) newOrientation.x;
+    TPH_CameraPoseOrientationWxyz[2] = (float) newOrientation.y;
+    TPH_CameraPoseOrientationWxyz[3] = (float) newOrientation.z;
 
 
     LogText("adjust camera position %f %f %f\n", newPosition.x, newPosition.y, newPosition.z);
@@ -753,7 +753,7 @@ void SensorFusion::SetCenterPupilDepth(float centerPupilDepth)
 
     CPFPositionInIMUFrame = -IMUPosition;
     CPFPositionInIMUFrame.z += CenterPupilDepth;
-	
+    
     setNeckPivotFromPose ( State.Transform );
 }
 
@@ -768,21 +768,21 @@ void SensorFusion::SetCenterPupilDepth(float centerPupilDepth)
 static Pose<double> calcPredictedPose(const PoseState<double>& poseState, double predictionDt)
 {
     Pose<double> pose        = poseState.Transform;
-	const double linearCoef  = 1.0;
-	Vector3d angularVelocity = poseState.AngularVelocity;
-	double   angularSpeed    = angularVelocity.Length();
+    const double linearCoef  = 1.0;
+    Vector3d angularVelocity = poseState.AngularVelocity;
+    double   angularSpeed    = angularVelocity.Length();
 
-	// This could be tuned so that linear and angular are combined with different coefficients
-	double speed             = angularSpeed + linearCoef * poseState.LinearVelocity.Length();
+    // This could be tuned so that linear and angular are combined with different coefficients
+    double speed             = angularSpeed + linearCoef * poseState.LinearVelocity.Length();
 
-	const double slope       = 0.2; // The rate at which the dynamic prediction interval varies
-	double candidateDt       = slope * speed; // TODO: Replace with smoothstep function
+    const double slope       = 0.2; // The rate at which the dynamic prediction interval varies
+    double candidateDt       = slope * speed; // TODO: Replace with smoothstep function
 
-	double dynamicDt         = predictionDt;
+    double dynamicDt         = predictionDt;
 
-	// Choose the candidate if it is shorter, to improve stability
-	if (candidateDt < predictionDt)
-		dynamicDt = candidateDt;
+    // Choose the candidate if it is shorter, to improve stability
+    if (candidateDt < predictionDt)
+        dynamicDt = candidateDt;
 
     if (angularSpeed > 0.001)
         pose.Orientation = pose.Orientation * Quatd(angularVelocity, angularSpeed * dynamicDt);
@@ -841,7 +841,7 @@ void SensorFusion::OnMessage(const MessageBodyFrame& msg)
 
 void SensorFusion::BodyFrameHandler::OnMessage(const Message& msg)
 {
-	Recorder::Buffer(msg);
+    Recorder::Buffer(msg);
     if (msg.Type == Message_BodyFrame)
         pFusion->handleMessage(static_cast<const MessageBodyFrame&>(msg));
     if (msg.Type == Message_ExposureFrame)

@@ -156,10 +156,10 @@ struct FrameTimeRecordSet
 //                              such that it doesn't significantly impact the rendering of the scene,
 //                              but large enough to be 'seen' by the sensor. See the SDK
 //                              documentation for more information.
-//		GetResultsString -	Call this to get a string containing the most recent results.
-//							If the string has already been gotten then NULL will be returned.
-//							The string pointer will remain valid until the next time this 
-//							method is called.
+//        GetResultsString -    Call this to get a string containing the most recent results.
+//                            If the string has already been gotten then NULL will be returned.
+//                            The string pointer will remain valid until the next time this 
+//                            method is called.
 //
 
 class LatencyTest2 : public NewOverrideBase
@@ -178,11 +178,11 @@ public:
     bool        HasDevice() const        { return Handler.IsHandlerInstalled(); }
 
     bool        DisplayScreenColor(Color& colorToDisplay);
-	//const char*	GetResultsString();
+    //const char*    GetResultsString();
 
     // Begin test. Equivalent to pressing the button on the latency tester.
     void        BeginTest(double startTime = -1.0f);
-    bool		IsMeasuringNow() const { return TestActive; }
+    bool        IsMeasuringNow() const { return TestActive; }
     double      GetMeasuredLatency() const { return LatencyMeasuredInSeconds; }
 
 //

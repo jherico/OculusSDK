@@ -101,8 +101,8 @@ public:
     void HIDShutdown();
 
     // OVR::HIDDevice
-	bool SetFeatureReport(UByte* data, UInt32 length);
-	bool GetFeatureReport(UByte* data, UInt32 length);
+    bool SetFeatureReport(UByte* data, UInt32 length);
+    bool GetFeatureReport(UByte* data, UInt32 length);
     
 
     // DeviceManagerThread::Notifier
@@ -120,7 +120,7 @@ private:
 
     bool                inMinimalMode;
     HIDDeviceManager*   HIDManager;
-	HANDLE              Device;
+    HANDLE              Device;
     HIDDeviceDesc       DevDesc; 
 
     OVERLAPPED          ReadOverlapped;
@@ -139,10 +139,10 @@ private:
 
 class HIDDeviceManager : public OVR::HIDDeviceManager
 {
-	friend class HIDDevice;
+    friend class HIDDevice;
 public:
 
-	HIDDeviceManager(DeviceManager* manager);
+    HIDDeviceManager(DeviceManager* manager);
     virtual ~HIDDeviceManager();
 
     virtual bool Initialize();

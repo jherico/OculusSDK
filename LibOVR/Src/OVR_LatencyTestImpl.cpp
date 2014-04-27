@@ -65,8 +65,8 @@ struct LatencyTestSample
 
 struct LatencyTestSamples
 {
-    UByte	SampleCount;
-    UInt16	Timestamp;
+    UByte    SampleCount;
+    UInt16    Timestamp;
 
     LatencyTestSample Samples[20];
 
@@ -77,8 +77,8 @@ struct LatencyTestSamples
             return LatencyTestMessage_SizeError;
         }
 
-        SampleCount		= buffer[1];
-        Timestamp		= DecodeUInt16(buffer + 2);
+        SampleCount        = buffer[1];
+        Timestamp        = DecodeUInt16(buffer + 2);
         
         for (UByte i = 0; i < SampleCount; i++)
         {
@@ -121,8 +121,8 @@ bool DecodeLatencyTestSamplesMessage(LatencyTestSamplesMessage* message, UByte* 
 
 struct LatencyTestColorDetected
 {
-    UInt16	CommandID;
-    UInt16	Timestamp;
+    UInt16    CommandID;
+    UInt16    Timestamp;
     UInt16  Elapsed;
     UByte   TriggerValue[3];
     UByte   TargetValue[3];
@@ -174,8 +174,8 @@ bool DecodeLatencyTestColorDetectedMessage(LatencyTestColorDetectedMessage* mess
 
 struct LatencyTestStarted
 {
-    UInt16	CommandID;
-    UInt16	Timestamp;
+    UInt16    CommandID;
+    UInt16    Timestamp;
     UByte   TargetValue[3];
 
     LatencyTestMessageType Decode(const UByte* buffer, int size)
@@ -223,8 +223,8 @@ bool DecodeLatencyTestStartedMessage(LatencyTestStartedMessage* message, UByte* 
 
 struct LatencyTestButton
 {
-    UInt16	CommandID;
-    UInt16	Timestamp;
+    UInt16    CommandID;
+    UInt16    Timestamp;
 
     LatencyTestMessageType Decode(const UByte* buffer, int size)
     {
@@ -284,15 +284,15 @@ struct LatencyTestConfigurationImpl
     void Pack()
     {
         Buffer[0] = 5;
-		Buffer[1] = UByte(Configuration.SendSamples);
-		Buffer[2] = Configuration.Threshold.R;
+        Buffer[1] = UByte(Configuration.SendSamples);
+        Buffer[2] = Configuration.Threshold.R;
         Buffer[3] = Configuration.Threshold.G;
         Buffer[4] = Configuration.Threshold.B;
     }
 
     void Unpack()
     {
-		Configuration.SendSamples = Buffer[1] != 0 ? true : false;
+        Configuration.SendSamples = Buffer[1] != 0 ? true : false;
         Configuration.Threshold.R = Buffer[2];
         Configuration.Threshold.G = Buffer[3];
         Configuration.Threshold.B = Buffer[4];
@@ -315,9 +315,9 @@ struct LatencyTestCalibrateImpl
     void Pack()
     {
         Buffer[0] = 7;
-		Buffer[1] = CalibrationColor.R;
-		Buffer[2] = CalibrationColor.G;
-		Buffer[3] = CalibrationColor.B;
+        Buffer[1] = CalibrationColor.R;
+        Buffer[2] = CalibrationColor.G;
+        Buffer[3] = CalibrationColor.B;
     }
 
     void Unpack()
@@ -347,9 +347,9 @@ struct LatencyTestStartTestImpl
 
         Buffer[0] = 8;
         EncodeUInt16(Buffer+1, commandID);
-		Buffer[3] = TargetColor.R;
-		Buffer[4] = TargetColor.G;
-		Buffer[5] = TargetColor.B;
+        Buffer[3] = TargetColor.R;
+        Buffer[4] = TargetColor.G;
+        Buffer[5] = TargetColor.B;
     }
 
     void Unpack()
@@ -584,7 +584,7 @@ bool LatencyTestDeviceImpl::GetConfiguration(OVR::LatencyTestConfiguration* conf
 {  
     bool result = false;
 
-	ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
+    ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
     if (!pQueue->PushCallAndWaitResult(this, &LatencyTestDeviceImpl::getConfiguration, &result, configuration))
         return false;
 

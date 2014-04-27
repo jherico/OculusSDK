@@ -45,7 +45,7 @@ typedef struct ovrGLTextureData_s
 typedef union ovrGLTexture_s
 {
     ovrTexture          Texture;
-    ovrGLTextureData	OGL;
+    ovrGLTextureData    OGL;
 } ovrGLTexture;
 
-#endif	// OVR_CAPI_GL_h
+#endif    // OVR_CAPI_GL_h

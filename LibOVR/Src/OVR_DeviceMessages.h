@@ -57,7 +57,7 @@ enum MessageType
     Message_DeviceRemoved           = OVR_MESSAGETYPE(Manager, 1),  // Existing device has been plugged/unplugged.
     // Sensor Messages
     Message_BodyFrame               = OVR_MESSAGETYPE(Sensor, 0),   // Emitted by sensor at regular intervals.
-    Message_ExposureFrame	        = OVR_MESSAGETYPE(Sensor, 1),
+    Message_ExposureFrame            = OVR_MESSAGETYPE(Sensor, 1),
     Message_PixelRead               = OVR_MESSAGETYPE(Sensor, 2),
 
     // Latency Tester Messages
@@ -66,8 +66,8 @@ enum MessageType
     Message_LatencyTestStarted          = OVR_MESSAGETYPE(LatencyTester, 2),
     Message_LatencyTestButton           = OVR_MESSAGETYPE(LatencyTester, 3),
     
-    Message_CameraFrame					= OVR_MESSAGETYPE(Camera, 0),
-	Message_CameraAdded			        = OVR_MESSAGETYPE(Camera, 1),	
+    Message_CameraFrame                    = OVR_MESSAGETYPE(Camera, 0),
+    Message_CameraAdded                    = OVR_MESSAGETYPE(Camera, 1),    
 };
 
 //-------------------------------------------------------------------------------------
@@ -246,13 +246,13 @@ public:
         FrameSizeInBytes = sizeInBytes;
     }
 
-    UInt32   FrameNumber;			// an index of the frame
+    UInt32   FrameNumber;            // an index of the frame
     double   ArrivalTimeSeconds;    // frame time in seconds, as recorded by the host computer
-    const UByte* pFrameData;		// a ptr to frame data. 
-    UInt32   FrameSizeInBytes;		// size of the data in the pFrameData.
-    UInt32   Width, Height;			// width & height in pixels.
-    UInt32   Format;				// format of pixel, see CameraDevice::PixelFormat enum
-    UInt32   LostFrames;			// number of lost frames before this frame
+    const UByte* pFrameData;        // a ptr to frame data. 
+    UInt32   FrameSizeInBytes;        // size of the data in the pFrameData.
+    UInt32   Width, Height;            // width & height in pixels.
+    UInt32   Format;                // format of pixel, see CameraDevice::PixelFormat enum
+    UInt32   LostFrames;            // number of lost frames before this frame
 };
 
 // Sent when a new camera is connected

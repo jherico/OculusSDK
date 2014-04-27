@@ -117,9 +117,9 @@ static const char* TexturePixelShaderSrc =
     "};\n"
     "float4 main(in Varyings ov) : SV_Target\n"
     "{\n"
-    "	float4 color2 = ov.Color * Texture.Sample(Linear, ov.TexCoord);\n"
+    "    float4 color2 = ov.Color * Texture.Sample(Linear, ov.TexCoord);\n"
     "   if (color2.a <= 0.4)\n"
-    "		discard;\n"
+    "        discard;\n"
     "   return color2;\n"
     "}\n";
 
@@ -265,27 +265,27 @@ bool Buffer::Data(int use, const void *buffer, size_t size)
 
 void*  Buffer::Map(size_t start, size_t size, int flags)
 {
-	OVR_UNUSED(size);
+    OVR_UNUSED(size);
 
-	D3D11_MAP mapFlags = D3D11_MAP_WRITE;
-	if (flags & Map_Discard)    
-		mapFlags = D3D11_MAP_WRITE_DISCARD;    
-	if (flags & Map_Unsynchronized)    
-		mapFlags = D3D11_MAP_WRITE_NO_OVERWRITE;    
+    D3D11_MAP mapFlags = D3D11_MAP_WRITE;
+    if (flags & Map_Discard)    
+        mapFlags = D3D11_MAP_WRITE_DISCARD;    
+    if (flags & Map_Unsynchronized)    
+        mapFlags = D3D11_MAP_WRITE_NO_OVERWRITE;    
 
-	D3D11_MAPPED_SUBRESOURCE map;
-	if (SUCCEEDED(Ren->Context->Map(D3DBuffer, 0, mapFlags, 0, &map)))    
-		return ((char*)map.pData) + start;    
-	else    
-		return NULL;    
+    D3D11_MAPPED_SUBRESOURCE map;
+    if (SUCCEEDED(Ren->Context->Map(D3DBuffer, 0, mapFlags, 0, &map)))    
+        return ((char*)map.pData) + start;    
+    else    
+        return NULL;    
 }
 
 bool   Buffer::Unmap(void *m)
 {
-	OVR_UNUSED(m);
+    OVR_UNUSED(m);
 
-	Ren->Context->Unmap(D3DBuffer, 0);
-	return true;
+    Ren->Context->Unmap(D3DBuffer, 0);
+    return true;
 }
 
 
@@ -351,15 +351,15 @@ bool ShaderBase::SetUniformBool(const char* name, int n, const bool* v)
 {
     OVR_UNUSED(n);
 
-	for(unsigned i = 0; i < UniformInfo.GetSize(); i++)
-	{
-		if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
-		{
-			memcpy(UniformData + UniformInfo[i].Offset, v, UniformInfo[i].Size);
-			return 1;
-		}
-	}
-	return 0;
+    for(unsigned i = 0; i < UniformInfo.GetSize(); i++)
+    {
+        if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
+        {
+            memcpy(UniformData + UniformInfo[i].Offset, v, UniformInfo[i].Size);
+            return 1;
+        }
+    }
+    return 0;
 }
 
 void ShaderBase::InitUniforms(ID3D10Blob* s)
@@ -737,21 +737,21 @@ void  RenderDevice::initShadersAndStates()
 }
 
 void RenderDevice::InitShaders( const char * vertex_shader, const char * pixel_shader, ShaderSet ** pShaders, ID3D11InputLayout ** pVertexIL,
-				  D3D11_INPUT_ELEMENT_DESC * DistortionMeshVertexDesc, int num_elements)
+                  D3D11_INPUT_ELEMENT_DESC * DistortionMeshVertexDesc, int num_elements)
 {
     ID3D10Blob* vsData = CompileShader("vs_4_0", vertex_shader);
 
     Ptr<VertexShader> vtxShader = *new VertexShader(this, vsData);
 
-	ID3D11InputLayout** objRef   = pVertexIL;
+    ID3D11InputLayout** objRef   = pVertexIL;
 
-	HRESULT validate = Device->CreateInputLayout(
+    HRESULT validate = Device->CreateInputLayout(
         DistortionMeshVertexDesc, num_elements,
         vsData->GetBufferPointer(), vsData->GetBufferSize(), objRef);
-	if(FAILED(validate)) OVR_ASSERT(false);
+    if(FAILED(validate)) OVR_ASSERT(false);
     
-	(*pShaders) = CreateShaderSet();
-	(*pShaders)->SetShader(vtxShader);
+    (*pShaders) = CreateShaderSet();
+    (*pShaders)->SetShader(vtxShader);
  
     ID3D10Blob *pShader = CompileShader("ps_4_0", pixel_shader);
     Ptr<PixelShader> ps  = *new PixelShader(this, pShader);
@@ -888,12 +888,12 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.Windowed             = (Params.Fullscreen != Display_Fullscreen);
     scDesc.Flags                = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-	if (SwapChain)
-	{
-		SwapChain->SetFullscreenState(FALSE, NULL);
-		SwapChain->Release();
-		SwapChain = NULL;
-	}
+    if (SwapChain)
+    {
+        SwapChain->SetFullscreenState(FALSE, NULL);
+        SwapChain->Release();
+        SwapChain = NULL;
+    }
 
     Ptr<IDXGISwapChain> newSC;
     if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef())))
@@ -1453,15 +1453,15 @@ void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indi
     unsigned char* vertexData = vshader->UniformData;
     if (vertexData)
     {
-		// TODO: some VSes don't start with StandardUniformData!
-		if ( updateUniformData )
-		{
-			StandardUniformData* stdUniforms = (StandardUniformData*) vertexData;
-			stdUniforms->View = matrix.Transposed();
-			stdUniforms->Proj = StdUniforms.Proj;
-		}
-		UniformBuffers[Shader_Vertex]->Data(Buffer_Uniform, vertexData, vshader->UniformsSize);
-		vshader->SetUniformBuffer(UniformBuffers[Shader_Vertex]);
+        // TODO: some VSes don't start with StandardUniformData!
+        if ( updateUniformData )
+        {
+            StandardUniformData* stdUniforms = (StandardUniformData*) vertexData;
+            stdUniforms->View = matrix.Transposed();
+            stdUniforms->Proj = StdUniforms.Proj;
+        }
+        UniformBuffers[Shader_Vertex]->Data(Buffer_Uniform, vertexData, vshader->UniformsSize);
+        vshader->SetUniformBuffer(UniformBuffers[Shader_Vertex]);
     }
 
     for(int i = Shader_Vertex + 1; i < Shader_Count; i++)

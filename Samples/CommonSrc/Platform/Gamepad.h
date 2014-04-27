@@ -75,10 +75,10 @@ struct GamepadState
     {
         return !(*this == b);
     }
-	void Debug() const
-	{
-		OVR_DEBUG_LOG(("Buttons:0x%4x LX:%.2f LY:%.2f RX:%.2f RY:%.2f LT:%.2f RT:%.2f", Buttons, LX, LY, RX, RY, LT, RT));
-	}
+    void Debug() const
+    {
+        OVR_DEBUG_LOG(("Buttons:0x%4x LX:%.2f LY:%.2f RX:%.2f RY:%.2f LT:%.2f RT:%.2f", Buttons, LX, LY, RX, RY, LT, RT));
+    }
 };
 
 //-------------------------------------------------------------------------------------

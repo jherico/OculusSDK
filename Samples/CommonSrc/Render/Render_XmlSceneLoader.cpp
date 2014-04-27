@@ -41,9 +41,9 @@ XmlHandler::~XmlHandler()
 }
 
 bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRender,
-	                      OVR::Render::Scene* pScene,
+                          OVR::Render::Scene* pScene,
                           OVR::Array<Ptr<CollisionModel> >* pCollisions,
-	                      OVR::Array<Ptr<CollisionModel> >* pGroundCollisions)
+                          OVR::Array<Ptr<CollisionModel> >* pGroundCollisions)
 {
     if(pXmlDocument->LoadFile(fileName) != 0)
     {
@@ -53,7 +53,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     // Extract the relative path to our working directory for loading textures
     filePath[0] = 0;
     SPInt pos = 0;
-	SPInt len = strlen(fileName);
+    SPInt len = strlen(fileName);
     for(SPInt i = len; i > 0; i--)
     {
         if (fileName[i-1]=='\\' || fileName[i-1]=='/')
@@ -65,7 +65,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     }    
 
     // Load the textures
-	OVR_DEBUG_LOG_TEXT(("Loading textures..."));
+    OVR_DEBUG_LOG_TEXT(("Loading textures..."));
     XMLElement* pXmlTexture = pXmlDocument->FirstChildElement("scene")->FirstChildElement("textures");
     if (pXmlTexture)
     {
@@ -76,86 +76,86 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     for(int i = 0; i < textureCount; ++i)
     {
         const char* textureName = pXmlTexture->Attribute("fileName");
-		SPInt       dotpos = strcspn(textureName, ".");
+        SPInt       dotpos = strcspn(textureName, ".");
         char        fname[300];
 
-		if (pos == len)
-		{            
-			OVR_sprintf(fname, 300, "%s", textureName);
-		}
-		else
-		{
-			OVR_sprintf(fname, 300, "%s%s", filePath, textureName);
-		}
+        if (pos == len)
+        {            
+            OVR_sprintf(fname, 300, "%s", textureName);
+        }
+        else
+        {
+            OVR_sprintf(fname, 300, "%s%s", filePath, textureName);
+        }
 
         SysFile* pFile = new SysFile(fname);
-		Ptr<Texture> texture;
-		if (textureName[dotpos + 1] == 'd' || textureName[dotpos + 1] == 'D')
-		{
-			// DDS file
-			texture.SetPtr(*LoadTextureDDS(pRender, pFile));
-		}
-		else
-		{
-			texture.SetPtr(*LoadTextureTga(pRender, pFile));
-		}
+        Ptr<Texture> texture;
+        if (textureName[dotpos + 1] == 'd' || textureName[dotpos + 1] == 'D')
+        {
+            // DDS file
+            texture.SetPtr(*LoadTextureDDS(pRender, pFile));
+        }
+        else
+        {
+            texture.SetPtr(*LoadTextureTga(pRender, pFile));
+        }
 
         Textures.PushBack(texture);
-		pFile->Close();
-		pFile->Release();
+        pFile->Close();
+        pFile->Release();
         pXmlTexture = pXmlTexture->NextSiblingElement("texture");
     }
-	OVR_DEBUG_LOG_TEXT(("Done.\n"));
+    OVR_DEBUG_LOG_TEXT(("Done.\n"));
 
     // Load the models
-	pXmlDocument->FirstChildElement("scene")->FirstChildElement("models")->
-		          QueryIntAttribute("count", &modelCount);
-	
-		OVR_DEBUG_LOG(("Loading models... %i models to load...", modelCount));
+    pXmlDocument->FirstChildElement("scene")->FirstChildElement("models")->
+                  QueryIntAttribute("count", &modelCount);
+    
+        OVR_DEBUG_LOG(("Loading models... %i models to load...", modelCount));
     XMLElement* pXmlModel = pXmlDocument->FirstChildElement("scene")->
-		                                  FirstChildElement("models")->FirstChildElement("model");
+                                          FirstChildElement("models")->FirstChildElement("model");
     for(int i = 0; i < modelCount; ++i)
     {
-		if (i % 15 == 0)
-		{
-			OVR_DEBUG_LOG_TEXT(("%i models remaining...", modelCount - i));
-		}
-		Models.PushBack(*new Model(Prim_Triangles));
+        if (i % 15 == 0)
+        {
+            OVR_DEBUG_LOG_TEXT(("%i models remaining...", modelCount - i));
+        }
+        Models.PushBack(*new Model(Prim_Triangles));
         const char* name = pXmlModel->Attribute("name");
         bool isCollisionModel = false;
         pXmlModel->QueryBoolAttribute("isCollisionModel", &isCollisionModel);
         Models[i]->IsCollisionModel = isCollisionModel;
-		if (isCollisionModel)
-		{
-			Models[i]->Visible = false;
-		}
+        if (isCollisionModel)
+        {
+            Models[i]->Visible = false;
+        }
 
         bool tree_c = (strcmp(name, "tree_C") == 0) || (strcmp(name, "Object03") == 0);
 
         //read the vertices
         OVR::Array<Vector3f> *vertices = new OVR::Array<Vector3f>();
         ParseVectorString(pXmlModel->FirstChildElement("vertices")->FirstChild()->
-			              ToText()->Value(), vertices);
+                          ToText()->Value(), vertices);
 
-		for (unsigned int vertexIndex = 0; vertexIndex < vertices->GetSize(); ++vertexIndex)
-		{
-			vertices->At(vertexIndex).x *= -1.0f;
+        for (unsigned int vertexIndex = 0; vertexIndex < vertices->GetSize(); ++vertexIndex)
+        {
+            vertices->At(vertexIndex).x *= -1.0f;
 
             if (tree_c)
             {   // Move the terrace tree closer to the house
                 vertices->At(vertexIndex).z += 0.5;
             }
-		}
+        }
 
         //read the normals
         OVR::Array<Vector3f> *normals = new OVR::Array<Vector3f>();
         ParseVectorString(pXmlModel->FirstChildElement("normals")->FirstChild()->
-			              ToText()->Value(), normals);
+                          ToText()->Value(), normals);
 
-		for (unsigned int normalIndex = 0; normalIndex < normals->GetSize(); ++normalIndex)
-		{
-			normals->At(normalIndex).z *= -1.0f;
-		}
+        for (unsigned int normalIndex = 0; normalIndex < normals->GetSize(); ++normalIndex)
+        {
+            normals->At(normalIndex).z *= -1.0f;
+        }
 
         //read the textures
         OVR::Array<Vector3f> *diffuseUVs = new OVR::Array<Vector3f>();
@@ -169,17 +169,17 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
             if(pXmlCurMaterial->Attribute("name", "diffuse"))
             {
                 pXmlCurMaterial->FirstChildElement("texture")->
-					             QueryIntAttribute("index", &diffuseTextureIndex);
+                                 QueryIntAttribute("index", &diffuseTextureIndex);
                 if(diffuseTextureIndex > -1)
                 {
                     ParseVectorString(pXmlCurMaterial->FirstChildElement("texture")->
-						              FirstChild()->ToText()->Value(), diffuseUVs, true);
+                                      FirstChild()->ToText()->Value(), diffuseUVs, true);
                 }
             }
             else if(pXmlCurMaterial->Attribute("name", "lightmap"))
             {
                 pXmlCurMaterial->FirstChildElement("texture")->
-					                               QueryIntAttribute("index", &lightmapTextureIndex);
+                                                   QueryIntAttribute("index", &lightmapTextureIndex);
                 if(lightmapTextureIndex > -1)
                 {
                     XMLElement* firstChildElement = pXmlCurMaterial->FirstChildElement("texture");
@@ -287,14 +287,14 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         pScene->Models.PushBack(Models[i]);
         pXmlModel = pXmlModel->NextSiblingElement("model");
     }
-	OVR_DEBUG_LOG(("Done."));
+    OVR_DEBUG_LOG(("Done."));
 
     //load the collision models
-	OVR_DEBUG_LOG(("Loading collision models... "));
+    OVR_DEBUG_LOG(("Loading collision models... "));
     XMLElement* pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("collisionModels");
     if (pXmlCollisionModel)
     {
-		pXmlCollisionModel->QueryIntAttribute("count", &collisionModelCount);
+        pXmlCollisionModel->QueryIntAttribute("count", &collisionModelCount);
         pXmlCollisionModel = pXmlCollisionModel->FirstChildElement("collisionModel");
     }
 
@@ -325,14 +325,14 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         pCollisions->PushBack(cm);
         pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
     }
-	OVR_DEBUG_LOG(("done."));
+    OVR_DEBUG_LOG(("done."));
 
     //load the ground collision models
-	OVR_DEBUG_LOG(("Loading ground collision models..."));
+    OVR_DEBUG_LOG(("Loading ground collision models..."));
     pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("groundCollisionModels");
     if (pXmlCollisionModel)
     {
-		pXmlCollisionModel->QueryIntAttribute("count", &groundCollisionModelCount);
+        pXmlCollisionModel->QueryIntAttribute("count", &groundCollisionModelCount);
         pXmlCollisionModel = pXmlCollisionModel->FirstChildElement("collisionModel");
     }
     pXmlPlane = NULL;
@@ -359,12 +359,12 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         pGroundCollisions->PushBack(cm);
         pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
     }
-	OVR_DEBUG_LOG(("done."));
-	return true;
+    OVR_DEBUG_LOG(("done."));
+    return true;
 }
 
 void XmlHandler::ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *array,
-	                               bool is2element)
+                                   bool is2element)
 {
     UPInt stride = is2element ? 2 : 3;
     UPInt stringLength = strlen(str);

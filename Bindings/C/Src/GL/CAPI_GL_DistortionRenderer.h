@@ -43,7 +43,7 @@ public:
 
 
     // ***** Public DistortionRenderer interface
-	
+    
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
                             unsigned hmdCaps, unsigned distortionCaps);
 
@@ -53,37 +53,37 @@ public:
 
     void         WaitUntilGpuIdle();
 
-	// Similar to ovr_WaitTillTime but it also flushes GPU.
-	// Note, it exits when time expires, even if GPU is not in idle state yet.
-	double       FlushGpuAndWaitTillTime(double absTime);
+    // Similar to ovr_WaitTillTime but it also flushes GPU.
+    // Note, it exits when time expires, even if GPU is not in idle state yet.
+    double       FlushGpuAndWaitTillTime(double absTime);
 
 private:    
     // TBD: Should we be using oe from RState instead?
     unsigned            DistortionCaps;
 
-	struct FOR_EACH_EYE
-	{
+    struct FOR_EACH_EYE
+    {
 #if 0
-		IDirect3DVertexBuffer9  * dxVerts;
-		IDirect3DIndexBuffer9   * dxIndices;
+        IDirect3DVertexBuffer9  * dxVerts;
+        IDirect3DIndexBuffer9   * dxIndices;
 #endif
-		int                       numVerts;
-		int                       numIndices;
+        int                       numVerts;
+        int                       numIndices;
 
-		GLuint                     texture;
+        GLuint                     texture;
 
-		ovrVector2f			 	  UVScaleOffset[2]; 
-	} eachEye[2];
+        ovrVector2f                   UVScaleOffset[2]; 
+    } eachEye[2];
 
     // GL context and utility variables.
     RenderParams        RParams;    
 
-	// Helpers
+    // Helpers
     void initBuffersAndShaders();
     void initShaders();
     void initFullscreenQuad();
     void destroy();
-	
+    
     void setViewport(const Recti& vp);
 
     void renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture);
@@ -92,19 +92,19 @@ private:
                           Matrix4f* viewMatrix, int offset, int count,
                           PrimitiveType rprim, bool useDistortionVertex);
 
-	void createDrawQuad();
+    void createDrawQuad();
     void renderLatencyQuad(unsigned char* latencyTesterDrawColor);
     void renderLatencyPixel(unsigned char* latencyTesterPixelColor);
-	
+    
     Ptr<Texture>        pEyeTextures[2];
 
     // U,V scale and offset needed for timewarp.
     ovrVector2f         UVScaleOffset[2][2];
 
-	Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
-	Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
+    Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
+    Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
 
-	Ptr<ShaderSet>      DistortionShader;
+    Ptr<ShaderSet>      DistortionShader;
 
     struct StandardUniformData
     {

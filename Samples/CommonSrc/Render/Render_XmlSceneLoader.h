@@ -47,12 +47,12 @@ public:
 
     bool ReadFile(const char* fileName, OVR::Render::RenderDevice* pRender,
                   OVR::Render::Scene* pScene,
-		          OVR::Array<Ptr<CollisionModel> >* pColisions,
+                  OVR::Array<Ptr<CollisionModel> >* pColisions,
                   OVR::Array<Ptr<CollisionModel> >* pGroundCollisions);
 
 protected:
     void ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *array,
-		                   bool is2element = false);
+                           bool is2element = false);
 
 private:
     tinyxml2::XMLDocument* pXmlDocument;

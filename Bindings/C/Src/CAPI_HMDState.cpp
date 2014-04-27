@@ -160,14 +160,14 @@ bool HMDState::StartSensor(unsigned supportedCaps, unsigned requiredCaps)
             return false;
         }
     }
-	if (requiredCaps & ovrHmdCap_LowPersistence)
-	{
-		if (HMDInfo.HmdType != HmdType_CrystalCoveProto && HMDInfo.HmdType != HmdType_DK2)
-		{
-			pLastError = "ovrHmdCap_LowPersistence not supported on this HMD.";
-			return false;
-		}
-	}
+    if (requiredCaps & ovrHmdCap_LowPersistence)
+    {
+        if (HMDInfo.HmdType != HmdType_CrystalCoveProto && HMDInfo.HmdType != HmdType_DK2)
+        {
+            pLastError = "ovrHmdCap_LowPersistence not supported on this HMD.";
+            return false;
+        }
+    }
 
 
     SensorCreated = false;
@@ -211,18 +211,18 @@ bool HMDState::StartSensor(unsigned supportedCaps, unsigned requiredCaps)
         SFusion.SetYawCorrectionEnabled((supportedCaps & ovrHmdCap_YawCorrection) != 0);
         LogText("Sensor created.\n");
 
-		if (supportedCaps & ovrHmdCap_LowPersistence)
-		{
-			updateLowPersistenceMode(true);
-		}
-		else
-		{
-			if (HMDInfo.HmdType == HmdType_CrystalCoveProto || HMDInfo.HmdType == HmdType_DK2)
-			{
-				// switch to full persistence
-				updateLowPersistenceMode(false);
-			}
-		}
+        if (supportedCaps & ovrHmdCap_LowPersistence)
+        {
+            updateLowPersistenceMode(true);
+        }
+        else
+        {
+            if (HMDInfo.HmdType == HmdType_CrystalCoveProto || HMDInfo.HmdType == HmdType_DK2)
+            {
+                // switch to full persistence
+                updateLowPersistenceMode(false);
+            }
+        }
 
         if (HMDInfo.HmdType == HmdType_DK2)
         {
@@ -413,14 +413,14 @@ void HMDState::applyProfileToSensorFusion()
 
 void HMDState::updateLowPersistenceMode(bool lowPersistence) const
 {
-	OVR_ASSERT(pSensor);
-	DisplayReport dr;
-	pSensor->GetDisplayReport(&dr);
+    OVR_ASSERT(pSensor);
+    DisplayReport dr;
+    pSensor->GetDisplayReport(&dr);
 
-	dr.Persistence = (UInt16) (dr.TotalRows * (lowPersistence ? 0.18f : 1.0f));
-	dr.Brightness = lowPersistence ? 255 : 0;
+    dr.Persistence = (UInt16) (dr.TotalRows * (lowPersistence ? 0.18f : 1.0f));
+    dr.Brightness = lowPersistence ? 255 : 0;
     
-	pSensor->SetDisplayReport(dr);
+    pSensor->SetDisplayReport(dr);
 }
 
 void HMDState::updateLatencyTestForHmd(bool latencyTesting)
@@ -452,23 +452,23 @@ void HMDState::updateLatencyTestForHmd(bool latencyTesting)
 
 float HMDState::getFloatValue(const char* propertyName, float defaultVal)
 {
-	if (OVR_strcmp(propertyName, "LensSeparation") == 0)
-	{
-		return HMDInfo.LensSeparationInMeters;
-	}
+    if (OVR_strcmp(propertyName, "LensSeparation") == 0)
+    {
+        return HMDInfo.LensSeparationInMeters;
+    }
     else if (OVR_strcmp(propertyName, "CenterPupilDepth") == 0)
     {        
         return SFusion.GetCenterPupilDepth();
     }
-	else if (pHMD)
-	{
-		Profile* p = pHMD->GetProfile();
-		if (p)
-		{
-			return p->GetFloatValue(propertyName, defaultVal);
-		}
-	}
-	return defaultVal;
+    else if (pHMD)
+    {
+        Profile* p = pHMD->GetProfile();
+        if (p)
+        {
+            return p->GetFloatValue(propertyName, defaultVal);
+        }
+    }
+    return defaultVal;
 }
 
 bool HMDState::setFloatValue(const char* propertyName, float value)
@@ -494,14 +494,14 @@ static unsigned CopyFloatArrayWithLimit(float dest[], unsigned destSize,
 
 unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsigned arraySize)
 {
-	if (arraySize)
-	{
-		if (OVR_strcmp(propertyName, "ScreenSize") == 0)
-		{
+    if (arraySize)
+    {
+        if (OVR_strcmp(propertyName, "ScreenSize") == 0)
+        {
             float data[2] = { HMDInfo.ScreenSizeInMeters.w, HMDInfo.ScreenSizeInMeters.h };
 
             return CopyFloatArrayWithLimit(values, arraySize, data, 2);
-		}
+        }
         else if (OVR_strcmp(propertyName, "DistortionClearColor") == 0)
         {
             return CopyFloatArrayWithLimit(values, arraySize, RenderState.ClearColor, 4);
@@ -527,21 +527,21 @@ unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsig
             }
             return 0;
         } */
-		else if (pHMD)
-		{        
-			Profile* p = pHMD->GetProfile();
+        else if (pHMD)
+        {        
+            Profile* p = pHMD->GetProfile();
 
-			// TBD: Not quite right. Should update profile interface, so that
-			//      we can return 0 in all conditions if property doesn't exist.
-			if (p)
-			{
-				unsigned count = p->GetFloatValues(propertyName, values, arraySize);
-				return count;
-			}
-		}
-	}
+            // TBD: Not quite right. Should update profile interface, so that
+            //      we can return 0 in all conditions if property doesn't exist.
+            if (p)
+            {
+                unsigned count = p->GetFloatValues(propertyName, values, arraySize);
+                return count;
+            }
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned arraySize)
@@ -560,19 +560,19 @@ bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned 
 
 const char* HMDState::getString(const char* propertyName, const char* defaultVal)
 {
-	if (pHMD)
-	{
-		// For now, just access the profile.
-		Profile* p = pHMD->GetProfile();
+    if (pHMD)
+    {
+        // For now, just access the profile.
+        Profile* p = pHMD->GetProfile();
 
-		LastGetStringValue[0] = 0;
-		if (p && p->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
-		{
-			return LastGetStringValue;
-		}
-	}
+        LastGetStringValue[0] = 0;
+        if (p && p->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
+        {
+            return LastGetStringValue;
+        }
+    }
 
-	return defaultVal;
+    return defaultVal;
 }
 
 //-------------------------------------------------------------------------------------

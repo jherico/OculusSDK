@@ -41,7 +41,7 @@ namespace OVR { namespace CAPI {
 HMDRenderState::HMDRenderState(ovrHmd hmd, Profile* userProfile, const OVR::HMDInfo& hmdInfo)
     : HMD(hmd), HMDInfo(hmdInfo)
 {
-	RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
+    RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
 
     Distortion[0] = CalculateDistortionRenderDesc(StereoEye_Left,  RenderInfo, 0);
     Distortion[1] = CalculateDistortionRenderDesc(StereoEye_Right, RenderInfo, 0);

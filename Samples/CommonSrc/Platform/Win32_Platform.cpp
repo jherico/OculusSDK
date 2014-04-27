@@ -185,10 +185,10 @@ static UByte KeyMap[][2] =
     { VK_OEM_6,     Key_BracketRight },
     { VK_OEM_7,     Key_Quote },
 
-    { VK_OEM_AX,	Key_OEM_AX },   //  'AX' key on Japanese AX keyboard.
+    { VK_OEM_AX,    Key_OEM_AX },   //  'AX' key on Japanese AX keyboard.
     { VK_OEM_102,   Key_OEM_102 },  //  "<>" or "\|" on RT 102-key keyboard.
     { VK_ICO_HELP,  Key_ICO_HELP },
-    { VK_ICO_00,	Key_ICO_00 }
+    { VK_ICO_00,    Key_ICO_00 }
 };
 
 
@@ -445,7 +445,7 @@ RenderDevice* PlatformCore::SetupGraphics(const SetupGraphicsDeviceSet& setupGra
 
 void PlatformCore::PlayMusicFile(const char *fileName)
 {
-	PlaySoundA(fileName, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC); 
+    PlaySoundA(fileName, NULL, SND_FILENAME | SND_LOOP | SND_ASYNC); 
 }
 
 

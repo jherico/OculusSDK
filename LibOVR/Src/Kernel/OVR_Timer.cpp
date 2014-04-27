@@ -50,8 +50,8 @@ double Timer::FakeSeconds     = 0;
 // Returns global high-resolution application timer in seconds.
 double Timer::GetSeconds()
 {
-	if(useFakeSeconds)
-		return FakeSeconds;
+    if(useFakeSeconds)
+        return FakeSeconds;
 
     return double(Timer::GetTicksNanos()) * 0.000000001;
 }
@@ -226,10 +226,10 @@ UInt64 PerformanceTimer::GetTimeNanos()
     LastResultNanos = resultNanos;
     ::LeaveCriticalSection(&TimeCS);
 
-	//Tom's addition, to keep precision
-	static UInt64      initial_time = 0;
-	if (!initial_time) initial_time = resultNanos;
-	resultNanos -= initial_time;
+    //Tom's addition, to keep precision
+    static UInt64      initial_time = 0;
+    if (!initial_time) initial_time = resultNanos;
+    resultNanos -= initial_time;
 
 
     return resultNanos;
@@ -266,7 +266,7 @@ UInt64 Timer::GetTicksNanos()
         return (UInt64) (FakeSeconds * NanosPerSecond);
 
     // TODO: prefer rdtsc when available?
-	UInt64 result;
+    UInt64 result;
 
     // Return microseconds.
     struct timeval tv;

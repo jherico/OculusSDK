@@ -308,10 +308,10 @@ UInt32 OptionVar::GetEnumIndex()
 
 OptionSelectionMenu::OptionSelectionMenu(OptionSelectionMenu* parentMenu)
 {
-    DisplayState	= Display_None;
-    SelectedIndex 	= 0;
+    DisplayState    = Display_None;
+    SelectedIndex     = 0;
     SelectionActive = false;
-    ParentMenu 		= parentMenu;
+    ParentMenu         = parentMenu;
 
     PopupMessageTimeout = 0.0;
     PopupMessageBorder  = false;

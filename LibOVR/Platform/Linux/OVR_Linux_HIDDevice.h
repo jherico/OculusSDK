@@ -55,7 +55,7 @@ public:
     void HIDShutdown();
     
     virtual bool SetFeatureReport(UByte* data, UInt32 length);
-	virtual bool GetFeatureReport(UByte* data, UInt32 length);
+    virtual bool GetFeatureReport(UByte* data, UInt32 length);
 
     // DeviceManagerThread::Notifier
     void OnEvent(int i, int fd);
@@ -91,7 +91,7 @@ private:
 
 class HIDDeviceManager : public OVR::HIDDeviceManager, public DeviceManagerThread::Notifier
 {
-	friend class HIDDevice;
+    friend class HIDDevice;
 
 public:
     HIDDeviceManager(Linux::DeviceManager* Manager);
