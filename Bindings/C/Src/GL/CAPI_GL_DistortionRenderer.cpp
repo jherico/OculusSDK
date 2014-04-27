@@ -14,9 +14,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 ************************************************************************************/
 
 #include "CAPI_GL_DistortionRenderer.h"
-
 #include <OVR_CAPI_GL.h>
-#include <fstream>
 
 namespace OVR { namespace CAPI { namespace GL {
 
@@ -711,9 +709,16 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         RState.ClearColor[2],
         RState.ClearColor[3] );
 
+#define NEW_DEPTH
+#ifdef NEW_DEPTH
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glClear(GL_COLOR_BUFFER_BIT);
+#else
     glClearDepth(0);
-
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+#endif
+
     static GLuint distortionVAOs[2] = { 0, 0 };
     for (int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
@@ -732,17 +737,15 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
             // Feed identity like matrices in until we get proper timewarp calculation going on
             DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]).Transposed());
             DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]).Transposed());
-
-            renderPrimitives(&distortionShaderFill, distortionVAOs + eyeNum,  DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
-                            NULL, 0, (int)DistortionMeshVBs[eyeNum]->GetSize(), Prim_Triangles, true);
         }
-        else
-        {
-          renderPrimitives(&distortionShaderFill, distortionVAOs + eyeNum, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
-                            NULL, 0, (int)DistortionMeshVBs[eyeNum]->GetSize(), Prim_Triangles, true);
-        }
+        renderPrimitives(&distortionShaderFill, distortionVAOs + eyeNum, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
+          NULL, 0, (int)DistortionMeshVBs[eyeNum]->GetSize(), Prim_Triangles, true);
     }
+
+#ifndef NEW_DEPTH
     glClearDepth(1);
+#endif
+
 }
 
 void DistortionRenderer::createDrawQuad()
@@ -827,43 +830,7 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
     SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f, 1.0f);
     renderPrimitives(&quadFill, &latencyVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);
 }
-#if 1
-namespace gl {
-class Query {
-  GLuint query;
-public:
-  Query() {
-    glGenQueries(1, &query);
-  }
 
-  virtual ~Query() {
-    glDeleteQueries(1, &query);
-    query = 0;
-  }
-
-  void begin() {
-    glBeginQuery(GL_TIME_ELAPSED, query);
-  }
-
-  static void end() {
-    glEndQuery(GL_TIME_ELAPSED);
-  }
-
-  bool available() {
-    GLint result;
-    glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &result);
-    return result == GL_TRUE;
-  }
-
-  GLint getResult() {
-    GLint result = -1;
-    glGetQueryObjectiv(query, GL_QUERY_RESULT, &result);
-    return result;
-  }
-};
-}
-
-#endif
 void DistortionRenderer::renderPrimitives(
                           const ShaderFill* fill,
                           GLuint * vao,
@@ -925,19 +892,10 @@ void DistortionRenderer::renderPrimitives(
       glBindVertexArray(*vao);
     }
 
-    static gl::Query * q = nullptr;
-    if (!q) {
-      glewExperimental = GL_TRUE;
-      glewInit();
-      q = new gl::Query();
-    }
     // Draw
     if (indices) {
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ((Buffer*)indices)->GLBuffer);
-      q->begin();
       glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
-      q->end();
-      OVR_DEBUG_LOG(("Took: %d", q->getResult()));
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     } else {
       glDrawArrays(prim, 0, count);
