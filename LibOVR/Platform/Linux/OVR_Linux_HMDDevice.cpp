@@ -32,7 +32,7 @@ limitations under the License.
 
 #include "edid.h"
 
-namespace OVR { namespace Linux {
+namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------

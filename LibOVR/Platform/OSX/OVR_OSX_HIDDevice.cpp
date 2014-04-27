@@ -27,7 +27,7 @@ limitations under the License.
 
 #include <IOKit/usb/IOUSBLib.h>
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 static const UInt32 MAX_QUEUED_INPUT_REPORTS = 5;
 

@@ -30,7 +30,7 @@ limitations under the License.
 #include "OVR_Linux_DeviceManager.h"
 #include "OVR_Profile.h"
 
-namespace OVR { namespace Linux {
+namespace OVR { namespace Platform {
 
 class HMDDevice;
 

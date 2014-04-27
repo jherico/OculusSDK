@@ -33,7 +33,7 @@ limitations under the License.
 #include "Kernel/OVR_Timer.h"
 
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 class DeviceManagerThread;
 

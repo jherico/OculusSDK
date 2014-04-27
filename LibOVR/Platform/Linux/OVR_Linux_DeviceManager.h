@@ -33,7 +33,7 @@ limitations under the License.
 #include <sys/poll.h>
 
 
-namespace OVR { namespace Linux {
+namespace OVR { namespace Platform {
 
 class DeviceManagerThread;
 

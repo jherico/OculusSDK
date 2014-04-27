@@ -32,7 +32,7 @@ limitations under the License.
 
 #include <dbt.h>
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 static TCHAR windowClassName[] = TEXT("LibOVR_DeviceStatus_WindowClass");
 

@@ -36,7 +36,7 @@ limitations under the License.
 #include <CoreGraphics/CGDisplayConfiguration.h>
 
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 class DeviceManagerThread;
 

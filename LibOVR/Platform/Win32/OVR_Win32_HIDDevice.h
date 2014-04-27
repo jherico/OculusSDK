@@ -77,7 +77,7 @@ struct HIDP_CAPS
 #endif
 
 
-namespace OVR { namespace Win32 { 
+namespace OVR { namespace Platform { 
 
 class HIDDeviceManager;
 class DeviceManager;

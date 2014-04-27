@@ -30,7 +30,7 @@ limitations under the License.
 #include "OVR_Win32_DeviceManager.h"
 #include "OVR_Profile.h"
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 class HMDDevice;
 

@@ -30,7 +30,7 @@ limitations under the License.
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Log.h"
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
 // HIDDevicePathWrapper is a simple class used to extract HID device file path
@@ -149,7 +149,7 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
             initStrings(hidDev, &devDesc);
 
             // Construct minimal device that the visitor callback can get feature reports from.
-            Win32::HIDDevice device(this, hidDev);
+            HIDDevice device(this, hidDev);
             enumVisitor->Visit(device, devDesc);
         }
 
@@ -177,7 +177,7 @@ bool HIDDeviceManager::GetHIDDeviceDesc(const String& path, HIDDeviceDesc* pdevD
 OVR::HIDDevice* HIDDeviceManager::Open(const String& path)
 {
 
-    Ptr<Win32::HIDDevice> device = *new Win32::HIDDevice(this);
+  Ptr<HIDDevice> device = *new HIDDevice(this);
 
     if (device->HIDInitialize(path))
     {
@@ -585,7 +585,7 @@ bool HIDDevice::OnDeviceMessage(DeviceMessageType messageType,
     return true;
 }
 
-HIDDeviceManager* HIDDeviceManager::CreateInternal(Win32::DeviceManager* devManager)
+HIDDeviceManager* HIDDeviceManager::CreateInternal(Platform::DeviceManager* devManager)
 {
 
     if (!System::IsInitialized())
@@ -596,7 +596,7 @@ HIDDeviceManager* HIDDeviceManager::CreateInternal(Win32::DeviceManager* devMana
         return 0;
     }
 
-    Ptr<Win32::HIDDeviceManager> manager = *new Win32::HIDDeviceManager(devManager);
+    Ptr<HIDDeviceManager> manager = *new HIDDeviceManager(devManager);
 
     if (manager)
     {
@@ -631,7 +631,7 @@ HIDDeviceManager* HIDDeviceManager::Create()
         return 0;
     }
 
-    Ptr<Win32::HIDDeviceManager> manager = *new Win32::HIDDeviceManager(NULL);
+    Ptr<Platform::HIDDeviceManager> manager = *new Platform::HIDDeviceManager(NULL);
 
     if (manager)
     {

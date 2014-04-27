@@ -40,7 +40,7 @@ limitations under the License.
 #include <IOKit/hid/IOHIDKeys.h>
 
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
 // **** OSX::DeviceManager

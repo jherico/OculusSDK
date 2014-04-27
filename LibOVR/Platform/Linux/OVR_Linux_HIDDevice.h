@@ -30,7 +30,7 @@ limitations under the License.
 #include "OVR_Linux_DeviceManager.h"
 #include <libudev.h>
 
-namespace OVR { namespace Linux {
+namespace OVR { namespace Platform {
 
 class HIDDeviceManager;
 

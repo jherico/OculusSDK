@@ -31,7 +31,7 @@ limitations under the License.
 #include <CoreFoundation/CFString.h>
 #include <IOKit/graphics/IOGraphicsLib.h>
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
 

@@ -32,7 +32,7 @@ limitations under the License.
 
 #include <IOKit/IOKitLib.h>
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 class HIDDeviceManager;
 

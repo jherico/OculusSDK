@@ -31,7 +31,7 @@ limitations under the License.
 #include <linux/hidraw.h>
 #include "OVR_HIDDeviceImpl.h"
 
-namespace OVR { namespace Linux {
+namespace OVR { namespace Platform {
 
 static const UInt32 MAX_QUEUED_INPUT_REPORTS = 5;
 

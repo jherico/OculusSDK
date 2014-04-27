@@ -10,7 +10,9 @@ if(WIN32)
 
     # Extra source
     file(GLOB PLATFORM_SOURCE_FILES Platform/Win32/*.cpp Platform/Win32/*.h)
-    list(APPEND PLATFORM_SOURCE_FILES Platform/OVR_ThreadsWinAPI.cpp)
+    list(APPEND PLATFORM_SOURCE_FILES 
+        Platform/OVR_ThreadsWinAPI.cpp 
+        Platform/OVR_Platform_DeviceManager.cpp)
 
     # Extra libs
     list(APPEND OculusVR_EXTRA_LIBS setupapi winmm)
@@ -19,7 +21,9 @@ elseif(APPLE)
 
     # Extra source
     file(GLOB PLATFORM_SOURCE_FILES Platform/OSX/*.cpp Platform/OSX/*.h)
-    list(APPEND PLATFORM_SOURCE_FILES Platform/OVR_ThreadsPthread.cpp)
+    list(APPEND PLATFORM_SOURCE_FILES 
+        Platform/OVR_ThreadsPthread.cpp  
+        Platform/OVR_Platform_DeviceManager.cpp)
 
     # Extra libs
     find_library(COCOA_LIBRARY Cocoa)
@@ -30,7 +34,9 @@ else()
 
     # Extra source
     file(GLOB PLATFORM_SOURCE_FILES Platform/Linux/*.cpp Platform/Linux/*.h)
-    list(APPEND PLATFORM_SOURCE_FILES Platform/OVR_ThreadsPthread.cpp)
+    list(APPEND PLATFORM_SOURCE_FILES 
+        Platform/OVR_ThreadsPthread.cpp  
+        Platform/OVR_Platform_DeviceManager.cpp)
 
     # Extra libs
 

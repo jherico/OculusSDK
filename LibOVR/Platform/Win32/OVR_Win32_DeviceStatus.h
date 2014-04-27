@@ -32,7 +32,7 @@ limitations under the License.
 #include "Kernel/OVR_RefCount.h"
 #include "Kernel/OVR_Array.h"
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 //-------------------------------------------------------------------------------------
 // ***** DeviceStatus

@@ -31,7 +31,7 @@ limitations under the License.
 #include "Kernel/OVR_String.h"
 #include "OVR_Profile.h"
 
-namespace OVR { namespace OSX {
+namespace OVR { namespace Platform {
 
 class HMDDevice;
 

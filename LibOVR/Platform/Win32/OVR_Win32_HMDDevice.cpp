@@ -31,7 +31,7 @@ limitations under the License.
 
 #include <tchar.h>
 
-namespace OVR { namespace Win32 {
+namespace OVR { namespace Platform {
 
 using namespace OVR::Util::Render;
 
