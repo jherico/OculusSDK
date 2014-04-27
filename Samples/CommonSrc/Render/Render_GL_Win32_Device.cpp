@@ -23,7 +23,7 @@ limitations under the License.
 
 #include "Render_GL_Win32_Device.h"
 #include "OVR_CAPI_GL.h"
-
+#include <GL/wglew.h>
 #include <dwmapi.h>
 
 namespace OVR { namespace Render { namespace GL { namespace Win32 {

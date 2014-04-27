@@ -513,15 +513,14 @@ DistortionRenderer::~DistortionRenderer()
     destroy();
 }
 
+extern void InitGl();
+
 // static
 CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
                                                      FrameTimeManager& timeManager,
                                                      const HMDRenderState& renderState)
 {
-#ifdef OVR_OS_WIN32
-    InitGLExtensions();
-#endif
-
+    InitGl();
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
 
@@ -828,7 +827,43 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
     SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f, 1.0f);
     renderPrimitives(&quadFill, &latencyVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);
 }
+#if 1
+namespace gl {
+class Query {
+  GLuint query;
+public:
+  Query() {
+    glGenQueries(1, &query);
+  }
 
+  virtual ~Query() {
+    glDeleteQueries(1, &query);
+    query = 0;
+  }
+
+  void begin() {
+    glBeginQuery(GL_TIME_ELAPSED, query);
+  }
+
+  static void end() {
+    glEndQuery(GL_TIME_ELAPSED);
+  }
+
+  bool available() {
+    GLint result;
+    glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &result);
+    return result == GL_TRUE;
+  }
+
+  GLint getResult() {
+    GLint result = -1;
+    glGetQueryObjectiv(query, GL_QUERY_RESULT, &result);
+    return result;
+  }
+};
+}
+
+#endif
 void DistortionRenderer::renderPrimitives(
                           const ShaderFill* fill,
                           GLuint * vao,
@@ -842,8 +877,10 @@ void DistortionRenderer::renderPrimitives(
     switch (rprim)
     {
     case Prim_Triangles:
-        prim = GL_TRIANGLES;
-        break;
+      prim = GL_TRIANGLES;
+      //prim = GL_LINE_STRIP;
+      //prim = GL_TRIANGLE_STRIP;
+      break;
     case Prim_Lines:
         prim = GL_LINES;
         break;
@@ -888,10 +925,19 @@ void DistortionRenderer::renderPrimitives(
       glBindVertexArray(*vao);
     }
 
+    static gl::Query * q = nullptr;
+    if (!q) {
+      glewExperimental = GL_TRUE;
+      glewInit();
+      q = new gl::Query();
+    }
     // Draw
     if (indices) {
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ((Buffer*)indices)->GLBuffer);
+      q->begin();
       glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
+      q->end();
+      OVR_DEBUG_LOG(("Took: %d", q->getResult()));
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     } else {
       glDrawArrays(prim, 0, count);

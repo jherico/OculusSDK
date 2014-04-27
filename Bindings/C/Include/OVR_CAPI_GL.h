@@ -17,14 +17,9 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_CAPI.h"
 
-//-----------------------------------------------------------------------------------
-// ***** GL Specific
-
-#if defined(OVR_OS_WIN32)
-#include <GL/gl.h>
-#include <GL/wglext.h>
+#ifndef GL_TRUE
+#error "You must include an OpenGL header before including OVR_CAPI_GL.h"
 #endif
-
 
 // Used to configure slave GL rendering (i.e. for devices created externally).
 typedef struct ovrGLConfigData_s

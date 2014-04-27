@@ -1,19 +1,17 @@
 project (LibOVR)
 
 include_directories(Include Src Src/Kernel Src/Util)
-include_directories(../3rdParty/glext)
 
 file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h Include/*.h)
 list(REMOVE_ITEM SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Src/OVR_Common_HMDDevice.cpp)
 
 if(WIN32)
-
     # Extra source
     file(GLOB PLATFORM_SOURCE_FILES Platform/Win32/*.cpp Platform/Win32/*.h)
     list(APPEND PLATFORM_SOURCE_FILES Platform/OVR_ThreadsWinAPI.cpp)
 
     # Extra libs
-    list(APPEND OculusVR_EXTRA_LIBS setupapi winmm)
+    list(APPEND EXTRA_LIBS setupapi winmm)
 
 elseif(APPLE)
 
@@ -24,40 +22,34 @@ elseif(APPLE)
     # Extra libs
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKIT_LIBRARY IOKit)
-    list(APPEND OculusVR_EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
+    list(APPEND EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
 
 else()
-
     # Extra source
     file(GLOB PLATFORM_SOURCE_FILES Platform/Linux/*.cpp Platform/Linux/*.h)
     list(APPEND PLATFORM_SOURCE_FILES Platform/OVR_ThreadsPthread.cpp)
 
     # Extra libs
-
     # Used by the SDK to read the EDID of the monitors
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID 
-        ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID
-    )
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID)
+    list(APPEND EXTRA_LIBS edid)
 
-    find_package(X11 REQUIRED)
+    # Used by the SDK to access the HID functions
+    list(APPEND EXTRA_LIBS udev)
+
     find_package(Threads REQUIRED)
+    list(APPEND EXTRA_LIBS ${CMAKE_THREAD_LIBS_INIT})
 
     # Check for XRandR (modern resolution switching and gamma control)
+    find_package(X11 REQUIRED)
     if (NOT X11_Xrandr_FOUND)
         message(FATAL_ERROR "The RandR library and headers were not found")
     endif()
+    list(APPEND EXTRA_LIBS ${X11_X11_LIB}) 
+    list(APPEND EXTRA_LIBS ${X11_Xrandr_LIB})
 
-    # Set up library and include paths
-    list(APPEND OculusVR_EXTRA_LIBS 
-        ${X11_X11_LIB} 
-        ${X11_Xrandr_LIB}
-        ${CMAKE_THREAD_LIBS_INIT}
-        edid udev
-    )
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID)
+
 endif()
 
-add_library(OculusVR STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
-set(OVR_LIBRARIES ${OculusVR_EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")
-target_link_libraries(OculusVR ${OculusVR_EXTRA_LIBS})
+add_library(OVR STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+set(OVR_LIBRARIES ${EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")

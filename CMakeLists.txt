@@ -7,11 +7,23 @@ list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}/CMake/Modules
 )
 
-# Comment out these two lines to disable the debug build
-set(CMAKE_BUILD_TYPE "Debug")
-add_definitions(-DOVR_BUILD_DEBUG)
+# First for the generic no-config case (e.g. with mingw)
+set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
+set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
+# Second, for multi-config builds (e.g. msvc)
+foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+    set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+    set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_BINARY_DIR}/output )
+endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
+set(CMAKE_DEBUG_POSTFIX "d")
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-std=gnu++0x)
@@ -21,17 +33,26 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     endif()
 endif()
 
-
 if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
+else(APPLE)
+else() 
+    add_subdirectory(3rdParty/EDID)
+    set_target_properties(edid PROPERTIES FOLDER "3rdParty")
 endif()
-
-include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
-include_directories(${CMAKE_SOURCE_DIR}/LibOVR/Src/CAPI/D3D1X)
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
+set_target_properties(OVR PROPERTIES FOLDER "Oculus")
+
+# Cross platform GL access.  Used by the C API and by
+# the sample applications
+add_definitions(-DGLEW_STATIC)
+add_subdirectory(3rdParty/glew)
+    set_target_properties(glew PROPERTIES FOLDER "3rdParty")
+
 add_subdirectory(Bindings/C)
+set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
 
 ###############################################################################
 #
@@ -42,6 +63,7 @@ option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
 
 if(OCULUS_BUILD_SAMPLES)
     # Make sure to set up the OVR include paths
+    include_directories(3rdParty/glew/include)
     include_directories(${LibOVR_SOURCE_DIR}/Include)
     include_directories(${LibOVR_SOURCE_DIR}/Src)
     include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
@@ -52,20 +74,17 @@ if(OCULUS_BUILD_SAMPLES)
  #   include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
 
     # Cross platform access to shader functionality
- #   add_definitions( -DGLEW_STATIC )
- #   add_subdirectory(3rdParty/glew)
-#    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glew/include)
-    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
+#    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
 
     # Used by the sample code to read the tuscany resources
     add_subdirectory(3rdParty/TinyXml)
-    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/TinyXml)
+    set_target_properties(TinyXML2 PROPERTIES FOLDER "3rdParty")
+    include_directories(3rdParty/TinyXml)
 
-    add_definitions( -DGL_GLEXT_PROTOTYPES )
-    #add_subdirectory (Samples/CommonSrc )
-    #add_subdirectory (Samples/OculusWorldDemo )
-    #add_subdirectory (Samples/OculusRoomTiny )
-    #add_subdirectory (Samples/SensorBox )
-    #add_subdirectory (Samples/TestSensor )
+    add_subdirectory (Samples/CommonSrc )
+    set_target_properties(CommonSrc PROPERTIES FOLDER "Samples")
+
+    add_subdirectory (Samples/OculusWorldDemo )
+    set_target_properties(OculusWorldDemo PROPERTIES FOLDER "Samples")
 endif()
 

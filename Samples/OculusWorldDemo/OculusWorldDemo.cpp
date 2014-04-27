@@ -809,6 +809,7 @@ void OculusWorldDemoApp::OnIdle()
     // TODO: These happen inside ovrHmd_EndFrame; need to hook into it.
     //Profiler.RecordSample(RenderProfiler::Sample_BeforeDistortion);
     ovrHmd_EndFrame(Hmd);
+    pRender->Present(true);
     Profiler.RecordSample(RenderProfiler::Sample_AfterPresent);    
 }
 

@@ -25,84 +25,12 @@ limitations under the License.
 #define OVR_Render_GL_Device_h
 
 #include "../Render/Render_Device.h"
-
-#if defined(OVR_OS_WIN32)
-#include <Windows.h>
-#endif
-
-#if defined(OVR_OS_MAC)
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#else
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
-#if defined(OVR_OS_WIN32)
-#include <GL/wglext.h>
-#endif
-#endif
+#include <GL/glew.h>
 
 namespace OVR { namespace Render { namespace GL {
 
 // GL extension Hooks for PC.
-#if defined(OVR_OS_WIN32)
-    
-extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
-extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
-extern PFNGLGENFRAMEBUFFERSEXTPROC              glGenFramebuffersEXT;
-extern PFNGLDELETEFRAMEBUFFERSEXTPROC           glDeleteFramebuffersEXT;
-extern PFNGLDELETESHADERPROC                    glDeleteShader;
-extern PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC       glCheckFramebufferStatusEXT;
-extern PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC      glFramebufferRenderbufferEXT;
-extern PFNGLFRAMEBUFFERTEXTURE2DEXTPROC         glFramebufferTexture2DEXT;
-extern PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebufferEXT;
-extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
-extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
-extern PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
-extern PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
-extern PFNGLBINDBUFFERPROC                      glBindBuffer;
-extern PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
-extern PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
-extern PFNGLBUFFERDATAPROC                      glBufferData;
-extern PFNGLGENBUFFERSPROC                      glGenBuffers;
-extern PFNGLMAPBUFFERPROC                       glMapBuffer;
-extern PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
-extern PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
-extern PFNGLGETSHADERIVPROC                     glGetShaderiv;
-extern PFNGLCOMPILESHADERPROC                   glCompileShader;
-extern PFNGLSHADERSOURCEPROC                    glShaderSource;
-extern PFNGLCREATESHADERPROC                    glCreateShader;
-extern PFNGLCREATEPROGRAMPROC                   glCreateProgram;
-extern PFNGLATTACHSHADERPROC                    glAttachShader;
-extern PFNGLDETACHSHADERPROC                    glDetachShader;
-extern PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
-extern PFNGLUNIFORM1IPROC                       glUniform1i;
-extern PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
-extern PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
-extern PFNGLUSEPROGRAMPROC                      glUseProgram;
-extern PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
-extern PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
-extern PFNGLLINKPROGRAMPROC                     glLinkProgram;
-extern PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
-extern PFNGLUNIFORM4FVPROC                      glUniform4fv;
-extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
-extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
-extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
-extern PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
-extern PFNGLRENDERBUFFERSTORAGEEXTPROC          glRenderbufferStorageEXT;
-extern PFNGLBINDRENDERBUFFEREXTPROC             glBindRenderbufferEXT;
-extern PFNGLGENRENDERBUFFERSEXTPROC             glGenRenderbuffersEXT;
-extern PFNGLDELETERENDERBUFFERSEXTPROC          glDeleteRenderbuffersEXT;
-
-// For testing
-extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
-
 extern void InitGLExtensions();
-
-#endif
-
 
 class RenderDevice;
 
