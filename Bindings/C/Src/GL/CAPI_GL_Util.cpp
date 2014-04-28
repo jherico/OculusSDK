@@ -28,7 +28,7 @@ namespace OVR { namespace CAPI { namespace GL {
 
 void InitGl()
 {
-  static boolean called = false;
+  static bool called = false;
   if (!called) {
     called = true;
     glewExperimental = true;
