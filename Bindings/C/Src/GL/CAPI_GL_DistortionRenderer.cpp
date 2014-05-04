@@ -691,7 +691,7 @@ void DistortionRenderer::initBuffersAndShaders()
         DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
         DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
         DistortionMeshIBs[eyeNum]->Data ( Buffer_Index, meshData.pIndexData, ( sizeof(uint16_t) * meshData.IndexCount ) );
-
+        DistortionMeshIndexCount[eyeNum] = meshData.IndexCount;
         OVR_FREE ( pVBVerts );
         ovrHmd_DestroyDistortionMesh( &meshData );
     }
@@ -709,15 +709,9 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         RState.ClearColor[2],
         RState.ClearColor[3] );
 
-#define NEW_DEPTH
-#ifdef NEW_DEPTH
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glClear(GL_COLOR_BUFFER_BIT);
-#else
-    glClearDepth(0);
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-#endif
 
     static GLuint distortionVAOs[2] = { 0, 0 };
     for (int eyeNum = 0; eyeNum < 2; eyeNum++)
@@ -739,13 +733,8 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
             DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]).Transposed());
         }
         renderPrimitives(&distortionShaderFill, distortionVAOs + eyeNum, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
-          NULL, 0, (int)DistortionMeshVBs[eyeNum]->GetSize(), Prim_Triangles, true);
+          NULL, 0, DistortionMeshIndexCount[eyeNum], Prim_Triangles, true);
     }
-
-#ifndef NEW_DEPTH
-    glClearDepth(1);
-#endif
-
 }
 
 void DistortionRenderer::createDrawQuad()

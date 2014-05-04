@@ -103,6 +103,7 @@ private:
 
     Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
     Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
+    int                 DistortionMeshIndexCount[2];
 
     Ptr<ShaderSet>      DistortionShader;
 
