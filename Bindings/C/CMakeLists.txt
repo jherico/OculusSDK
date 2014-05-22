@@ -4,15 +4,15 @@ include_directories(Include Src)
 
 # Make sure to set up the OVR include paths
 include_directories(../../3rdParty/glew/include)
-include_directories(${LibOVR_SOURCE_DIR}/Include)
-include_directories(${LibOVR_SOURCE_DIR}/Src)
-include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
-include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
+include_directories(${OculusVR_SOURCE_DIR}/Include)
+include_directories(${OculusVR_SOURCE_DIR}/Src)
+include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
+include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
 
 file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h Include/*.h)
 add_library(OVR_C SHARED ${SOURCE_FILES})
 
-set(EXTRA_LIBS OVR)
+set(EXTRA_LIBS OculusVR)
 list(APPEND EXTRA_LIBS ${OVR_LIBRARIES})
 
 # All platforms require GLEW and OpenGL

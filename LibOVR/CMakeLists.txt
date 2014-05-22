@@ -1,4 +1,4 @@
-project (LibOVR)
+project (OculusVR)
 
 include_directories(Include Src Src/Kernel Src/Util)
 
@@ -51,5 +51,5 @@ else()
 
 endif()
 
-add_library(OVR STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+add_library(OculusVR STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
 set(OVR_LIBRARIES ${EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")

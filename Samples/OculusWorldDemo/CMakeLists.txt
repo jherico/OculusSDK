@@ -24,7 +24,7 @@ set(EXTRA_LIBS OVR_C)
 
 # While the samples use the C API, they also use the 
 # core SDK functionality quite a bit
-list(APPEND EXTRA_LIBS OVR)
+list(APPEND EXTRA_LIBS OculusVR)
 list(APPEND EXTRA_LIBS ${OVR_LIBRARIES})
 
 # Supplementary rendering wrapper functionality

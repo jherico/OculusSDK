@@ -28,14 +28,18 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 if(CMAKE_COMPILER_IS_GNUCXX)
     add_definitions(-std=gnu++0x)
     if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC"  )
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC"  )    
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fPIC")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fPIC")
     endif()
 endif()
 
 if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
-else(APPLE)
+elseif(APPLE)
 else() 
     add_subdirectory(3rdParty/EDID)
     set_target_properties(edid PROPERTIES FOLDER "3rdParty")
@@ -43,13 +47,13 @@ endif()
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
-set_target_properties(OVR PROPERTIES FOLDER "Oculus")
+set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
 # Cross platform GL access.  Used by the C API and by
 # the sample applications
 add_definitions(-DGLEW_STATIC)
 add_subdirectory(3rdParty/glew)
-    set_target_properties(glew PROPERTIES FOLDER "3rdParty")
+set_target_properties(glew PROPERTIES FOLDER "3rdParty")
 
 add_subdirectory(Bindings/C)
 set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
@@ -61,13 +65,14 @@ set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
 
 option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
 
+if(WIN32)
 if(OCULUS_BUILD_SAMPLES)
     # Make sure to set up the OVR include paths
     include_directories(3rdParty/glew/include)
-    include_directories(${LibOVR_SOURCE_DIR}/Include)
-    include_directories(${LibOVR_SOURCE_DIR}/Src)
-    include_directories(${LibOVR_SOURCE_DIR}/Src/Kernel)
-    include_directories(${LibOVR_SOURCE_DIR}/Src/Util)
+    include_directories(${OculusVR_SOURCE_DIR}/Include)
+    include_directories(${OculusVR_SOURCE_DIR}/Src)
+    include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
+    include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
     include_directories(Bindings/C/Include)
     # Cross platform window creation
  #   add_subdirectory(3rdParty/glfw)
@@ -87,4 +92,4 @@ if(OCULUS_BUILD_SAMPLES)
     add_subdirectory (Samples/OculusWorldDemo )
     set_target_properties(OculusWorldDemo PROPERTIES FOLDER "Samples")
 endif()
-
+endif()
