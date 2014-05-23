@@ -132,35 +132,35 @@ public:
     unsigned char*  UniformData;
     int             UniformsSize;
 
-    enum VarType
-    {
-        VARTYPE_FLOAT,
-        VARTYPE_INT,
-        VARTYPE_BOOL,
-    };
+	enum VarType
+	{
+		VARTYPE_FLOAT,
+		VARTYPE_INT,
+		VARTYPE_BOOL,
+	};
 
-    struct Uniform
-    {
-        String Name;
-        VarType Type;
-        int    Offset, Size;
-    };
-    Array<Uniform> UniformInfo;
+	struct Uniform
+	{
+		String Name;
+		VarType Type;
+		int    Offset, Size;
+	};
+	Array<Uniform> UniformInfo;
 
     ShaderBase(RenderDevice* r, ShaderStage stage);
     ShaderBase(ShaderStage s) : Stage(s) {}
 
-    ~ShaderBase();
+	~ShaderBase();
 
     ShaderStage GetStage() const { return Stage; }
 
     virtual void Set(PrimitiveType) const { }
     virtual void SetUniformBuffer(class Buffer* buffers, int i = 0) { OVR_UNUSED2(buffers, i); }
     
-    void InitUniforms(ID3D10Blob* s);
+	void InitUniforms(ID3D10Blob* s);
     void InitUniforms(void* s, size_t sizeS);
-    virtual bool SetUniform(const char* name, int n, const float* v);
-    virtual bool SetUniformBool(const char* name, int n, const bool* v);
+	virtual bool SetUniform(const char* name, int n, const float* v);
+	virtual bool SetUniformBool(const char* name, int n, const bool* v);
  
     void UpdateBuffer(Buffer* b);
 };
@@ -445,7 +445,7 @@ struct Vertex
 {
     Vector3f  Pos;
     Color     C;
-    float     U, V;    
+    float     U, V;	
     Vector3f  Norm;
 
     Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255), 
@@ -506,7 +506,7 @@ public:
     Array<UInt16>     Indices;
     PrimitiveType     Type;
     Ptr<ShaderFill>   Fill;
-    bool              Visible;    
+    bool              Visible;	
 
     // Some renderers will create these if they didn't exist before rendering.
     // Currently they are not updated, so vertex data should not be changed after rendering.
@@ -568,8 +568,8 @@ public:
 
     virtual void Render(const Matrix4f& ltw, RenderDevice* ren);
 
-    void Add(Node *n)  { Nodes.PushBack(n); }    
-    void Clear()       { Nodes.Clear(); }    
+    void Add(Node *n)  { Nodes.PushBack(n); }	
+    void Clear()       { Nodes.Clear(); }	
 };
 
 
@@ -577,9 +577,9 @@ public:
 class Scene : public NewOverrideBase
 {
 public:
-    Container            World;
-    Vector4f            LightPos[8];
-    LightingParams        Lighting;
+    Container			World;
+    Vector4f			LightPos[8];
+    LightingParams		Lighting;
 
 public:
     void Render(RenderDevice* ren, const Matrix4f& view);
@@ -706,7 +706,7 @@ public:
     // specified device.
     struct SlaveRendererParams
     {
-        ID3D11Device*            pDevice;
+		ID3D11Device*			pDevice;
         ID3D11DeviceContext*    pDeviceContext;
         ID3D11RenderTargetView* pBackBufferRT;
         Sizei                   RTSize;
@@ -729,8 +729,8 @@ public:
 
     // Constructor helper
     void  initShadersAndStates();
-    void  InitShaders( const char * vertex_shader, const char * pixel_shader, ShaderSet ** pShaders, ID3D11InputLayout ** pVertexIL,
-                  D3D11_INPUT_ELEMENT_DESC * DistortionMeshVertexDesc, int num_elements);
+	void  InitShaders( const char * vertex_shader, const char * pixel_shader, ShaderSet ** pShaders, ID3D11InputLayout ** pVertexIL,
+				  D3D11_INPUT_ELEMENT_DESC * DistortionMeshVertexDesc, int num_elements);
 
 
 
@@ -777,7 +777,7 @@ public:
     virtual void SetRenderTarget(Texture* color,
                                  Texture* depth = NULL,
                                  Texture* stencil = NULL);
-
+            void SetDefaultRenderTarget() { SetRenderTarget(NULL, NULL); }
     virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less);
     virtual void SetProjection(const Matrix4f& proj);
     virtual void SetWorldUniforms(const Matrix4f& proj);

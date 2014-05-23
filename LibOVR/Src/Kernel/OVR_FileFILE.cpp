@@ -89,7 +89,7 @@ public:
 class SysErrorModeDisabler
 {
 public:
-    SysErrorModeDisabler(const char* pfileName) { }
+    SysErrorModeDisabler(const char* pfileName) { OVR_UNUSED(pfileName); }
 };
 #endif // OVR_OS_WIN32
 
@@ -564,7 +564,7 @@ bool    FILEFile::CloseCancel()
 Ptr<File> FileFILEOpen(const String& path, int flags, int mode)
 {
     Ptr<File> result = *new FILEFile(path, flags, mode);
-    return result;
+	return result;
 }
 
 // Helper function: obtain file information time.

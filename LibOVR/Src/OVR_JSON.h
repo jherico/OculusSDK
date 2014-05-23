@@ -82,6 +82,9 @@ public:
     // Returns null pointer and fills in *perror in case of parse error.
     static JSON*    Parse(const char* buff, const char** perror = 0);
 
+	// This version works for buffers that are not null terminated strings.
+	static JSON*	ParseBuffer(const char *buff, int len, const char** perror = 0);
+
     // Loads and parses a JSON object from a file.
     // Returns 0 and assigns perror with error message on fail.
     static JSON*    Load(const char* path, const char** perror = 0);
@@ -101,6 +104,12 @@ public:
     unsigned        GetItemCount() const;
     JSON*           GetItemByIndex(unsigned i);
     JSON*           GetItemByName(const char* name);
+
+	// Accessors by name
+	double			GetNumberByName(const char *name, double defValue = 0.0);
+	int				GetIntByName(const char *name, int defValue = 0);
+	bool			GetBoolByName(const char *name, bool defValue = false);
+	String			GetStringByName(const char *name, const String &defValue = "");
 
     // Returns next item in a list of children; 0 if no more items exist.
     JSON*           GetNextItem(JSON* item)  { return Children.IsNull(item->pNext) ? 0 : item->pNext; }

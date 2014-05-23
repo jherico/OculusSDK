@@ -280,7 +280,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                            bool bRendertargetSharedByBothEyes,
                                            bool bRightHanded /*= true*/,
                                            float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/,
-                                           Sizei const *pOverrideRenderedPixelSize /* = NULL*/,
+										   Sizei const *pOverrideRenderedPixelSize /* = NULL*/,
                                            FovPort const *pOverrideFovport /*= NULL*/,
                                            float zoomFactor /*= 1.0f*/ )
 {
@@ -391,10 +391,10 @@ StereoConfig::StereoConfig(StereoMode mode)
     Hmd.EyeLeft.Distortion.K[2]                         = 0.2408f;
     Hmd.EyeLeft.Distortion.K[3]                         = -0.4589f;
     Hmd.EyeLeft.Distortion.MaxR                         = 1.0f;
-    Hmd.EyeLeft.Distortion.ChromaticAberration[0]        = 0.006f;
-    Hmd.EyeLeft.Distortion.ChromaticAberration[1]        = 0.0f;
-    Hmd.EyeLeft.Distortion.ChromaticAberration[2]        = -0.014f;
-    Hmd.EyeLeft.Distortion.ChromaticAberration[3]        = 0.0f;
+	Hmd.EyeLeft.Distortion.ChromaticAberration[0]		= 0.006f;
+	Hmd.EyeLeft.Distortion.ChromaticAberration[1]		= 0.0f;
+	Hmd.EyeLeft.Distortion.ChromaticAberration[2]		= -0.014f;
+	Hmd.EyeLeft.Distortion.ChromaticAberration[3]		= 0.0f;
     Hmd.EyeLeft.NoseToPupilInMeters                     = 0.62f;
     Hmd.EyeLeft.ReliefInMeters                          = 0.013f;
     Hmd.EyeRight = Hmd.EyeLeft;
@@ -836,8 +836,8 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
         }
         *ppVertices             = NULL;
         *ppTriangleListIndices  = NULL;
-        *pNumTriangles          = NULL;
-        *pNumVertices           = NULL;
+        *pNumTriangles          = 0;
+        *pNumVertices           = 0;
         return;
     }
 
@@ -848,6 +848,7 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
     // Populate vertex buffer info
     float xOffset = 0.0f;
     float uOffset = 0.0f;
+    OVR_UNUSED(uOffset);
 
     if (rightEye)
     {
@@ -877,11 +878,11 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
             Vector2f tanEyeAnglesR, tanEyeAnglesG, tanEyeAnglesB;
             TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
                                                     distortion, screenNDC );
-            
-            pcurVert->TanEyeAnglesR = tanEyeAnglesR;
-            pcurVert->TanEyeAnglesG = tanEyeAnglesG;
-            pcurVert->TanEyeAnglesB = tanEyeAnglesB;
-            
+			
+			pcurVert->TanEyeAnglesR = tanEyeAnglesR;
+			pcurVert->TanEyeAnglesG = tanEyeAnglesG;
+			pcurVert->TanEyeAnglesB = tanEyeAnglesB;
+			
 
             HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
             switch ( shutterType )
@@ -1002,7 +1003,203 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
     }
 }
 
+//-----------------------------------------------------------------------------------
+// *****  Heightmap Mesh Rendering
 
+
+static const int HMA_GridSizeLog2   = 7;
+static const int HMA_GridSize       = 1<<HMA_GridSizeLog2;
+static const int HMA_NumVertsPerEye = (HMA_GridSize+1)*(HMA_GridSize+1);
+static const int HMA_NumTrisPerEye  = (HMA_GridSize)*(HMA_GridSize)*2;
+
+
+void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices )
+{
+    OVR_FREE ( pVertices );
+    OVR_FREE ( pTriangleMeshIndices );
+}
+
+void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+    int *pNumVertices, int *pNumTriangles,
+    const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo )
+{
+    bool    rightEye      = ( stereoParams.Eye == StereoEye_Right );
+    int     vertexCount   = 0;
+    int     triangleCount = 0;
+
+    // Generate mesh into allocated data and return result.
+    HeightmapMeshCreate(ppVertices, ppTriangleListIndices, &vertexCount, &triangleCount,
+        rightEye, hmdRenderInfo, stereoParams.EyeToSourceNDC);
+
+    *pNumVertices  = vertexCount;
+    *pNumTriangles = triangleCount;
+}
+
+
+// Generate heightmap mesh for one eye.
+void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+    int *pNumVertices, int *pNumTriangles, bool rightEye,
+    const HmdRenderInfo &hmdRenderInfo,
+    const ScaleAndOffset2D &eyeToSourceNDC )
+{
+    *pNumVertices  = HMA_NumVertsPerEye;
+    *pNumTriangles = HMA_NumTrisPerEye;
+
+    *ppVertices = (HeightmapMeshVertexData*) OVR_ALLOC( sizeof(HeightmapMeshVertexData) * (*pNumVertices) );
+    *ppTriangleListIndices  = (UInt16*) OVR_ALLOC( sizeof(UInt16) * (*pNumTriangles) * 3 );
+
+    if (!*ppVertices || !*ppTriangleListIndices)
+    {
+        if (*ppVertices)
+        {
+            OVR_FREE(*ppVertices);
+        }
+        if (*ppTriangleListIndices)
+        {
+            OVR_FREE(*ppTriangleListIndices);
+        }
+        *ppVertices             = NULL;
+        *ppTriangleListIndices  = NULL;
+        *pNumTriangles          = 0;
+        *pNumVertices           = 0;
+        return;
+    }
+
+    // Populate vertex buffer info
+    float xOffset = 0.0f;
+    float uOffset = 0.0f;
+
+    if (rightEye)
+    {
+        xOffset = 1.0f;
+        uOffset = 0.5f;
+    }
+
+    // First pass - build up raw vertex data.
+    HeightmapMeshVertexData* pcurVert = *ppVertices;
+
+    for ( int y = 0; y <= HMA_GridSize; y++ )
+    {
+        for ( int x = 0; x <= HMA_GridSize; x++ )
+        {
+            Vector2f sourceCoordNDC;
+            // NDC texture coords [-1,+1]
+            sourceCoordNDC.x = 2.0f * ( (float)x / (float)HMA_GridSize ) - 1.0f;
+            sourceCoordNDC.y = 2.0f * ( (float)y / (float)HMA_GridSize ) - 1.0f;
+            Vector2f tanEyeAngle = TransformRendertargetNDCToTanFovSpace ( eyeToSourceNDC, sourceCoordNDC );
+            
+            pcurVert->TanEyeAngles = tanEyeAngle;
+
+            HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
+            switch ( shutterType )
+            {
+            case HmdShutter_Global:
+                pcurVert->TimewarpLerp = 0.0f;
+                break;
+            case HmdShutter_RollingLeftToRight:
+                // Retrace is left to right - left eye goes 0.0 -> 0.5, then right goes 0.5 -> 1.0
+                pcurVert->TimewarpLerp = sourceCoordNDC.x * 0.25f + 0.25f;
+                if (rightEye)
+                {
+                    pcurVert->TimewarpLerp += 0.5f;
+                }
+                break;
+            case HmdShutter_RollingRightToLeft:
+                // Retrace is right to left - right eye goes 0.0 -> 0.5, then left goes 0.5 -> 1.0
+                pcurVert->TimewarpLerp = 0.75f - sourceCoordNDC.x * 0.25f;
+                if (rightEye)
+                {
+                    pcurVert->TimewarpLerp -= 0.5f;
+                }
+                break;
+            case HmdShutter_RollingTopToBottom:
+                // Retrace is top to bottom on both eyes at the same time.
+                pcurVert->TimewarpLerp = sourceCoordNDC.y * 0.5f + 0.5f;
+                break;
+            default: OVR_ASSERT ( false ); break;
+            }
+
+            // Don't let verts overlap to the other eye.
+            //sourceCoordNDC.x = Alg::Max ( -1.0f, Alg::Min ( sourceCoordNDC.x, 1.0f ) );
+            //sourceCoordNDC.y = Alg::Max ( -1.0f, Alg::Min ( sourceCoordNDC.y, 1.0f ) );
+
+            //pcurVert->ScreenPosNDC.x = 0.5f * sourceCoordNDC.x - 0.5f + xOffset;
+            pcurVert->ScreenPosNDC.x = sourceCoordNDC.x;
+            pcurVert->ScreenPosNDC.y = -sourceCoordNDC.y;
+
+            pcurVert++;
+        }
+    }
+
+
+    // Populate index buffer info  
+    UInt16 *pcurIndex = *ppTriangleListIndices;
+
+    for ( int triNum = 0; triNum < HMA_GridSize * HMA_GridSize; triNum++ )
+    {
+        // Use a Morton order to help locality of FB, texture and vertex cache.
+        // (0.325ms raster order -> 0.257ms Morton order)
+        OVR_ASSERT ( HMA_GridSize < 256 );
+        int x = ( ( triNum & 0x0001 ) >> 0 ) |
+                ( ( triNum & 0x0004 ) >> 1 ) |
+                ( ( triNum & 0x0010 ) >> 2 ) |
+                ( ( triNum & 0x0040 ) >> 3 ) |
+                ( ( triNum & 0x0100 ) >> 4 ) |
+                ( ( triNum & 0x0400 ) >> 5 ) |
+                ( ( triNum & 0x1000 ) >> 6 ) |
+                ( ( triNum & 0x4000 ) >> 7 );
+        int y = ( ( triNum & 0x0002 ) >> 1 ) |
+                ( ( triNum & 0x0008 ) >> 2 ) |
+                ( ( triNum & 0x0020 ) >> 3 ) |
+                ( ( triNum & 0x0080 ) >> 4 ) |
+                ( ( triNum & 0x0200 ) >> 5 ) |
+                ( ( triNum & 0x0800 ) >> 6 ) |
+                ( ( triNum & 0x2000 ) >> 7 ) |
+                ( ( triNum & 0x8000 ) >> 8 );
+        int FirstVertex = x * (HMA_GridSize+1) + y;
+        // Another twist - we want the top-left and bottom-right quadrants to
+        // have the triangles split one way, the other two split the other.
+        // +---+---+---+---+
+        // |  /|  /|\  |\  |
+        // | / | / | \ | \ |
+        // |/  |/  |  \|  \|
+        // +---+---+---+---+
+        // |  /|  /|\  |\  |
+        // | / | / | \ | \ |
+        // |/  |/  |  \|  \|
+        // +---+---+---+---+
+        // |\  |\  |  /|  /|
+        // | \ | \ | / | / |
+        // |  \|  \|/  |/  |
+        // +---+---+---+---+
+        // |\  |\  |  /|  /|
+        // | \ | \ | / | / |
+        // |  \|  \|/  |/  |
+        // +---+---+---+---+
+        // This way triangle edges don't span long distances over the distortion function,
+        // so linear interpolation works better & we can use fewer tris.
+        if ( ( x < HMA_GridSize/2 ) != ( y < HMA_GridSize/2 ) )       // != is logical XOR
+        {
+            *pcurIndex++ = (UInt16)FirstVertex;
+            *pcurIndex++ = (UInt16)FirstVertex+1;
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
+
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
+            *pcurIndex++ = (UInt16)FirstVertex;
+        }
+        else
+        {
+            *pcurIndex++ = (UInt16)FirstVertex;
+            *pcurIndex++ = (UInt16)FirstVertex+1;
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
+
+            *pcurIndex++ = (UInt16)FirstVertex+1;
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
+            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
+        }
+    }
+}
 
 //-----------------------------------------------------------------------------------
 // ***** Prediction and timewarp.
@@ -1075,10 +1272,10 @@ PredictionValues PredictionGetDeviceValues ( const HmdRenderInfo &hmdRenderInfo,
     return result;
 }
 
-Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld )
+Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust )
 {
-    Matrix4f worldFromPredictedView = predictedViewFromWorld.InvertedHomogeneousTransform();
-    Matrix4f matRenderFromNowStart = renderedViewFromWorld * worldFromPredictedView;
+    Matrix4f worldFromPredictedView = (eyeViewAdjust * predictedViewFromWorld).InvertedHomogeneousTransform();
+    Matrix4f matRenderFromNowStart = (eyeViewAdjust * renderedViewFromWorld) * worldFromPredictedView;
 
     // The sensor-predicted orientations have:                           X=right, Y=up,   Z=backwards.
     // The vectors inside the mesh are in NDC to keep the shader simple: X=right, Y=down, Z=forwards.
@@ -1109,12 +1306,19 @@ Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matri
     return matRenderFromNowStart;
 }
 
+Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust )
+{
+    Matrix4f worldFromPredictedView = (eyeViewAdjust * predictedViewFromWorld).InvertedHomogeneousTransform();
+    Matrix4f matRenderXform = (eyeViewAdjust * renderedViewFromWorld) * worldFromPredictedView;
+
+    return matRenderXform.Inverted();
+}
 
 TimewarpMachine::TimewarpMachine()
 {    
     for ( int i = 0; i < 2; i++ )
     {
-        EyeRenderPoses[i] = Posef();
+        EyeRenderPoses[i] = Transformf();
     }
     DistortionTimeCount = 0;
     VsyncEnabled = false;
@@ -1145,7 +1349,7 @@ double TimewarpMachine::GetViewRenderPredictionTime()
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToRenderedScene;
 }
 
-Posef TimewarpMachine::GetViewRenderPredictionPose(SensorFusion &sfusion)
+Transformf TimewarpMachine::GetViewRenderPredictionPose(SensorFusion &sfusion)
 {
     double predictionTime = GetViewRenderPredictionTime();
     return sfusion.GetPoseAtTime(predictionTime);
@@ -1161,29 +1365,31 @@ double TimewarpMachine::GetVisiblePixelTimeEnd()
     // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToTimewarpEnd;
 }
-Posef TimewarpMachine::GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion)
+Transformf TimewarpMachine::GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion)
 {
     double predictionTime = GetVisiblePixelTimeStart();
     return sfusion.GetPoseAtTime(predictionTime);
 }
-Posef TimewarpMachine::GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion)
+Transformf TimewarpMachine::GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion)
 {
     double predictionTime = GetVisiblePixelTimeEnd();
     return sfusion.GetPoseAtTime(predictionTime);
 }
-Matrix4f TimewarpMachine::GetTimewarpDeltaStart(SensorFusion &sfusion, Posef const &renderedPose)
+Matrix4f TimewarpMachine::GetTimewarpDeltaStart(SensorFusion &sfusion, Transformf const &renderedPose)
 {
-    Posef visiblePose = GetPredictedVisiblePixelPoseStart ( sfusion );
+    Transformf visiblePose = GetPredictedVisiblePixelPoseStart ( sfusion );
     Matrix4f visibleMatrix(visiblePose);
     Matrix4f renderedMatrix(renderedPose);
-    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix );
+    Matrix4f identity;  // doesn't matter for orientation-only timewarp
+    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
 }
-Matrix4f TimewarpMachine::GetTimewarpDeltaEnd  (SensorFusion &sfusion, Posef const &renderedPose)
+Matrix4f TimewarpMachine::GetTimewarpDeltaEnd  (SensorFusion &sfusion, Transformf const &renderedPose)
 {
-    Posef visiblePose = GetPredictedVisiblePixelPoseEnd ( sfusion );
+    Transformf visiblePose = GetPredictedVisiblePixelPoseEnd ( sfusion );
     Matrix4f visibleMatrix(visiblePose);
     Matrix4f renderedMatrix(renderedPose);
-    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix );
+    Matrix4f identity;  // doesn't matter for orientation-only timewarp
+    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
 }
 
 

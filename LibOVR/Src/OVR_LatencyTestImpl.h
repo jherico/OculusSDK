@@ -41,9 +41,9 @@ struct LatencyTestColorDetectedMessage;
 class LatencyTestDeviceFactory : public DeviceFactory
 {
 public:
-    static LatencyTestDeviceFactory Instance;
+	static LatencyTestDeviceFactory &GetInstance();
 
-    // Enumerates devices, creating and destroying relevant objects in manager.
+	// Enumerates devices, creating and destroying relevant objects in manager.
     virtual void EnumerateDevices(EnumerateVisitor& visitor);
 
     virtual bool MatchVendorProduct(UInt16 vendorId, UInt16 productId) const;

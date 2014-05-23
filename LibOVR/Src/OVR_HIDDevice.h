@@ -82,7 +82,7 @@ class HIDDeviceManager : public RefCountBase<HIDDeviceManager>
 public:
 
     // Creates a new HIDDeviceManager. Only one instance of HIDDeviceManager should be created at a time.
-    static HIDDeviceManager* Create();
+    static HIDDeviceManager* Create(Ptr<OVR::DeviceManager>& deviceManager);
 
     // Enumerate HID devices using a HIDEnumerateVisitor derived visitor class.
     virtual bool Enumerate(HIDEnumerateVisitor* enumVisitor) = 0;

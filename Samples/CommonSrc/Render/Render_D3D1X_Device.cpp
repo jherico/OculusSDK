@@ -21,7 +21,6 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifdef OVR_D3D_VERSION
 #define GPU_PROFILING 0
 
 #include "Kernel/OVR_Log.h"
@@ -47,10 +46,11 @@ static D3D1x_(INPUT_ELEMENT_DESC) ModelVertexDesc[] =
     {"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Pos),   D3D1x_(INPUT_PER_VERTEX_DATA), 0},
     {"Color",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, offsetof(Vertex, C),     D3D1x_(INPUT_PER_VERTEX_DATA), 0},
     {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex, U),     D3D1x_(INPUT_PER_VERTEX_DATA), 0},
-    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex, U2),     D3D1x_(INPUT_PER_VERTEX_DATA), 0},
+    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,    0, offsetof(Vertex, U2),	 D3D1x_(INPUT_PER_VERTEX_DATA), 0},
     {"Normal",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(Vertex, Norm),  D3D1x_(INPUT_PER_VERTEX_DATA), 0},
 };
 
+#pragma region Geometry shaders
 static const char* StdVertexShaderSrc =
     "float4x4 Proj;\n"
     "float4x4 View;\n"
@@ -96,7 +96,10 @@ static const char* SolidPixelShaderSrc =
     "};\n"
     "float4 main(in Varyings ov) : SV_Target\n"
     "{\n"
-    "   return Color;\n"
+    "   float4 finalColor = ov.Color;"
+    // blend state expects premultiplied alpha
+	"	finalColor.rgb *= finalColor.a;\n"
+    "   return finalColor;\n"
     "}\n";
 
 static const char* GouraudPixelShaderSrc =
@@ -108,7 +111,10 @@ static const char* GouraudPixelShaderSrc =
     "};\n"
     "float4 main(in Varyings ov) : SV_Target\n"
     "{\n"
-    "   return ov.Color;\n"
+    "   float4 finalColor = ov.Color;"
+    // blend state expects premultiplied alpha
+	"	finalColor.rgb *= finalColor.a;\n"
+    "   return finalColor;\n"
     "}\n";
 
 static const char* TexturePixelShaderSrc =
@@ -122,9 +128,9 @@ static const char* TexturePixelShaderSrc =
     "};\n"
     "float4 main(in Varyings ov) : SV_Target\n"
     "{\n"
-    "    float4 color2 = ov.Color * Texture.Sample(Linear, ov.TexCoord);\n"
+    "	float4 color2 = ov.Color * Texture.Sample(Linear, ov.TexCoord);\n"
     "   if (color2.a <= 0.4)\n"
-    "        discard;\n"
+    "		discard;\n"
     "   return color2;\n"
     "}\n";
 
@@ -142,18 +148,18 @@ static const char* MultiTexturePixelShaderSrc =
     "{\n"
     "float4 color1;\n"
     "float4 color2;\n"
-    "    color1 = Texture[0].Sample(Linear, ov.TexCoord);\n"
-    // go to linear space colors (assume gamma 2.0 for speed)
-    "    color1.rgb *= color1.rgb;\n"
-    "    color2 = Texture[1].Sample(Linear, ov.TexCoord1);\n"
-    // go to linear space colors (assume gamma 2.0 for speed)
-    "    color2.rgb *= color2.rgb;\n"
-    "    color2.rgb = color2.rgb * lerp(1.2, 1.9, saturate(length(color2.rgb)));\n"
-    "    color2 = color1 * color2;\n"
+	"	color1 = Texture[0].Sample(Linear, ov.TexCoord);\n"
+	// go to linear space colors (assume gamma 2.0 for speed)
+    "	color1.rgb *= color1.rgb;\n"
+    "	color2 = Texture[1].Sample(Linear, ov.TexCoord1);\n"
+	// go to linear space colors (assume gamma 2.0 for speed)
+	"	color2.rgb *= color2.rgb;\n"
+    "	color2.rgb = color2.rgb * lerp(1.2, 1.9, saturate(length(color2.rgb)));\n"
+    "	color2 = color1 * color2;\n"
     "   if (color2.a <= 0.4)\n"
-    "        discard;\n"
-    // go to back to gamma space space colors (assume gamma 2.0 for speed)
-    "    return float4(sqrt(color2.rgb), color2.a);\n"
+    "		discard;\n"
+	// go to back to gamma space space colors (assume gamma 2.0 for speed)
+	"	return float4(sqrt(color2.rgb), color2.a);\n"
     "}\n";
 
 #define LIGHTING_COMMON                 \
@@ -213,12 +219,15 @@ static const char* AlphaTexturePixelShaderSrc =
     "};\n"
     "float4 main(in Varyings ov) : SV_Target\n"
     "{\n"
-    "    float4 finalColor = ov.Color;\n"
-    "    finalColor.a *= Texture.Sample(Linear, ov.TexCoord).r;\n"
-    "    return finalColor;\n"
+	"	float4 finalColor = ov.Color;\n"
+    "	finalColor.a *= Texture.Sample(Linear, ov.TexCoord).r;\n"
+    // blend state expects premultiplied alpha
+	"	finalColor.rgb *= finalColor.a;\n"
+	"	return finalColor;\n"
     "}\n";
+#pragma endregion
 
-
+#pragma region Distortion shaders
 // ***** PostProcess Shader
 
 static const char* PostProcessVertexShaderSrc =
@@ -281,11 +290,12 @@ static const char* PostProcessPixelShaderWithChromAbSrc =
     "   EdgeFadeIn = saturate ( EdgeFadeIn );\n"
 
     // Actually do the lookups.
-    "   float ResultR = Texture.Sample(Linear, SourceCoordR).r;\n"
-    "   float ResultG = Texture.Sample(Linear, SourceCoordG).g;\n"
-    "   float ResultB = Texture.Sample(Linear, SourceCoordB).b;\n"
-
-    "   return float4(ResultR * EdgeFadeIn, ResultG * EdgeFadeIn, ResultB * EdgeFadeIn, 1.0);\n"
+    "   float4 Result = float4(0,0,0,1);\n"
+    "   Result.r = Texture.Sample(Linear, SourceCoordR).r;\n"
+    "   Result.g = Texture.Sample(Linear, SourceCoordG).g;\n"
+    "   Result.b = Texture.Sample(Linear, SourceCoordB).b;\n"
+    "   Result.rgb *= EdgeFadeIn;\n"
+    "   return Result;\n"
     "}\n";
 
 //----------------------------------------------------------------------------
@@ -306,11 +316,10 @@ static D3D1x_(INPUT_ELEMENT_DESC) DistortionVertexDesc[] =
 {
     {"Position", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 0,          D3D1x_(INPUT_PER_VERTEX_DATA), 0},
     {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 8,          D3D1x_(INPUT_PER_VERTEX_DATA), 0},
-    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,       0, 8+8,           D3D1x_(INPUT_PER_VERTEX_DATA), 0},
-    {"TexCoord", 2, DXGI_FORMAT_R32G32_FLOAT,       0, 8+8+8,       D3D1x_(INPUT_PER_VERTEX_DATA), 0},
+    {"TexCoord", 1, DXGI_FORMAT_R32G32_FLOAT,       0, 8+8,	       D3D1x_(INPUT_PER_VERTEX_DATA), 0},
+    {"TexCoord", 2, DXGI_FORMAT_R32G32_FLOAT,       0, 8+8+8,	   D3D1x_(INPUT_PER_VERTEX_DATA), 0},
     {"Color",    0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, 8+8+8+8,    D3D1x_(INPUT_PER_VERTEX_DATA), 0},
 };
-
 
 //----------------------------------------------------------------------------
 // Simple distortion shader that does three texture reads.
@@ -335,16 +344,33 @@ static const char* PostProcessMeshVertexShaderSrc =
     "}\n";
     
 static const char* PostProcessMeshPixelShaderSrc =
-    "Texture2D Texture : register(t0);\n"
+    "Texture2D HmdSpcTexture : register(t0);\n"
+    "Texture2D OverlayTexture : register(t1);\n"
     "SamplerState Linear : register(s0);\n"
+    "float  UseOverlay = 1;\n"
     "\n"
     "float4 main(in float4 oPosition : SV_Position, in float4 oColor : COLOR,\n"
     "            in float2 oTexCoord0 : TEXCOORD0, in float2 oTexCoord1 : TEXCOORD1, in float2 oTexCoord2 : TEXCOORD2) : SV_Target\n"
     "{\n"
-    "   float ResultR = Texture.Sample(Linear, oTexCoord0).r;\n"
-    "   float ResultG = Texture.Sample(Linear, oTexCoord1).g;\n"
-    "   float ResultB = Texture.Sample(Linear, oTexCoord2).b;\n"
-    "   return float4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "   float4 finalColor = float4(0,0,0,1);\n"
+    "   finalColor.r = HmdSpcTexture.Sample(Linear, oTexCoord0).r;\n"
+    "   finalColor.g = HmdSpcTexture.Sample(Linear, oTexCoord1).g;\n"
+    "   finalColor.b = HmdSpcTexture.Sample(Linear, oTexCoord2).b;\n"
+
+    "   if(UseOverlay > 0)\n"
+    "   {\n"
+    "       float2 overlayColorR = OverlayTexture.Sample(Linear, oTexCoord0).ra;\n"
+    "       float2 overlayColorG = OverlayTexture.Sample(Linear, oTexCoord1).ga;\n"
+    "       float2 overlayColorB = OverlayTexture.Sample(Linear, oTexCoord2).ba;\n"
+
+    // do premultiplied alpha blending - overlayColorX.x is color, overlayColorX.y is alpha
+    "       finalColor.r = finalColor.r * saturate(1-overlayColorR.y) + overlayColorR.x;\n"
+    "       finalColor.g = finalColor.g * saturate(1-overlayColorG.y) + overlayColorG.x;\n"
+    "       finalColor.b = finalColor.b * saturate(1-overlayColorB.y) + overlayColorB.x;\n"
+    "   }\n"
+
+    "   finalColor.rgb = saturate(finalColor.rgb * oColor.rgb);\n"
+    "   return finalColor;\n"
     "}\n";
 
 
@@ -358,8 +384,11 @@ static const char* PostProcessMeshTimewarpVertexShaderSrc =
     "float2 EyeToSourceUVOffset;\n"
     "float3x3 EyeRotationStart;\n"
     "float3x3 EyeRotationEnd;\n"
-    "void main(in float2 Position : POSITION, in float4 Color : COLOR0, in float2 TexCoord0 : TEXCOORD0, in float2 TexCoord1 : TEXCOORD1, in float2 TexCoord2 : TEXCOORD2,\n"
-    "          out float4 oPosition : SV_Position, out float4 oColor : COLOR, out float2 oTexCoord0 : TEXCOORD0, out float2 oTexCoord1 : TEXCOORD1, out float2 oTexCoord2 : TEXCOORD2)\n"
+    "void main(in float2 Position : POSITION, in float4 Color : COLOR0,\n"
+    "          in float2 TexCoord0 : TEXCOORD0, in float2 TexCoord1 : TEXCOORD1, in float2 TexCoord2 : TEXCOORD2,\n"
+    "          out float4 oPosition : SV_Position, out float4 oColor : COLOR,\n"
+    "          out float2 oHmdSpcTexCoordR : TEXCOORD0, out float2 oHmdSpcTexCoordG : TEXCOORD1, out float2 oHmdSpcTexCoordB : TEXCOORD2,"
+    "          out float2 oOverlayTexCoordR : TEXCOORD3, out float2 oOverlayTexCoordG : TEXCOORD4, out float2 oOverlayTexCoordB : TEXCOORD5)\n"
     "{\n"
     "   oPosition.x = Position.x;\n"
     "   oPosition.y = Position.y;\n"
@@ -402,27 +431,49 @@ static const char* PostProcessMeshTimewarpVertexShaderSrc =
 
     // These are now still in TanEyeAngle space.
     // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
-    "   float2 SrcCoordR = FlattenedR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   float2 SrcCoordG = FlattenedG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   float2 SrcCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0 = SrcCoordR;\n"
-    "   oTexCoord1 = SrcCoordG;\n"
-    "   oTexCoord2 = SrcCoordB;\n"
+    "   oHmdSpcTexCoordR = FlattenedR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oHmdSpcTexCoordG = FlattenedG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oHmdSpcTexCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+
+    // Static layer texcoords don't get any time warp offset
+    "   oOverlayTexCoordR = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oOverlayTexCoordG = TexCoord1 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oOverlayTexCoordB = TexCoord2 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+
     "   oColor = Color.r;\n"              // Used for vignette fade.
     "}\n";
     
 static const char* PostProcessMeshTimewarpPixelShaderSrc =
-    "Texture2D Texture : register(t0);\n"
+    "Texture2D HmdSpcTexture : register(t0);\n"
+    "Texture2D OverlayTexture : register(t1);\n"
     "SamplerState Linear : register(s0);\n"
+    "float  UseOverlay = 1;\n"
     "\n"
     "float4 main(in float4 oPosition : SV_Position, in float4 oColor : COLOR,\n"
-    "            in float2 oTexCoord0 : TEXCOORD0, in float2 oTexCoord1 : TEXCOORD1, in float2 oTexCoord2 : TEXCOORD2) : SV_Target\n"
+    "          in float2 oHmdSpcTexCoordR : TEXCOORD0, in float2 oHmdSpcTexCoordG : TEXCOORD1, in float2 oHmdSpcTexCoordB : TEXCOORD2,"
+    "          in float2 oOverlayTexCoordR : TEXCOORD3, in float2 oOverlayTexCoordG : TEXCOORD4, in float2 oOverlayTexCoordB : TEXCOORD5) : SV_Target\n"
     "{\n"
-    "   float ResultR = Texture.Sample(Linear, oTexCoord0).r;\n"
-    "   float ResultG = Texture.Sample(Linear, oTexCoord1).g;\n"
-    "   float ResultB = Texture.Sample(Linear, oTexCoord2).b;\n"
-    "   return float4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "   float4 finalColor = float4(0,0,0,1);\n"
+    "   finalColor.r = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordR).r;\n"
+    "   finalColor.g = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordG).g;\n"
+    "   finalColor.b = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordB).b;\n"
+
+    "   if(UseOverlay > 0)\n"
+    "   {\n"
+    "       float2 overlayColorR = OverlayTexture.Sample(Linear, oOverlayTexCoordR).ra;\n"
+    "       float2 overlayColorG = OverlayTexture.Sample(Linear, oOverlayTexCoordG).ga;\n"
+    "       float2 overlayColorB = OverlayTexture.Sample(Linear, oOverlayTexCoordB).ba;\n"
+
+    // do premultiplied alpha blending - overlayColorX.x is color, overlayColorX.y is alpha
+    "       finalColor.r = finalColor.r * saturate(1-overlayColorR.y) + overlayColorR.x;\n"
+    "       finalColor.g = finalColor.g * saturate(1-overlayColorG.y) + overlayColorG.x;\n"
+    "       finalColor.b = finalColor.b * saturate(1-overlayColorB.y) + overlayColorB.x;\n"
+    "   }\n"
+
+    "   finalColor.rgb = saturate(finalColor.rgb * oColor.rgb);\n"
+    "   return finalColor;\n"
     "}\n";
+
 
 //----------------------------------------------------------------------------
 // Pixel shader is very simple - does three texture reads.
@@ -454,7 +505,7 @@ static const char* PostProcessMeshPositionalTimewarpVertexShaderSrc =
     "float2 TimewarpTexCoordToWarpedPos(float2 inTexCoord, float4x4 rotMat)\n"
     "{\n"
     // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.    
+    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.	
     // Apply the 4x4 timewarp rotation to these vectors.
     "   float4 inputPos = PositionFromDepth(inTexCoord);\n"
     "   float3 transformed = float3( mul ( rotMat, inputPos ).xyz);\n"
@@ -466,10 +517,11 @@ static const char* PostProcessMeshPositionalTimewarpVertexShaderSrc =
     "   return noDepthUV.xy;\n"
     "}\n"
 
-    "void main( in float2 Position    : POSITION,    in float4 Color       : COLOR0,    in float2 TexCoord0 : TEXCOORD0,\n"
-    "           in float2 TexCoord1   : TEXCOORD1,   in float2 TexCoord2   : TEXCOORD2,\n"
-    "           out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,\n"
-    "           out float2 oTexCoord0 : TEXCOORD0,   out float2 oTexCoord1 : TEXCOORD1, out float2 oTexCoord2 : TEXCOORD2)\n"
+    "void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,    in float2 TexCoord0 : TEXCOORD0,\n"
+    "          in float2 TexCoord1   : TEXCOORD1,   in float2 TexCoord2   : TEXCOORD2,\n"
+    "          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,\n"
+    "          out float2 oHmdSpcTexCoordR : TEXCOORD0, out float2 oHmdSpcTexCoordG : TEXCOORD1, out float2 oHmdSpcTexCoordB : TEXCOORD2,"
+    "          out float2 oOverlayTexCoordR : TEXCOORD3, out float2 oOverlayTexCoordG : TEXCOORD4, out float2 oOverlayTexCoordB : TEXCOORD5)\n"
     "{\n"
     "   oPosition.x = Position.x;\n"
     "   oPosition.y = Position.y;\n"
@@ -478,30 +530,120 @@ static const char* PostProcessMeshPositionalTimewarpVertexShaderSrc =
 
     "   float timewarpLerpFactor = Color.a;\n"
     "   float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);\n"
-    //"    float4x4 lerpedEyeRot = EyeRotationStart;\n"
+    //"	float4x4 lerpedEyeRot = EyeRotationStart;\n"
 
     // warped positions are a bit more involved, hence a separate function
-    "   oTexCoord0 = TimewarpTexCoordToWarpedPos(TexCoord0, lerpedEyeRot);\n"
-    "   oTexCoord1 = TimewarpTexCoordToWarpedPos(TexCoord1, lerpedEyeRot);\n"
-    "   oTexCoord2 = TimewarpTexCoordToWarpedPos(TexCoord2, lerpedEyeRot);\n"
+    "   oHmdSpcTexCoordR = TimewarpTexCoordToWarpedPos(TexCoord0, lerpedEyeRot);\n"
+    "   oHmdSpcTexCoordG = TimewarpTexCoordToWarpedPos(TexCoord1, lerpedEyeRot);\n"
+    "   oHmdSpcTexCoordB = TimewarpTexCoordToWarpedPos(TexCoord2, lerpedEyeRot);\n"
+
+    "   oOverlayTexCoordR = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oOverlayTexCoordG = TexCoord1 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oOverlayTexCoordB = TexCoord2 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
 
     "   oColor = Color.r;              // Used for vignette fade.\n"
     "}\n";
 
 static const char* PostProcessMeshPositionalTimewarpPixelShaderSrc =
-    "Texture2D Texture : register(t0);\n"
+    "Texture2D HmdSpcTexture : register(t0);\n"
+    "Texture2D OverlayTexture : register(t1);\n"
     "SamplerState Linear : register(s0);\n"
     "float2 DepthDimSize;\n"
+    "float  UseOverlay = 1;\n"
     "\n"
     "float4 main(in float4 oPosition : SV_Position, in float4 oColor : COLOR,\n"
-    "            in float2 oTexCoord0 : TEXCOORD0, in float2 oTexCoord1 : TEXCOORD1, in float2 oTexCoord2 : TEXCOORD2) : SV_Target\n"
+    "            in float2 oHmdSpcTexCoordR : TEXCOORD0, in float2 oHmdSpcTexCoordG : TEXCOORD1, in float2 oHmdSpcTexCoordB : TEXCOORD2,"
+    "            in float2 oOverlayTexCoordR : TEXCOORD3, in float2 oOverlayTexCoordG : TEXCOORD4, in float2 oOverlayTexCoordB : TEXCOORD5) : SV_Target\n"
+    "{\n"
+    "   float4 finalColor = float4(0,0,0,1);\n"
+    "   finalColor.r = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordR).r;\n"
+    "   finalColor.g = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordG).g;\n"
+    "   finalColor.b = HmdSpcTexture.Sample(Linear, oHmdSpcTexCoordB).b;\n"
+
+    "   if(UseOverlay > 0)\n"
+    "   {\n"
+    "       float2 overlayColorR = OverlayTexture.Sample(Linear, oOverlayTexCoordR).ra;\n"
+    "       float2 overlayColorG = OverlayTexture.Sample(Linear, oOverlayTexCoordG).ga;\n"
+    "       float2 overlayColorB = OverlayTexture.Sample(Linear, oOverlayTexCoordB).ba;\n"
+
+    // do premultiplied alpha blending - overlayColorX.x is color, overlayColorX.y is alpha
+    "       finalColor.r = finalColor.r * saturate(1-overlayColorR.y) + overlayColorR.x;\n"
+    "       finalColor.g = finalColor.g * saturate(1-overlayColorG.y) + overlayColorG.x;\n"
+    "       finalColor.b = finalColor.b * saturate(1-overlayColorB.y) + overlayColorB.x;\n"
+    "   }\n"
+
+    "   finalColor.rgb = saturate(finalColor.rgb * oColor.rgb);\n"
+    "   return finalColor;\n"
+    "}\n";
+
+//----------------------------------------------------------------------------
+// Pixel shader is very simple - does three texture reads.
+// Vertex shader does all the hard work.
+// Used for mesh-based heightmap reprojection for positional timewarp.
+
+static D3D1x_(INPUT_ELEMENT_DESC) HeightmapVertexDesc[] =
+{
+    {"Position", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 0,          D3D1x_(INPUT_PER_VERTEX_DATA), 0},
+    {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 8,          D3D1x_(INPUT_PER_VERTEX_DATA), 0},
+};
+
+static const char* PostProcessHeightmapTimewarpVertexShaderSrc =
+	"Texture2DMS<float,4> DepthTexture : register(t0);\n"
+    // Padding because we are uploading "standard uniform buffer" constants
+    "float4x4 Padding1;\n"
+    "float4x4 Padding2;\n"
+    "float2 EyeToSourceUVScale;\n"
+    "float2 EyeToSourceUVOffset;\n"
+	"float2 DepthDimSize;\n"
+	"float4x4 EyeXformStart;\n"
+    "float4x4 EyeXformEnd;\n"
+    //"float4x4 Projection;\n"
+    "float4x4 InvProjection;\n"
+
+    "float4 PositionFromDepth(float2 position, float2 inTexCoord)\n"
+    "{\n"
+    "   float depth = DepthTexture.Load(int2(inTexCoord * DepthDimSize), 0).x;\n"
+	"   float4 retVal = float4(position, depth, 1);\n"
+    "   return retVal;\n"
+    "}\n"
+
+    "float4 TimewarpPos(float2 position, float2 inTexCoord, float4x4 rotMat)\n"
+    "{\n"
+    // Apply the 4x4 timewarp rotation to these vectors.
+    "   float4 transformed = PositionFromDepth(position, inTexCoord);\n"
+    // TODO: Precombining InvProjection in rotMat causes loss of precision flickering
+    "   transformed = mul ( InvProjection, transformed );\n"
+    "   transformed = mul ( rotMat, transformed );\n"
+    // Commented out as Projection is currently contained in rotMat
+    //"   transformed = mul ( Projection, transformed );\n"
+    "   return transformed;\n"
+    "}\n"
+
+    "void main( in float2 Position    : POSITION,    in float3 TexCoord0    : TEXCOORD0,\n"
+    "           out float4 oPosition  : SV_Position, out float2 oTexCoord0  : TEXCOORD0)\n"
+    "{\n"
+    "   float2 eyeToSrcTexCoord = TexCoord0.xy * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
+    "   oTexCoord0 = eyeToSrcTexCoord;\n"
+
+    "   float timewarpLerpFactor = TexCoord0.z;\n"
+    "   float4x4 lerpedEyeRot = lerp(EyeXformStart, EyeXformEnd, timewarpLerpFactor);\n"
+    //"	float4x4 lerpedEyeRot = EyeXformStart;\n"
+
+    "   oPosition = TimewarpPos(Position.xy, oTexCoord0, lerpedEyeRot);\n"
+    "}\n";
+
+static const char* PostProcessHeightmapTimewarpPixelShaderSrc =
+	"Texture2D Texture : register(t0);\n"
+    "SamplerState Linear : register(s0);\n"
+	"\n"
+    "float4 main(in float4 oPosition : SV_Position, in float2 oTexCoord0 : TEXCOORD0) : SV_Target\n"
     "{\n"
     "   float3 result;\n"
-    "   result.r = Texture.Sample(Linear, oTexCoord0).r;\n"
-    "   result.g = Texture.Sample(Linear, oTexCoord1).g;\n"
-    "   result.b = Texture.Sample(Linear, oTexCoord2).b;\n"
-    "   return float4(result * oColor, 1.0);\n"
+	"   result = Texture.Sample(Linear, oTexCoord0);\n"
+	"   return float4(result, 1.0);\n"
     "}\n";
+
+#pragma endregion
 
 //----------------------------------------------------------------------------
 
@@ -512,7 +654,8 @@ static const char* VShaderSrcs[VShader_Count] =
     PostProcessVertexShaderSrc,
     PostProcessMeshVertexShaderSrc,
     PostProcessMeshTimewarpVertexShaderSrc,
-    PostProcessMeshPositionalTimewarpVertexShaderSrc
+    PostProcessMeshPositionalTimewarpVertexShaderSrc,
+    PostProcessHeightmapTimewarpVertexShaderSrc
 };
 static const char* FShaderSrcs[FShader_Count] =
 {
@@ -526,7 +669,8 @@ static const char* FShaderSrcs[FShader_Count] =
     MultiTexturePixelShaderSrc,
     PostProcessMeshPixelShaderSrc,
     PostProcessMeshTimewarpPixelShaderSrc,
-    PostProcessMeshPositionalTimewarpPixelShaderSrc
+    PostProcessMeshPositionalTimewarpPixelShaderSrc,
+    PostProcessHeightmapTimewarpPixelShaderSrc
 };
 
 RenderDevice::RenderDevice(const RendererParams& p, HWND window)
@@ -535,7 +679,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     GetClientRect(window, &rc);
     UINT width = rc.right - rc.left;
     UINT height = rc.bottom - rc.top;
-    ::OVR::Render::RenderDevice::SetWindowSize(width, height);
+	::OVR::Render::RenderDevice::SetWindowSize(width, height);
 
     Window = window;
 
@@ -631,12 +775,23 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     HRESULT validate = Device->CreateInputLayout(ModelVertexDesc, sizeof(ModelVertexDesc)/sizeof(ModelVertexDesc[0]), buffer, bufferSize, objRef);
     OVR_UNUSED(validate);
 
-    ID3D10Blob* vsData2 = CompileShader("vs_4_1", PostProcessMeshVertexShaderSrc);
-    SPInt bufferSize2 = vsData2->GetBufferSize();
-    const void* buffer2 = vsData2->GetBufferPointer();
-    ID3D1xInputLayout** objRef2 = &DistortionVertexIL.GetRawRef();
-    HRESULT validate2 = Device->CreateInputLayout(DistortionVertexDesc, sizeof(DistortionVertexDesc)/sizeof(DistortionVertexDesc[0]), buffer2, bufferSize2, objRef2);
-    OVR_UNUSED(validate2);
+    {
+        ID3D10Blob* vsData2 = CompileShader("vs_4_1", PostProcessMeshVertexShaderSrc);
+        SPInt bufferSize2 = vsData2->GetBufferSize();
+        const void* buffer2 = vsData2->GetBufferPointer();
+        ID3D1xInputLayout** objRef2 = &DistortionVertexIL.GetRawRef();
+        HRESULT validate2 = Device->CreateInputLayout(DistortionVertexDesc, sizeof(DistortionVertexDesc)/sizeof(DistortionVertexDesc[0]), buffer2, bufferSize2, objRef2);
+        OVR_UNUSED(validate2);
+    }
+
+    {
+        ID3D10Blob* vsData2 = CompileShader("vs_4_1", PostProcessHeightmapTimewarpVertexShaderSrc);
+        SPInt bufferSize2 = vsData2->GetBufferSize();
+        const void* buffer2 = vsData2->GetBufferPointer();
+        ID3D1xInputLayout** objRef2 = &HeightmapVertexIL.GetRawRef();
+        HRESULT validate2 = Device->CreateInputLayout(HeightmapVertexDesc, sizeof(HeightmapVertexDesc)/sizeof(HeightmapVertexDesc[0]), buffer2, bufferSize2, objRef2);
+        OVR_UNUSED(validate2);
+    }
 
     Ptr<ShaderSet> gouraudShaders = *new ShaderSet();
     gouraudShaders->SetShader(VertexShaders[VShader_MVP]);
@@ -648,7 +803,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     memset(&bm, 0, sizeof(bm));
     bm.BlendEnable[0] = true;
     bm.BlendOp      = bm.BlendOpAlpha   = D3D1x_(BLEND_OP_ADD);
-    bm.SrcBlend     = bm.SrcBlendAlpha  = D3D1x_(BLEND_SRC_ALPHA);
+    bm.SrcBlend     = bm.SrcBlendAlpha  = D3D1x_(BLEND_ONE); //premultiplied alpha
     bm.DestBlend    = bm.DestBlendAlpha = D3D1x_(BLEND_INV_SRC_ALPHA);
     bm.RenderTargetWriteMask[0]         = D3D1x_(COLOR_WRITE_ENABLE_ALL);
     Device->CreateBlendState(&bm, &BlendState.GetRawRef());
@@ -657,7 +812,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     memset(&bm, 0, sizeof(bm));
     bm.RenderTarget[0].BlendEnable = true;
     bm.RenderTarget[0].BlendOp     = bm.RenderTarget[0].BlendOpAlpha    = D3D1x_(BLEND_OP_ADD);
-    bm.RenderTarget[0].SrcBlend    = bm.RenderTarget[0].SrcBlendAlpha   = D3D1x_(BLEND_SRC_ALPHA);
+    bm.RenderTarget[0].SrcBlend    = bm.RenderTarget[0].SrcBlendAlpha   = D3D1x_(BLEND_ONE); //premultiplied alpha
     bm.RenderTarget[0].DestBlend   = bm.RenderTarget[0].DestBlendAlpha  = D3D1x_(BLEND_INV_SRC_ALPHA);
     bm.RenderTarget[0].RenderTargetWriteMask = D3D1x_(COLOR_WRITE_ENABLE_ALL);
     Device->CreateBlendState(&bm, &BlendState.GetRawRef());
@@ -676,7 +831,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     const Render::Vertex QuadVertices[] =
     { Vertex(Vector3f(0, 1, 0)), Vertex(Vector3f(1, 1, 0)),
       Vertex(Vector3f(0, 0, 0)), Vertex(Vector3f(1, 0, 0)) };
-    QuadVertexBuffer->Data(Buffer_Vertex, QuadVertices, sizeof(QuadVertices));
+    QuadVertexBuffer->Data(Buffer_Vertex | Buffer_ReadOnly, QuadVertices, sizeof(QuadVertices));
 
     SetDepthMode(0, 0);
 }
@@ -803,6 +958,7 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.BufferDesc.Width  = WindowWidth;
     scDesc.BufferDesc.Height = WindowHeight;
     scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    //scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     // Use default refresh rate; switching rate on CC prototype can cause screen lockup.
     scDesc.BufferDesc.RefreshRate.Numerator = 0;
     scDesc.BufferDesc.RefreshRate.Denominator = 1;
@@ -813,12 +969,12 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.Windowed = Params.Fullscreen != Display_Fullscreen;
     scDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-    if (SwapChain)
-    {
-        SwapChain->SetFullscreenState(FALSE, NULL);
-        SwapChain->Release();
-        SwapChain = NULL;
-    }
+	if (SwapChain)
+	{
+		SwapChain->SetFullscreenState(FALSE, NULL);
+		SwapChain->Release();
+		SwapChain = NULL;
+	}
 
     Ptr<IDXGISwapChain> newSC;
     if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef())))
@@ -856,36 +1012,36 @@ bool RenderDevice::SetParams(const RendererParams& newParams)
 
     return RecreateSwapChain();
 }
-    
+	
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
 #if (OVR_D3D_VERSION == 10)
-    static ovrD3D10Config cfg;
-    cfg.D3D10.Header.API         = ovrRenderAPI_D3D10;
-    cfg.D3D10.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-    cfg.D3D10.Header.Multisample = Params.Multisample;
-    cfg.D3D10.pDevice            = Device;
-    cfg.D3D10.pBackBufferRT      = BackBufferRT;
-    cfg.D3D10.pSwapChain         = SwapChain;
+	static ovrD3D10Config cfg;
+	cfg.D3D10.Header.API         = ovrRenderAPI_D3D10;
+	cfg.D3D10.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
+	cfg.D3D10.Header.Multisample = Params.Multisample;
+	cfg.D3D10.pDevice            = Device;
+	cfg.D3D10.pBackBufferRT      = BackBufferRT;
+	cfg.D3D10.pSwapChain         = SwapChain;
 #else
-    static ovrD3D11Config cfg;
-    cfg.D3D11.Header.API         = ovrRenderAPI_D3D11;
-    cfg.D3D11.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-    cfg.D3D11.Header.Multisample = Params.Multisample;
-    cfg.D3D11.pDevice            = Device;
-    cfg.D3D11.pDeviceContext     = Context;
-    cfg.D3D11.pBackBufferRT      = BackBufferRT;
-    cfg.D3D11.pSwapChain         = SwapChain;
+	static ovrD3D11Config cfg;
+	cfg.D3D11.Header.API         = ovrRenderAPI_D3D11;
+	cfg.D3D11.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
+	cfg.D3D11.Header.Multisample = Params.Multisample;
+	cfg.D3D11.pDevice            = Device;
+	cfg.D3D11.pDeviceContext     = Context;
+	cfg.D3D11.pBackBufferRT      = BackBufferRT;
+	cfg.D3D11.pSwapChain         = SwapChain;
 #endif
-    return cfg.Config;
+	return cfg.Config;
 }
 
 ovrTexture Texture::Get_ovrTexture()
 {
-    ovrTexture tex;
+	ovrTexture tex;
 
-    OVR::Sizei newRTSize(Width, Height);
-    
+	OVR::Sizei newRTSize(Width, Height);
+	
 #if (OVR_D3D_VERSION == 10)
     ovrD3D10TextureData* texData = (ovrD3D10TextureData*)&tex;
     texData->Header.API            = ovrRenderAPI_D3D10;
@@ -898,7 +1054,7 @@ ovrTexture Texture::Get_ovrTexture()
     texData->pTexture              = Tex;
     texData->pSRView               = TexSv;
 
-    return tex;
+	return tex;
 }
 
 void RenderDevice::SetWindowSize(int w, int h)
@@ -906,7 +1062,7 @@ void RenderDevice::SetWindowSize(int w, int h)
     if (w == WindowWidth && h == WindowHeight)
         return;
 
-    ::OVR::Render::RenderDevice::SetWindowSize(w, h);
+	::OVR::Render::RenderDevice::SetWindowSize(w, h);
 
     Context->OMSetRenderTargets(0, NULL, NULL);
     BackBuffer   = NULL;
@@ -1487,7 +1643,7 @@ ID3D1xSamplerState* RenderDevice::GetSamplerState(int sm)
     else if (sm & Sample_Anisotropic)
     {
         ss.Filter = D3D1x_(FILTER_ANISOTROPIC);
-        ss.MaxAnisotropy = 8;
+        ss.MaxAnisotropy = 4;
     }
     else
     {
@@ -1506,7 +1662,7 @@ Texture::Texture(RenderDevice* ren, int fmt, int w, int h) : Ren(ren), Tex(NULL)
 
 void* Texture::GetInternalImplementation() 
 { 
-    return Tex;
+	return Tex;
 }
 
 Texture::~Texture()
@@ -1574,10 +1730,14 @@ void RenderDevice::GenerateSubresourceData(
         {
             bytesPerBlock = 8;
         }
-        else if (format == DXGI_FORMAT_BC3_UNORM)
-        {
-            bytesPerBlock = 16;
-        }
+		else if (format == DXGI_FORMAT_BC2_UNORM)
+		{
+			bytesPerBlock = 16;
+		}
+		else if (format == DXGI_FORMAT_BC3_UNORM)
+		{
+			bytesPerBlock = 16;
+		}
 
         unsigned blockWidth = 0;
         blockWidth = (subresWidth + 3) / 4;
@@ -1660,9 +1820,21 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         imageDimUpperLimit = 1024;
     } 
 
-    if (format == Texture_DXT1 || format == Texture_DXT5)
+	if (format == Texture_DXT1 || format == Texture_DXT3 || format == Texture_DXT5)
     {
-        int      convertedFormat   = (format == Texture_DXT1) ? DXGI_FORMAT_BC1_UNORM : DXGI_FORMAT_BC3_UNORM;
+		int convertedFormat;
+		switch (format) {
+		case Texture_DXT1:
+			convertedFormat = DXGI_FORMAT_BC1_UNORM;
+			break;
+		case Texture_DXT3:
+			convertedFormat = DXGI_FORMAT_BC2_UNORM;
+			break;
+		case Texture_DXT5:
+		default:
+			convertedFormat = DXGI_FORMAT_BC3_UNORM;
+			break;
+		}
         unsigned largestMipWidth   = 0;
         unsigned largestMipHeight  = 0;
         unsigned effectiveMipCount = mipcount;
@@ -1671,7 +1843,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
 #ifdef OVR_DEFINE_NEW
 #undef new
 #endif
-        
+
         D3D1x_(SUBRESOURCE_DATA)* subresData = (D3D1x_(SUBRESOURCE_DATA)*)
                                                 OVR_ALLOC(sizeof(D3D1x_(SUBRESOURCE_DATA)) * mipcount);
         GenerateSubresourceData(width, height, convertedFormat, imageDimUpperLimit, data, subresData, largestMipWidth,
@@ -1746,10 +1918,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         int         bpp;
         switch(format & Texture_TypeMask)
         {
-        case Texture_BGRA:
-            bpp = 4;
-            d3dformat = DXGI_FORMAT_B8G8R8A8_UNORM;
-            break;
+		case Texture_BGRA:
+			bpp = 4;
+			d3dformat = DXGI_FORMAT_B8G8R8A8_UNORM;
+			break;
         case Texture_RGBA:
             bpp = 4;
             d3dformat = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -1758,10 +1930,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             bpp = 1;
             d3dformat = DXGI_FORMAT_R8_UNORM;
             break;
-        case Texture_A:
-            bpp = 1;
-            d3dformat = DXGI_FORMAT_A8_UNORM;
-            break;
+		case Texture_A:
+			bpp = 1;
+			d3dformat = DXGI_FORMAT_A8_UNORM;
+			break;
         case Texture_Depth:
             bpp = 0;
             d3dformat = createDepthSrv ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_D32_FLOAT;
@@ -1774,12 +1946,12 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         NewTex->Samples = samples;
 
         D3D1x_(TEXTURE2D_DESC) dsDesc;
-        dsDesc.Width     = width;
-        dsDesc.Height    = height;
+		dsDesc.Width     = width;
+		dsDesc.Height    = height;
         dsDesc.MipLevels = (format == (Texture_RGBA | Texture_GenMipmaps) && data) ? GetNumMipLevels(width, height) : 1;
         dsDesc.ArraySize = 1;
         dsDesc.Format    = d3dformat;
-        dsDesc.SampleDesc.Count = samples;
+		dsDesc.SampleDesc.Count = samples;
         dsDesc.SampleDesc.Quality = 0;
         dsDesc.Usage     = D3D1x_(USAGE_DEFAULT);
         dsDesc.BindFlags = D3D1x_(BIND_SHADER_RESOURCE);
@@ -1811,7 +1983,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             {
                 D3D1x_(SHADER_RESOURCE_VIEW_DESC) depthSrv;
                 depthSrv.Format = DXGI_FORMAT_R32_FLOAT;
-                depthSrv.ViewDimension = samples > 1 ? D3D1x_(SRV_DIMENSION_TEXTURE2DMS) : D3D1x_(SRV_DIMENSION_TEXTURE2D);
+				depthSrv.ViewDimension = samples > 1 ? D3D1x_(SRV_DIMENSION_TEXTURE2DMS) : D3D1x_(SRV_DIMENSION_TEXTURE2D);
                 depthSrv.Texture2D.MostDetailedMip = 0;
                 depthSrv.Texture2D.MipLevels = dsDesc.MipLevels;
                 Device->CreateShaderResourceView(NewTex->Tex, &depthSrv, &NewTex->TexSv.GetRawRef());
@@ -1924,7 +2096,6 @@ void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* dept
     Context->OMSetRenderTargets(1, &((Texture*)color)->TexRtv.GetRawRef(), ((Texture*)depth)->TexDsv);
 }
 
-
 void RenderDevice::SetWorldUniforms(const Matrix4f& proj)
 {
     StdUniforms.Proj = proj.Transposed();
@@ -1938,13 +2109,13 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
     if (!model->VertexBuffer)
     {
         Ptr<Buffer> vb = *CreateBuffer();
-        vb->Data(Buffer_Vertex, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex));
+        vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex));
         model->VertexBuffer = vb;
     }
     if (!model->IndexBuffer)
     {
         Ptr<Buffer> ib = *CreateBuffer();
-        ib->Data(Buffer_Index, &model->Indices[0], model->Indices.GetSize() * 2);
+        ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.GetSize() * 2);
         model->IndexBuffer = ib;
     }
 
@@ -1953,30 +2124,37 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
            matrix, 0, (unsigned)model->Indices.GetSize(), model->GetPrimType());
 }
 
-void RenderDevice::RenderWithAlpha(    const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                                    const Matrix4f& matrix, int offset, int count, PrimitiveType rprim)
+void RenderDevice::RenderWithAlpha(	const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
+									const Matrix4f& matrix, int offset, int count, PrimitiveType rprim)
 {
-    Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
+	Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
     Render(fill, vertices, indices, matrix, offset, count, rprim);
     Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
 void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                          const Matrix4f& matrix, int offset, int count, PrimitiveType rprim, bool useDistortionVertex/* = false*/)
+                          const Matrix4f& matrix, int offset, int count, PrimitiveType rprim, MeshType meshType/* = Mesh_Scene*/)
 {
     ID3D1xBuffer* vertexBuffer = ((Buffer*)vertices)->GetBuffer();
     UINT vertexOffset = offset;
     UINT vertexStride = sizeof(Vertex);
-    if ( useDistortionVertex )
+    switch(meshType)
     {
-        Context->IASetInputLayout(DistortionVertexIL);
-        vertexStride = sizeof(DistortionVertex);
-    }
-    else
-    {
+    case Mesh_Scene:
         Context->IASetInputLayout(ModelVertexIL);
         vertexStride = sizeof(Vertex);
+        break;
+    case Mesh_Distortion:
+        Context->IASetInputLayout(DistortionVertexIL);
+        vertexStride = sizeof(DistortionVertex);
+        break;
+    case Mesh_Heightmap:
+        Context->IASetInputLayout(HeightmapVertexIL);
+        vertexStride = sizeof(HeightmapVertex);
+        break;
+    default: OVR_ASSERT(false);
     }
+
     Context->IASetVertexBuffers(0, 1, &vertexBuffer, &vertexStride, &vertexOffset);
 
     if (indices)
@@ -2047,22 +2225,25 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
 
 UPInt RenderDevice::QueryGPUMemorySize()
 {
-    IDXGIDevice* pDXGIDevice;
-    Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
-    IDXGIAdapter * pDXGIAdapter;
-    pDXGIDevice->GetAdapter(&pDXGIAdapter);
-    DXGI_ADAPTER_DESC adapterDesc;
-    pDXGIAdapter->GetDesc(&adapterDesc);
-    return adapterDesc.DedicatedVideoMemory;
+	IDXGIDevice* pDXGIDevice;
+	Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
+	IDXGIAdapter * pDXGIAdapter;
+	pDXGIDevice->GetAdapter(&pDXGIAdapter);
+	DXGI_ADAPTER_DESC adapterDesc;
+	pDXGIAdapter->GetDesc(&adapterDesc);
+	return adapterDesc.DedicatedVideoMemory;
 }
 
 
 void RenderDevice::Present ( bool withVsync )
 {
-    if( OVR::Util::ImageWindow::GlobalWindow() )
-    {
-        OVR::Util::ImageWindow::GlobalWindow()->Process();
-    }
+	for( int i = 0; i < 4; ++i )
+	{
+		if( OVR::Util::ImageWindow::GlobalWindow( i ) )
+		{
+			OVR::Util::ImageWindow::GlobalWindow( i )->Process();
+		}
+	}
 
     if ( withVsync )
     {
@@ -2078,13 +2259,13 @@ void RenderDevice::Present ( bool withVsync )
 void RenderDevice::WaitUntilGpuIdle()
 {
 #if 0
-    // If enabling this option and using an NVIDIA GPU,
-    // then make sure your "max pre-rendered frames" is set to 1 under the NVIDIA GPU settings.
+	// If enabling this option and using an NVIDIA GPU,
+	// then make sure your "max pre-rendered frames" is set to 1 under the NVIDIA GPU settings.
 
-    // Flush GPU data and don't stall CPU waiting for GPU to complete
-    Context->Flush();
+	// Flush GPU data and don't stall CPU waiting for GPU to complete
+	Context->Flush();
 #else
-    // Flush and Stall CPU while waiting for GPU to complete rendering all of the queued draw calls
+	// Flush and Stall CPU while waiting for GPU to complete rendering all of the queued draw calls
     D3D1x_QUERY_DESC queryDesc = { D3D1x_(QUERY_EVENT), 0 };
     Ptr<ID3D1xQuery> query;
     BOOL             done = FALSE;
@@ -2124,9 +2305,9 @@ void RenderDevice::FillGradientRect(float left, float top, float right, float bo
 
 void RenderDevice::RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c)
 {
-    Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
-    OVR::Render::RenderDevice::RenderText(font, str, x, y, size, c);
-    Context->OMSetBlendState(NULL, NULL, 0xffffffff);
+	Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
+	OVR::Render::RenderDevice::RenderText(font, str, x, y, size, c);
+	Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
 void RenderDevice::RenderImage(float left, float top, float right, float bottom, ShaderFill* image)
@@ -2160,4 +2341,3 @@ void RenderDevice::EndGpuEvent()
 
 }}}
 
-#endif

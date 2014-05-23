@@ -2,21 +2,21 @@
 
 Filename    :   OVR_Linux_DeviceManager.h
 Content     :   Linux implementation of DeviceManager.
-Created     :
-Authors     :
+Created     :   
+Authors     :   
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License");
-you may not use the Oculus VR SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -47,7 +47,7 @@ DeviceManager::DeviceManager()
 }
 
 DeviceManager::~DeviceManager()
-{
+{    
 }
 
 bool DeviceManager::Initialize(DeviceBase*)
@@ -64,14 +64,14 @@ bool DeviceManager::Initialize(DeviceBase*)
 
     // Do this now that we know the thread's run loop.
     HidDeviceManager = *HIDDeviceManager::CreateInternal(this);
-
+         
     pCreateDesc->pDevice = this;
     LogText("OVR::DeviceManager - initialized.\n");
     return true;
 }
 
 void DeviceManager::Shutdown()
-{
+{   
     LogText("OVR::DeviceManager - shutting down.\n");
 
     // Set Manager shutdown marker variable; this prevents
@@ -108,11 +108,11 @@ bool DeviceManager::GetDeviceInfo(DeviceInfo* info) const
     if ((info->InfoClassType != Device_Manager) &&
         (info->InfoClassType != Device_None))
         return false;
-
+    
     info->Type    = Device_Manager;
     info->Version = 0;
     info->ProductName = "DeviceManager";
-    info->Manufacturer = "Oculus VR, Inc.";
+    info->Manufacturer = "Oculus VR, Inc.";        
     return true;
 }
 
@@ -127,13 +127,14 @@ DeviceEnumerator<> DeviceManager::EnumerateDevicesEx(const DeviceEnumerationArgs
 
 
 //-------------------------------------------------------------------------------------
-// ***** DeviceManager Thread
+// ***** DeviceManager Thread 
 
 DeviceManagerThread::DeviceManagerThread()
     : Thread(ThreadStackSize)
 {
     int result = pipe(CommandFd);
     OVR_ASSERT(!result);
+    OVR_UNUSED(result);
 
     AddSelectFd(NULL, CommandFd[0]);
 }
@@ -186,7 +187,7 @@ int DeviceManagerThread::Run()
 
     SetThreadName("OVR::DeviceManagerThread");
     LogText("OVR::DeviceManagerThread - running (ThreadId=%p).\n", GetThreadId());
-
+    
     // Signal to the parent thread that initialization has finished.
     StartupEvent.SetEvent();
 
@@ -208,15 +209,15 @@ int DeviceManagerThread::Run()
                 // allowed based on current ticks.
                 if (!TicksNotifiers.IsEmpty())
                 {
-                    double ticksMks = Timer::GetSeconds();
-                    int  waitAllowed;
+                    double   timeSeconds = Timer::GetSeconds();
+                    unsigned waitAllowed;
 
                     for (UPInt j = 0; j < TicksNotifiers.GetSize(); j++)
                     {
-                        waitAllowed = (int)(TicksNotifiers[j]->OnTicks(ticksMks) / Timer::MsPerSecond);
-                        if (waitAllowed < waitMs)
+                        waitAllowed = (unsigned)(TicksNotifiers[j]->OnTicks(timeSeconds) * Timer::MsPerSecond);
+                        if (waitAllowed < (unsigned)waitMs)
                             waitMs = waitAllowed;
-                    }
+                    }                
                 }
 
                 // wait until there is data available on one of the devices or the timeout expires
@@ -308,10 +309,10 @@ DeviceManager* DeviceManager::Create()
     if (manager)
     {
         if (manager->Initialize(0))
-        {
-            manager->AddFactory(&LatencyTestDeviceFactory::Instance);
-            manager->AddFactory(&SensorDeviceFactory::Instance);
-            manager->AddFactory(&Linux::HMDDeviceFactory::Instance);
+        {            
+            manager->AddFactory(&LatencyTestDeviceFactory::GetInstance());
+            manager->AddFactory(&SensorDeviceFactory::GetInstance());
+            manager->AddFactory(&Linux::HMDDeviceFactory::GetInstance());
 
             manager->AddRef();
         }
@@ -320,7 +321,7 @@ DeviceManager* DeviceManager::Create()
             manager.Clear();
         }
 
-    }
+    }    
 
     return manager.GetPtr();
 }

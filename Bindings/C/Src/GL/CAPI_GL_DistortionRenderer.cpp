@@ -14,421 +14,12 @@ otherwise accompanies this software in either electronic or hard copy form.
 ************************************************************************************/
 
 #include "CAPI_GL_DistortionRenderer.h"
-#include <OVR_CAPI_GL.h>
+
+#include "CAPI_GL_DistortionShaders.h"
+
+#include "../../OVR_CAPI_GL.h"
 
 namespace OVR { namespace CAPI { namespace GL {
-
-
-static const char SimpleQuad_vs[] =
-    "uniform vec2 PositionOffset;\n"
-    "uniform vec2 Scale;\n"
-
-    "attribute vec3 Position;\n"
-
-    "void main()\n"
-    "{\n"
-    "    gl_Position = vec4(Position.xy * Scale + PositionOffset, 0.5, 1.0);\n"
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform SimpleQuad_vs_refl[] =
-{
-    { "PositionOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "Scale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
-static const char SimpleQuad_fs[] =
-    "uniform vec4 Color;\n"
-
-    "void main()\n"
-    "{\n"
-    "    gl_FragColor = Color;\n"
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform SimpleQuad_fs_refl[] =
-{
-    { "Color",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 16 },
-};
-
-
-static const char Distortion_vs[] =
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.5;\n"
-    "   gl_Position.w = 1.0;\n"
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
-    "   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oColor = Color;\n"              // Used for vignette fade.
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform Distortion_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
-static const char Distortion_fs[] =
-    "uniform sampler2D Texture0;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_FragColor = texture2D(Texture0, oTexCoord0);\n"
-    "   gl_FragColor.a = 1.0;\n"
-    "}\n";
-
-
-static const char DistortionTimewarp_vs[] =
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-    "uniform mat4 EyeRotationStart;\n"
-    "uniform mat4 EyeRotationEnd;\n"
-
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.0;\n"
-    "   gl_Position.w = 1.0;\n"
-
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
-    "   vec3 TanEyeAngle = vec3 ( TexCoord0.x, TexCoord0.y, 1.0 );\n"
-
-    // Accurate time warp lerp vs. faster
-#if 1
-    // Apply the two 3x3 timewarp rotations to these vectors.
-    "   vec3 TransformedStart = (EyeRotationStart * vec4(TanEyeAngle, 0)).xyz;\n"
-    "   vec3 TransformedEnd   = (EyeRotationEnd * vec4(TanEyeAngle, 0)).xyz;\n"
-    // And blend between them.
-    "   vec3 Transformed = mix ( TransformedStart, TransformedEnd, Color.a );\n"
-#else
-    "   mat3 EyeRotation = mix ( EyeRotationStart, EyeRotationEnd, Color.a );\n"
-    "   vec3 Transformed   = EyeRotation * TanEyeAngle;\n"
-#endif
-
-    // Project them back onto the Z=1 plane of the rendered images.
-    "   float RecipZ = 1.0 / Transformed.z;\n"
-    "   vec2 Flattened = vec2 ( Transformed.x * RecipZ, Transformed.y * RecipZ );\n"
-
-    // These are now still in TanEyeAngle space.
-    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
-    "   vec2 SrcCoord = Flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0 = SrcCoord;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oColor = Color.r;\n"              // Used for vignette fade.
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform DistortionTimewarp_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
-
-static const char DistortionPositionalTimewarp_vs[] =
-    "#version 150\n"
-
-    "uniform sampler2D Texture0;\n"
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-    "uniform vec2 DepthProjector;\n"
-    "uniform vec2 DepthDimSize;\n"
-    "uniform mat4 EyeRotationStart;\n"
-    "uniform mat4 EyeRotationEnd;\n"
-
-    "in vec2 Position;\n"
-    "in vec4 Color;\n"
-    "in vec2 TexCoord0;\n"
-    "in vec2 TexCoord1;\n"
-    "in vec2 TexCoord2;\n"
-
-    "out vec4 oColor;\n"
-    "out vec2 oTexCoord0;\n"
-
-    "vec4 PositionFromDepth(vec2 inTexCoord)\n"
-    "{\n"
-    "   vec2 eyeToSourceTexCoord = inTexCoord * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   eyeToSourceTexCoord.y = 1 - eyeToSourceTexCoord.y;\n"
-    "   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n"
-    "   float linearDepth = DepthProjector.y / (depth - DepthProjector.x);\n"
-    "   vec4 retVal = vec4(inTexCoord, 1, 1);\n"
-    "   retVal.xyz *= linearDepth;\n"
-    "   return retVal;\n"
-    "}\n"
-
-    "vec2 TimewarpTexCoordToWarpedPos(vec2 inTexCoord, float a)\n"
-    "{\n"
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
-    // Apply the 4x4 timewarp rotation to these vectors.
-    "   vec4 inputPos = PositionFromDepth(inTexCoord);\n"
-    "   vec3 transformed = mix ( EyeRotationStart * inputPos,  EyeRotationEnd * inputPos, a ).xyz;\n"
-    // Project them back onto the Z=1 plane of the rendered images.
-    "   vec2 flattened = transformed.xy / transformed.z;\n"
-    // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
-    "   vec2 noDepthUV = flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    //"   float depth = texture2DLod(Texture0, noDepthUV, 0).r;\n"
-    "   return noDepthUV.xy;\n"
-    "}\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.0;\n"
-    "   gl_Position.w = 1.0;\n"
-
-    // warped positions are a bit more involved, hence a separate function
-    "   oTexCoord0 = TimewarpTexCoordToWarpedPos(TexCoord0, Color.a);\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-
-    "   oColor = vec4(Color.r);              // Used for vignette fade.\n"
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform DistortionPositionalTimewarp_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
-
-static const char DistortionChroma_vs[] =
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.5;\n"
-    "   gl_Position.w = 1.0;\n"
-
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
-    "   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oTexCoord1 = TexCoord1 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
-    "   oTexCoord2 = TexCoord2 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
-
-    "   oColor = Color;\n"              // Used for vignette fade.
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform DistortionChroma_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
-static const char DistortionChroma_fs[] =
-    "uniform sampler2D Texture0;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
-
-    "void main()\n"
-    "{\n"
-    "   float ResultR = texture2D(Texture0, oTexCoord0).r;\n"
-    "   float ResultG = texture2D(Texture0, oTexCoord1).g;\n"
-    "   float ResultB = texture2D(Texture0, oTexCoord2).b;\n"
-
-    "   gl_FragColor = vec4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
-    "}\n";
-
-
-static const char DistortionTimewarpChroma_vs[] =
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-    "uniform mat4 EyeRotationStart;\n"
-    "uniform mat4 EyeRotationEnd;\n"
-
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.0;\n"
-    "   gl_Position.w = 1.0;\n"
-
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
-    "   vec3 TanEyeAngleR = vec3 ( TexCoord0.x, TexCoord0.y, 1.0 );\n"
-    "   vec3 TanEyeAngleG = vec3 ( TexCoord1.x, TexCoord1.y, 1.0 );\n"
-    "   vec3 TanEyeAngleB = vec3 ( TexCoord2.x, TexCoord2.y, 1.0 );\n"
-
-    // Accurate time warp lerp vs. faster
-#if 1
-    // Apply the two 3x3 timewarp rotations to these vectors.
-    "   vec3 TransformedRStart = (EyeRotationStart * vec4(TanEyeAngleR, 0)).xyz;\n"
-    "   vec3 TransformedGStart = (EyeRotationStart * vec4(TanEyeAngleG, 0)).xyz;\n"
-    "   vec3 TransformedBStart = (EyeRotationStart * vec4(TanEyeAngleB, 0)).xyz;\n"
-    "   vec3 TransformedREnd   = (EyeRotationEnd * vec4(TanEyeAngleR, 0)).xyz;\n"
-    "   vec3 TransformedGEnd   = (EyeRotationEnd * vec4(TanEyeAngleG, 0)).xyz;\n"
-    "   vec3 TransformedBEnd   = (EyeRotationEnd * vec4(TanEyeAngleB, 0)).xyz;\n"
-
-    // And blend between them.
-    "   vec3 TransformedR = mix ( TransformedRStart, TransformedREnd, Color.a );\n"
-    "   vec3 TransformedG = mix ( TransformedGStart, TransformedGEnd, Color.a );\n"
-    "   vec3 TransformedB = mix ( TransformedBStart, TransformedBEnd, Color.a );\n"
-#else
-    "   mat3 EyeRotation = mix ( EyeRotationStart, EyeRotationEnd, Color.a );\n"
-    "   vec3 TransformedR   = EyeRotation * TanEyeAngleR;\n"
-    "   vec3 TransformedG   = EyeRotation * TanEyeAngleG;\n"
-    "   vec3 TransformedB   = EyeRotation * TanEyeAngleB;\n"
-#endif
-
-    // Project them back onto the Z=1 plane of the rendered images.
-    "   float RecipZR = 1.0 / TransformedR.z;\n"
-    "   float RecipZG = 1.0 / TransformedG.z;\n"
-    "   float RecipZB = 1.0 / TransformedB.z;\n"
-    "   vec2 FlattenedR = vec2 ( TransformedR.x * RecipZR, TransformedR.y * RecipZR );\n"
-    "   vec2 FlattenedG = vec2 ( TransformedG.x * RecipZG, TransformedG.y * RecipZG );\n"
-    "   vec2 FlattenedB = vec2 ( TransformedB.x * RecipZB, TransformedB.y * RecipZB );\n"
-
-    // These are now still in TanEyeAngle space.
-    // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
-    "   vec2 SrcCoordR = FlattenedR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   vec2 SrcCoordG = FlattenedG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   vec2 SrcCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-
-    "   oTexCoord0 = SrcCoordR;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oTexCoord1 = SrcCoordG;\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
-    "   oTexCoord2 = SrcCoordB;\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
-
-    "   oColor = vec4(Color.r);\n"              // Used for vignette fade.
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform DistortionTimewarpChroma_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-    { "EyeRotationStart",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 16, 64 },
-    { "EyeRotationEnd",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 80, 64 },
-};
-
-
-static const char DistortionPositionalTimewarpChroma_vs[] =
-    "#version 150\n"
-    "uniform sampler2D Texture0;\n"
-    "uniform sampler2D Texture1;\n"
-    "uniform vec2 EyeToSourceUVScale;\n"
-    "uniform vec2 EyeToSourceUVOffset;\n"
-    "uniform vec2 DepthProjector;\n"
-    "uniform vec2 DepthDimSize;\n"
-    "uniform mat4 EyeRotationStart;\n"
-    "uniform mat4 EyeRotationEnd;\n"
-
-    "in vec2 Position;\n"
-    "in vec4 Color;\n"
-    "in vec2 TexCoord0;\n"
-    "in vec2 TexCoord1;\n"
-    "in vec2 TexCoord2;\n"
-
-    "out vec4 oColor;\n"
-    "out vec2 oTexCoord0;\n"
-    "out vec2 oTexCoord1;\n"
-    "out vec2 oTexCoord2;\n"
-
-    "vec4 PositionFromDepth(vec2 inTexCoord)\n"
-    "{\n"
-    "   vec2 eyeToSourceTexCoord = inTexCoord * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   eyeToSourceTexCoord.y = 1 - eyeToSourceTexCoord.y;\n"
-    "   float depth = texelFetch(Texture1, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n"
-    "   float linearDepth = DepthProjector.y / (depth - DepthProjector.x);\n"
-    "   vec4 retVal = vec4(inTexCoord, 1, 1);\n"
-    "   retVal.xyz *= linearDepth;\n"
-    "   return retVal;\n"
-    "}\n"
-
-    "vec2 TimewarpTexCoordToWarpedPos(vec2 inTexCoord, float a)\n"
-    "{\n"
-    // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
-    // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
-    // Apply the 4x4 timewarp rotation to these vectors.
-    "   vec4 inputPos = PositionFromDepth(inTexCoord);\n"
-    "   vec3 transformed = mix ( EyeRotationStart * inputPos,  EyeRotationEnd * inputPos, a ).xyz;\n"
-    // Project them back onto the Z=1 plane of the rendered images.
-    "   vec2 flattened = transformed.xy / transformed.z;\n"
-    // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
-    "   vec2 noDepthUV = flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    //"   float depth = texture2DLod(Texture1, noDepthUV, 0).r;\n"
-    "   return noDepthUV.xy;\n"
-    "}\n"
-
-    "void main()\n"
-    "{\n"
-    "   gl_Position.x = Position.x;\n"
-    "   gl_Position.y = Position.y;\n"
-    "   gl_Position.z = 0.0;\n"
-    "   gl_Position.w = 1.0;\n"
-
-    // warped positions are a bit more involved, hence a separate function
-    "   oTexCoord0 = TimewarpTexCoordToWarpedPos(TexCoord0, Color.a);\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oTexCoord1 = TimewarpTexCoordToWarpedPos(TexCoord1, Color.a);\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
-    "   oTexCoord2 = TimewarpTexCoordToWarpedPos(TexCoord2, Color.a);\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
-
-    "   oColor = vec4(Color.r, Color.r, Color.r, Color.r);              // Used for vignette fade.\n"
-    "}\n";
-
-const OVR::CAPI::GL::ShaderBase::Uniform DistortionPositionalTimewarpChroma_vs_refl[] =
-{
-    { "EyeToSourceUVScale",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
-    { "EyeToSourceUVOffset",     OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
-};
-
 
 // Distortion pixel shader lookup.
 //  Bit 0: Chroma Correction
@@ -460,8 +51,6 @@ static ShaderInfo DistortionVertexShaderLookup[DistortionVertexShaderCount] =
     SI_REFL__(DistortionChroma_vs),
     SI_REFL__(DistortionTimewarp_vs),
     SI_REFL__(DistortionTimewarpChroma_vs)
-    //SI_REFL__(DistortionPositionalTimewarp_vs),
-    //SI_REFL__(DistortionPositionalTimewarpChroma_vs)
 };
 
 static ShaderInfo DistortionPixelShaderLookup[DistortionPixelShaderCount] =
@@ -472,8 +61,8 @@ static ShaderInfo DistortionPixelShaderLookup[DistortionPixelShaderCount] =
 
 void DistortionShaderBitIndexCheck()
 {
-    OVR_COMPILER_ASSERT(ovrDistortion_Chromatic == 1);
-    OVR_COMPILER_ASSERT(ovrDistortion_TimeWarp  == 2);
+    OVR_COMPILER_ASSERT(ovrDistortionCap_Chromatic == 1);
+    OVR_COMPILER_ASSERT(ovrDistortionCap_TimeWarp  == 2);
 }
 
 
@@ -503,7 +92,10 @@ struct LatencyVertex
 DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager,
                                        const HMDRenderState& renderState)
     : CAPI::DistortionRenderer(ovrRenderAPI_OpenGL, hmd, timeManager, renderState)
+	, LatencyVAO(0)
 {
+	DistortionMeshVAOs[0] = 0;
+	DistortionMeshVAOs[1] = 0;
 }
 
 DistortionRenderer::~DistortionRenderer()
@@ -511,23 +103,22 @@ DistortionRenderer::~DistortionRenderer()
     destroy();
 }
 
-extern void InitGl();
-
 // static
 CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
                                                      FrameTimeManager& timeManager,
                                                      const HMDRenderState& renderState)
 {
-    InitGl();
+#if !defined(OVR_OS_MAC)
+    InitGLExtensions();
+#endif
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
 
 
 bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
-                                    unsigned hmdCaps, unsigned distortionCaps)
+									unsigned distortionCaps)
 {
-    // TBD: Decide if hmdCaps are needed here or are a part of RenderState
-    OVR_UNUSED(hmdCaps);
+	GfxState = *new GraphicsState();
 
     const ovrGLConfig* config = (const ovrGLConfig*)apiConfig;
 
@@ -540,11 +131,22 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
         return true;
     }
 
-    RParams.Multisample = config->OGL.Header.Multisample;
-    RParams.RTSize      = config->OGL.Header.RTSize;
-
+	RParams.Multisample = config->OGL.Header.Multisample;
+	RParams.RTSize      = config->OGL.Header.RTSize;
+#if defined(OVR_OS_WIN32)
+	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
+#elif defined(OVR_OS_LINUX)
+    RParams.Disp        = (config->OGL.Disp) ? config->OGL.Disp : XOpenDisplay(NULL);
+    RParams.Win         = config->OGL.Win;
+    if (!RParams.Win)
+    {
+        int unused;
+        XGetInputFocus(RParams.Disp, &RParams.Win, &unused);
+    }
+#endif
+	
     DistortionCaps = distortionCaps;
-
+	
     //DistortionWarper.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
 
     pEyeTextures[0] = *new Texture(&RParams, 0, 0);
@@ -558,40 +160,40 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 
 void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
 {
-    //Doesn't do a lot in here??
-    const ovrGLTexture* tex = (const ovrGLTexture*)eyeTexture;
+	// Doesn't do a lot in here??
+	const ovrGLTexture* tex = (const ovrGLTexture*)eyeTexture;
 
-    //Write in values
+	// Write in values
     eachEye[eyeId].texture = tex->OGL.TexId;
 
-    if (tex)
-    {
-        //Its only at this point we discover what the viewport of the texture is.
-        //because presumably we allow users to realtime adjust the resolution.
-        //Which begs the question - why did we ask them what viewport they were
-        //using before, which gave them a set of UV offsets.   In fact, our
-        //asking for eye mesh must be entirely independed of these viewports,
-        //presumably only to get the parameters.
+	if (tex)
+	{
+        // Its only at this point we discover what the viewport of the texture is.
+	    // because presumably we allow users to realtime adjust the resolution.
+        eachEye[eyeId].TextureSize    = tex->OGL.Header.TextureSize;
+        eachEye[eyeId].RenderViewport = tex->OGL.Header.RenderViewport;
 
-        ovrEyeDesc     ed = RState.EyeRenderDesc[eyeId].Desc;
-        ed.TextureSize    = tex->OGL.Header.TextureSize;
-        ed.RenderViewport = tex->OGL.Header.RenderViewport;
-        ovrHmd_GetRenderScaleAndOffset(HMD, ed, DistortionCaps, eachEye[eyeId].UVScaleOffset);
+        const ovrEyeRenderDesc& erd = RState.EyeRenderDesc[eyeId];
+    
+        ovrHmd_GetRenderScaleAndOffset( erd.Fov,
+                                        eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
+                                        eachEye[eyeId].UVScaleOffset );
 
         pEyeTextures[eyeId]->UpdatePlaceholderTexture(tex->OGL.TexId,
                                                       tex->OGL.Header.TextureSize);
-    }
+	}
 }
 
-void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
+void DistortionRenderer::EndFrame(bool swapBuffers,
+                                  unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
 {
     if (!TimeManager.NeedDistortionTimeMeasurement())
     {
-        if (RState.DistortionCaps & ovrDistortion_TimeWarp)
-        {
-            // Wait for timewarp distortion if it is time and Gpu idle
-            FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
-        }
+		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
+		{
+			// Wait for timewarp distortion if it is time and Gpu idle
+			FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
+		}
 
         renderDistortion(pEyeTextures[0], pEyeTextures[1]);
     }
@@ -616,36 +218,175 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
     {
         renderLatencyPixel(latencyTester2DrawColor);
     }
+
+    if (swapBuffers)
+    {
+		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
+		int swapInterval = (useVsync) ? 1 : 0;
+#if defined(OVR_OS_WIN32)
+		if (wglGetSwapIntervalEXT() != swapInterval)
+            wglSwapIntervalEXT(swapInterval);
+
+        HDC dc = GetDC(RParams.Window);
+		BOOL success = SwapBuffers(dc);
+        ReleaseDC(RParams.Window, dc);
+		OVR_ASSERT(success);
+        OVR_UNUSED(success);
+#elif defined(OVR_OS_MAC)
+        CGLContextObj context = CGLGetCurrentContext();
+        GLint currentSwapInterval = 0;
+        CGLGetParameter(context, kCGLCPSwapInterval, &currentSwapInterval);
+        if (currentSwapInterval != swapInterval)
+            CGLSetParameter(context, kCGLCPSwapInterval, &swapInterval);
+        
+        CGLFlushDrawable(context);
+#elif defined(OVR_OS_LINUX)
+        static const char* extensions = glXQueryExtensionsString(RParams.Disp, 0);
+        static bool supportsVSync = (extensions != NULL && strstr(extensions, "GLX_EXT_swap_control"));
+        if (supportsVSync)
+        {
+            GLuint currentSwapInterval = 0;
+            glXQueryDrawable(RParams.Disp, RParams.Win, GLX_SWAP_INTERVAL_EXT, &currentSwapInterval);
+            if (currentSwapInterval != swapInterval)
+                glXSwapIntervalEXT(RParams.Disp, RParams.Win, swapInterval);
+        }
+
+        glXSwapBuffers(RParams.Disp, RParams.Win);
+#endif
+    }
 }
 
 void DistortionRenderer::WaitUntilGpuIdle()
 {
-    //glFlush();
-    //glFinish();
+	glFlush();
+	glFinish();
 }
 
 double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
 {
-    double       initialTime = ovr_GetTimeInSeconds();
-    if (initialTime >= absTime)
-        return 0.0;
+	double       initialTime = ovr_GetTimeInSeconds();
+	if (initialTime >= absTime)
+		return 0.0;
+	
+	glFlush();
+	glFinish();
 
-    glFlush();
-    glFinish();
+	double newTime   = initialTime;
+	volatile int i;
 
-    double newTime   = initialTime;
-    volatile int i;
+	while (newTime < absTime)
+	{
+		for (int j = 0; j < 50; j++)
+			i = 0;
 
-    while (newTime < absTime)
+		newTime = ovr_GetTimeInSeconds();
+	}
+
+	// How long we waited
+	return newTime - initialTime;
+}
+    
+    
+DistortionRenderer::GraphicsState::GraphicsState()
+{
+    const char* glVersionString = (const char*)glGetString(GL_VERSION);
+    OVR_DEBUG_LOG(("GL_VERSION STRING: %s", (const char*)glVersionString));
+    char prefix[64];
+    bool foundVersion = false;
+    
+    for (int i = 10; i < 30; ++i)
     {
-        for (int j = 0; j < 50; j++)
-            i = 0;
-
-        newTime = ovr_GetTimeInSeconds();
+        int major = i / 10;
+        int minor = i % 10;
+        OVR_sprintf(prefix, 64, "%d.%d", major, minor);
+        if (strstr(glVersionString, prefix) == glVersionString)
+        {
+            GlMajorVersion = major;
+            GlMinorVersion = minor;
+            foundVersion = true;
+            break;
+        }
     }
+    
+    if (!foundVersion)
+    {
+        glGetIntegerv(GL_MAJOR_VERSION, &GlMajorVersion);
+        glGetIntegerv(GL_MAJOR_VERSION, &GlMinorVersion);
+	}
 
-    // How long we waited
-    return newTime - initialTime;
+	OVR_ASSERT(GlMajorVersion >= 2);
+    
+    if (GlMajorVersion >= 3)
+    {
+        SupportsVao = true;
+    }
+    else
+    {
+        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+        SupportsVao = (strstr("GL_ARB_vertex_array_object", extensions) != NULL);
+    }
+}
+    
+    
+void DistortionRenderer::GraphicsState::ApplyBool(GLenum Name, GLint Value)
+{
+    if (Value != 0)
+        glEnable(Name);
+    else
+        glDisable(Name);
+}
+    
+    
+void DistortionRenderer::GraphicsState::Save()
+{
+    glGetIntegerv(GL_VIEWPORT, Viewport);
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, ClearColor);
+    glGetIntegerv(GL_DEPTH_TEST, &DepthTest);
+    glGetIntegerv(GL_CULL_FACE, &CullFace);
+    glGetIntegerv(GL_CURRENT_PROGRAM, &Program);
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &ActiveTexture);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &TextureBinding);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArray);
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FrameBufferBinding);
+    glGetIntegerv(GL_BLEND, &Blend);
+    glGetIntegerv(GL_COLOR_WRITEMASK, ColorWritemask);
+    glGetIntegerv(GL_DITHER, &Dither);
+    glGetIntegerv(GL_RASTERIZER_DISCARD, &RasterizerDiscard);
+    if (GlMajorVersion >= 3 && GlMajorVersion >= 2)
+        glGetIntegerv(GL_SAMPLE_MASK, &SampleMask);
+	glGetIntegerv(GL_SCISSOR_TEST, &ScissorTest);
+
+	IsValid = true;
+}
+    
+
+void DistortionRenderer::GraphicsState::Restore()
+{
+	// Don't allow restore-before-save.
+	if (!IsValid)
+		return;
+
+    glViewport(Viewport[0], Viewport[1], Viewport[2], Viewport[3]);
+    glClearColor(ClearColor[0], ClearColor[1], ClearColor[2], ClearColor[3]);
+    
+    ApplyBool(GL_DEPTH_TEST, DepthTest);
+    ApplyBool(GL_CULL_FACE, CullFace);
+    
+    glUseProgram(Program);
+    glActiveTexture(ActiveTexture);
+    glBindTexture(GL_TEXTURE_2D, TextureBinding);
+    if (SupportsVao)
+        glBindVertexArray(VertexArray);
+    glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferBinding);
+    
+    ApplyBool(GL_BLEND, Blend);
+    
+	glColorMask((GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    ApplyBool(GL_DITHER, Dither);
+    ApplyBool(GL_RASTERIZER_DISCARD, RasterizerDiscard);
+    if (GlMajorVersion >= 3 && GlMajorVersion >= 2)
+        ApplyBool(GL_SAMPLE_MASK, SampleMask);
+    ApplyBool(GL_SCISSOR_TEST, ScissorTest);
 }
 
 
@@ -658,9 +399,11 @@ void DistortionRenderer::initBuffersAndShaders()
 
 //        double startT = ovr_GetTimeInSeconds();
 
-        if (!ovrHmd_CreateDistortionMesh( HMD, RState.EyeRenderDesc[eyeNum].Desc,
+        if (!ovrHmd_CreateDistortionMesh( HMD,
+                                          RState.EyeRenderDesc[eyeNum].Eye,
+                                          RState.EyeRenderDesc[eyeNum].Fov,
                                           RState.DistortionCaps,
-                                          UVScaleOffset[eyeNum], &meshData) )
+                                          &meshData) )
         {
             OVR_ASSERT(false);
             continue;
@@ -688,10 +431,10 @@ void DistortionRenderer::initBuffersAndShaders()
         }
 
         DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
+        DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex | Buffer_ReadOnly, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
         DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index, meshData.pIndexData, ( sizeof(uint16_t) * meshData.IndexCount ) );
-        DistortionMeshIndexCount[eyeNum] = meshData.IndexCount;
+        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, ( sizeof(SInt16) * meshData.IndexCount ) );
+
         OVR_FREE ( pVBVerts );
         ovrHmd_DestroyDistortionMesh( &meshData );
     }
@@ -701,39 +444,56 @@ void DistortionRenderer::initBuffersAndShaders()
 
 void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture)
 {
+    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     setViewport( Recti(0,0, RParams.RTSize.w, RParams.RTSize.h) );
 
-    glClearColor(
-        RState.ClearColor[0],
-        RState.ClearColor[1],
-        RState.ClearColor[2],
-        RState.ClearColor[3] );
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+    glDisable(GL_DITHER);
+    glDisable(GL_RASTERIZER_DISCARD);
+    if (glState->GlMajorVersion >= 3 && glState->GlMajorVersion >= 2)
+        glDisable(GL_SAMPLE_MASK);
+    glDisable(GL_SCISSOR_TEST);
+        
+	glClearColor(
+		RState.ClearColor[0],
+		RState.ClearColor[1],
+		RState.ClearColor[2],
+		RState.ClearColor[3] );
 
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    static GLuint distortionVAOs[2] = { 0, 0 };
     for (int eyeNum = 0; eyeNum < 2; eyeNum++)
-    {
-        ShaderFill distortionShaderFill(DistortionShader);
+    {        
+		ShaderFill distortionShaderFill(DistortionShader);
         distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture);
 
-        DistortionShader->SetUniform2f("EyeToSourceUVScale",  UVScaleOffset[eyeNum][0].x, UVScaleOffset[eyeNum][0].y);
-        DistortionShader->SetUniform2f("EyeToSourceUVOffset", UVScaleOffset[eyeNum][1].x, UVScaleOffset[eyeNum][1].y);
-
-        if (DistortionCaps & ovrDistortion_TimeWarp)
-        {
-            ovrMatrix4f timeWarpMatrices[2];
+		DistortionShader->SetUniform2f("EyeToSourceUVScale",  eachEye[eyeNum].UVScaleOffset[0].x, eachEye[eyeNum].UVScaleOffset[0].y);
+		DistortionShader->SetUniform2f("EyeToSourceUVOffset", eachEye[eyeNum].UVScaleOffset[1].x, eachEye[eyeNum].UVScaleOffset[1].y);
+        
+		if (DistortionCaps & ovrDistortionCap_TimeWarp)
+		{                       
+            ovrMatrix4f timeWarpMatrices[2];            
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
                                           RState.EyeRenderPoses[eyeNum], timeWarpMatrices);
 
             // Feed identity like matrices in until we get proper timewarp calculation going on
-            DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]).Transposed());
-            DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]).Transposed());
+			DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]).Transposed());
+			DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]).Transposed());
+
+            renderPrimitives(&distortionShaderFill, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
+                            0, (int)DistortionMeshIBs[eyeNum]->GetSize()/2, Prim_Triangles, &DistortionMeshVAOs[eyeNum], true);
+		}
+        else
+        {
+            renderPrimitives(&distortionShaderFill, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
+                            0, (int)DistortionMeshIBs[eyeNum]->GetSize()/2, Prim_Triangles, &DistortionMeshVAOs[eyeNum], true);
         }
-        renderPrimitives(&distortionShaderFill, distortionVAOs + eyeNum, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
-          NULL, 0, DistortionMeshIndexCount[eyeNum], Prim_Triangles, true);
     }
 }
 
@@ -770,13 +530,12 @@ void DistortionRenderer::createDrawQuad()
 void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor)
 {
     const int numQuadVerts = 4;
-    static GLuint latencyQuatVAO = 0;
 
     if(!LatencyTesterQuadVB)
     {
         createDrawQuad();
     }
-
+       
     ShaderFill quadFill(SimpleQuadShader);
     //quadFill.SetInputLayout(SimpleQuadVertexIL);
 
@@ -790,15 +549,14 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
-        SimpleQuadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.4f : 0.4f, 0.0f);
-        renderPrimitives(&quadFill, &latencyQuatVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);
+        SimpleQuadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.4f : 0.4f, 0.0f);    
+        renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
     }
 }
 
 void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelColor)
 {
     const int numQuadVerts = 4;
-    static GLuint latencyVAO = 0;
 
     if(!LatencyTesterQuadVB)
     {
@@ -814,29 +572,26 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
                                             (float)latencyTesterPixelColor[0] / 255.99f,
                                             1.0f);
 
-    Vector2f scale(2.0f / RParams.RTSize.w, 2.0f / RParams.RTSize.h);
+    Vector2f scale(2.0f / RParams.RTSize.w, 2.0f / RParams.RTSize.h); 
     SimpleQuadShader->SetUniform2f("Scale", scale.x, scale.y);
     SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f, 1.0f);
-    renderPrimitives(&quadFill, &latencyVAO, LatencyTesterQuadVB, NULL, NULL, 0, numQuadVerts, Prim_TriangleStrip, false);
+	renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
 }
 
 void DistortionRenderer::renderPrimitives(
                           const ShaderFill* fill,
-                          GLuint * vao,
                           Buffer* vertices, Buffer* indices,
-                          Matrix4f* viewMatrix, int offset, int count,
-                          PrimitiveType rprim, bool useDistortionVertex)
+                          int offset, int count,
+                          PrimitiveType rprim, GLuint* vao, bool isDistortionMesh)
 {
-    ShaderSet* shaders = (ShaderSet*) ((ShaderFill*)fill)->GetShaders();
+    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
 
     GLenum prim;
     switch (rprim)
     {
     case Prim_Triangles:
-      prim = GL_TRIANGLES;
-      //prim = GL_LINE_STRIP;
-      //prim = GL_TRIANGLE_STRIP;
-      break;
+        prim = GL_TRIANGLES;
+        break;
     case Prim_Lines:
         prim = GL_LINES;
         break;
@@ -844,121 +599,186 @@ void DistortionRenderer::renderPrimitives(
         prim = GL_TRIANGLE_STRIP;
         break;
     default:
-        assert(0);
+        OVR_ASSERT(false);
         return;
     }
 
     fill->Set();
-    if (shaders->ProjLoc >= 0)
-        glUniformMatrix4fv(shaders->ProjLoc, 1, 0, &StdUniforms.Proj.M[0][0]);
-    if (shaders->ViewLoc >= 0 && viewMatrix != NULL)
-        glUniformMatrix4fv(shaders->ViewLoc, 1, 0, &viewMatrix->Transposed().M[0][0]);
+    
+    GLuint prog = fill->GetShaders()->Prog;
 
-    //if (shaders->UsesLighting && Lighting->Version != shaders->LightingVer)
-    //{
-    //    shaders->LightingVer = Lighting->Version;
-    //    Lighting->Set(shaders);
-    //}
+	if (vao != NULL)
+	{
+		if (*vao != 0)
+		{
+			glBindVertexArray(*vao);
 
-    if (!*vao) {
-      glGenVertexArrays(1, vao);
-      glBindVertexArray(*vao);
-      // Bind the buffers
-      glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
-      if (useDistortionVertex) {
-        for (int i = 0; i < VA_Count; i++)
-          glEnableVertexAttribArray(i);
-        glVertexAttribPointer(VA_Position, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, Pos));
-        glVertexAttribPointer(VA_Color, 4, GL_UNSIGNED_BYTE, true, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, Col));
-        glVertexAttribPointer(VA_TexCoord0, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexR));
-        glVertexAttribPointer(VA_TexCoord1, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexG));
-        glVertexAttribPointer(VA_TexCoord2, 2, GL_FLOAT, false, sizeof(DistortionVertex), (char*)offset + offsetof(DistortionVertex, TexB));
-      } else {
-        glEnableVertexAttribArray(VA_Position);
-        glVertexAttribPointer(VA_Position, 3, GL_FLOAT, false, sizeof(LatencyVertex), (char*)offset + offsetof(LatencyVertex, Pos));
-      }
-    } else {
-      glBindVertexArray(*vao);
-    }
+			if (isDistortionMesh)
+				glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
+			else
+				glDrawArrays(prim, 0, count);
+		}
+		else
+		{
+            if (glState->SupportsVao)
+            {
+                glGenVertexArrays(1, vao);
+                glBindVertexArray(*vao);
+			}
 
-    // Draw
-    if (indices) {
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ((Buffer*)indices)->GLBuffer);
-      glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    } else {
-      glDrawArrays(prim, 0, count);
-    }
+			int attributeCount = (isDistortionMesh) ? 5 : 1;
+			int* locs = new int[attributeCount];
 
-    // Unbind the VAO
-    glBindVertexArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
+
+			if (isDistortionMesh)
+			{
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ((Buffer*)indices)->GLBuffer);
+
+				locs[0] = glGetAttribLocation(prog, "Position");
+				locs[1] = glGetAttribLocation(prog, "Color");
+				locs[2] = glGetAttribLocation(prog, "TexCoord0");
+				locs[3] = glGetAttribLocation(prog, "TexCoord1");
+				locs[4] = glGetAttribLocation(prog, "TexCoord2");
+
+				glVertexAttribPointer(locs[0], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, Pos));
+				glVertexAttribPointer(locs[1], 4, GL_UNSIGNED_BYTE, true, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, Col));
+				glVertexAttribPointer(locs[2], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexR));
+				glVertexAttribPointer(locs[3], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexG));
+				glVertexAttribPointer(locs[4], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexB));
+			}
+			else
+			{
+				locs[0] = glGetAttribLocation(prog, "Position");
+
+				glVertexAttribPointer(locs[0], 3, GL_FLOAT, false, sizeof(LatencyVertex), reinterpret_cast<char*>(offset)+offsetof(LatencyVertex, Pos));
+			}
+
+            for (int i = 0; i < attributeCount; ++i)
+                glEnableVertexAttribArray(locs[i]);
+            
+			if (isDistortionMesh)
+				glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
+			else
+				glDrawArrays(prim, 0, count);
+
+
+            if (!glState->SupportsVao)
+            {
+				for (int i = 0; i < attributeCount; ++i)
+                    glDisableVertexAttribArray(locs[i]);
+            }
+
+			delete[] locs;
+		}
+	}
 }
 
 void DistortionRenderer::setViewport(const Recti& vp)
 {
     glViewport(vp.x, vp.y, vp.w, vp.h);
-
-    //glEnable(GL_SCISSOR_TEST);
-    //glScissor(vp.x, wh-vp.y-vp.h, vp.w, vp.h);
 }
 
 
 void DistortionRenderer::initShaders()
 {
+    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
+
+    const char* shaderPrefix =
+        (glState->GlMajorVersion < 3 || (glState->GlMajorVersion == 3 && glState->GlMinorVersion < 2)) ?
+            glsl2Prefix : glsl3Prefix;
+
     {
-        ShaderInfo vsShaderByteCode = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & DistortionCaps];
-        Ptr<GL::VertexShader> vtxShader = *new GL::VertexShader(
+		ShaderInfo vsInfo = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & DistortionCaps];
+
+		size_t vsSize = strlen(shaderPrefix)+vsInfo.ShaderSize;
+		char* vsSource = new char[vsSize];
+		OVR_strcpy(vsSource, vsSize, shaderPrefix);
+		OVR_strcat(vsSource, vsSize, vsInfo.ShaderData);
+
+        Ptr<GL::VertexShader> vs = *new GL::VertexShader(
             &RParams,
-            (void*)vsShaderByteCode.ShaderData, vsShaderByteCode.ShaderSize,
-            vsShaderByteCode.ReflectionData, vsShaderByteCode.ReflectionSize);
+			(void*)vsSource, vsSize,
+			vsInfo.ReflectionData, vsInfo.ReflectionSize);
 
         DistortionShader = *new ShaderSet;
-        DistortionShader->SetShader(vtxShader);
+        DistortionShader->SetShader(vs);
 
-        ShaderInfo psShaderByteCode = DistortionPixelShaderLookup[DistortionPixelShaderBitMask & DistortionCaps];
+		delete[](vsSource);
+
+		ShaderInfo psInfo = DistortionPixelShaderLookup[DistortionPixelShaderBitMask & DistortionCaps];
+
+		size_t psSize = strlen(shaderPrefix)+psInfo.ShaderSize;
+		char* psSource = new char[psSize];
+		OVR_strcpy(psSource, psSize, shaderPrefix);
+		OVR_strcat(psSource, psSize, psInfo.ShaderData);
 
         Ptr<GL::FragmentShader> ps  = *new GL::FragmentShader(
             &RParams,
-            (void*)psShaderByteCode.ShaderData, psShaderByteCode.ShaderSize,
-            psShaderByteCode.ReflectionData, psShaderByteCode.ReflectionSize);
+			(void*)psSource, psSize,
+			psInfo.ReflectionData, psInfo.ReflectionSize);
 
         DistortionShader->SetShader(ps);
+
+		delete[](psSource);
     }
-    {
-        Ptr<GL::VertexShader> vtxShader = *new GL::VertexShader(
+	{
+		size_t vsSize = strlen(shaderPrefix)+sizeof(SimpleQuad_vs);
+		char* vsSource = new char[vsSize];
+		OVR_strcpy(vsSource, vsSize, shaderPrefix);
+		OVR_strcat(vsSource, vsSize, SimpleQuad_vs);
+
+        Ptr<GL::VertexShader> vs = *new GL::VertexShader(
             &RParams,
-            (void*)SimpleQuad_vs, sizeof(SimpleQuad_vs),
-            SimpleQuad_vs_refl, sizeof(SimpleQuad_vs_refl) / sizeof(SimpleQuad_vs_refl[0]));
+            (void*)vsSource, vsSize,
+			SimpleQuad_vs_refl, sizeof(SimpleQuad_vs_refl) / sizeof(SimpleQuad_vs_refl[0]));
 
         SimpleQuadShader = *new ShaderSet;
-        SimpleQuadShader->SetShader(vtxShader);
+		SimpleQuadShader->SetShader(vs);
+
+		delete[](vsSource);
+
+		size_t psSize = strlen(shaderPrefix)+sizeof(SimpleQuad_fs);
+		char* psSource = new char[psSize];
+		OVR_strcpy(psSource, psSize, shaderPrefix);
+		OVR_strcat(psSource, psSize, SimpleQuad_fs);
 
         Ptr<GL::FragmentShader> ps  = *new GL::FragmentShader(
             &RParams,
-            (void*)SimpleQuad_fs, sizeof(SimpleQuad_fs),
+            (void*)psSource, psSize,
             SimpleQuad_fs_refl, sizeof(SimpleQuad_fs_refl) / sizeof(SimpleQuad_fs_refl[0]));
 
-        SimpleQuadShader->SetShader(ps);
-    }
+		SimpleQuadShader->SetShader(ps);
+
+		delete[](psSource);
+	}
 }
 
 
 void DistortionRenderer::destroy()
 {
-    for(int eyeNum = 0; eyeNum < 2; eyeNum++)
-    {
-        DistortionMeshVBs[eyeNum].Clear();
-        DistortionMeshIBs[eyeNum].Clear();
-    }
+    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
 
-    if (DistortionShader)
+	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
+	{
+        if (glState->SupportsVao)
+            glDeleteVertexArrays(1, &DistortionMeshVAOs[eyeNum]);
+
+		DistortionMeshVAOs[eyeNum] = 0;
+
+		DistortionMeshVBs[eyeNum].Clear();
+		DistortionMeshIBs[eyeNum].Clear();
+	}
+
+	if (DistortionShader)
     {
         DistortionShader->UnsetShader(Shader_Vertex);
-        DistortionShader->UnsetShader(Shader_Pixel);
-        DistortionShader.Clear();
+	    DistortionShader->UnsetShader(Shader_Pixel);
+	    DistortionShader.Clear();
     }
 
     LatencyTesterQuadVB.Clear();
+	LatencyVAO = 0;
 }
 
 }}} // OVR::CAPI::GL

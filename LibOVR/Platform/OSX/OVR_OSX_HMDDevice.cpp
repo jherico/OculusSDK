@@ -5,16 +5,16 @@ Content     :   OSX Interface to HMD - detects HMD display
 Created     :   September 21, 2012
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,47 +25,53 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_OSX_HMDDevice.h"
-#include <CoreGraphics/CGDirectDisplay.h>
-#include <CoreGraphics/CGDisplayConfiguration.h>
+
+#include "OVR_OSX_DeviceManager.h"
+#include "Util/Util_Render_Stereo.h"
+
+#include "OVR_OSX_HMDDevice.h"
+#include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreFoundation/CFString.h>
 #include <IOKit/graphics/IOGraphicsLib.h>
 
 namespace OVR { namespace OSX {
 
+using namespace OVR::Util::Render;
+    
 //-------------------------------------------------------------------------------------
 
 HMDDeviceCreateDesc::HMDDeviceCreateDesc(DeviceFactory* factory, 
-                                         UInt32 vend, UInt32 prod, const String& displayDeviceName, long dispId)
+                                         UInt32 vend, UInt32 prod, const String& displayDeviceName, int dispId)
         : DeviceCreateDesc(factory, Device_HMD),
           DisplayDeviceName(displayDeviceName),
-          DesktopX(0), DesktopY(0), Contents(0), EyeToScreenDistance(0),
-          HResolution(0), VResolution(0), HScreenSize(0), VScreenSize(0),
+          Contents(0),
           DisplayId(dispId)
 {
-    /* //??????????
-    char idstring[9];
-    idstring[0] = 'A'-1+((vend>>10) & 31);
-    idstring[1] = 'A'-1+((vend>>5) & 31);
-    idstring[2] = 'A'-1+((vend>>0) & 31);
-    snprintf(idstring+3, 5, "%04d", prod);
-    DeviceId = idstring;*/
+    OVR_UNUSED(vend);
+    OVR_UNUSED(prod);
     DeviceId = DisplayDeviceName;
 
-    for (int i=0; i<4; i++)
-        DistortionK[i] = 0;
+    Desktop.X = 0;
+    Desktop.Y = 0;
+    ResolutionInPixels = Sizei(0);          
+    ScreenSizeInMeters = Sizef(0.0f);
+    VCenterFromTopInMeters = 0.0f;
+    LensSeparationInMeters = 0.0f;
 }
 
 HMDDeviceCreateDesc::HMDDeviceCreateDesc(const HMDDeviceCreateDesc& other)
         : DeviceCreateDesc(other.pFactory, Device_HMD),
           DeviceId(other.DeviceId), DisplayDeviceName(other.DisplayDeviceName),
-          DesktopX(other.DesktopX), DesktopY(other.DesktopY), Contents(other.Contents),
-          HResolution(other.HResolution), VResolution(other.VResolution),
-          HScreenSize(other.HScreenSize), VScreenSize(other.VScreenSize),
-          DisplayId(other.DisplayId), EyeToScreenDistance(other.EyeToScreenDistance)
+          Contents(other.Contents),
+          DisplayId(other.DisplayId)
 {
-    for (int i=0; i<4; i++)
-        DistortionK[i] = other.DistortionK[i];
+    Desktop.X              = other.Desktop.X;
+    Desktop.Y              = other.Desktop.Y;
+    ResolutionInPixels     = other.ResolutionInPixels;
+    ScreenSizeInMeters     = other.ScreenSizeInMeters;          
+    VCenterFromTopInMeters = other.VCenterFromTopInMeters;
+    LensSeparationInMeters = other.LensSeparationInMeters;
 }
 
 HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCreateDesc& other,
@@ -90,8 +96,7 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
         // Non-null DeviceId may match while size is different if screen size was overwritten
         // by SensorDisplayInfo in prior iteration.
         if (!DeviceId.IsEmpty() ||
-             ((HScreenSize == s2.HScreenSize) &&
-              (VScreenSize == s2.VScreenSize)) )
+            (ScreenSizeInMeters == s2.ScreenSizeInMeters) )
         {            
             *pcandidate = 0;
             return Match_Found;
@@ -100,10 +105,8 @@ HMDDeviceCreateDesc::MatchResult HMDDeviceCreateDesc::MatchDevice(const DeviceCr
 
 
     // DisplayInfo takes precedence, although we try to match it first.
-    if ((HResolution == s2.HResolution) &&
-        (VResolution == s2.VResolution) &&
-        (HScreenSize == s2.HScreenSize) &&
-        (VScreenSize == s2.VScreenSize))
+    if ((ResolutionInPixels == s2.ResolutionInPixels) &&        
+        (ScreenSizeInMeters == s2.ScreenSizeInMeters))
     {
         if (DeviceId.IsEmpty() && !s2.DeviceId.IsEmpty())
         {
@@ -144,19 +147,20 @@ bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other, 
     // which may be corrupted by splitter reporting wrong monitor 
     if (s2.DeviceId.IsEmpty() && s2.DisplayId == 0)
     {
-        // disconnected HMD: replace old descriptor by the 'fake' one.
-        HScreenSize = s2.HScreenSize;
-        VScreenSize = s2.VScreenSize;
+        ScreenSizeInMeters = s2.ScreenSizeInMeters;        
         Contents |= Contents_Screen;
 
         if (s2.Contents & HMDDeviceCreateDesc::Contents_Distortion)
         {
             memcpy(DistortionK, s2.DistortionK, sizeof(float)*4);
+            // TODO: DistortionEqn
             Contents |= Contents_Distortion;
         }
         DeviceId          = s2.DeviceId;
         DisplayId         = s2.DisplayId;
         DisplayDeviceName = s2.DisplayDeviceName;
+        Desktop.X         = s2.Desktop.X;
+        Desktop.Y         = s2.Desktop.Y;
         if (newDeviceFlag) *newDeviceFlag = true;
     }
     else if (DeviceId.IsEmpty())
@@ -166,6 +170,12 @@ bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other, 
         DeviceId          = s2.DeviceId;
         DisplayId         = s2.DisplayId;
         DisplayDeviceName = s2.DisplayDeviceName;
+        Desktop.X         = s2.Desktop.X;
+        Desktop.Y         = s2.Desktop.Y;
+
+		// ScreenSize and Resolution are NOT assigned here, since they may have
+		// come from a sensor DisplayInfo (which has precedence over HDMI).
+
         if (newDeviceFlag) *newDeviceFlag = true;
     }
     else
@@ -183,7 +193,11 @@ bool HMDDeviceCreateDesc::UpdateMatchedCandidate(const DeviceCreateDesc& other, 
 //-------------------------------------------------------------------------------------
 // ***** HMDDeviceFactory
 
-HMDDeviceFactory HMDDeviceFactory::Instance;
+HMDDeviceFactory &HMDDeviceFactory::GetInstance()
+{
+	static HMDDeviceFactory instance;
+	return instance;
+}
 
 void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 {
@@ -191,15 +205,14 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     uint32_t NDisplays = 0;
     CGGetOnlineDisplayList(32, Displays, &NDisplays);
 
-    for (int i = 0; i < NDisplays; i++)
+    for (unsigned int i = 0; i < NDisplays; i++)
     {
         io_service_t port = CGDisplayIOServicePort(Displays[i]);
         CFDictionaryRef DispInfo = IODisplayCreateInfoDictionary(port, kIODisplayMatchingInfo);
 
         uint32_t vendor = CGDisplayVendorNumber(Displays[i]);
         uint32_t product = CGDisplayModelNumber(Displays[i]);
-        unsigned mwidth = (unsigned)CGDisplayPixelsWide(Displays[i]);
-        unsigned mheight = (unsigned)CGDisplayPixelsHigh(Displays[i]);
+
         CGRect desktop = CGDisplayBounds(Displays[i]);
         
         if (vendor == 16082 && ( (product == 1)||(product == 2) ) ) // 7" or HD
@@ -212,26 +225,28 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
             HMDDeviceCreateDesc hmdCreateDesc(this, vendor, product, idstring, Displays[i]);
             
-            if (product == 2)
-            {
+			// Hard-coded defaults in case the device doesn't have the data itself.
+            if (product == 3)
+            {   // DK2 prototypes and variants (default to HmdType_DK2)
                 hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
-                                                  mwidth, mheight, 0.12096f, 0.06804f);
+                                                  1920, 1080, 0.12576f, 0.07074f, 0.12576f*0.5f, 0.0635f );
             }
-            else
-            {
-                if (hmdCreateDesc.Is7Inch())
-                {
-                    // Physical dimension of SLA screen.
-                    hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
-                                                      mwidth, mheight, 0.14976f, 0.0936f);
-                }
-                else
-                {
-                    hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
-                                                      mwidth, mheight, 0.12096f, 0.0756f);
-                }
+			else if (product == 2)
+			{   // HD Prototypes (default to HmdType_DKHDProto) 
+				hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
+                                                  1920, 1080, 0.12096f, 0.06804f, 0.06804f*0.5f, 0.0635f);
+			}
+			else if (product == 1)
+			{   // DK1
+                hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
+                                                  1280, 800, 0.14976f, 0.0936f, 0.0936f*0.5f, 0.0635f);
             }
-
+            else 
+            {   // Future Oculus HMD devices (default to DK1 dimensions)
+				hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
+                                                      1280, 800, 0.14976f, 0.0936f, 0.0936f*0.5f, 0.0635f);
+			}
+            
             OVR_DEBUG_LOG_TEXT(("DeviceManager - HMD Found %x:%x\n", vendor, product));
             
             // Notify caller about detected device. This will call EnumerateAddDevice
@@ -242,175 +257,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
     }
 }
 
-DeviceBase* HMDDeviceCreateDesc::NewDeviceInstance()
-{
-    return new HMDDevice(this);
-}
-
-bool HMDDeviceCreateDesc::Is7Inch() const
-{
-    return (strstr(DeviceId.ToCStr(), "OVR0001") != 0) || (Contents & Contents_7Inch);
-}
-
-Profile* HMDDeviceCreateDesc::GetProfileAddRef() const
-{
-    // Create device may override profile name, so get it from there is possible.
-    ProfileManager* profileManager = GetManagerImpl()->GetProfileManager();
-    ProfileType     profileType    = GetProfileType();
-    const char *    profileName    = pDevice ?
-                        ((HMDDevice*)pDevice)->GetProfileName() :
-                        profileManager->GetDefaultProfileName(profileType);
-
-    return profileName ?
-        profileManager->LoadProfile(profileType, profileName) :
-        profileManager->GetDeviceDefaultProfile(profileType);
-}
-
-bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
-{
-    if ((info->InfoClassType != Device_HMD) &&
-        (info->InfoClassType != Device_None))
-        return false;
-
-    bool is7Inch = Is7Inch();
-
-    OVR_strcpy(info->ProductName,  DeviceInfo::MaxNameLength,
-               is7Inch ? "Oculus Rift DK1" :
-               ((HResolution >= 1920) ? "Oculus Rift DK HD" : "Oculus Rift DK1-Prototype") );
-    OVR_strcpy(info->Manufacturer, DeviceInfo::MaxNameLength, "Oculus VR");
-    info->Type    = Device_HMD;
-    info->Version = 0;
-
-    // Display detection.
-    if (info->InfoClassType == Device_HMD)
-    {
-        HMDInfo* hmdInfo = static_cast<HMDInfo*>(info);
-
-        hmdInfo->DesktopX               = DesktopX;
-        hmdInfo->DesktopY               = DesktopY;
-        hmdInfo->HResolution            = HResolution;
-        hmdInfo->VResolution            = VResolution;
-        hmdInfo->HScreenSize            = HScreenSize;
-        hmdInfo->VScreenSize            = VScreenSize;
-        hmdInfo->VScreenCenter          = VScreenSize * 0.5f;
-        hmdInfo->InterpupillaryDistance = 0.064f;  // Default IPD; should be configurable.
-        hmdInfo->LensSeparationDistance = 0.0635f;
-
-        // Obtain IPD from profile.
-        Ptr<Profile> profile = *GetProfileAddRef();
-
-        if (profile)
-        {
-            hmdInfo->InterpupillaryDistance = profile->GetIPD();
-            // TBD: Switch on EyeCup type.
-        }
-        
-        if (Contents & Contents_Distortion)
-        {
-            memcpy(hmdInfo->DistortionK, DistortionK, sizeof(float)*4);
-            hmdInfo->EyeToScreenDistance = EyeToScreenDistance;
-        }
-        else
-        {
-            if (is7Inch)
-            {
-                // 7" screen.
-                hmdInfo->DistortionK[0]        = 1.0f;
-                hmdInfo->DistortionK[1]        = 0.22f;
-                hmdInfo->DistortionK[2]        = 0.24f;
-                hmdInfo->EyeToScreenDistance   = 0.041f;                
-            }
-            else
-            {
-                hmdInfo->DistortionK[0]        = 1.0f;
-                hmdInfo->DistortionK[1]        = 0.18f;
-                hmdInfo->DistortionK[2]        = 0.115f;
-
-                if (HResolution == 1920)
-                    hmdInfo->EyeToScreenDistance = 0.040f;
-                else
-                    hmdInfo->EyeToScreenDistance = 0.0387f;
-            }
-        }
-
-        hmdInfo->ChromaAbCorrection[0] = 0.996f;
-        hmdInfo->ChromaAbCorrection[1] = -0.004f;
-        hmdInfo->ChromaAbCorrection[2] = 1.014f;
-        hmdInfo->ChromaAbCorrection[3] = 0.0f;
-
-        OVR_strcpy(hmdInfo->DisplayDeviceName, sizeof(hmdInfo->DisplayDeviceName),
-                   DisplayDeviceName.ToCStr());
-        hmdInfo->DisplayId = DisplayId;
-    }
-
-    return true;
-}
-
-//-------------------------------------------------------------------------------------
-// ***** HMDDevice
-
-HMDDevice::HMDDevice(HMDDeviceCreateDesc* createDesc)
-    : OVR::DeviceImpl<OVR::HMDDevice>(createDesc, 0)
-{
-}
-HMDDevice::~HMDDevice()
-{
-}
-
-bool HMDDevice::Initialize(DeviceBase* parent)
-{
-    pParent = parent;
-
-    // Initialize user profile to default for device.
-    ProfileManager* profileManager = GetManager()->GetProfileManager();    
-    ProfileName = profileManager->GetDefaultProfileName(getDesc()->GetProfileType());
-
-    return true;
-}
-void HMDDevice::Shutdown()
-{
-    ProfileName.Clear();
-    pCachedProfile.Clear();
-    pParent.Clear();
-}
-
-Profile* HMDDevice::GetProfile() const
-{    
-    if (!pCachedProfile)
-        pCachedProfile = *getDesc()->GetProfileAddRef();
-    return pCachedProfile.GetPtr();
-}
-
-const char* HMDDevice::GetProfileName() const
-{
-    return ProfileName.ToCStr();
-}
-
-bool HMDDevice::SetProfileName(const char* name)
-{
-    pCachedProfile.Clear();
-    if (!name)
-    {
-        ProfileName.Clear();
-        return 0;
-    }
-    if (GetManager()->GetProfileManager()->HasProfile(getDesc()->GetProfileType(), name))
-    {
-        ProfileName = name;
-        return true;
-    }
-    return false;
-}
-
-OVR::SensorDevice* HMDDevice::GetSensor()
-{
-    // Just return first sensor found since we have no way to match it yet.
-    OVR::SensorDevice* sensor = GetManager()->EnumerateDevices<SensorDevice>().CreateDevice();
-    if (sensor)
-        sensor->SetCoordinateFrame(SensorDevice::Coord_HMD);
-    return sensor;
-}
-
+#include "OVR_Common_HMDDevice.cpp"
 
 }} // namespace OVR::OSX
 

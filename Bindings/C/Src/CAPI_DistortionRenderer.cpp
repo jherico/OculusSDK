@@ -26,18 +26,22 @@ limitations under the License.
 
 #include "CAPI_DistortionRenderer.h"
 
+#if defined (OVR_OS_WIN32)
+
 // TBD: Move to separate config file that handles back-ends.
-//#define OVR_D3D_VERSION 11
-//#include "D3D1X/CAPI_D3D1X_DistortionRenderer.h"
-//#undef OVR_D3D_VERSION
-//
-//#define OVR_D3D_VERSION 10
-//#include "D3D1X/CAPI_D3D1X_DistortionRenderer.h"
-//#undef OVR_D3D_VERSION
-//
-//#define OVR_D3D_VERSION 9
-//#include "D3D1X/CAPI_D3D9_DistortionRenderer.h"
-//#undef OVR_D3D_VERSION
+#define OVR_D3D_VERSION 11
+#include "D3D1X/CAPI_D3D1X_DistortionRenderer.h"
+#undef OVR_D3D_VERSION
+
+#define OVR_D3D_VERSION 10
+#include "D3D1X/CAPI_D3D1X_DistortionRenderer.h"
+#undef OVR_D3D_VERSION
+
+#define OVR_D3D_VERSION 9
+#include "D3D1X/CAPI_D3D9_DistortionRenderer.h"
+#undef OVR_D3D_VERSION
+
+#endif
 
 #include "GL/CAPI_GL_DistortionRenderer.h"
 
@@ -53,9 +57,15 @@ DistortionRenderer::CreateFunc DistortionRenderer::APICreateRegistry[ovrRenderAP
     0, // None
     &GL::DistortionRenderer::Create,
     0, // Android_GLES
+#if defined (OVR_OS_WIN32)
+    &D3D9::DistortionRenderer::Create,
+    &D3D10::DistortionRenderer::Create,
+    &D3D11::DistortionRenderer::Create
+#else
     0,
     0,
     0
+#endif
 };
 
 

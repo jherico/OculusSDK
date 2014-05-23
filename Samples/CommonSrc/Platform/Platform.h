@@ -139,7 +139,7 @@ public:
     virtual void    GetWindowSize(int* w, int* h) const = 0;
 
     virtual void    SetWindowTitle(const char*title) = 0;
-    virtual void    PlayMusicFile(const char *fileName) { OVR_UNUSED(fileName); }
+	virtual void	PlayMusicFile(const char *fileName) { OVR_UNUSED(fileName); }
     virtual int     GetDisplayCount() { return 0; }
     virtual Render::DisplayId GetDisplay(int screen);
     

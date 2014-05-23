@@ -77,9 +77,9 @@ struct SensorConfigImpl
     // Flag values for Flags.
     enum {
         Flag_RawMode            = 0x01,
-        Flag_CalibrationTest    = 0x02, // Internal test mode
-        Flag_UseCalibration        = 0x04,
-        Flag_AutoCalibration    = 0x08,
+        Flag_CalibrationTest	= 0x02, // Internal test mode
+        Flag_UseCalibration		= 0x04,
+        Flag_AutoCalibration	= 0x08,
         Flag_MotionKeepAlive    = 0x10,
         Flag_CommandKeepAlive   = 0x20,
         Flag_SensorCoordinates  = 0x40
@@ -87,8 +87,8 @@ struct SensorConfigImpl
 
     UInt16  CommandId;
     UByte   Flags;
-    UInt16  PacketInterval;
-    UInt16  KeepAliveIntervalMs;
+    UInt16  PacketInterval;		// LDC - This should be a UByte. Fix when you have time to test it.
+    UInt16  SampleRate;
 
     SensorConfigImpl();
 

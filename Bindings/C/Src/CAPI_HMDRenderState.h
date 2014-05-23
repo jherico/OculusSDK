@@ -27,9 +27,9 @@ limitations under the License.
 #ifndef OVR_CAPI_HMDRenderState_h
 #define OVR_CAPI_HMDRenderState_h
 
-#include "OVR_CAPI.h"
-#include <Kernel/OVR_Math.h>
-#include <Util/Util_Render_Stereo.h>
+#include "../OVR_CAPI.h"
+#include "../Kernel/OVR_Math.h"
+#include "../Util/Util_Render_Stereo.h"
 
 
 namespace OVR { namespace CAPI {
@@ -57,10 +57,10 @@ public:
     ovrHmdDesc GetDesc();
     ovrSizei   GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel);
 
-    ovrEyeRenderDesc calcRenderDesc(const ovrEyeDesc& eyeDesc);
+    ovrEyeRenderDesc calcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov);
 
     void       setupRenderDesc(ovrEyeRenderDesc eyeRenderDescOut[2],
-                               const ovrEyeDesc eyeDescIn[2]);
+                               const ovrFovPort eyeFovIn[2]);
 public:
     
     // HMDInfo shouldn't change, as its string pointers are passed out.    
@@ -71,7 +71,7 @@ public:
 
     HmdRenderInfo            RenderInfo;    
     DistortionRenderDesc     Distortion[2];
-    ovrEyeRenderDesc         EyeRenderDesc[2];
+    ovrEyeRenderDesc         EyeRenderDesc[2]; 
 
     // Clear color used for distortion
     float                    ClearColor[4];
@@ -80,7 +80,7 @@ public:
     ovrPosef                 EyeRenderPoses[2];
 
     // Capabilities passed to Configure.
-    unsigned                 HMDCaps;
+    unsigned                 EnabledHmdCaps;
     unsigned                 DistortionCaps;
 };
 

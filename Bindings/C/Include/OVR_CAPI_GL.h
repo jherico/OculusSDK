@@ -17,15 +17,37 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_CAPI.h"
 
-#ifndef GL_TRUE
-#error "You must include an OpenGL header before including OVR_CAPI_GL.h"
+//-----------------------------------------------------------------------------------
+// ***** GL Specific
+
+#if defined(OVR_OS_WIN32)
+    #include <Windows.h>
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/wglext.h>
+#elif defined(OVR_OS_MAC)
+    #include <OpenGL/gl3.h>
+    #include <OpenGL/gl3ext.h>
+    #include <OpenGL/OpenGL.h>
+#else
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/glx.h>
 #endif
+
 
 // Used to configure slave GL rendering (i.e. for devices created externally).
 typedef struct ovrGLConfigData_s
 {
     // General device settings.
     ovrRenderAPIConfigHeader Header;
+
+#if defined(OVR_OS_WIN32)
+    HWND   Window;
+#elif defined(OVR_OS_LINUX)
+    Display* Disp;
+    Window  Win;
+#endif
 } ovrGLConfigData;
 
 union ovrGLConfig
@@ -45,7 +67,7 @@ typedef struct ovrGLTextureData_s
 typedef union ovrGLTexture_s
 {
     ovrTexture          Texture;
-    ovrGLTextureData    OGL;
+    ovrGLTextureData	OGL;
 } ovrGLTexture;
 
-#endif    // OVR_CAPI_GL_h
+#endif	// OVR_CAPI_GL_h

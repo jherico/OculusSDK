@@ -70,24 +70,24 @@ enum TrackerMessageType
 
 struct TrackerSensors
 {
-    UByte    SampleCount;
-    UInt16    Timestamp;
-    UInt16    LastCommandID;
-    SInt16    Temperature;
+    UByte	SampleCount;
+    UInt16	Timestamp;
+    UInt16	LastCommandID;
+    SInt16	Temperature;
 
     TrackerSample Samples[3];
 
-    SInt16    MagX, MagY, MagZ;
+    SInt16	MagX, MagY, MagZ;
 
     TrackerMessageType Decode(const UByte* buffer, int size)
     {
         if (size < 62)
             return TrackerMessage_SizeError;
 
-        SampleCount        = buffer[1];
-        Timestamp        = DecodeUInt16(buffer + 2);
-        LastCommandID    = DecodeUInt16(buffer + 4);
-        Temperature        = DecodeSInt16(buffer + 6);
+        SampleCount		= buffer[1];
+        Timestamp		= DecodeUInt16(buffer + 2);
+        LastCommandID	= DecodeUInt16(buffer + 4);
+        Temperature		= DecodeSInt16(buffer + 6);
         
         //if (SampleCount > 2)        
         //    OVR_DEBUG_LOG_TEXT(("TackerSensor::Decode SampleCount=%d\n", SampleCount));        
@@ -166,7 +166,11 @@ void SensorDisplayInfoImpl::Unpack()
 //-------------------------------------------------------------------------------------
 // ***** SensorDeviceFactory
 
-SensorDeviceFactory SensorDeviceFactory::Instance;
+SensorDeviceFactory &SensorDeviceFactory::GetInstance()
+{
+		static SensorDeviceFactory instance;
+		return instance;
+}
 
 void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 {
@@ -232,9 +236,9 @@ void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
 bool SensorDeviceFactory::MatchVendorProduct(UInt16 vendorId, UInt16 productId) const
 {
-    return     ((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker_ProductId)) ||
-            ((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker2_ProductId)) ||
-            ((vendorId == Sensor_VendorId) && (productId == Sensor_KTracker_ProductId));
+    return 	((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker_ProductId)) ||
+    		((vendorId == Sensor_VendorId) && (productId == Sensor_Tracker2_ProductId)) ||
+    		((vendorId == Sensor_VendorId) && (productId == Sensor_KTracker_ProductId));
 }
 
 bool SensorDeviceFactory::DetectHIDDevice(DeviceManager* pdevMgr, const HIDDeviceDesc& desc)
@@ -407,7 +411,7 @@ void SensorDeviceImpl::Shutdown()
 void SensorDeviceImpl::OnInputReport(UByte* pData, UInt32 length)
 {
 
-    bool processed = false;
+	bool processed = false;
     if (!processed)
     {
         TrackerMessage message;
@@ -431,7 +435,7 @@ double SensorDeviceImpl::OnTicks(double tickSeconds)
         // OnTicks is called from background thread so we don't need to add this to the command queue.
         GetInternalDevice()->SetFeatureReport(skeepAlive.Buffer, SensorKeepAliveImpl::PacketSize);
 
-        // Emit keep-alive every few seconds.
+		// Emit keep-alive every few seconds.
         NextKeepAliveTickSeconds = tickSeconds + keepAliveDelta;
     }
     return NextKeepAliveTickSeconds - tickSeconds;
@@ -572,6 +576,11 @@ void SensorDeviceImpl::GetFactoryCalibration(Vector3f* AccelOffset, Vector3f* Gy
     *Temperature = CalibrationTemperature;
 }
 
+bool SensorDeviceImpl::IsMagCalibrated()
+{
+    return magCalibrated;
+}
+
 void SensorDeviceImpl::SetOnboardCalibrationEnabled(bool enabled)
 {
     // Push call with wait.
@@ -700,9 +709,9 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
 
         if (s.Timestamp < LastTimestamp)
         {
-            // The timestamp rolled around the 16 bit counter, so FullTimeStamp
-            // needs a high word increment.
-            FullTimestamp += 0x10000;
+        	// The timestamp rolled around the 16 bit counter, so FullTimeStamp
+        	// needs a high word increment.
+        	FullTimestamp += 0x10000;
             timestampDelta = ((((int)s.Timestamp) + 0x10000) - (int)LastTimestamp);
         }
         else
@@ -731,7 +740,6 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
                 sensors.RotationRate        = LastRotationRate;
                 sensors.MagneticField       = LastMagneticField;
                 sensors.Temperature         = LastTemperature;
-                sensors.MagCalibrated       = magCalibrated;
 
                 HandlerRef.Call(sensors);
             }
@@ -759,7 +767,7 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
     LastTimestamp   = s.Timestamp;
 
     bool convertHMDToSensor = (Coordinates == Coord_Sensor) && (HWCoordinates == Coord_HMD);
-    
+	
 #ifdef OVR_OS_ANDROID
     // LDC - Normally we get the coordinate system from the tracker.
     // Since KTracker doesn't store it we'll always assume HMD coordinate system.
@@ -769,7 +777,6 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
     if (HandlerRef.HasHandlers())
     {
         MessageBodyFrame sensors(this);
-        sensors.MagCalibrated = magCalibrated;
         UByte            iterations = s.SampleCount;
 
         if (s.SampleCount > 3)
@@ -823,21 +830,21 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
 void SensorDeviceImpl::replaceWithPhoneMag(Vector3f* val)
 {
 
-    // Native calibrated.
-    pPhoneSensors->SetMagSource(PhoneSensors::MagnetometerSource_Native);
+	// Native calibrated.
+	pPhoneSensors->SetMagSource(PhoneSensors::MagnetometerSource_Native);
 
-    Vector3f magPhone;
-    pPhoneSensors->GetLatestMagValue(&magPhone);
+	Vector3f magPhone;
+	pPhoneSensors->GetLatestMagValue(&magPhone);
 
-    // Phone value is in micro-Tesla. Convert it to Gauss and flip axes.
-    magPhone *= 10000.0f/1000000.0f;
+	// Phone value is in micro-Tesla. Convert it to Gauss and flip axes.
+	magPhone *= 10000.0f/1000000.0f;
 
-    Vector3f res;
-    res.x = -magPhone.y;
-    res.y = magPhone.x;
-    res.z = magPhone.z;
+	Vector3f res;
+	res.x = -magPhone.y;
+	res.y = magPhone.x;
+	res.z = magPhone.z;
 
-    *val = res;
+	*val = res;
 }
 #endif 
 
@@ -1058,7 +1065,7 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
                                 time(&now);
 
                                 // parse the calibration time
-                                time_t calibration_time = now;
+                                //time_t calibration_time = now;
                                 JSON* caltime = calibration->GetItemByName("Time");
                                 if (caltime)
                                 {
@@ -1083,7 +1090,7 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
 #endif
                                     ct.tm_year -= 1900;
                                     ct.tm_mon--;
-                                    calibration_time = mktime(&ct);
+                                    //calibration_time = mktime(&ct);
                                 }
                                                         
                                 // parse the calibration matrix
@@ -1111,6 +1118,48 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
     return true;
 }
 
+
+bool SensorDeviceImpl::SetSerialReport(const SerialReport& data)
+{ 
+	bool result;
+	if (!GetManagerImpl()->GetThreadQueue()->
+            PushCallAndWaitResult(this, &Sensor2DeviceImpl::setSerialReport, &result, data))
+	{
+		return false;
+	}
+
+	return result;
+}
+
+bool SensorDeviceImpl::setSerialReport(const SerialReport& data)
+{
+    SerialImpl di(data);
+    return GetInternalDevice()->SetFeatureReport(di.Buffer, SerialImpl::PacketSize);
+}
+
+bool SensorDeviceImpl::GetSerialReport(SerialReport* data)
+{
+	bool result;
+	if (!GetManagerImpl()->GetThreadQueue()->
+            PushCallAndWaitResult(this, &Sensor2DeviceImpl::getSerialReport, &result, data))
+	{
+		return false;
+	}
+
+	return result;
+}
+
+bool SensorDeviceImpl::getSerialReport(SerialReport* data)
+{
+    SerialImpl di;
+    if (GetInternalDevice()->GetFeatureReport(di.Buffer, SerialImpl::PacketSize))
+    {
+        di.Unpack();
+        *data = di.Settings;
+        return true;
+    }
+
+    return false;
+}
+
 } // namespace OVR
-
-

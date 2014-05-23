@@ -43,21 +43,21 @@ struct TrackingImpl
     
     TrackingReport  Settings;
 
-    TrackingImpl()
-    {
-        for (int i=0; i<PacketSize; i++)
-        {
-            Buffer[i] = 0;
-        }
+	TrackingImpl()
+	{
+		for (int i=0; i<PacketSize; i++)
+		{
+			Buffer[i] = 0;
+		}
 
-        Buffer[0] = 12;
-    }
+		Buffer[0] = 12;
+	}
 
     TrackingImpl(const TrackingReport& settings)
-        :    Settings(settings)
+		:	Settings(settings)
     {
-        Pack();
-    }
+		Pack();
+	}
 
     void  Pack()
     {
@@ -103,21 +103,21 @@ struct DisplayImpl
     
     DisplayReport Settings;
 
-    DisplayImpl()
-    {
-        for (int i=0; i<PacketSize; i++)
-        {
-            Buffer[i] = 0;
-        }
+	DisplayImpl()
+	{
+		for (int i=0; i<PacketSize; i++)
+		{
+			Buffer[i] = 0;
+		}
 
-        Buffer[0] = 13;
-    }
+		Buffer[0] = 13;
+	}
 
     DisplayImpl(const DisplayReport& settings)
-        :    Settings(settings)
+		:	Settings(settings)
     {
-        Pack();
-    }
+		Pack();
+	}
 
     void  Pack()
     {
@@ -174,7 +174,7 @@ struct MagCalibrationImpl
     }
 
     MagCalibrationImpl(const MagCalibrationReport& settings)
-        :    Settings(settings)
+        :	Settings(settings)
     {
         Pack();
     }
@@ -213,128 +213,128 @@ struct MagCalibrationImpl
 
 struct PositionCalibrationImpl
 {
-    enum  { PacketSize = 30 };
-    UByte   Buffer[PacketSize];
+	enum  { PacketSize = 30 };
+	UByte   Buffer[PacketSize];
 
-    PositionCalibrationReport Settings;
+	PositionCalibrationReport Settings;
 
-    PositionCalibrationImpl()
-    {
-        for (int i=0; i<PacketSize; i++)
-        {
-            Buffer[i] = 0;
-        }
+	PositionCalibrationImpl()
+	{
+		for (int i=0; i<PacketSize; i++)
+		{
+			Buffer[i] = 0;
+		}
 
-        Buffer[0] = 15;
-    }
+		Buffer[0] = 15;
+	}
 
-    PositionCalibrationImpl(const PositionCalibrationReport& settings)
-        :    Settings(settings)
-    {
-        Pack();
-    }
+	PositionCalibrationImpl(const PositionCalibrationReport& settings)
+		:	Settings(settings)
+	{
+		Pack();
+	}
 
-    void  Pack()
-    {
+	void  Pack()
+	{
 
-        Buffer[0] = 15;
-        EncodeUInt16(Buffer+1, Settings.CommandId);
-        Buffer[3] = Settings.Version;
+		Buffer[0] = 15;
+		EncodeUInt16(Buffer+1, Settings.CommandId);
+		Buffer[3] = Settings.Version;
 
         Vector3d position = Settings.Position * 1e6;
-        EncodeSInt32(Buffer+4,  (SInt32) position.x);
-        EncodeSInt32(Buffer+8,  (SInt32) position.y);
-        EncodeSInt32(Buffer+12, (SInt32) position.z);
+		EncodeSInt32(Buffer+4,  (SInt32) position.x);
+		EncodeSInt32(Buffer+8,  (SInt32) position.y);
+		EncodeSInt32(Buffer+12, (SInt32) position.z);
 
         Vector3d normal = Settings.Normal * 1e6;
         EncodeSInt16(Buffer+16, (SInt16) normal.x);
-        EncodeSInt16(Buffer+18, (SInt16) normal.y);
-        EncodeSInt16(Buffer+20, (SInt16) normal.z);
+		EncodeSInt16(Buffer+18, (SInt16) normal.y);
+		EncodeSInt16(Buffer+20, (SInt16) normal.z);
 
-        double rotation = Settings.Rotation * 1e4;
-        EncodeSInt16(Buffer+22, (SInt16) rotation);
+        double rotation = Settings.Angle * 1e4;
+		EncodeSInt16(Buffer+22, (SInt16) rotation);
 
-        EncodeUInt16(Buffer+24, Settings.PositionIndex);
-        EncodeUInt16(Buffer+26, Settings.NumPositions);
-        EncodeUInt16(Buffer+28, UInt16(Settings.PositionType));
-    }
+		EncodeUInt16(Buffer+24, Settings.PositionIndex);
+		EncodeUInt16(Buffer+26, Settings.NumPositions);
+		EncodeUInt16(Buffer+28, UInt16(Settings.PositionType));
+	}
 
-    void Unpack()
-    {
-        Settings.CommandId = DecodeUInt16(Buffer+1);
-        Settings.Version = Buffer[3];
+	void Unpack()
+	{
+		Settings.CommandId = DecodeUInt16(Buffer+1);
+		Settings.Version = Buffer[3];
 
-        Settings.Position.x = DecodeSInt32(Buffer + 4) * 1e-6;
-        Settings.Position.y = DecodeSInt32(Buffer + 8) * 1e-6;
-        Settings.Position.z = DecodeSInt32(Buffer + 12) * 1e-6;
+		Settings.Position.x = DecodeSInt32(Buffer + 4) * 1e-6;
+		Settings.Position.y = DecodeSInt32(Buffer + 8) * 1e-6;
+		Settings.Position.z = DecodeSInt32(Buffer + 12) * 1e-6;
 
-        Settings.Normal.x = DecodeSInt16(Buffer + 16) * 1e-6;
-        Settings.Normal.y = DecodeSInt16(Buffer + 18) * 1e-6;
-        Settings.Normal.z = DecodeSInt16(Buffer + 20) * 1e-6;
+		Settings.Normal.x = DecodeSInt16(Buffer + 16) * 1e-6;
+		Settings.Normal.y = DecodeSInt16(Buffer + 18) * 1e-6;
+		Settings.Normal.z = DecodeSInt16(Buffer + 20) * 1e-6;
 
-        Settings.Rotation = DecodeSInt16(Buffer + 22) * 1e-4;
+		Settings.Angle = DecodeSInt16(Buffer + 22) * 1e-4;
 
-        Settings.PositionIndex = DecodeUInt16(Buffer + 24);
-        Settings.NumPositions  = DecodeUInt16(Buffer + 26);
+		Settings.PositionIndex = DecodeUInt16(Buffer + 24);
+		Settings.NumPositions  = DecodeUInt16(Buffer + 26);
 
-        Settings.PositionType  = PositionCalibrationReport::PositionTypeEnum(DecodeUInt16(Buffer + 28));
-    }
+		Settings.PositionType  = PositionCalibrationReport::PositionTypeEnum(DecodeUInt16(Buffer + 28));
+	}
 };
 
 struct PositionCalibrationImpl_Pre5
 {
-    enum  { PacketSize = 22 };
-    UByte   Buffer[PacketSize];
+	enum  { PacketSize = 22 };
+	UByte   Buffer[PacketSize];
 
-    PositionCalibrationReport Settings;
+	PositionCalibrationReport Settings;
 
-    PositionCalibrationImpl_Pre5()
-    {
-        for (int i=0; i<PacketSize; i++)
-        {
-            Buffer[i] = 0;
-        }
+	PositionCalibrationImpl_Pre5()
+	{
+		for (int i=0; i<PacketSize; i++)
+		{
+			Buffer[i] = 0;
+		}
 
-        Buffer[0] = 15;
-    }
+		Buffer[0] = 15;
+	}
 
-    PositionCalibrationImpl_Pre5(const PositionCalibrationReport& settings)
-        :    Settings(settings)
-    {
-        Pack();
-    }
+	PositionCalibrationImpl_Pre5(const PositionCalibrationReport& settings)
+		:	Settings(settings)
+	{
+		Pack();
+	}
 
-    void  Pack()
-    {
+	void  Pack()
+	{
 
-        Buffer[0] = 15;
-        EncodeUInt16(Buffer+1, Settings.CommandId);
-        Buffer[3] = Settings.Version;
+		Buffer[0] = 15;
+		EncodeUInt16(Buffer+1, Settings.CommandId);
+		Buffer[3] = Settings.Version;
 
         Vector3d position = Settings.Position * 1e6;
         EncodeSInt32(Buffer+4 , (SInt32) position.x);
         EncodeSInt32(Buffer+8 , (SInt32) position.y);
         EncodeSInt32(Buffer+12, (SInt32) position.z);
 
-        EncodeUInt16(Buffer+16, Settings.PositionIndex);
-        EncodeUInt16(Buffer+18, Settings.NumPositions);
-        EncodeUInt16(Buffer+20, UInt16(Settings.PositionType));
-    }
+		EncodeUInt16(Buffer+16, Settings.PositionIndex);
+		EncodeUInt16(Buffer+18, Settings.NumPositions);
+		EncodeUInt16(Buffer+20, UInt16(Settings.PositionType));
+	}
 
-    void Unpack()
-    {
+	void Unpack()
+	{
 
-        Settings.CommandId = DecodeUInt16(Buffer+1);
-        Settings.Version = Buffer[3];
+		Settings.CommandId = DecodeUInt16(Buffer+1);
+		Settings.Version = Buffer[3];
 
-        Settings.Position.x = DecodeSInt32(Buffer + 4) * 1e-6;
-        Settings.Position.y = DecodeSInt32(Buffer + 8) * 1e-6;
-        Settings.Position.z = DecodeSInt32(Buffer + 12) * 1e-6;
+		Settings.Position.x = DecodeSInt32(Buffer + 4) * 1e-6;
+		Settings.Position.y = DecodeSInt32(Buffer + 8) * 1e-6;
+		Settings.Position.z = DecodeSInt32(Buffer + 12) * 1e-6;
 
-        Settings.PositionIndex = DecodeUInt16(Buffer + 16);
-        Settings.NumPositions  = DecodeUInt16(Buffer + 18);
-        Settings.PositionType  = PositionCalibrationReport::PositionTypeEnum(DecodeUInt16(Buffer + 20));
-    }
+		Settings.PositionIndex = DecodeUInt16(Buffer + 16);
+		Settings.NumPositions  = DecodeUInt16(Buffer + 18);
+		Settings.PositionType  = PositionCalibrationReport::PositionTypeEnum(DecodeUInt16(Buffer + 20));
+	}
 };
 
 // CustomPattern feature report.
@@ -345,21 +345,21 @@ struct CustomPatternImpl
     
     CustomPatternReport Settings;
 
-    CustomPatternImpl()
-    {
-        for (int i=0; i<PacketSize; i++)
-        {
-            Buffer[i] = 0;
-        }
+	CustomPatternImpl()
+	{
+		for (int i=0; i<PacketSize; i++)
+		{
+			Buffer[i] = 0;
+		}
 
-        Buffer[0] = 16;
-    }
+		Buffer[0] = 16;
+	}
 
     CustomPatternImpl(const CustomPatternReport& settings)
-        :    Settings(settings)
+		:	Settings(settings)
     {
-        Pack();
-    }
+		Pack();
+	}
 
     void  Pack()
     {
@@ -390,11 +390,11 @@ struct ManufacturingImpl
 
     ManufacturingReport Settings;
 
-    ManufacturingImpl()
-    {
-        memset(Buffer, 0, sizeof(Buffer));
-        Buffer[0] = 18;
-    }
+	ManufacturingImpl()
+	{
+		memset(Buffer, 0, sizeof(Buffer));
+		Buffer[0] = 18;
+	}
 
     ManufacturingImpl(const ManufacturingReport& settings)
         :   Settings(settings)
@@ -434,11 +434,11 @@ struct UUIDImpl
 
     UUIDReport Settings;
 
-    UUIDImpl()
-    {
-        memset(Buffer, 0, sizeof(Buffer));
-        Buffer[0] = 19;
-    }
+	UUIDImpl()
+	{
+		memset(Buffer, 0, sizeof(Buffer));
+		Buffer[0] = 19;
+	}
 
     UUIDImpl(const UUIDReport& settings)
         :   Settings(settings)
@@ -450,15 +450,15 @@ struct UUIDImpl
     {
         Buffer[0] = 19;
         EncodeUInt16(Buffer+1, Settings.CommandId);
-        for (int i = 0; i < 20; ++i)
-            Buffer[3 + i] = Settings.UUIDValue[i];
+		for (int i = 0; i < 20; ++i)
+			Buffer[3 + i] = Settings.UUIDValue[i];
     }
 
     void Unpack()
     {
         Settings.CommandId = DecodeUInt16(Buffer+1);
-        for (int i = 0; i < 20; ++i)
-            Settings.UUIDValue[i] = Buffer[3 + i];
+		for (int i = 0; i < 20; ++i)
+			Settings.UUIDValue[i] = Buffer[3 + i];
     }
 };
 
@@ -470,11 +470,11 @@ struct LensDistortionImpl
 
     LensDistortionReport Settings;
 
-    LensDistortionImpl()
-    {
-        memset(Buffer, 0, sizeof(Buffer));
-        Buffer[0] = 22;
-    }
+	LensDistortionImpl()
+	{
+		memset(Buffer, 0, sizeof(Buffer));
+		Buffer[0] = 22;
+	}
 
     LensDistortionImpl(const LensDistortionReport& settings)
         :   Settings(settings)
@@ -486,43 +486,43 @@ struct LensDistortionImpl
     {
         Buffer[0] = 19;
         EncodeUInt16(Buffer+1, Settings.CommandId);
-        
-        Buffer[3] = Settings.NumDistortions;
-        Buffer[4] = Settings.DistortionIndex;
-        Buffer[5] = Settings.Bitmask;
-        EncodeUInt16(Buffer+6, Settings.LensType);
-        EncodeUInt16(Buffer+8, Settings.Version);
-        EncodeUInt16(Buffer+10, Settings.EyeRelief);
+		
+		Buffer[3] = Settings.NumDistortions;
+		Buffer[4] = Settings.DistortionIndex;
+		Buffer[5] = Settings.Bitmask;
+		EncodeUInt16(Buffer+6, Settings.LensType);
+		EncodeUInt16(Buffer+8, Settings.Version);
+		EncodeUInt16(Buffer+10, Settings.EyeRelief);
 
-        for (int i = 0; i < 11; ++i)
-            EncodeUInt16(Buffer+12+2*i, Settings.KCoefficients[i]);
+		for (int i = 0; i < 11; ++i)
+			EncodeUInt16(Buffer+12+2*i, Settings.KCoefficients[i]);
 
-        EncodeUInt16(Buffer+34, Settings.MaxR);
-        EncodeUInt16(Buffer+36, Settings.MetersPerTanAngleAtCenter);
-                
-        for (int i = 0; i < 4; ++i)
-            EncodeUInt16(Buffer+38+2*i, Settings.ChromaticAberration[i]);
+		EncodeUInt16(Buffer+34, Settings.MaxR);
+		EncodeUInt16(Buffer+36, Settings.MetersPerTanAngleAtCenter);
+				
+		for (int i = 0; i < 4; ++i)
+			EncodeUInt16(Buffer+38+2*i, Settings.ChromaticAberration[i]);
     }
 
     void Unpack()
     {
         Settings.CommandId = DecodeUInt16(Buffer+1);
-        
-        Settings.NumDistortions = Buffer[3];
-        Settings.DistortionIndex = Buffer[4];
-        Settings.Bitmask = Buffer[5];
-        Settings.LensType = DecodeUInt16(Buffer+6);
-        Settings.Version = DecodeUInt16(Buffer+8);
-        Settings.EyeRelief = DecodeUInt16(Buffer+10);
+		
+		Settings.NumDistortions = Buffer[3];
+		Settings.DistortionIndex = Buffer[4];
+		Settings.Bitmask = Buffer[5];
+		Settings.LensType = DecodeUInt16(Buffer+6);
+		Settings.Version = DecodeUInt16(Buffer+8);
+		Settings.EyeRelief = DecodeUInt16(Buffer+10);
 
-        for (int i = 0; i < 11; ++i)
-            Settings.KCoefficients[i] = DecodeUInt16(Buffer+12+2*i);
+		for (int i = 0; i < 11; ++i)
+			Settings.KCoefficients[i] = DecodeUInt16(Buffer+12+2*i);
 
-        Settings.MaxR = DecodeUInt16(Buffer+34);
-        Settings.MetersPerTanAngleAtCenter = DecodeUInt16(Buffer+36);
-                
-        for (int i = 0; i < 4; ++i)
-            Settings.ChromaticAberration[i] = DecodeUInt16(Buffer+38+2*i);
+		Settings.MaxR = DecodeUInt16(Buffer+34);
+		Settings.MetersPerTanAngleAtCenter = DecodeUInt16(Buffer+36);
+				
+		for (int i = 0; i < 4; ++i)
+			Settings.ChromaticAberration[i] = DecodeUInt16(Buffer+38+2*i);
     }
 };
 
@@ -534,11 +534,11 @@ struct KeepAliveMuxImpl
 
     KeepAliveMuxReport Settings;
 
-    KeepAliveMuxImpl()
-    {
-        memset(Buffer, 0, sizeof(Buffer));
-        Buffer[0] = 17;
-    }
+	KeepAliveMuxImpl()
+	{
+		memset(Buffer, 0, sizeof(Buffer));
+		Buffer[0] = 17;
+	}
 
     KeepAliveMuxImpl(const KeepAliveMuxReport& settings)
         :   Settings(settings)
@@ -570,17 +570,17 @@ struct TemperatureImpl
     
     TemperatureReport Settings;
 
-    TemperatureImpl()
-    {
-        memset(Buffer, 0, sizeof(Buffer));
-        Buffer[0] = 20;
-    }
+	TemperatureImpl()
+	{
+		memset(Buffer, 0, sizeof(Buffer));
+		Buffer[0] = 20;
+	}
 
     TemperatureImpl(const TemperatureReport& settings)
-        :    Settings(settings)
+		:	Settings(settings)
     {
-        Pack();
-    }
+		Pack();
+	}
 
     void  Pack()
     {
@@ -639,10 +639,10 @@ struct GyroOffsetImpl
     }
 
    GyroOffsetImpl(const GyroOffsetReport& settings)
-        :    Settings(settings)
+		:	Settings(settings)
     {
-        Pack();
-    }
+		Pack();
+	}
 
     void  Pack()
     {
@@ -652,8 +652,8 @@ struct GyroOffsetImpl
         Buffer[2] = UByte(Settings.CommandId >> 8);
         Buffer[3] = UByte(Settings.Version);
 
-        Vector3d offset = Settings.Offset * 1e4;
-        PackSensor(Buffer + 4, (SInt32) offset.x, (SInt32) offset.y, (SInt32) offset.z);
+		Vector3d offset = Settings.Offset * 1e4;
+		PackSensor(Buffer + 4, (SInt32) offset.x, (SInt32) offset.y, (SInt32) offset.z);
 
         EncodeSInt16(Buffer + 16, SInt16(Settings.Temperature * 1e2));
     }

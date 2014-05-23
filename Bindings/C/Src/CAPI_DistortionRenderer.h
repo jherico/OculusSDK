@@ -60,7 +60,7 @@ public:
     // Under D3D, apiConfig includes D3D Device pointer, back buffer and other
     // needed structures.
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
-                            unsigned hmdCaps, unsigned distortionCaps) = 0;
+                            unsigned distortionCaps) = 0;
 
     // Submits one eye texture for rendering. This is in the separate method to
     // allow "submit as you render" scenarios on horizontal screens where one
@@ -72,7 +72,11 @@ public:
     virtual void EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor,
                                             unsigned char* latencyTester2DrawColor) = 0;
     
+	// Stores the current graphics pipeline state so it can be restored later.
+	void SaveGraphicsState() { if (!(RState.EnabledHmdCaps & ovrHmdCap_NoRestore)) GfxState->Save(); }
 
+	// Restores the saved graphics pipeline state.
+	void RestoreGraphicsState() { if (!(RState.EnabledHmdCaps & ovrHmdCap_NoRestore)) GfxState->Restore(); }
 
     // *** Creation Factory logic
     
@@ -86,10 +90,24 @@ public:
     static CreateFunc APICreateRegistry[ovrRenderAPI_Count];
 
 protected:
+    
+    class GraphicsState : public RefCountBase<GraphicsState>
+    {
+    public:
+        GraphicsState() : IsValid(false) {}
+        virtual ~GraphicsState() {}
+        virtual void Save() = 0;
+        virtual void Restore() = 0;
+        
+    protected:
+        bool IsValid;
+    };
+    
     const ovrRenderAPIType  RenderAPI;
     const ovrHmd            HMD;
     FrameTimeManager&       TimeManager;
-    const HMDRenderState&   RState;    
+    const HMDRenderState&   RState;
+    Ptr<GraphicsState>      GfxState;
 };
 
 }} // namespace OVR::CAPI

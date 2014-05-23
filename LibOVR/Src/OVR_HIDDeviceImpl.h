@@ -100,7 +100,7 @@ public:
     virtual bool Initialize(DeviceBase* parent)
     {
         // Open HID device.
-        HIDDeviceDesc&        hidDesc = *getHIDDesc();
+        HIDDeviceDesc&		hidDesc = *getHIDDesc();
         HIDDeviceManager*   pManager = GetHIDDeviceManager();
 
 
@@ -141,7 +141,7 @@ public:
         // Push call with wait.
         bool result = false;
 
-        ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
+		ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
         if (!pQueue->PushCallAndWaitResult(this, &HIDDeviceImpl::setFeatureReport, &result, data, length))
             return false;
 
@@ -157,7 +157,7 @@ public:
     { 
         bool result = false;
 
-        ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
+		ThreadCommandQueue* pQueue = this->GetManagerImpl()->GetThreadQueue();
         if (!pQueue->PushCallAndWaitResult(this, &HIDDeviceImpl::getFeatureReport, &result, data, length))
             return false;
 
@@ -169,16 +169,16 @@ public:
         return InternalDevice->GetFeatureReport(data, length);
     }
 
-    UByte GetDeviceInterfaceVersion()
-    {
-        UInt16 versionNumber = getHIDDesc()->VersionNumber;
+	UByte GetDeviceInterfaceVersion()
+	{
+		UInt16 versionNumber = getHIDDesc()->VersionNumber;
 
-        // Our interface and hardware versions are represented as two BCD digits each.
-        // Interface version is in the last two digits.
-        UByte interfaceVersion = (UByte)    ((versionNumber & 0x000F) >> 0) * 1 +
-                                            ((versionNumber & 0x00F0) >> 4) * 10;
-        return interfaceVersion;
-    }
+		// Our interface and hardware versions are represented as two BCD digits each.
+		// Interface version is in the last two digits.
+		UByte interfaceVersion = (UByte)	((versionNumber & 0x000F) >> 0) * 1 +
+											((versionNumber & 0x00F0) >> 4) * 10;
+		return interfaceVersion;
+	}
 
 protected:
     HIDDevice* GetInternalDevice() const

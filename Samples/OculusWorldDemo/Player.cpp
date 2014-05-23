@@ -28,7 +28,7 @@ Player::Player()
     BodyPos(7.7f, 1.76f - 0.15f, -1.0f),
     BodyYaw(YawInitial)
 {
-    MoveForward = MoveBack = MoveLeft = MoveRight = 0;
+	MoveForward = MoveBack = MoveLeft = MoveRight = 0;
     GamepadMove = Vector3f(0);
     GamepadRotate = Vector3f(0);
 }
@@ -39,26 +39,26 @@ Player::~Player()
 
 Vector3f Player::GetPosition()
 {
-    return BodyPos + Quatf(Vector3f(0,1,0), BodyYaw.Get()).Rotate(HeadPose.Position);
+    return BodyPos + Quatf(Vector3f(0,1,0), BodyYaw.Get()).Rotate(HeadPose.Translation);
 }
 
 Quatf Player::GetOrientation(bool baseOnly)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
-    return baseOnly ? baseQ : baseQ * HeadPose.Orientation;
+    return baseOnly ? baseQ : baseQ * HeadPose.Rotation;
 }
 
-Posef Player::VirtualWorldPoseFromRealPose(const Posef &sensorHeadPose)
+Transformf Player::VirtualWorldTransformfromRealPose(const Transformf &sensorHeadPose)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
 
-    return Posef(baseQ * sensorHeadPose.Orientation,
-                 BodyPos + baseQ.Rotate(sensorHeadPose.Position));
+    return Transformf(baseQ * sensorHeadPose.Rotation,
+                 BodyPos + baseQ.Rotate(sensorHeadPose.Translation));
 }
 
 
 void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-                            Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
+	                        Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
 {
     // Handle keyboard movement.
     // This translates BasePos based on the orientation and keys pressed.
@@ -110,9 +110,9 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
     for(unsigned int i = 0; i < collisionModels->GetSize(); ++i)
     {
         // Checks for collisions at model base level, which should prevent us from
-        // slipping under walls
+		// slipping under walls
         if (collisionModels->At(i)->TestRay(BodyPos, orientationVector, checkLengthForward,
-                                            &collisionPlaneForward))
+				                            &collisionPlaneForward))
         {
             gotCollision = true;
             break;
@@ -123,13 +123,13 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
     {
         // Project orientationVector onto the plane
         Vector3f slideVector = orientationVector - collisionPlaneForward.N
-            * (orientationVector.Dot(collisionPlaneForward.N));
+			* (orientationVector.Dot(collisionPlaneForward.N));
 
         // Make sure we aren't in a corner
         for(unsigned int j = 0; j < collisionModels->GetSize(); ++j)
         {
             if (collisionModels->At(j)->TestPoint(BodyPos - Vector3f(0.0f, RailHeight, 0.0f) +
-                                                    (slideVector * (moveLength))) )
+					                                (slideVector * (moveLength))) )
             {
                 moveLength = 0;
                 break;
@@ -187,8 +187,8 @@ bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
     case OVR::Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); return true;
     case OVR::Key_Left:  MoveLeft    = down ? (MoveLeft    | 2) : (MoveLeft    & ~2); return true;
     case OVR::Key_Right: MoveRight   = down ? (MoveRight   | 2) : (MoveRight   & ~2); return true;
+    default: return false;
     }
-    return false;
 }
 
 

@@ -3,7 +3,7 @@
 Filename    :   Render_GL_Device.h
 Content     :   RenderDevice implementation header for OpenGL
 Created     :   September 10, 2012
-Authors     :   Andrew Reisse
+Authors     :   Andrew Reisse, David Borel
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -25,12 +25,91 @@ limitations under the License.
 #define OVR_Render_GL_Device_h
 
 #include "../Render/Render_Device.h"
-#include <GL/glew.h>
+
+#if defined(OVR_OS_WIN32)
+    #include <Windows.h>
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/wglext.h>
+#elif defined(OVR_OS_MAC)
+    #include <OpenGL/gl3.h>
+    #include <OpenGL/gl3ext.h>
+#else
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/glx.h>
+#endif
+
 
 namespace OVR { namespace Render { namespace GL {
+    
+#if !defined(OVR_OS_MAC)
 
 // GL extension Hooks for PC.
+#if defined(OVR_OS_WIN32)
+
+extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
+extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
+extern PFNWGLCHOOSEPIXELFORMATARBPROC           wglChoosePixelFormatARB;
+extern PFNWGLCREATECONTEXTATTRIBSARBPROC        wglCreateContextAttribsARB;
+
+#elif defined(OVR_OS_LINUX)
+
+extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
+
+#endif
+
+extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
+extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
+extern PFNGLDELETESHADERPROC                    glDeleteShader;
+extern PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
+extern PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
+extern PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
+extern PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebuffer;
+extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
+extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
+extern PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
+extern PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
+extern PFNGLBINDBUFFERPROC                      glBindBuffer;
+extern PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
+extern PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
+extern PFNGLBUFFERDATAPROC                      glBufferData;
+extern PFNGLGENBUFFERSPROC                      glGenBuffers;
+extern PFNGLMAPBUFFERPROC                       glMapBuffer;
+extern PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
+extern PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
+extern PFNGLGETSHADERIVPROC                     glGetShaderiv;
+extern PFNGLCOMPILESHADERPROC                   glCompileShader;
+extern PFNGLSHADERSOURCEPROC                    glShaderSource;
+extern PFNGLCREATESHADERPROC                    glCreateShader;
+extern PFNGLCREATEPROGRAMPROC                   glCreateProgram;
+extern PFNGLATTACHSHADERPROC                    glAttachShader;
+extern PFNGLDETACHSHADERPROC                    glDetachShader;
+extern PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
+extern PFNGLUNIFORM1IPROC                       glUniform1i;
+extern PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
+extern PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
+extern PFNGLUSEPROGRAMPROC                      glUseProgram;
+extern PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
+extern PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
+extern PFNGLLINKPROGRAMPROC                     glLinkProgram;
+extern PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
+extern PFNGLUNIFORM4FVPROC                      glUniform4fv;
+extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
+extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
+extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
+extern PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
+extern PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
+extern PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
+extern PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
+extern PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
+extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
+extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
+extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
+
 extern void InitGLExtensions();
+
+#endif
 
 class RenderDevice;
 
@@ -68,7 +147,7 @@ public:
     virtual int GetHeight() const { return Height; }
 
     virtual void SetSampleMode(int);
-    virtual ovrTexture Get_ovrTexture();
+	virtual ovrTexture Get_ovrTexture();
 
     virtual void Set(int slot, ShaderStage stage = Shader_Fragment) const;
 };
@@ -84,7 +163,7 @@ public:
         Compile(src);
     }
 
-    ~Shader();
+	~Shader();
     bool Compile(const char* src);
 
     GLenum GLStage() const
@@ -123,7 +202,7 @@ public:
     ~ShaderSet();
 
     virtual void SetShader(Render::Shader *s);
-    virtual void UnsetShader(int stage);
+	virtual void UnsetShader(int stage);
 
     virtual void Set(PrimitiveType prim) const;
 
@@ -155,25 +234,26 @@ class RenderDevice : public Render::RenderDevice
 
     Matrix4f    Proj;
 
+	GLuint Vao;
+
 protected:
     Ptr<Texture>             CurRenderTarget;
     Array<Ptr<Texture> >     DepthBuffers;
     GLuint                   CurrentFbo;
 
     const LightingParams*    Lighting;
+    bool SupportsVao;
     
 public:
     RenderDevice(const RendererParams& p);
     virtual ~RenderDevice();
 
     virtual void Shutdown();
-    
+	
     virtual void FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex);
 
     virtual void SetViewport(const Recti& vp);
-
-    //virtual void SetScissor(int x, int y, int w, int h);
-        
+		
     virtual void WaitUntilGpuIdle();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1,
@@ -194,7 +274,7 @@ public:
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false);
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                  const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
 

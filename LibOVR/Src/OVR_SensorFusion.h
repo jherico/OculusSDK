@@ -4,7 +4,7 @@ PublicHeader:   OVR.h
 Filename    :   OVR_SensorFusion.h
 Content     :   Methods that determine head orientation from sensor data over time
 Created     :   October 9, 2012
-Authors     :   Michael Antonov, Steve LaValle, Dov Katz, Max Katsev
+Authors     :   Michael Antonov, Steve LaValle, Dov Katz, Max Katsev, Dan Gierl
 
 Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
@@ -30,7 +30,6 @@ limitations under the License.
 
 #include "OVR_Device.h"
 #include "OVR_SensorFilter.h"
-#include <time.h>
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_Threads.h"
 #include "Kernel/OVR_Lockless.h"
@@ -58,12 +57,12 @@ template<class T>
 class PoseState
 {
 public:
-    typedef typename CompatibleTypes<Pose<T> >::Type CompatibleType;
+    typedef typename CompatibleTypes<Transform<T> >::Type CompatibleType;
 
     PoseState() : TimeInSeconds(0.0) { }
     // float <-> double conversion constructor.
     explicit PoseState(const PoseState<typename Math<T>::OtherFloatType> &src)
-        : Transform(src.Transform),
+        : Pose(src.Pose),
           AngularVelocity(src.AngularVelocity), LinearVelocity(src.LinearVelocity),
           AngularAcceleration(src.AngularAcceleration), LinearAcceleration(src.LinearAcceleration),
           TimeInSeconds(src.TimeInSeconds)
@@ -71,16 +70,16 @@ public:
 
     // C-interop support: PoseStatef <-> ovrPoseStatef
     PoseState(const typename CompatibleTypes<PoseState<T> >::Type& src)
-        : Transform(src.Pose),
+        : Pose(src.Pose),
           AngularVelocity(src.AngularVelocity), LinearVelocity(src.LinearVelocity),
           AngularAcceleration(src.AngularAcceleration), LinearAcceleration(src.LinearAcceleration),
           TimeInSeconds(src.TimeInSeconds)
     { }
 
-    operator const typename CompatibleTypes<PoseState<T> >::Type () const
+    operator typename CompatibleTypes<PoseState<T> >::Type () const
     {
         typename CompatibleTypes<PoseState<T> >::Type result;
-        result.Pose                    = Transform;
+        result.Pose		            = Pose;
         result.AngularVelocity      = AngularVelocity;
         result.LinearVelocity       = LinearVelocity;
         result.AngularAcceleration  = AngularAcceleration;
@@ -90,7 +89,7 @@ public:
     }
 
 
-    Pose<T>     Transform;
+    Transform<T> Pose;
     Vector3<T>  AngularVelocity;
     Vector3<T>  LinearVelocity;
     Vector3<T>  AngularAcceleration;
@@ -140,7 +139,7 @@ public:
 
     // C-interop support
     SensorState(const ovrSensorState& s);
-    operator const ovrSensorState () const;
+    operator ovrSensorState () const;
 
     // Pose state at the time that SensorState was requested.
     PoseStatef   Predicted;
@@ -163,12 +162,12 @@ public:
 class VisionHandler
 {
 public:
-    virtual void        OnVisionSuccess(const Pose<double>& pose, UInt32 exposureCounter) = 0;
-    virtual void        OnVisionPreviousFrame(const Pose<double>& pose) = 0;
-    virtual void        OnVisionFailure() = 0;
+    virtual void        OnVisionSuccess(const Transform<double>& cameraFromImu, UInt32 exposureCounter) = 0;
+    virtual void        OnVisionPreviousFrame(const Transform<double>& cameraFromImu) = 0;
+	virtual void		OnVisionFailure() = 0;
 
     // Get a configuration that represents the change over a short time interval
-    virtual Pose<double> GetVisionPrediction(UInt32 exposureCounter) = 0;
+    virtual Transform<double> GetVisionPrediction(UInt32 exposureCounter) = 0;
 };
 
 //-------------------------------------------------------------------------------------
@@ -189,6 +188,8 @@ public:
 
 class SensorFusion : public NewOverrideBase, public VisionHandler
 {
+	friend class SensorFusionDebug;
+
     enum
     {
         MagMaxReferences = 1000
@@ -196,8 +197,8 @@ class SensorFusion : public NewOverrideBase, public VisionHandler
 
 public:
 
-    // -------------------------------------------------------------------------------
-    // Critical components for tiny API
+	// -------------------------------------------------------------------------------
+	// Critical components for tiny API
 
     SensorFusion(SensorDevice* sensor = 0);
     ~SensorFusion();
@@ -212,10 +213,10 @@ public:
 
     // Sets up head-and-neck model and device-to-pupil dimensions from the user's profile and the HMD stats.
     // This copes elegantly if profile is NULL.
-    void                        SetUserHeadDimensions(Profile const *profile, HmdRenderInfo const &hmdRenderInfo);
+    void SetUserHeadDimensions(Profile const &profile, HmdRenderInfo const &hmdRenderInfo);
 
-    // Get the predicted pose (orientation, position) of the center pupil frame (CPF) at a specific point in time.
-    Posef                       GetPoseAtTime(double absoluteTime) const;
+	// Get the predicted pose (orientation, position) of the center pupil frame (CPF) at a specific point in time.
+	Transformf                  GetPoseAtTime(double absoluteTime) const;
 
     // Get the full dynamical system state of the CPF, which includes velocities and accelerations,
     // predicted at a specified absolute point in time.
@@ -224,7 +225,7 @@ public:
     // Get the sensor status (same as GetSensorStateAtTime(...).Status)
     unsigned int                GetStatus() const;
 
-    // End tiny API components
+	// End tiny API components
     // -------------------------------------------------------------------------------
 
     // Resets the current orientation.
@@ -239,13 +240,13 @@ public:
     void        SetGravityEnabled   (bool enableGravity);
     bool        IsGravityEnabled    () const;
 
-    // Vision Position and Orientation Configuration
+	// Vision Position and Orientation Configuration
     // -----------------------------------------------
-    bool        IsVisionPositionEnabled       () const;
-    void        SetVisionPositionEnabled      (bool enableVisionPosition);
+	bool        IsVisionPositionEnabled       () const;
+	void        SetVisionPositionEnabled      (bool enableVisionPosition);
     
     // compensates for a tilted camera
-    void        SetCameraTiltCorrectionEnabled(bool enable);
+	void        SetCameraTiltCorrectionEnabled(bool enable);
     bool        IsCameraTiltCorrectionEnabled () const;
 
     // Message Handling Logic
@@ -256,25 +257,26 @@ public:
     void        OnMessage                (const MessageBodyFrame& msg);
    
 
-    // Interaction with vision
+	// Interaction with vision
     // -----------------------------------------------
-    // Handle observation from vision system (orientation, position, time)
-    virtual void        OnVisionSuccess(const Pose<double>& pose, UInt32 exposureCounter);
-    virtual void        OnVisionPreviousFrame(const Pose<double>& pose);
-    virtual void        OnVisionFailure();
+	// Handle observation from vision system (orientation, position, time)
+    virtual void        OnVisionSuccess(const Transform<double>& cameraFromImu, UInt32 exposureCounter);
+
+    virtual void        OnVisionPreviousFrame(const Transform<double>& cameraFromImu);
+	virtual void		OnVisionFailure();
     // Get a configuration that represents the change over a short time interval
-    virtual Pose<double> GetVisionPrediction(UInt32 exposureCounter);
+    virtual Transform<double> GetVisionPrediction(UInt32 exposureCounter);
 
     double              GetTime                ()     const;
     double              GetVisionLatency       ()     const;
 
 
-    // Detailed head dimension control
+	// Detailed head dimension control
     // -----------------------------------------------
-    // These are now deprecated in favour of SetUserHeadDimensions()
-    Vector3f                    GetHeadModel() const;
+	// These are now deprecated in favour of SetUserHeadDimensions()
+	Vector3f                    GetHeadModel() const;
     void                        SetHeadModel(const Vector3f &headModel, bool resetNeckPivot = true );
-    float                       GetCenterPupilDepth() const;
+	float                       GetCenterPupilDepth() const;
     void                        SetCenterPupilDepth(float centerPupilDepth);
 
 
@@ -283,21 +285,30 @@ public:
 
     // Enables/disables magnetometer based yaw drift correction. 
     // Must also have mag calibration data for this correction to work.
-    void        SetYawCorrectionEnabled(bool enable);
+	void        SetYawCorrectionEnabled(bool enable);
     // Determines if yaw correction is enabled.
     bool        IsYawCorrectionEnabled () const;
 
-    // True if mag has calibration values stored
-    bool        HasMagCalibration      () const;
-    // Clear the reference points associating
+	// Clear the reference points associating
     // mag readings with orientations
-    void        ClearMagReferences     ();
+	void        ClearMagReferences     ();
+
+	// Sets the focus filter direction to the current HMD direction
+    void		SetFocusDirection();
+    // Sets the focus filter to a direction in the body frame. Once set, a complementary filter
+    // will very slowly drag the world to keep the direction of the HMD within the FOV of the focus
+    void		SetFocusDirection(Vector3d direction);
+    // Sets the FOV (in radians) of the focus. When the yaw difference between the HMD's current pose
+    // and the focus is smaller than the FOV, the complementary filter does not act.
+    void		SetFocusFOV(double rads);
+    // Turns off the focus filter (equivalent to setting the focus to 0
+    void		ClearFocus();
 
 private:
   
     // -----------------------------------------------
     
-    class BodyFrameHandler : public NewOverrideBase, public MessageHandler
+	class BodyFrameHandler : public NewOverrideBase, public MessageHandler
     {
         SensorFusion* pFusion;
     public:
@@ -333,96 +344,109 @@ private:
     // incremental tracking based on IMU change and for drift correction
     struct ExposureRecord
     {
-        UInt32            ExposureCounter;
+		UInt32            ExposureCounter;
         double            ExposureTime;
-        PoseState<double> State;  // State of the headset at the time of exposure.
-        PoseState<double> Delta;  // IMU Delta between previous exposure (or a vision frame) and this one.
+        // State of the headset at the time of exposure
+        PoseState<double> WorldFromImu;  
+        // Change in state since the last exposure based on IMU data only
+        PoseState<double> ImuOnlyDelta;
+        // Did we have tracking for the entire interval between exposures
+        bool              VisionTrackingAvailable;
 
-        ExposureRecord() : ExposureCounter(0), ExposureTime(0.0) { }
-        ExposureRecord(UInt32 exposureCounter, double exposureTime,
-                      const PoseState<double>& state,
-                      const PoseState<double>& stateDelta)
+		ExposureRecord() : ExposureCounter(0), ExposureTime(0.0), VisionTrackingAvailable(true) { }
+        ExposureRecord(UInt32 exposureCounter, double exposureTime, 
+            const PoseState<double>& worldFromImu, const PoseState<double>& imuOnlyDelta)
             : ExposureCounter(exposureCounter), ExposureTime(exposureTime),
-              State(state), Delta(stateDelta) { }
+              WorldFromImu(worldFromImu), ImuOnlyDelta(imuOnlyDelta), VisionTrackingAvailable(true) { }
+    };
+
+    // -----------------------------------------------
+
+    // Entry describing the magnetometer reference point
+    // Used for mag yaw correction
+    struct MagReferencePoint
+    {
+        Vector3d          InImuFrame;
+        Transformd        WorldFromImu;
+		int				  Score;
+
+        MagReferencePoint() { }
+        MagReferencePoint(const Vector3d& inImuFrame, const Transformd& worldFromImu, int score)
+            : InImuFrame(inImuFrame), WorldFromImu(worldFromImu), Score(score) { }
     };
 
     // -----------------------------------------------
 
     // The phase of the head as estimated by sensor fusion
-    PoseState<double> State;
+	PoseState<double> WorldFromImu;
 
     // State that can be read without any locks, so that high priority rendering thread
     // doesn't have to worry about being blocked by a sensor/vision threads that got preempted.
-    LocklessUpdater<LocklessState>    UpdatedState;
+    LocklessUpdater<LocklessState>	UpdatedState;
 
     // The pose we got from Vision, augmented with velocity information from numerical derivatives
-    // This is the only state that is stored in the camera reference frame; the rest are in the world frame
-    PoseState<double> VisionState;    
-    // Difference between the state from vision and the main State at the time of exposure
-    PoseState<double> VisionError;
-    // ExposureRecord that corresponds to the same exposure/frame as VisionState
-    ExposureRecord    LastVisionExposureRecord; 
-    // Change in state since the last exposure based on IMU data only 
-    // (used for incremental tracking predictions)
-    PoseState<double> CurrentExposureIMUDelta;
+    PoseState<double>       CameraFromImu;    
+    // Difference between the vision and sensor fusion poses at the time of last exposure adjusted
+    // by all the corrections applied since then
+    // NB: this one is unlike all the other poses/transforms we use, since it's a difference 
+    // between 2 WorldFromImu transforms, but is stored in the world frame, not the IMU frame
+    // (see computeVisionError() for details)
+    // For composition purposes it should be considered a WorldFromWorld transform, where the left
+    // side comes from vision and the right - from sensor fusion
+    PoseState<double>       VisionError;
     // Past exposure records between the last update from vision and now
     // (should only be one record unless vision latency is high)
     CircularBuffer<ExposureRecord> ExposureRecordHistory;
+    // ExposureRecord that corresponds to the last pose we got from vision
+    ExposureRecord          LastVisionExposureRecord;
+    // Incomplete ExposureRecord that will go into the history buffer when 
+    // the new MessageExposureFrame is received
+    ExposureRecord          NextExposureRecord;
     // Timings of the previous exposure, used to populate ExposureRecordHistory
-    MessageExposureFrame LastMessageExposureFrame;
+    MessageExposureFrame    LastMessageExposureFrame;
     // Time of the last vision update
-    double            LastVisionAbsoluteTime;
-    // Used by the head model.
-    Vector3d          NeckPivotPosition;
+    double                  LastVisionAbsoluteTime;
 
-    bool              EnableCameraTiltCorrection;
-    // Pose of the camera in the world coordinate system
-    Pose<double>      CameraPose;
-    double            CameraPoseConfidence;
-    Vector3d          DefaultCameraPosition;
+    unsigned int            Stage;
+    BodyFrameHandler       *pHandler;
 
-    UInt32            FullVisionCorrectionExposureCounter;
+	Vector3d				FocusDirection;
+	double					FocusFOV;
+
+    SensorFilterBodyFrame   FAccelInImuFrame, FAccelInCameraFrame;
+    SensorFilterd           FAngV;
+
+    Vector3d                AccelOffset;
+
+    bool                    EnableGravity;
+
+    bool                    EnableYawCorrection;
+    bool                    MagCalibrated;
+    Array<MagReferencePoint> MagRefs;
+    int                     MagRefIdx;
+    Quatd                   MagCorrectionIntegralTerm;
+
+    bool                    EnableCameraTiltCorrection;
+    // Describes the pose of the camera in the world coordinate system
+    Transformd              WorldFromCamera;
+    double                  WorldFromCameraConfidence;
+
+    bool                    MotionTrackingEnabled;
+    bool                    VisionPositionEnabled;
 
     // This is a signed distance, but positive because Z increases looking inward.
     // This is expressed relative to the IMU in the HMD and corresponds to the location
     // of the cyclopean virtual camera focal point if both the physical and virtual 
     // worlds are isometrically mapped onto each other.  -Steve
     float                   CenterPupilDepth;
-    Vector3d                CPFPositionInIMUFrame;
-    // Position of the IMU relative to the center of the screen (loaded from the headset firmware)
-    Vector3d                IMUPosition;
-    // Origin of the positional coordinate system in the real world relative to the camera.
-    Vector3d                PositionOrigin;
-
-    double                    VisionMaxIMUTrackTime;
-        
-    unsigned int            Stage;
-    BodyFrameHandler        *pHandler;
-    volatile bool           EnableGravity;
-
-    SensorFilterBodyFrame   FAccelHeadset, FAccelCamera;
-    SensorFilterd           FAngV;
-
-    Vector3d                AccelOffset;
-
-    bool                     EnableYawCorrection;
-    bool                     MagCalibrated;
-public: // The below made public for access during rendering for debugging
-    int                      MagNumReferences;
-    Vector3d                 MagRefsInBodyFrame[MagMaxReferences];
-    Vector3d                 MagRefsInWorldFrame[MagMaxReferences];
-    Quatd                     MagRefsPoses[MagMaxReferences];
-    int                      MagRefIdx;
-private:
-    int                      MagRefScore;
-    Quatd                    MagCorrectionIntegralTerm;
-
-    bool                     MotionTrackingEnabled;
-    bool                     VisionPositionEnabled;
-
-    // Built-in head model for faking 
-    // position using orientation only 
-    Vector3d                 HeadModel; 
+    // Describes the position of the user eyes relative to the IMU
+    Transformd              ImuFromCpf;
+    // Position of the center of the screen relative to the IMU (loaded from the headset firmware)
+    Transformd              ImuFromScreen;
+    // Built-in head model for faking position using orientation only 
+    Transformd              CpfFromNeck;
+    // Last known base of the neck pose used for head model computations
+    Transformd              WorldFromNeck;
 
     //---------------------------------------------    
 
@@ -431,13 +455,11 @@ private:
     void        handleMessage(const MessageBodyFrame& msg);
     void        handleExposure(const MessageExposureFrame& msg);
 
-    // Returns  new gyroCorrection
-    Vector3d    calcMagYawCorrectionForMessage(Vector3d gyroCorrection,
-                                               Quatd q, Quatd qInv,
-                                               Vector3d calMag, Vector3d up, double deltaT);
+    // Compute the difference between vision and sensor fusion data
+    PoseStated  computeVisionError();
     // Apply headset yaw correction from magnetometer
-    // for models without camera or when camera isn't available
-    void applyMagYawCorrection(Vector3d mag, double deltaT);
+	// for models without camera or when camera isn't available
+	void        applyMagYawCorrection(Vector3d mag, double deltaT);
     // Apply headset tilt correction from the accelerometer
     void        applyTiltCorrection(double deltaT);
     // Apply headset yaw correction from the camera
@@ -446,9 +468,11 @@ private:
     void        applyPositionCorrection(double deltaT);
     // Apply camera tilt correction from the accelerometer
     void        applyCameraTiltCorrection(Vector3d accel, double deltaT);
+	// Apply camera focus correction
+	void		applyFocusCorrection(double deltaT);
 
     // If you have a known-good pose, this sets the neck pivot position.
-    void        setNeckPivotFromPose ( Posed const &pose );
+    void        setNeckPivotFromPose ( Transformd const &pose );
 };
 
 
@@ -481,16 +505,6 @@ inline bool SensorFusion::IsYawCorrectionEnabled() const
     return EnableYawCorrection;
 }
 
-inline bool SensorFusion::HasMagCalibration() const 
-{
-    return MagCalibrated;
-}  
-
-inline void SensorFusion::ClearMagReferences()
-{ 
-    MagNumReferences = 0; 
-}
-
 inline bool SensorFusion::IsVisionPositionEnabled() const             
 { 
     return VisionPositionEnabled;
@@ -513,7 +527,7 @@ inline bool SensorFusion::IsCameraTiltCorrectionEnabled() const
 
 inline double SensorFusion::GetVisionLatency() const
 {
-    return LastVisionAbsoluteTime - VisionState.TimeInSeconds;
+    return LastVisionAbsoluteTime - CameraFromImu.TimeInSeconds;
 }
 
 inline double SensorFusion::GetTime() const 
@@ -542,14 +556,14 @@ void PoseState<T>::StoreAndIntegrateGyro(Vector3d angVel, double dt)
     AngularVelocity = angVel;
     double angle = angVel.Length() * dt;
     if (angle > 0)
-        Transform.Orientation = Transform.Orientation * Quatd(angVel, angle);
+        Pose.Rotation = Pose.Rotation * Quatd(angVel, angle);
 }
 
 template<class T>
 void PoseState<T>::StoreAndIntegrateAccelerometer(Vector3d linearAccel, double dt)
 {
     LinearAcceleration = linearAccel;
-    Transform.Position     += LinearVelocity * dt + LinearAcceleration * (dt * dt * 0.5);
+    Pose.Translation  += LinearVelocity * dt + LinearAcceleration * (dt * dt * 0.5);
     LinearVelocity    += LinearAcceleration * dt;
 }
 
@@ -558,8 +572,8 @@ void PoseState<T>::StoreAndIntegrateAccelerometer(Vector3d linearAccel, double d
 template<class T>
 void PoseState<T>::AdvanceByDelta(const PoseState<T>& delta)
 {
-    Transform.Orientation  = Transform.Orientation * delta.Transform.Orientation;
-    Transform.Position    += delta.Transform.Position + LinearVelocity * delta.TimeInSeconds;
+    Pose.Rotation     = Pose.Rotation * delta.Pose.Rotation;
+    Pose.Translation += delta.Pose.Translation + LinearVelocity * delta.TimeInSeconds;
     LinearVelocity   += delta.LinearVelocity;
     TimeInSeconds    += delta.TimeInSeconds;
 }

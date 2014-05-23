@@ -51,10 +51,15 @@ public:
     void Initialize();
     // Apply the calibration
     void Apply(MessageBodyFrame& msg);
+    // Is mag calibration available?
+    bool IsMagCalibrated() { return MagCalibrated; }
 
 protected:
     void StoreAutoOffset();
     void AutocalibrateGyro(MessageBodyFrame const& msg);
+
+	void DebugPrintLocalTemperatureTable();
+	void DebugClearHeadsetTemperatureReports();
 
     SensorDevice* pSensor;
 
@@ -64,7 +69,7 @@ protected:
     Vector3f AccelOffset;
     
     // Temperature based data
-    Array<Array<TemperatureReport> > temperatureReports;
+    Array<Array<TemperatureReport> > TemperatureReports;
     OffsetInterpolator Interpolators[3];
 
     // Autocalibration data

@@ -24,14 +24,9 @@ limitations under the License.
 
 ************************************************************************************/
 
-
-
-
 #include "CAPI_HMDRenderState.h"
 
-
 namespace OVR { namespace CAPI {
-
 
 
 //-------------------------------------------------------------------------------------
@@ -41,19 +36,19 @@ namespace OVR { namespace CAPI {
 HMDRenderState::HMDRenderState(ovrHmd hmd, Profile* userProfile, const OVR::HMDInfo& hmdInfo)
     : HMD(hmd), HMDInfo(hmdInfo)
 {
-    RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
+	RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
 
     Distortion[0] = CalculateDistortionRenderDesc(StereoEye_Left,  RenderInfo, 0);
     Distortion[1] = CalculateDistortionRenderDesc(StereoEye_Right, RenderInfo, 0);
 
     ClearColor[0] = ClearColor[1] = ClearColor[2] = ClearColor[3] =0.0f;
+
+    EnabledHmdCaps = 0;
 }
 
 HMDRenderState::~HMDRenderState()
 {
-
 }
-
 
 ovrHmdDesc HMDRenderState::GetDesc()
 {
@@ -71,7 +66,9 @@ ovrHmdDesc HMDRenderState::GetDesc()
     d.DisplayDeviceName = HMDInfo.DisplayDeviceName;
     d.DisplayId         = HMDInfo.DisplayId;
 
-    d.Caps              = ovrHmdCap_YawCorrection | ovrHmdCap_Orientation | ovrHmdCap_Present;
+    d.HmdCaps           = ovrHmdCap_Present | ovrHmdCap_NoVSync;
+    d.SensorCaps        = ovrSensorCap_YawCorrection | ovrSensorCap_Orientation;
+    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
 
     if (strstr(HMDInfo.ProductName, "DK1"))
     {
@@ -79,8 +76,10 @@ ovrHmdDesc HMDRenderState::GetDesc()
     }
     else if (strstr(HMDInfo.ProductName, "DK2"))
     {
-        d.Type = ovrHmd_DK2;
-        d.Caps |= ovrHmdCap_Position | ovrHmdCap_LowPersistence;
+        d.Type        = ovrHmd_DK2;
+        d.HmdCaps    |= ovrHmdCap_LowPersistence |
+                        ovrHmdCap_LatencyTest | ovrHmdCap_DynamicPrediction;
+        d.SensorCaps |= ovrSensorCap_Position;
     }
         
     DistortionRenderDesc& leftDistortion  = Distortion[0];
@@ -116,30 +115,27 @@ ovrSizei HMDRenderState::GetFOVTextureSize(int eye, ovrFovPort fov, float pixels
     return CalculateIdealPixelSize(seye, Distortion[eye], fov, pixelsPerDisplayPixel);
 }
 
-ovrEyeRenderDesc HMDRenderState::calcRenderDesc(const ovrEyeDesc& eyeDesc)
+ovrEyeRenderDesc HMDRenderState::calcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov)
 {    
     HmdRenderInfo&   hmdri = RenderInfo;
-    StereoEye        eye   = (eyeDesc.Eye == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
+    StereoEye        eye   = (eyeType == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
     ovrEyeRenderDesc e0;
-
-    e0.Desc                      = eyeDesc;
+    
+    e0.Eye                       = eyeType;
+    e0.Fov                       = fov;
     e0.ViewAdjust                = CalculateEyeVirtualCameraOffset(hmdri, eye, false);
     e0.DistortedViewport         = GetFramebufferViewport(eye, hmdri);
     e0.PixelsPerTanAngleAtCenter = Distortion[0].PixelsPerTanAngleAtCenter;
-
-    // If RenderViewport is uninitialized, set it to texture size.
-    if (Sizei(e0.Desc.RenderViewport.Size) == Sizei(0))
-        e0.Desc.RenderViewport.Size = e0.Desc.TextureSize;
 
     return e0;
 }
 
 
 void HMDRenderState::setupRenderDesc( ovrEyeRenderDesc eyeRenderDescOut[2],
-                                      const ovrEyeDesc eyeDescIn[2] )
+                                      const ovrFovPort eyeFovIn[2] )
 {
-    eyeRenderDescOut[0] = EyeRenderDesc[0] = calcRenderDesc(eyeDescIn[0]);
-    eyeRenderDescOut[1] = EyeRenderDesc[1] = calcRenderDesc(eyeDescIn[1]);    
+    eyeRenderDescOut[0] = EyeRenderDesc[0] = calcRenderDesc(ovrEye_Left,  eyeFovIn[0]);
+    eyeRenderDescOut[1] = EyeRenderDesc[1] = calcRenderDesc(ovrEye_Right, eyeFovIn[1]);   
 }
 
 

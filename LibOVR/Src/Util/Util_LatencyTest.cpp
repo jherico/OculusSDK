@@ -372,15 +372,15 @@ bool LatencyTest::DisplayScreenColor(Color& colorToDisplay)
     return true;
 }
 
-const char*    LatencyTest::GetResultsString()
+const char*	LatencyTest::GetResultsString()
 {
-    if (!ResultsString.IsEmpty() && ReturnedResultString != ResultsString.ToCStr())
-    {
-        ReturnedResultString = ResultsString;
-        return ReturnedResultString.ToCStr();
-    }
+	if (!ResultsString.IsEmpty() && ReturnedResultString != ResultsString.ToCStr())
+	{
+		ReturnedResultString = ResultsString;
+		return ReturnedResultString.ToCStr();
+	}
     
-    return NULL;
+	return NULL;
 }
 
 bool LatencyTest::areResultsComplete()

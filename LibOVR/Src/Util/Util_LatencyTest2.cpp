@@ -26,15 +26,12 @@ limitations under the License.
 
 #include "Util_LatencyTest2.h"
 
-#include "../../Bindings/C/Include/OVR_CAPI.h"
+#include "../OVR_CAPI.h"
 #include "../Kernel/OVR_Log.h"
 #include "../Kernel/OVR_Timer.h"
 
 
 namespace OVR { namespace Util {
-
-//static const float      BIG_FLOAT = 1000000.0f;
-//static const float      SMALL_FLOAT = -1000000.0f;
 
 //-------------------------------------------------------------------------------------
 // ***** LatencyTest2

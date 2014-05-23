@@ -208,7 +208,7 @@ public:
     Ptr<ID3D1xShaderResourceView>   TexSv;
     Ptr<ID3D1xRenderTargetView>     TexRtv;
     Ptr<ID3D1xDepthStencilView>     TexDsv;
-    Ptr<ID3D1xTexture2D>            TexStaging;
+	Ptr<ID3D1xTexture2D>			TexStaging;
     mutable Ptr<ID3D1xSamplerState> Sampler;
     int                             Width, Height;
     int                             Samples;
@@ -233,9 +233,9 @@ public:
 
     virtual void Set(int slot, Render::ShaderStage stage = Render::Shader_Fragment) const;
 
-    virtual ovrTexture Get_ovrTexture();
+	virtual ovrTexture Get_ovrTexture();
 
-    virtual void* GetInternalImplementation();
+	virtual void* GetInternalImplementation();
 
 };
 
@@ -265,6 +265,7 @@ public:
     Ptr<ID3D1xDepthStencilState> CurDepthState;
     Ptr<ID3D1xInputLayout>      ModelVertexIL;
     Ptr<ID3D1xInputLayout>      DistortionVertexIL;
+    Ptr<ID3D1xInputLayout>      HeightmapVertexIL;
 
     Ptr<ID3D1xSamplerState>     SamplerStates[Sample_Count];
 
@@ -304,14 +305,14 @@ public:
     virtual void SetWindowSize(int w, int h);
     virtual bool SetParams(const RendererParams& newParams);
 
-    // Returns details needed by CAPI distortion rendering.
-    virtual ovrRenderAPIConfig Get_ovrRenderAPIConfig() const;
+	// Returns details needed by CAPI distortion rendering.
+	virtual ovrRenderAPIConfig Get_ovrRenderAPIConfig() const;
 
     virtual void Present ( bool withVsync );
     virtual void WaitUntilGpuIdle();
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
-    virtual UPInt QueryGPUMemorySize();
+	virtual UPInt QueryGPUMemorySize();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1,
                        float depth = 1,
@@ -346,12 +347,12 @@ public:
     // Overrident to apply proper blend state.
     virtual void FillRect(float left, float top, float right, float bottom, Color c);
     virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
-    virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
+	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
     virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image);
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false);
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(   const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                     const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
 

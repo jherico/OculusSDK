@@ -53,37 +53,37 @@ class DeviceEnumerationArgs;
 
 class DeviceHandle
 {    
-    friend class DeviceManager;
-    friend class DeviceManagerImpl;
+	friend class DeviceManager;
+	friend class DeviceManagerImpl;
     template<class B> friend class HIDDeviceImpl;
 
 public:
-    DeviceHandle() : pImpl(0) { }    
-    DeviceHandle(const DeviceHandle& src);
-    ~DeviceHandle();
+	DeviceHandle() : pImpl(0) { }    
+	DeviceHandle(const DeviceHandle& src);
+	~DeviceHandle();
 
-    void operator = (const DeviceHandle& src);
+	void operator = (const DeviceHandle& src);
 
-    bool operator == (const DeviceHandle& other) const { return pImpl == other.pImpl; }
-    bool operator != (const DeviceHandle& other) const { return pImpl != other.pImpl; }
+	bool operator == (const DeviceHandle& other) const { return pImpl == other.pImpl; }
+	bool operator != (const DeviceHandle& other) const { return pImpl != other.pImpl; }
 
-    // operator bool() returns true if Handle/Enumerator points to a valid device.
-    operator bool () const   { return GetType() != Device_None; }
+	// operator bool() returns true if Handle/Enumerator points to a valid device.
+	operator bool () const   { return GetType() != Device_None; }
 
     // Returns existing device, or NULL if !IsCreated. The returned ptr is 
     // addref-ed.
     DeviceBase* GetDevice_AddRef() const;
-    DeviceType  GetType() const;
-    bool        GetDeviceInfo(DeviceInfo* info) const;
-    bool        IsAvailable() const;
-    bool        IsCreated() const;
+	DeviceType  GetType() const;
+	bool        GetDeviceInfo(DeviceInfo* info) const;
+	bool        IsAvailable() const;
+	bool        IsCreated() const;
     // Returns true, if the handle contains the same device ptr
     // as specified in the parameter.
     bool        IsDevice(DeviceBase*) const;
 
-    // Creates a device, or returns AddRefed pointer if one is already created.
-    // New devices start out with RefCount of 1.
-    DeviceBase* CreateDevice();
+	// Creates a device, or returns AddRefed pointer if one is already created.
+	// New devices start out with RefCount of 1.
+	DeviceBase* CreateDevice();
 
     // Creates a device, or returns AddRefed pointer if one is already created.
     // New devices start out with RefCount of 1. DeviceT is used to cast the
@@ -94,13 +94,13 @@ public:
         return static_cast<DeviceT*>(DeviceHandle(*this).CreateDevice());
     }
 
-    // Resets the device handle to uninitialized state.
-    void        Clear();
+	// Resets the device handle to uninitialized state.
+	void        Clear();
 
 protected:
-    explicit DeviceHandle(DeviceCreateDesc* impl);
-    bool     enumerateNext(const DeviceEnumerationArgs& args);
-    DeviceCreateDesc* pImpl;
+	explicit DeviceHandle(DeviceCreateDesc* impl);
+	bool     enumerateNext(const DeviceEnumerationArgs& args);
+	DeviceCreateDesc* pImpl;
 };
 
 } // namespace OVR

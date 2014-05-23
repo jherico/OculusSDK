@@ -15,7 +15,7 @@ Doc
 LibOVR/Lib
 LibOVR/Obj
 Mac_OculusWorldDemo.app/Contents/Resources
-OculusWorldDemo.app
+*.app
 Samples/**/Obj
 Samples/**/Release
 Samples/**/Debug

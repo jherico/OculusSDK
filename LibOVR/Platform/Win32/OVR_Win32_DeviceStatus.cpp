@@ -37,107 +37,107 @@ namespace OVR { namespace Win32 {
 static TCHAR windowClassName[] = TEXT("LibOVR_DeviceStatus_WindowClass");
 
 #define STATIC_KSCATEGORY_VIDEO_CAMERA \
-    0xe5323777, 0xf976, 0x4f5b, { 0x9b, 0x55, 0xb9, 0x46, 0x99, 0xc4, 0x6e, 0x44 }
+	0xe5323777, 0xf976, 0x4f5b, { 0x9b, 0x55, 0xb9, 0x46, 0x99, 0xc4, 0x6e, 0x44 }
 
 
 //-------------------------------------------------------------------------------------
 DeviceStatus::DeviceStatus(Notifier* const pClient)
-    : pNotificationClient(pClient), LastTimerId(0)
-{    
+	: pNotificationClient(pClient), LastTimerId(0)
+{	
 }
 
 bool DeviceStatus::Initialize()
 {
 
-    WNDCLASS wndClass;
-    wndClass.style         = CS_HREDRAW | CS_VREDRAW;
-    wndClass.lpfnWndProc   = WindowsMessageCallback;
-    wndClass.cbClsExtra    = 0;
-    wndClass.cbWndExtra    = 0;
-    wndClass.hInstance     = 0;
-    wndClass.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-    wndClass.hCursor       = LoadCursor(NULL, IDC_ARROW);
-    wndClass.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
-    wndClass.lpszMenuName  = NULL;
-    wndClass.lpszClassName = windowClassName;
+	WNDCLASS wndClass;
+	wndClass.style         = CS_HREDRAW | CS_VREDRAW;
+	wndClass.lpfnWndProc   = WindowsMessageCallback;
+	wndClass.cbClsExtra    = 0;
+	wndClass.cbWndExtra    = 0;
+	wndClass.hInstance     = 0;
+	wndClass.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+	wndClass.hCursor       = LoadCursor(NULL, IDC_ARROW);
+	wndClass.hbrBackground = (HBRUSH) (COLOR_WINDOW + 1);
+	wndClass.lpszMenuName  = NULL;
+	wndClass.lpszClassName = windowClassName;
 
-    if (!RegisterClass(&wndClass))
-    {
-        OVR_ASSERT_LOG(false, ("Failed to register window class."));
-        return false;
-    }
+	if (!RegisterClass(&wndClass))
+	{
+		OVR_ASSERT_LOG(false, ("Failed to register window class."));
+		return false;
+	}
 
     // We're going to create a 'message-only' window. This will be hidden, can't be enumerated etc.
     // To do this we supply 'HWND_MESSAGE' as the hWndParent.
     // http://msdn.microsoft.com/en-us/library/ms632599%28VS.85%29.aspx#message_only
-    hMessageWindow = CreateWindow(    windowClassName,
-                                    windowClassName,
-                                    WS_OVERLAPPEDWINDOW,
-                                    CW_USEDEFAULT,
-                                    CW_USEDEFAULT,
-                                    CW_USEDEFAULT,
-                                    CW_USEDEFAULT,
-                                    HWND_MESSAGE,
-                                    NULL,
-                                    0,
-                                    this);    // Pass this object via the CREATESTRUCT mechanism 
+	hMessageWindow = CreateWindow(	windowClassName,
+									windowClassName,
+									WS_OVERLAPPEDWINDOW,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									CW_USEDEFAULT,
+									HWND_MESSAGE,
+									NULL,
+									0,
+									this);	// Pass this object via the CREATESTRUCT mechanism 
                                             // so that we can attach it to the window user data.
 
     if (hMessageWindow == NULL)
-    {
-        OVR_ASSERT_LOG(false, ("Failed to create window."));
-        return false;
-    }
+	{
+		OVR_ASSERT_LOG(false, ("Failed to create window."));
+		return false;
+	}
 
     // According to MS, topmost windows receive WM_DEVICECHANGE faster.
-    ::SetWindowPos(hMessageWindow, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);
-    UpdateWindow(hMessageWindow);
+	::SetWindowPos(hMessageWindow, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE);
+	UpdateWindow(hMessageWindow);
 
 
-    // Register notification for additional HID messages.
+	// Register notification for additional HID messages.
     HIDDeviceManager* hidDeviceManager = new HIDDeviceManager(NULL);
-    HidGuid = hidDeviceManager->GetHIDGuid();
+	HidGuid = hidDeviceManager->GetHIDGuid();
     hidDeviceManager->Release();
 
-    DEV_BROADCAST_DEVICEINTERFACE notificationFilter;
+	DEV_BROADCAST_DEVICEINTERFACE notificationFilter;
 
-    ZeroMemory(&notificationFilter, sizeof(notificationFilter));
-    notificationFilter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
-    notificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-    //notificationFilter.dbcc_classguid = hidguid;
+	ZeroMemory(&notificationFilter, sizeof(notificationFilter));
+	notificationFilter.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
+	notificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	//notificationFilter.dbcc_classguid = hidguid;
 
     // We need DEVICE_NOTIFY_ALL_INTERFACE_CLASSES to detect
     // HDMI plug/unplug events.
-    hDeviceNotify = RegisterDeviceNotification(    
+	hDeviceNotify = RegisterDeviceNotification(	
         hMessageWindow,
-        &notificationFilter,
-        DEVICE_NOTIFY_ALL_INTERFACE_CLASSES|DEVICE_NOTIFY_WINDOW_HANDLE);
+		&notificationFilter,
+		DEVICE_NOTIFY_ALL_INTERFACE_CLASSES|DEVICE_NOTIFY_WINDOW_HANDLE);
 
-    if (hDeviceNotify == NULL)
-    {
-        OVR_ASSERT_LOG(false, ("Failed to register for device notifications."));
-        return false;
-    }
+	if (hDeviceNotify == NULL)
+	{
+		OVR_ASSERT_LOG(false, ("Failed to register for device notifications."));
+		return false;
+	}
 
-    return true;
+	return true;
 }
 
 void DeviceStatus::ShutDown()
 {
-    OVR_ASSERT(hMessageWindow);
+	OVR_ASSERT(hMessageWindow);
 
-    if (!UnregisterDeviceNotification(hDeviceNotify))
-    {
-        OVR_ASSERT_LOG(false, ("Failed to unregister device notification."));
-    }
+	if (!UnregisterDeviceNotification(hDeviceNotify))
+	{
+		OVR_ASSERT_LOG(false, ("Failed to unregister device notification."));
+	}
 
-    PostMessage(hMessageWindow, WM_CLOSE, 0, 0);
+	PostMessage(hMessageWindow, WM_CLOSE, 0, 0);
 
-    while (hMessageWindow != NULL)
-    {
-        ProcessMessages();
-        Sleep(1);
-    }
+	while (hMessageWindow != NULL)
+	{
+		ProcessMessages();
+		Sleep(1);
+	}
 
     if (!UnregisterClass(windowClassName, NULL))
     {
@@ -147,40 +147,40 @@ void DeviceStatus::ShutDown()
 
 DeviceStatus::~DeviceStatus()
 {    
-    OVR_ASSERT_LOG(hMessageWindow == NULL, ("Need to call 'ShutDown' from DeviceManagerThread."));
+	OVR_ASSERT_LOG(hMessageWindow == NULL, ("Need to call 'ShutDown' from DeviceManagerThread."));
 }
 
 void DeviceStatus::ProcessMessages()
 {
-    OVR_ASSERT_LOG(hMessageWindow != NULL, ("Need to call 'Initialize' before first use."));
+	OVR_ASSERT_LOG(hMessageWindow != NULL, ("Need to call 'Initialize' before first use."));
 
-    MSG msg;
+	MSG msg;
 
-    // Note WM_DEVICECHANGED messages are dispatched but not retrieved by PeekMessage.
+	// Note WM_DEVICECHANGED messages are dispatched but not retrieved by PeekMessage.
     // I think this is because they are pending, non-queued messages.
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) 
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
+	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) 
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
 }
 
 bool DeviceStatus::MessageCallback(WORD messageType, const String& devicePath)
 {
-    bool rv = true;
-    if (messageType == DBT_DEVICEARRIVAL)
-    {
-        rv = pNotificationClient->OnMessage(Notifier::DeviceAdded, devicePath);
-    }
-    else if (messageType == DBT_DEVICEREMOVECOMPLETE)
-    {
-        pNotificationClient->OnMessage(Notifier::DeviceRemoved, devicePath);
-    }
-    else
-    {
-        OVR_ASSERT(0);
-    }
-    return rv;
+	bool rv = true;
+	if (messageType == DBT_DEVICEARRIVAL)
+	{
+		rv = pNotificationClient->OnMessage(Notifier::DeviceAdded, devicePath);
+	}
+	else if (messageType == DBT_DEVICEREMOVECOMPLETE)
+	{
+		pNotificationClient->OnMessage(Notifier::DeviceRemoved, devicePath);
+	}
+	else
+	{
+		OVR_ASSERT(0);
+	}
+	return rv;
 }
 
 void DeviceStatus::CleanupRecoveryTimer(UPInt index)
@@ -222,51 +222,51 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
                                                         WPARAM wParam, 
                                                         LPARAM lParam)
 {
-    switch (message)
-    {
-    case WM_CREATE:
-        {
-            // Setup window user data with device status object pointer.
-            LPCREATESTRUCT create_struct = reinterpret_cast<LPCREATESTRUCT>(lParam);
-            void *lpCreateParam = create_struct->lpCreateParams;
-            DeviceStatus *pDeviceStatus = reinterpret_cast<DeviceStatus*>(lpCreateParam);
+	switch (message)
+	{
+	case WM_CREATE:
+		{
+			// Setup window user data with device status object pointer.
+			LPCREATESTRUCT create_struct = reinterpret_cast<LPCREATESTRUCT>(lParam);
+			void *lpCreateParam = create_struct->lpCreateParams;
+			DeviceStatus *pDeviceStatus = reinterpret_cast<DeviceStatus*>(lpCreateParam);
 
-            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pDeviceStatus));
-        }
-        return 0;    // Return 0 for successfully handled WM_CREATE.
+			SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pDeviceStatus));
+		}
+		return 0;	// Return 0 for successfully handled WM_CREATE.
 
-    case WM_DEVICECHANGE:
-        {
-            WORD loword = LOWORD(wParam);
+	case WM_DEVICECHANGE:
+		{
+			WORD loword = LOWORD(wParam);
 
-            if (loword != DBT_DEVICEARRIVAL &&
-                loword != DBT_DEVICEREMOVECOMPLETE) 
-            {
-                // Ignore messages other than device arrive and remove complete 
+			if (loword != DBT_DEVICEARRIVAL &&
+				loword != DBT_DEVICEREMOVECOMPLETE) 
+			{
+				// Ignore messages other than device arrive and remove complete 
                 // (we're not handling intermediate ones).
-                return TRUE;    // Grant WM_DEVICECHANGE request.
-            }
+				return TRUE;	// Grant WM_DEVICECHANGE request.
+			}
 
-            DEV_BROADCAST_DEVICEINTERFACE* hdr;
-            hdr = (DEV_BROADCAST_DEVICEINTERFACE*) lParam;
+			DEV_BROADCAST_DEVICEINTERFACE* hdr;
+			hdr = (DEV_BROADCAST_DEVICEINTERFACE*) lParam;
 
-            if (hdr->dbcc_devicetype != DBT_DEVTYP_DEVICEINTERFACE) 
-            {
-                // Ignore non interface device messages.
-                return TRUE;    // Grant WM_DEVICECHANGE request.
-            }
+			if (hdr->dbcc_devicetype != DBT_DEVTYP_DEVICEINTERFACE) 
+			{
+				// Ignore non interface device messages.
+				return TRUE;	// Grant WM_DEVICECHANGE request.
+			}
 
-            LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
-            OVR_ASSERT(userData != NULL);
+			LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
+			OVR_ASSERT(userData != NULL);
 
-            // Call callback on device messages object with the device path.
-            DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
-            String devicePath(hdr->dbcc_name);
+			// Call callback on device messages object with the device path.
+			DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+			String devicePath(hdr->dbcc_name);
 
-            static const GUID videoCamGuid = { STATIC_KSCATEGORY_VIDEO_CAMERA };
+			static const GUID videoCamGuid = { STATIC_KSCATEGORY_VIDEO_CAMERA };
             // check if HID device caused the event...
             if (pDeviceStatus->HidGuid == hdr->dbcc_classguid ||
-                videoCamGuid           == hdr->dbcc_classguid)
+				videoCamGuid           == hdr->dbcc_classguid)
             {
                 // check if recovery timer is already running; stop it and 
                 // remove it, if so.
@@ -302,30 +302,30 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
             {
                 pDeviceStatus->MessageCallback(loword, devicePath);
             }
-        }
-        return TRUE;    // Grant WM_DEVICECHANGE request.
+		}
+		return TRUE;	// Grant WM_DEVICECHANGE request.
 
-    case WM_TIMER:
-        {
-            if (wParam != 0)
-            {
-                LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
-                OVR_ASSERT(userData != NULL);
+	case WM_TIMER:
+		{
+			if (wParam != 0)
+			{
+				LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
+				OVR_ASSERT(userData != NULL);
 
-                // Call callback on device messages object with the device path.
-                DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+				// Call callback on device messages object with the device path.
+				DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
 
                 // Check if we have recovery timer running (actually, we must be!)
                 UPInt rtIndex;
                 RecoveryTimerDesc* prtDesc = pDeviceStatus->FindRecoveryTimer(wParam, &rtIndex);
-                if (prtDesc)
-                {
-                    if (pDeviceStatus->MessageCallback(DBT_DEVICEARRIVAL, prtDesc->DevicePath))
-                    {
+				if (prtDesc)
+				{
+					if (pDeviceStatus->MessageCallback(DBT_DEVICEARRIVAL, prtDesc->DevicePath))
+					{
                         OVR_DEBUG_LOG(("Recovered, adding is successful, cleaning up the timer..."));
                         // now it is successful, kill the timer and cleanup
                         pDeviceStatus->CleanupRecoveryTimer(rtIndex);
-                    }
+					}
                     else
                     {
                         if (++prtDesc->NumAttempts >= MaxUSBRecoveryAttempts)
@@ -340,28 +340,28 @@ LRESULT CALLBACK DeviceStatus::WindowsMessageCallback(  HWND hwnd,
                                 prtDesc->NumAttempts, prtDesc->DevicePath.ToCStr()));
                         }
                     }
-                }
-            }
-        }
-        return 0;
+				}
+			}
+		}
+		return 0;
 
-    case WM_CLOSE:
-        {
-            LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
-            OVR_ASSERT(userData != NULL);
-            DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
-            pDeviceStatus->hMessageWindow = NULL;
+	case WM_CLOSE:
+		{
+			LONG_PTR userData = GetWindowLongPtr(hwnd, GWLP_USERDATA);
+			OVR_ASSERT(userData != NULL);
+			DeviceStatus* pDeviceStatus = (DeviceStatus*) userData;
+			pDeviceStatus->hMessageWindow = NULL;
 
-            DestroyWindow(hwnd);
-        }
-        return 0;    // We processed the WM_CLOSE message.
+			DestroyWindow(hwnd);
+		}
+		return 0;	// We processed the WM_CLOSE message.
 
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;    // We processed the WM_DESTROY message.
-    }
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;	// We processed the WM_DESTROY message.
+	}
 
-    return DefWindowProc(hwnd, message, wParam, lParam);
+	return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
 }} // namespace OVR::Win32

@@ -233,10 +233,9 @@ void FrameTimeManager::Init(HmdRenderInfo& renderInfo)
 }
 
 void FrameTimeManager::ResetFrameTiming(unsigned frameIndex,
-                                        bool vsyncEnabled, bool dynamicPrediction,
+                                        bool dynamicPrediction,
                                         bool sdkRender)
-{
-    VsyncEnabled        = vsyncEnabled;
+{    
     DynamicPrediction   = dynamicPrediction;
     SdkRender           = sdkRender;
 
@@ -397,6 +396,8 @@ void FrameTimeManager::Timing::InitTimingFromInputs(const FrameTimeManager::Timi
         TimeWarpStartEndTimes[1][0]     = MidpointTime;
         TimeWarpStartEndTimes[1][1]     = MidpointTime;
         break;
+    default:
+        break;
     }
 }
 
@@ -474,7 +475,7 @@ double FrameTimeManager::GetEyePredictionTime(ovrEyeType eye)
     return ovr_GetTimeInSeconds() + ScreenSwitchingDelay + NoVSyncToScanoutDelay;
 }
 
-Posef FrameTimeManager::GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye)
+Transformf FrameTimeManager::GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye)
 {
     double         eyeRenderTime = GetEyePredictionTime(eye);
     ovrSensorState eyeState      = ovrHmd_GetSensorState(hmd, eyeRenderTime);

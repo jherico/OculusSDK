@@ -34,7 +34,7 @@ limitations under the License.
 #include "Kernel/OVR_Math.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Color.h"
-
+#include "Kernel/OVR_String.h"
 
 namespace OVR {
 
@@ -57,7 +57,7 @@ enum MessageType
     Message_DeviceRemoved           = OVR_MESSAGETYPE(Manager, 1),  // Existing device has been plugged/unplugged.
     // Sensor Messages
     Message_BodyFrame               = OVR_MESSAGETYPE(Sensor, 0),   // Emitted by sensor at regular intervals.
-    Message_ExposureFrame            = OVR_MESSAGETYPE(Sensor, 1),
+    Message_ExposureFrame	        = OVR_MESSAGETYPE(Sensor, 1),
     Message_PixelRead               = OVR_MESSAGETYPE(Sensor, 2),
 
     // Latency Tester Messages
@@ -66,8 +66,8 @@ enum MessageType
     Message_LatencyTestStarted          = OVR_MESSAGETYPE(LatencyTester, 2),
     Message_LatencyTestButton           = OVR_MESSAGETYPE(LatencyTester, 3),
     
-    Message_CameraFrame                    = OVR_MESSAGETYPE(Camera, 0),
-    Message_CameraAdded                    = OVR_MESSAGETYPE(Camera, 1),    
+    Message_CameraFrame					= OVR_MESSAGETYPE(Camera, 0),
+	Message_CameraAdded			        = OVR_MESSAGETYPE(Camera, 1),	
 };
 
 //-------------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ class MessageBodyFrame : public Message
 {
 public:
     MessageBodyFrame(DeviceBase* dev)
-        : Message(Message_BodyFrame, dev), Temperature(0.0f), TimeDelta(0.0f), MagCalibrated(false)
+        : Message(Message_BodyFrame, dev), Temperature(0.0f), TimeDelta(0.0f)
     {
     }
 
@@ -112,8 +112,6 @@ public:
     Vector3f MagneticField;  // Magnetic field strength in Gauss.
     float    Temperature;    // Temperature reading on sensor surface, in degrees Celsius.
     float    TimeDelta;      // Time passed since last Body Frame, in seconds.
-
-    bool     MagCalibrated;  // True if MagneticField is calibrated, false if raw
 
     // The absolute time from the host computers perspective that the message should be
     // interpreted as. This is based on incoming timestamp and processed by a filter
@@ -226,7 +224,7 @@ class MessageCameraFrame : public Message
 {
 public:
     MessageCameraFrame(DeviceBase* dev)
-        : Message(Message_CameraFrame, dev)
+        : Message(Message_CameraFrame, dev), CameraHandle(NULL), pFrameData(NULL)
     {
         LostFrames = 0;
     }
@@ -246,13 +244,15 @@ public:
         FrameSizeInBytes = sizeInBytes;
     }
 
-    UInt32   FrameNumber;            // an index of the frame
+    UInt32   FrameNumber;			// an index of the frame
     double   ArrivalTimeSeconds;    // frame time in seconds, as recorded by the host computer
-    const UByte* pFrameData;        // a ptr to frame data. 
-    UInt32   FrameSizeInBytes;        // size of the data in the pFrameData.
-    UInt32   Width, Height;            // width & height in pixels.
-    UInt32   Format;                // format of pixel, see CameraDevice::PixelFormat enum
-    UInt32   LostFrames;            // number of lost frames before this frame
+    const UByte* pFrameData;		// a ptr to frame data. 
+    UInt32   FrameSizeInBytes;		// size of the data in the pFrameData.
+    UInt32   Width, Height;			// width & height in pixels.
+    UInt32   Format;				// format of pixel, see CameraDevice::PixelFormat enum
+    UInt32   LostFrames;			// number of lost frames before this frame
+	String	  DeviceIdentifier;		// identifies the device sensing the message
+    UInt32* CameraHandle;			// Identifies the camera object associated with this frame
 };
 
 // Sent when a new camera is connected
@@ -261,6 +261,11 @@ class MessageCameraAdded : public Message
 public:
     MessageCameraAdded(DeviceBase* dev)
         : Message(Message_CameraAdded, dev) { }
+
+    MessageCameraAdded(UInt32* cam)
+        : Message(Message_CameraAdded, NULL), CameraHandle(cam) { }
+
+    UInt32* CameraHandle;			// Identifies the camera object associated with this frame
 };
 
 } // namespace OVR

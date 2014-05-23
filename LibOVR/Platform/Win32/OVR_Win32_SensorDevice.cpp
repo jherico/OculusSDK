@@ -39,9 +39,9 @@ void SensorDeviceImpl::EnumerateHMDFromSensorDisplayInfo
     (const SensorDisplayInfoImpl& displayInfo, 
      DeviceFactory::EnumerateVisitor& visitor)
 {
-
-    Win32::HMDDeviceCreateDesc hmdCreateDesc(&Win32::HMDDeviceFactory::Instance, String(), String());
-    hmdCreateDesc.SetScreenParameters(  0, 0,
+    Win32::HMDDeviceCreateDesc hmdCreateDesc(&Win32::HMDDeviceFactory::GetInstance(), String(), String());
+ 
+	hmdCreateDesc.SetScreenParameters(  0, 0,
                                         displayInfo.HResolution, displayInfo.VResolution,
                                         displayInfo.HScreenSize, displayInfo.VScreenSize,
                                         displayInfo.VCenter, displayInfo.LensSeparation);

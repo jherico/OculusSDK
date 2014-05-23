@@ -27,10 +27,10 @@ limitations under the License.
 #ifndef OVR_CAPI_GlobalState_h
 #define OVR_CAPI_GlobalState_h
 
-#include "OVR_CAPI.h"
-#include <OVR_Device.h>
-#include <Kernel/OVR_Timer.h>
-#include <Kernel/OVR_Math.h>
+#include "../OVR_CAPI.h"
+#include "../OVR_Device.h"
+#include "../Kernel/OVR_Timer.h"
+#include "../Kernel/OVR_Math.h"
 
 #include "CAPI_HMDState.h"
 

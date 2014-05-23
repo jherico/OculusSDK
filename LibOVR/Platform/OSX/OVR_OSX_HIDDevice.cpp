@@ -3,17 +3,17 @@ Filename    :   OVR_OSX_HIDDevice.cpp
 Content     :   OSX HID device implementation.
 Created     :   February 26, 2013
 Authors     :   Lee Cooper
+ 
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
-
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,7 @@ limitations under the License.
 
 namespace OVR { namespace OSX {
 
-static const UInt32 MAX_QUEUED_INPUT_REPORTS = 5;
-
+    
 //-------------------------------------------------------------------------------------
 // **** OSX::DeviceManager
 
@@ -60,21 +59,21 @@ bool HIDDeviceManager::initializeManager()
     {
         return true;
     }
-
-    HIDManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
-
+    
+	HIDManager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+    
     if (!HIDManager)
     {
         return false;
     }
-
+    
     // Create a Matching Dictionary
     CFMutableDictionaryRef matchDict =
         CFDictionaryCreateMutable(kCFAllocatorDefault,
                                   2,
                                   &kCFTypeDictionaryKeyCallBacks,
                                   &kCFTypeDictionaryValueCallBacks);
-
+    
     // Specify a device manufacturer in the Matching Dictionary
     UInt32 vendorId = Oculus_VendorId;
     CFNumberRef vendorIdRef = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendorId);
@@ -85,15 +84,15 @@ bool HIDDeviceManager::initializeManager()
     IOHIDManagerSetDeviceMatching(HIDManager, matchDict);
     CFRelease(vendorIdRef);
     CFRelease(matchDict);
-
+    
     // Register a callback for USB device detection with the HID Manager
     IOHIDManagerRegisterDeviceMatchingCallback(HIDManager, &staticDeviceMatchingCallback, this);
-
+    
     IOHIDManagerScheduleWithRunLoop(HIDManager, getRunLoop(), kCFRunLoopDefaultMode);
 
     return true;
 }
-
+    
 bool HIDDeviceManager::Initialize()
 {
     return initializeManager();
@@ -103,38 +102,38 @@ void HIDDeviceManager::Shutdown()
 {
     OVR_ASSERT_LOG(HIDManager, ("Should have called 'Initialize' before 'Shutdown'."));
     CFRelease(HIDManager);
-
+    
     LogText("OVR::OSX::HIDDeviceManager - shutting down.\n");
 }
-
+    
 bool HIDDeviceManager::getIntProperty(IOHIDDeviceRef device, CFStringRef propertyName, SInt32* pResult)
 {
-
+    
     CFTypeRef ref = IOHIDDeviceGetProperty(device, propertyName);
 
     if (!ref)
     {
         return false;
     }
-
+    
     if (CFGetTypeID(ref) != CFNumberGetTypeID())
     {
         return false;
     }
-
+    
     CFNumberGetValue((CFNumberRef) ref, kCFNumberSInt32Type, pResult);
 
     return true;
 }
-
+    
 bool HIDDeviceManager::initVendorProductVersion(IOHIDDeviceRef device, HIDDeviceDesc* pDevDesc)
 {
-
+    
     if (!getVendorId(device, &(pDevDesc->VendorId)))
     {
         return false;
     }
-
+    
     if (!getProductId(device, &(pDevDesc->ProductId)))
     {
         return false;
@@ -146,30 +145,30 @@ bool HIDDeviceManager::initVendorProductVersion(IOHIDDeviceRef device, HIDDevice
         return false;
     }
     pDevDesc->VersionNumber = result;
-
+    
     return true;
 }
 
 bool HIDDeviceManager::initUsage(IOHIDDeviceRef device, HIDDeviceDesc* pDevDesc)
 {
-
+    
     SInt32 result;
-
+    
     if (!getIntProperty(device, CFSTR(kIOHIDPrimaryUsagePageKey), &result))
     {
         return false;
     }
-
+    
     pDevDesc->UsagePage = result;
 
-
+    
     if (!getIntProperty(device, CFSTR(kIOHIDPrimaryUsageKey), &result))
     {
         return false;
     }
-
+    
     pDevDesc->Usage = result;
-
+    
     return true;
 }
 
@@ -177,14 +176,14 @@ bool HIDDeviceManager::initSerialNumber(IOHIDDeviceRef device, HIDDeviceDesc* pD
 {
     return getSerialNumberString(device, &(pDevDesc->SerialNumber));
 }
-
+    
 bool HIDDeviceManager::initStrings(IOHIDDeviceRef device, HIDDeviceDesc* pDevDesc)
 {
 
     // Regardless of whether they fail we'll try and get the remaining.
     getStringProperty(device, CFSTR(kIOHIDManufacturerKey), &(pDevDesc->Manufacturer));
     getStringProperty(device, CFSTR(kIOHIDProductKey), &(pDevDesc->Product));
-
+    
     return true;
 }
 
@@ -192,9 +191,9 @@ bool HIDDeviceManager::getStringProperty(IOHIDDeviceRef device,
                                          CFStringRef propertyName,
                                          String* pResult)
 {
-
+    
     CFStringRef str = (CFStringRef) IOHIDDeviceGetProperty(device, propertyName);
-
+    
     if (!str)
     {
         return false;
@@ -202,7 +201,7 @@ bool HIDDeviceManager::getStringProperty(IOHIDDeviceRef device,
 
     CFIndex length = CFStringGetLength(str);
     CFRange range = CFRangeMake(0, length);
-
+    
     // Test the conversion first to get required buffer size.
     CFIndex bufferLength;
     CFIndex numberOfChars = CFStringGetBytes(str,
@@ -213,15 +212,15 @@ bool HIDDeviceManager::getStringProperty(IOHIDDeviceRef device,
                                              NULL,
                                              0,
                                              &bufferLength);
-
+    
     if (numberOfChars == 0)
     {
         return false;
     }
-
+    
     // Now allocate buffer.
     char* buffer = new char[bufferLength+1];
-
+    
     numberOfChars = CFStringGetBytes(str,
                                      range,
                                      kCFStringEncodingUTF8,
@@ -234,55 +233,55 @@ bool HIDDeviceManager::getStringProperty(IOHIDDeviceRef device,
 
     buffer[bufferLength] = '\0';
     *pResult = String(buffer);
-
+    
     return true;
 }
-
+    
 bool HIDDeviceManager::getVendorId(IOHIDDeviceRef device, UInt16* pResult)
 {
     SInt32 result;
-
+    
     if (!getIntProperty(device, CFSTR(kIOHIDVendorIDKey), &result))
     {
         return false;
     }
-
+    
     *pResult = result;
 
     return true;
 }
-
+    
 bool HIDDeviceManager::getProductId(IOHIDDeviceRef device, UInt16* pResult)
 {
     SInt32 result;
-
+    
     if (!getIntProperty(device, CFSTR(kIOHIDProductIDKey), &result))
     {
         return false;
     }
-
+    
     *pResult = result;
-
+    
     return true;
 }
-
+ 
 bool HIDDeviceManager::getLocationId(IOHIDDeviceRef device, SInt32* pResult)
 {
     SInt32 result;
-
+    
     if (!getIntProperty(device, CFSTR(kIOHIDLocationIDKey), &result))
     {
         return false;
     }
-
+        
     *pResult = result;
-
+        
     return true;
 }
-
+    
 bool HIDDeviceManager::getSerialNumberString(IOHIDDeviceRef device, String* pResult)
 {
-
+ 
     if (!getStringProperty(device, CFSTR(kIOHIDSerialNumberKey), pResult))
     {
         return false;
@@ -290,7 +289,7 @@ bool HIDDeviceManager::getSerialNumberString(IOHIDDeviceRef device, String* pRes
 
     return true;
 }
-
+    
 bool HIDDeviceManager::getPath(IOHIDDeviceRef device, String* pPath)
 {
 
@@ -299,7 +298,7 @@ bool HIDDeviceManager::getPath(IOHIDDeviceRef device, String* pPath)
     {
         return false;
     }
-
+    
     UInt16 vendorId;
     if (!getVendorId(device, &vendorId))
     {
@@ -311,13 +310,13 @@ bool HIDDeviceManager::getPath(IOHIDDeviceRef device, String* pPath)
     {
         return false;
     }
-
+    
     String serialNumber;
-    if (!getSerialNumberString(device, &serialNumber))
+	if (!getSerialNumberString(device, &serialNumber))
     {
         return false;
     }
-
+    
 
     StringBuffer buffer;
     buffer.AppendFormat("%s:vid=%04hx:pid=%04hx:ser=%s",
@@ -325,9 +324,9 @@ bool HIDDeviceManager::getPath(IOHIDDeviceRef device, String* pPath)
                             vendorId,
                             productId,
                             serialNumber.ToCStr());
-
+    
     *pPath = String(buffer);
-
+    
     return true;
 }
 
@@ -337,31 +336,31 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
     {
         return false;
     }
+    
 
-
-    CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager);
+	CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager);
     if (!deviceSet)
         return false;
-
-    CFIndex deviceCount = CFSetGetCount(deviceSet);
-
+    
+	CFIndex deviceCount = CFSetGetCount(deviceSet);
+    
     // Allocate a block of memory and read the set into it.
     IOHIDDeviceRef* devices = (IOHIDDeviceRef*) OVR_ALLOC(sizeof(IOHIDDeviceRef) * deviceCount);
     CFSetGetValues(deviceSet, (const void **) devices);
-
+    
 
     // Iterate over devices.
     for (CFIndex deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
     {
         IOHIDDeviceRef hidDev = devices[deviceIndex];
-
+        
         if (!hidDev)
         {
             continue;
         }
-
+        
         HIDDeviceDesc devDesc;
-
+                
         if (getPath(hidDev, &(devDesc.Path)) &&
             initVendorProductVersion(hidDev, &devDesc) &&
             enumVisitor->MatchVendorProduct(devDesc.VendorId, devDesc.ProductId) &&
@@ -379,23 +378,17 @@ bool HIDDeviceManager::Enumerate(HIDEnumerateVisitor* enumVisitor)
                 existingDevice->Enumerated = true;
                 continue;
             }
-
-            // open the device temporarily for startup communication
-            if (IOHIDDeviceOpen(hidDev, kIOHIDOptionsTypeSeizeDevice) == kIOReturnSuccess)
-            {
-                // Construct minimal device that the visitor callback can get feature reports from.
-                OSX::HIDDevice device(this, hidDev);
-
-                enumVisitor->Visit(device, devDesc);
-
-                IOHIDDeviceClose(hidDev, kIOHIDOptionsTypeSeizeDevice);
-            }
+            
+            // Construct minimal device that the visitor callback can get feature reports from.
+            OSX::HIDDevice device(this, hidDev);
+            
+            enumVisitor->Visit(device, devDesc);
         }
     }
-
+    
     OVR_FREE(devices);
     CFRelease(deviceSet);
-
+    
     return true;
 }
 
@@ -410,30 +403,30 @@ OVR::HIDDevice* HIDDeviceManager::Open(const String& path)
     }
 
     device->AddRef();
-
+    
     return device;
 }
-
+    
 bool HIDDeviceManager::getFullDesc(IOHIDDeviceRef device, HIDDeviceDesc* desc)
 {
-
+        
     if (!initVendorProductVersion(device, desc))
     {
         return false;
     }
-
+        
     if (!initUsage(device, desc))
     {
         return false;
     }
-
+    
     if (!initSerialNumber(device, desc))
     {
         return false;
     }
-
+    
     initStrings(device, desc);
-
+        
     return true;
 }
 
@@ -443,11 +436,13 @@ void HIDDeviceManager::staticDeviceMatchingCallback(void *inContext,
                                                     void *inSender,
                                                     IOHIDDeviceRef inIOHIDDeviceRef)
 {
+    OVR_UNUSED(inResult);
+    OVR_UNUSED(inSender);
     HIDDeviceManager* hidMgr = static_cast<HIDDeviceManager*>(inContext);
     HIDDeviceDesc hidDevDesc;
     hidMgr->getPath(inIOHIDDeviceRef, &hidDevDesc.Path);
     hidMgr->getFullDesc(inIOHIDDeviceRef, &hidDevDesc);
-
+    
     hidMgr->DevManager->DetectHIDDevice(hidDevDesc);
 }
 
@@ -455,16 +450,16 @@ void HIDDeviceManager::staticDeviceMatchingCallback(void *inContext,
 // **** OSX::HIDDevice
 
 HIDDevice::HIDDevice(HIDDeviceManager* manager)
- :  HIDManager(manager), InMinimalMode(false)
+ :  InMinimalMode(false), HIDManager(manager)
 {
     Device = NULL;
     RepluggedNotificationPort = 0;
 }
-
+    
 // This is a minimal constructor used during enumeration for us to pass
 // a HIDDevice to the visit function (so that it can query feature reports).
 HIDDevice::HIDDevice(HIDDeviceManager* manager, IOHIDDeviceRef device)
-:   HIDManager(manager), Device(device), InMinimalMode(true)
+:   InMinimalMode(true), HIDManager(manager), Device(device)
 {
     RepluggedNotificationPort = 0;
 }
@@ -495,16 +490,16 @@ bool HIDDevice::HIDInitialize(const String& path)
         closeDevice(false);
         return false;
     }
-
+    
     HIDManager->DevManager->pThread->AddTicksNotifier(this);
 
-
+    
     LogText("OVR::OSX::HIDDevice - Opened '%s'\n"
             "                    Manufacturer:'%s'  Product:'%s'  Serial#:'%s'\n",
             DevDesc.Path.ToCStr(),
             DevDesc.Manufacturer.ToCStr(), DevDesc.Product.ToCStr(),
             DevDesc.SerialNumber.ToCStr());
-
+    
     return true;
 }
 
@@ -512,8 +507,8 @@ bool HIDDevice::initInfo()
 {
     // Device must have been successfully opened.
     OVR_ASSERT(Device);
-
-
+    
+    
     // Get report lengths.
     SInt32 bufferLength;
     bool getResult = HIDManager->getIntProperty(Device, CFSTR(kIOHIDMaxInputReportSizeKey), &bufferLength);
@@ -527,21 +522,21 @@ bool HIDDevice::initInfo()
     getResult = HIDManager->getIntProperty(Device, CFSTR(kIOHIDMaxFeatureReportSizeKey), &bufferLength);
     OVR_ASSERT(getResult);
     FeatureReportBufferLength = (UInt16) bufferLength;
-
-
+    
+    
     if (ReadBufferSize < InputReportBufferLength)
     {
         OVR_ASSERT_LOG(false, ("Input report buffer length is bigger than read buffer."));
         return false;
     }
-
+    
     // Get device desc.
     if (!HIDManager->getFullDesc(Device, &DevDesc))
     {
         OVR_ASSERT_LOG(false, ("Failed to get device desc while initializing device."));
         return false;
     }
-
+    
     return true;
 }
 
@@ -572,53 +567,53 @@ void HIDDevice::deviceAddedCallback(io_iterator_t iterator)
     while (IOIteratorNext(iterator))
         ;
 }
-
+    
 bool HIDDevice::openDevice()
 {
-
+    
     // Have to iterate through devices again to generate paths.
-    CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager->HIDManager);
-    CFIndex deviceCount = CFSetGetCount(deviceSet);
-
+	CFSetRef deviceSet = IOHIDManagerCopyDevices(HIDManager->HIDManager);
+	CFIndex deviceCount = CFSetGetCount(deviceSet);
+    
     // Allocate a block of memory and read the set into it.
     IOHIDDeviceRef* devices = (IOHIDDeviceRef*) OVR_ALLOC(sizeof(IOHIDDeviceRef) * deviceCount);
     CFSetGetValues(deviceSet, (const void **) devices);
-
-
+    
+    
     // Iterate over devices.
     IOHIDDeviceRef device = NULL;
 
     for (CFIndex deviceIndex = 0; deviceIndex < deviceCount; deviceIndex++)
     {
         IOHIDDeviceRef tmpDevice = devices[deviceIndex];
-
+        
         if (!tmpDevice)
         {
             continue;
         }
-
+        
         String path;
         if (!HIDManager->getPath(tmpDevice, &path))
         {
             continue;
         }
-
+        
         if (path == DevDesc.Path)
         {
             device = tmpDevice;
             break;
         }
     }
-
-
+    
+    
     OVR_FREE(devices);
-
+    
     if (!device)
     {
         CFRelease(deviceSet);
         return false;
     }
-
+    
     // Attempt to open device.
     if (IOHIDDeviceOpen(device, kIOHIDOptionsTypeSeizeDevice)
         != kIOReturnSuccess)
@@ -630,11 +625,11 @@ bool HIDDevice::openDevice()
     // Retain the device before we release the set.
     CFRetain(device);
     CFRelease(deviceSet);
-
-
+    
+    
     Device = device;
 
-
+    
     if (!initInfo())
     {
         IOHIDDeviceClose(Device, kIOHIDOptionsTypeSeizeDevice);
@@ -642,13 +637,13 @@ bool HIDDevice::openDevice()
         Device = NULL;
         return false;
     }
-
-
+    
+    
     // Setup the Run Loop and callbacks.
     IOHIDDeviceScheduleWithRunLoop(Device,
                                    HIDManager->getRunLoop(),
                                    kCFRunLoopDefaultMode);
-
+    
     IOHIDDeviceRegisterInputReportCallback(Device,
                                            ReadBuffer,
                                            ReadBufferSize,
@@ -658,15 +653,15 @@ bool HIDDevice::openDevice()
     IOHIDDeviceRegisterRemovalCallback(Device,
                                        staticDeviceRemovedCallback,
                                        this);
-
+    
     return true;
 }
-
+    
 void HIDDevice::HIDShutdown()
 {
 
     HIDManager->DevManager->pThread->RemoveTicksNotifier(this);
-
+    
     if (Device != NULL) // Device may already have been closed if unplugged.
     {
         closeDevice(false);
@@ -675,25 +670,25 @@ void HIDDevice::HIDShutdown()
     IOObjectRelease(RepluggedNotification);
     if (RepluggedNotificationPort)
         IONotificationPortDestroy(RepluggedNotificationPort);
-
+    
     LogText("OVR::OSX::HIDDevice - HIDShutdown '%s'\n", DevDesc.Path.ToCStr());
 }
 
 bool HIDDevice::setupDevicePluggedInNotification()
 {
-
+    
     // Setup notification when devices are plugged in.
     RepluggedNotificationPort = IONotificationPortCreate(kIOMasterPortDefault);
-
+    
     CFRunLoopSourceRef notificationRunLoopSource =
         IONotificationPortGetRunLoopSource(RepluggedNotificationPort);
-
+    
     CFRunLoopAddSource(HIDManager->getRunLoop(),
                        notificationRunLoopSource,
                        kCFRunLoopDefaultMode);
-
+    
     CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
-
+    
     // Have to specify vendorId and productId. Doesn't seem to accept additional
     // things like serial number.
     SInt32 vendorId = DevDesc.VendorId;
@@ -702,14 +697,14 @@ bool HIDDevice::setupDevicePluggedInNotification()
                                            &vendorId);
     CFDictionarySetValue(matchingDict, CFSTR(kUSBVendorID), numberRef);
     CFRelease(numberRef);
-
+    
     SInt32 deviceProductId = DevDesc.ProductId;
     numberRef = CFNumberCreate(kCFAllocatorDefault,
                                kCFNumberSInt32Type,
                                &deviceProductId);
     CFDictionarySetValue(matchingDict, CFSTR(kUSBProductID), numberRef);
     CFRelease(numberRef);
-
+    
     kern_return_t result =
             IOServiceAddMatchingNotification(RepluggedNotificationPort,
                                              kIOMatchedNotification,
@@ -717,26 +712,26 @@ bool HIDDevice::setupDevicePluggedInNotification()
                                              staticDeviceAddedCallback,
                                              this,
                                              &RepluggedNotification);
-
+    
     if (result != KERN_SUCCESS)
     {
         CFRelease(RepluggedNotificationPort);
         RepluggedNotificationPort = 0;
         return false;
     }
-
+    
     // Iterate through to arm.
     while (IOIteratorNext(RepluggedNotification))
     {
-    }
-
+	}
+    
     return true;
 }
 
 void HIDDevice::closeDevice(bool wasUnplugged)
 {
     OVR_ASSERT(Device != NULL);
-
+    
     if (!wasUnplugged)
     {
         // Clear the registered callbacks.
@@ -745,18 +740,18 @@ void HIDDevice::closeDevice(bool wasUnplugged)
                                                InputReportBufferLength,
                                                NULL,
                                                this);
-
+        
         IOHIDDeviceRegisterRemovalCallback(Device, NULL, this);
-
+        
         IOHIDDeviceUnscheduleFromRunLoop(Device,
                                          HIDManager->getRunLoop(),
                                          kCFRunLoopDefaultMode);
         IOHIDDeviceClose(Device, kIOHIDOptionsTypeNone);
     }
-
-    CFRelease(Device);
+    
+	CFRelease(Device);
     Device = NULL;
-
+        
     LogText("OVR::OSX::HIDDevice - HID Device Closed '%s'\n", DevDesc.Path.ToCStr());
 }
 
@@ -768,26 +763,33 @@ void HIDDevice::staticHIDReportCallback(void* pContext,
                                         uint8_t* pReport,
                                         CFIndex reportLength)
 {
+    OVR_UNUSED(result);
+    OVR_UNUSED(pSender);
+    OVR_UNUSED(reportType);
+    OVR_UNUSED(reportId);
+
     HIDDevice* pDevice = (HIDDevice*) pContext;
     return pDevice->hidReportCallback(pReport, (UInt32)reportLength);
 }
 
-void HIDDevice::hidReportCallback(const UByte* pData, UInt32 length)
+void HIDDevice::hidReportCallback(UByte* pData, UInt32 length)
 {
-
+    
     // We got data.
     if (Handler)
     {
         Handler->OnInputReport(pData, length);
     }
 }
-
+    
 void HIDDevice::staticDeviceRemovedCallback(void* pContext, IOReturn result, void* pSender)
 {
+    OVR_UNUSED(result);
+    OVR_UNUSED(pSender);
     HIDDevice* pDevice = (HIDDevice*) pContext;
     pDevice->deviceRemovedCallback();
 }
-
+    
 void HIDDevice::deviceRemovedCallback()
 {
     Ptr<HIDDevice> _this(this); // prevent from release
@@ -805,16 +807,16 @@ CFStringRef HIDDevice::generateRunLoopModeString(IOHIDDeviceRef device)
     const UInt32 safeBuffSize = 256;
     char nameBuff[safeBuffSize];
     OVR_sprintf(nameBuff, safeBuffSize, "%016lX", device);
-
+  
     return CFStringCreateWithCString(NULL, nameBuff, kCFStringEncodingASCII);
 }
-
+    
 bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
 {
-
+    
     if (!Device)
         return false;
-
+    
     UByte reportID = data[0];
 
     if (reportID == 0)
@@ -823,13 +825,13 @@ bool HIDDevice::SetFeatureReport(UByte* data, UInt32 length)
         data++;
         length--;
     }
-
-    IOReturn result = IOHIDDeviceSetReport( Device,
+    
+	IOReturn result = IOHIDDeviceSetReport( Device,
                                             kIOHIDReportTypeFeature,
                                             reportID,
                                             data,
                                             length);
-
+    
     return (result == kIOReturnSuccess);
 }
 
@@ -837,29 +839,29 @@ bool HIDDevice::GetFeatureReport(UByte* data, UInt32 length)
 {
     if (!Device)
         return false;
-
+    
     CFIndex bufferLength = length;
-
+    
     // Report id is in first byte of the buffer.
-    IOReturn result = IOHIDDeviceGetReport(Device, kIOHIDReportTypeFeature, data[0], data, &bufferLength);
-
+	IOReturn result = IOHIDDeviceGetReport(Device, kIOHIDReportTypeFeature, data[0], data, &bufferLength);
+	
     return (result == kIOReturnSuccess);
 }
-
-UInt64 HIDDevice::OnTicks(UInt64 ticksMks)
+   
+double HIDDevice::OnTicks(double tickSeconds)
 {
-
+    
     if (Handler)
     {
-        return Handler->OnTicks(ticksMks);
+        return Handler->OnTicks(tickSeconds);
     }
-
-    return DeviceManagerThread::Notifier::OnTicks(ticksMks);
+    
+    return DeviceManagerThread::Notifier::OnTicks(tickSeconds);
 }
 
 HIDDeviceManager* HIDDeviceManager::CreateInternal(OSX::DeviceManager* devManager)
 {
-
+        
     if (!System::IsInitialized())
     {
         // Use custom message, since Log is not yet installed.
@@ -884,17 +886,16 @@ HIDDeviceManager* HIDDeviceManager::CreateInternal(OSX::DeviceManager* devManage
 
     return manager.GetPtr();
 }
-
+    
 } // namespace OSX
 
 //-------------------------------------------------------------------------------------
 // ***** Creation
 
 // Creates a new HIDDeviceManager and initializes OVR.
-HIDDeviceManager* HIDDeviceManager::Create()
+HIDDeviceManager* HIDDeviceManager::Create(Ptr<OVR::DeviceManager>& deviceManager)
 {
-    OVR_ASSERT_LOG(false, ("Standalone mode not implemented yet."));
-
+    
     if (!System::IsInitialized())
     {
         // Use custom message, since Log is not yet installed.
@@ -903,21 +904,21 @@ HIDDeviceManager* HIDDeviceManager::Create()
         return 0;
     }
 
-    Ptr<OSX::HIDDeviceManager> manager = *new OSX::HIDDeviceManager(NULL);
+    Ptr<OSX::DeviceManager> deviceManagerOSX = *new OSX::DeviceManager;
 
-    if (manager)
+	if (!deviceManagerOSX)
     {
-        if (manager->Initialize())
-        {
-            manager->AddRef();
-        }
-        else
-        {
-            manager.Clear();
-        }
+		return NULL;
+	}
+
+	if (!deviceManagerOSX->Initialize(NULL))
+    {         
+		return NULL;
     }
 
-    return manager.GetPtr();
+	deviceManager = deviceManagerOSX;
+
+	return deviceManagerOSX->GetHIDDeviceManager();
 }
 
 } // namespace OVR

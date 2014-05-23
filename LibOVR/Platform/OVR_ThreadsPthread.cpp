@@ -1,21 +1,20 @@
 /************************************************************************************
 
-PublicHeader:   OVR
-Filename    :   OVR_Threads.h
+Filename    :   OVR_ThreadsPthread.cpp
 Content     :   
 Created     :   
 Notes       : 
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,19 +34,10 @@ limitations under the License.
 
 #include <pthread.h>
 #include <time.h>
-
-#ifdef OVR_OS_PS3
-#include <sys/sys_time.h>
-#include <sys/timer.h>
-#include <sys/synchronization.h>
-#define sleep(x) sys_timer_sleep(x)
-#define usleep(x) sys_timer_usleep(x)
-using std::timespec;
-#else
 #include <unistd.h>
 #include <sys/time.h>
 #include <errno.h>
-#endif
+
 
 namespace OVR {
 
@@ -86,6 +76,7 @@ bool Lock::RecursiveAttrInit = 0;
 // *** Constructor/destructor
 MutexImpl::MutexImpl(Mutex* pmutex, bool recursive)
 {   
+    OVR_UNUSED(pmutex);
     Recursive           = recursive;
     LockCount           = 0;
 
@@ -113,7 +104,8 @@ MutexImpl::~MutexImpl()
 // Lock and try lock
 void MutexImpl::DoLock()
 {
-    while (pthread_mutex_lock(&SMutex));
+    while (pthread_mutex_lock(&SMutex))
+        ;
     LockCount++;
     LockedBy = pthread_self();
 }
@@ -132,6 +124,7 @@ bool MutexImpl::TryLock()
 
 void MutexImpl::Unlock(Mutex* pmutex)
 {
+    OVR_UNUSED(pmutex);
     OVR_ASSERT(pthread_self() == LockedBy && LockCount > 0);
 
     unsigned lockCount;
@@ -143,6 +136,7 @@ void MutexImpl::Unlock(Mutex* pmutex)
 
 bool    MutexImpl::IsLockedByAnotherThread(Mutex* pmutex)
 {
+    OVR_UNUSED(pmutex);
     // There could be multiple interpretations of IsLocked with respect to current thread
     if (LockCount == 0)
         return 0;
@@ -302,21 +296,13 @@ bool    WaitConditionImpl::Wait(Mutex *pmutex, unsigned delay)
     else
     {
         timespec ts;
-#ifdef OVR_OS_PS3
-        sys_time_sec_t s;
-        sys_time_nsec_t ns;
-        sys_time_get_current_time(&s, &ns);
 
-        ts.tv_sec = s + (delay / 1000);
-        ts.tv_nsec = ns + (delay % 1000) * 1000000;
-
-#else
         struct timeval tv;
         gettimeofday(&tv, 0);
 
         ts.tv_sec = tv.tv_sec + (delay / 1000);
         ts.tv_nsec = (tv.tv_usec + (delay % 1000) * 1000) * 1000;
-#endif
+
         if (ts.tv_nsec > 999999999)
         {
             ts.tv_sec++;
@@ -668,7 +654,7 @@ void* Thread_PthreadStartFn(void* phandle)
     // At this point Thread object might be dead; however we can still pass
     // it to RemoveRunningThread since it is only used as a key there.   
     ThreadList::RemoveRunningThread(pthread);
-    return (void*) result;
+    return reinterpret_cast<void*>(result);
 }
 
 int Thread::InitAttr = 0;
@@ -678,21 +664,8 @@ pthread_attr_t Thread::Attr;
 int Thread::GetOSPriority(ThreadPriority p)
 //static inline int MapToSystemPrority(Thread::ThreadPriority p)
 {
-#ifdef OVR_OS_PS3 
-    switch(p)
-    {
-    case Thread::CriticalPriority:     return 0;
-    case Thread::HighestPriority:      return 300;
-    case Thread::AboveNormalPriority:  return 600;
-    case Thread::NormalPriority:       return 1000;
-    case Thread::BelowNormalPriority:  return 1500;
-    case Thread::LowestPriority:       return 2500;
-    case Thread::IdlePriority:         return 3071;
-    }                                  return 1000;
-#else
     OVR_UNUSED(p);
     return -1;
-#endif
 }
 
 bool    Thread::Start(ThreadState initialState)
@@ -780,7 +753,7 @@ void    Thread::Exit(int exitCode)
     FinishAndRelease();
     ThreadList::RemoveRunningThread(this);
 
-    pthread_exit((void *) exitCode);
+    pthread_exit(reinterpret_cast<void*>(exitCode));
 }
 
 ThreadId GetCurrentThreadId()
@@ -808,13 +781,6 @@ int     Thread::GetCPUCount()
 {
     return 1;
 }
-
-
-#ifdef OVR_OS_PS3
-
-sys_lwmutex_attribute_t Lock::LockAttr = { SYS_SYNC_PRIORITY, SYS_SYNC_RECURSIVE };
-
-#endif
 
 }
 

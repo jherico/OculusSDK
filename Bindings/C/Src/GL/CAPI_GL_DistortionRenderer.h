@@ -18,7 +18,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "../CAPI_DistortionRenderer.h"
 
-#include <Kernel/OVR_Log.h>
+#include "../../Kernel/OVR_Log.h"
 #include "CAPI_GL_Util.h"
 
 namespace OVR { namespace CAPI { namespace GL {
@@ -43,9 +43,9 @@ public:
 
 
     // ***** Public DistortionRenderer interface
-    
+	
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
-                            unsigned hmdCaps, unsigned distortionCaps);
+                            unsigned distortionCaps);
 
     virtual void SubmitEye(int eyeId, ovrTexture* eyeTexture);
 
@@ -53,72 +53,124 @@ public:
 
     void         WaitUntilGpuIdle();
 
-    // Similar to ovr_WaitTillTime but it also flushes GPU.
-    // Note, it exits when time expires, even if GPU is not in idle state yet.
-    double       FlushGpuAndWaitTillTime(double absTime);
+	// Similar to ovr_WaitTillTime but it also flushes GPU.
+	// Note, it exits when time expires, even if GPU is not in idle state yet.
+	double       FlushGpuAndWaitTillTime(double absTime);
 
-private:    
+protected:
+    
+    
+    class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
+    {
+    public:
+        GraphicsState();
+        virtual void Save();
+        virtual void Restore();
+        
+    protected:
+        void ApplyBool(GLenum Name, GLint Value);
+        
+    public:
+        GLint GlMajorVersion;
+        GLint GlMinorVersion;
+        bool SupportsVao;
+        
+        GLint Viewport[4];
+        GLfloat ClearColor[4];
+        GLint DepthTest;
+        GLint CullFace;
+        GLint Program;
+        GLint ActiveTexture;
+        GLint TextureBinding;
+        GLint VertexArray;
+        GLint FrameBufferBinding;
+        
+        GLint Blend;
+        GLint ColorWritemask[4];
+        GLint Dither;
+        GLint Fog;
+        GLint Lighting;
+        GLint RasterizerDiscard;
+        GLint RenderMode;
+        GLint SampleMask;
+        GLint ScissorTest;
+        GLfloat ZoomX;
+        GLfloat ZoomY;
+    };
+
     // TBD: Should we be using oe from RState instead?
     unsigned            DistortionCaps;
 
-    struct FOR_EACH_EYE
-    {
+	struct FOR_EACH_EYE
+	{
+        FOR_EACH_EYE() : TextureSize(0), RenderViewport(Sizei(0)) { }
+
 #if 0
-        IDirect3DVertexBuffer9  * dxVerts;
-        IDirect3DIndexBuffer9   * dxIndices;
+		IDirect3DVertexBuffer9  * dxVerts;
+		IDirect3DIndexBuffer9   * dxIndices;
 #endif
-        int                       numVerts;
-        int                       numIndices;
+		int                       numVerts;
+		int                       numIndices;
 
-        GLuint                     texture;
+		GLuint                    texture;
 
-        ovrVector2f                   UVScaleOffset[2]; 
-    } eachEye[2];
+		ovrVector2f			 	  UVScaleOffset[2];
+        Sizei                     TextureSize;
+        Recti                     RenderViewport;
+	} eachEye[2];
 
     // GL context and utility variables.
     RenderParams        RParams;    
 
-    // Helpers
+	// Helpers
     void initBuffersAndShaders();
     void initShaders();
     void initFullscreenQuad();
     void destroy();
-    
+	
     void setViewport(const Recti& vp);
 
     void renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture);
 
-    void renderPrimitives(const ShaderFill* fill, GLuint * vao, Buffer* vertices, Buffer* indices,
-                          Matrix4f* viewMatrix, int offset, int count,
-                          PrimitiveType rprim, bool useDistortionVertex);
+    void renderPrimitives(const ShaderFill* fill, Buffer* vertices, Buffer* indices,
+                          int offset, int count,
+						  PrimitiveType rprim, GLuint* vao, bool isDistortionMesh);
 
-    void createDrawQuad();
+	void createDrawQuad();
     void renderLatencyQuad(unsigned char* latencyTesterDrawColor);
     void renderLatencyPixel(unsigned char* latencyTesterPixelColor);
-    
+	
     Ptr<Texture>        pEyeTextures[2];
 
-    // U,V scale and offset needed for timewarp.
-    ovrVector2f         UVScaleOffset[2][2];
+	Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
+	Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
+	GLuint              DistortionMeshVAOs[2];   // one per-eye
 
-    Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
-    Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
-    int                 DistortionMeshIndexCount[2];
-
-    Ptr<ShaderSet>      DistortionShader;
+	Ptr<ShaderSet>      DistortionShader;
 
     struct StandardUniformData
     {
         Matrix4f  Proj;
         Matrix4f  View;
     }                   StdUniforms;
-
+	
+	GLuint              LatencyVAO;
     Ptr<Buffer>         LatencyTesterQuadVB;
     Ptr<ShaderSet>      SimpleQuadShader;
 
     Ptr<Texture>             CurRenderTarget;
     Array<Ptr<Texture> >     DepthBuffers;
     GLuint                   CurrentFbo;
+
+	GLint SavedViewport[4];
+	GLfloat SavedClearColor[4];
+	GLint SavedDepthTest;
+	GLint SavedCullFace;
+	GLint SavedProgram;
+	GLint SavedActiveTexture;
+	GLint SavedBoundTexture;
+	GLint SavedVertexArray;
+    GLint SavedBoundFrameBuffer;
 };
 
 }}} // OVR::CAPI::GL

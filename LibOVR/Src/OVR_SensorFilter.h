@@ -108,17 +108,17 @@ public:
         return this->IsEmpty() ? T() : (Total() / (float) this->ElemCount);
     }
 
-    T MeanN(int n) const
-    {
+	T MeanN(int n) const
+	{
         OVR_ASSERT(n > 0);
         OVR_ASSERT(this->Capacity >= n);
-        T total = T();
+		T total = T();
         for (int i = 0; i < n; i++) 
         {
-            total += this->PeekBack(i);
-        }
-        return total / n;
-    }
+			total += this->PeekBack(i);
+		}
+		return total / n;
+	}
 
     // A popular family of smoothing filters and smoothed derivatives
 
@@ -209,7 +209,7 @@ template <typename T>
 class SensorFilter : public SensorFilterBase<Vector3<T> >
 {
 public:
-    SensorFilter(int capacity = SensorFilterBase<Vector3<T> >::DefaultCapacity) : SensorFilterBase<Vector3<T> >(capacity) { };
+	SensorFilter(int capacity = SensorFilterBase<Vector3<T> >::DefaultCapacity) : SensorFilterBase<Vector3<T> >(capacity) { };
 
     // Simple statistics
     Vector3<T> Median() const;
@@ -251,9 +251,9 @@ private:
     }
 
 public:
-    SensorFilterBodyFrame(int capacity = SensorFilterBase<Vector3d>::DefaultCapacity) 
+	SensorFilterBodyFrame(int capacity = SensorFilterBase<Vector3d>::DefaultCapacity) 
         : SensorFilterBase<Vector3d>(capacity), gain(2.5), 
-        output(), Q(), runningTotalLengthSq(0) { };
+        runningTotalLengthSq(0), Q(), output()  { };
 
     // return the scalar variance of the filter values (rotated to be in the same frame)
     double Variance() const

@@ -33,9 +33,9 @@ limitations under the License.
 // ***** Choices and settings
 
 // Whether the SDK performs rendering/distortion, or the app.
-//#define          SDK_RENDER       1
-
-const unsigned   DistortionCaps = ovrDistortion_Chromatic | ovrDistortion_TimeWarp;
+#define          SDK_RENDER       1
+ 
+const unsigned   DistortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp;
 const bool       VSyncEnabled  = true;
 const bool       FullScreen    = true;
 
@@ -52,19 +52,22 @@ void             PopulateRoomScene             (Scene* scene, RenderDevice* rend
 ovrHmd           HMD;
 ovrHmdDesc       HMDDesc;
 ovrEyeRenderDesc EyeRenderDesc[2];
-RenderDevice*    pRender; 
-Texture*         pRendertargetTexture;
-Scene*           pRoomScene;
+ovrRecti         EyeRenderViewport[2];
+RenderDevice*    pRender = 0;
+Texture*         pRendertargetTexture = 0;
+Scene*           pRoomScene = 0;
 
 // Specifics for whether the SDK or the app is doing the distortion.
 #if SDK_RENDER
-    #define OVR_D3D_VERSION 11
-    #include "OVR_CAPI_D3D.h"
-    ovrD3D11Texture      EyeTexture[2];
+	#define OVR_D3D_VERSION 11
+	#include "OVR_CAPI_D3D.h"
+	ovrD3D11Texture      EyeTexture[2];
 #else
-    void DistortionMeshInit  (unsigned distortionCaps, ovrHmd HMD,
-                              ovrEyeRenderDesc eyeRenderDesc[2], RenderDevice * pRender);
-    void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
+	void DistortionMeshInit  (unsigned distortionCaps, ovrHmd HMD,
+                              ovrEyeRenderDesc eyeRenderDesc[2],
+                              ovrSizei textureSize, ovrRecti viewports[2],
+                              RenderDevice * pRender);
+	void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
                               double timwarpTimePoint, ovrPosef eyeRenderPoses[2],
                               RenderDevice * pRender, Texture* pRendertargetTexture);
 #endif
@@ -76,27 +79,27 @@ int Init()
     // Initializes LibOVR. 
     ovr_Initialize();
 
-    HMD = ovrHmd_Create(0);
+	HMD = ovrHmd_Create(0);
     if (!HMD)
     {
         MessageBoxA(NULL,"Oculus Rift not detected.","", MB_OK);
         return(1);
     }
-    //Get more details about the HMD    
-    ovrHmd_GetDesc(HMD, &HMDDesc);
-    if (HMDDesc.DisplayDeviceName[0] == '\0')
+	//Get more details about the HMD	
+	ovrHmd_GetDesc(HMD, &HMDDesc);
+	if (HMDDesc.DisplayDeviceName[0] == '\0')
         MessageBoxA(NULL,"Rift detected, display not enabled.","", MB_OK);
 
-    //Setup Window and Graphics
-    const int backBufferMultisample = 1;
+	//Setup Window and Graphics
+	const int backBufferMultisample = 1;
     pRender = Util_InitWindowAndGraphics(Recti(HMDDesc.WindowsPos, HMDDesc.Resolution),
                                          FullScreen, backBufferMultisample);
-    if (!pRender) return 1;
+	if (!pRender) return 1;
      
     //Configure Stereo settings.
     Sizei recommenedTex0Size = ovrHmd_GetFovTextureSize(HMD, ovrEye_Left,  HMDDesc.DefaultEyeFov[0], 1.0f);
     Sizei recommenedTex1Size = ovrHmd_GetFovTextureSize(HMD, ovrEye_Right, HMDDesc.DefaultEyeFov[1], 1.0f);
-    Sizei RenderTargetSize;
+	Sizei RenderTargetSize;
     RenderTargetSize.w = recommenedTex0Size.w + recommenedTex1Size.w;
     RenderTargetSize.h = max ( recommenedTex0Size.h, recommenedTex1Size.h );
 
@@ -110,30 +113,25 @@ int Init()
 
     // Initialize eye rendering information for ovrHmd_Configure.
     // The viewport sizes are re-computed in case RenderTargetSize changed due to HW limitations.
-    ovrEyeDesc eyes[2];
-    eyes[0].Eye                 = ovrEye_Left;
-    eyes[1].Eye                 = ovrEye_Right;
-    eyes[0].Fov                 = HMDDesc.DefaultEyeFov[0];
-    eyes[1].Fov                 = HMDDesc.DefaultEyeFov[1];
-    eyes[0].TextureSize         = RenderTargetSize;
-    eyes[1].TextureSize         = RenderTargetSize;
-    eyes[0].RenderViewport.Pos  = Vector2i(0,0);
-    eyes[0].RenderViewport.Size = Sizei(RenderTargetSize.w / 2, RenderTargetSize.h);
-    eyes[1].RenderViewport.Pos  = Vector2i((RenderTargetSize.w + 1) / 2, 0);
-    eyes[1].RenderViewport.Size = eyes[0].RenderViewport.Size;
+    ovrFovPort eyeFov[2] = { HMDDesc.DefaultEyeFov[0], HMDDesc.DefaultEyeFov[1] } ;
+
+    EyeRenderViewport[0].Pos  = Vector2i(0,0);
+    EyeRenderViewport[0].Size = Sizei(RenderTargetSize.w / 2, RenderTargetSize.h);
+    EyeRenderViewport[1].Pos  = Vector2i((RenderTargetSize.w + 1) / 2, 0);
+    EyeRenderViewport[1].Size = EyeRenderViewport[0].Size;
 
 #if SDK_RENDER
-    // Query D3D texture data.
+	// Query D3D texture data.
     Texture* rtt = (Texture*)pRendertargetTexture;
     EyeTexture[0].D3D11.Header.API            = ovrRenderAPI_D3D11;
     EyeTexture[0].D3D11.Header.TextureSize    = RenderTargetSize;
-    EyeTexture[0].D3D11.Header.RenderViewport = eyes[0].RenderViewport;
+    EyeTexture[0].D3D11.Header.RenderViewport = EyeRenderViewport[0];
     EyeTexture[0].D3D11.pTexture              = rtt->Tex.GetPtr();
     EyeTexture[0].D3D11.pSRView               = rtt->TexSv.GetPtr();
 
     // Right eye uses the same texture, but different rendering viewport.
     EyeTexture[1] = EyeTexture[0];
-    EyeTexture[1].D3D11.Header.RenderViewport = eyes[1].RenderViewport;    
+    EyeTexture[1].D3D11.Header.RenderViewport = EyeRenderViewport[1];
 
     // Configure d3d11.
     RenderDevice* render = (RenderDevice*)pRender;
@@ -147,25 +145,27 @@ int Init()
     d3d11cfg.D3D11.pSwapChain         = render->SwapChain;
 
     if (!ovrHmd_ConfigureRendering(HMD, &d3d11cfg.Config,
-                                   (VSyncEnabled ? 0 : ovrHmdCap_NoVSync), DistortionCaps,
-                                   eyes, EyeRenderDesc)) return(1);
+		                           DistortionCaps,
+                                   eyeFov, EyeRenderDesc)) return(1);
 #else // !SDK_RENDER
-    EyeRenderDesc[0] = ovrHmd_GetRenderDesc(HMD, eyes[0]);
-    EyeRenderDesc[1] = ovrHmd_GetRenderDesc(HMD, eyes[1]);
+    EyeRenderDesc[0] = ovrHmd_GetRenderDesc(HMD, ovrEye_Left,  eyeFov[0]);
+    EyeRenderDesc[1] = ovrHmd_GetRenderDesc(HMD, ovrEye_Right, eyeFov[1]);
     
-     // Create our own distortion mesh and shaders
-    DistortionMeshInit(DistortionCaps, HMD, EyeRenderDesc, pRender);
+ 	// Create our own distortion mesh and shaders
+    DistortionMeshInit(DistortionCaps, HMD, EyeRenderDesc,
+                       RenderTargetSize, EyeRenderViewport, pRender);
 #endif
 
-    // Start the sensor which informs of the Rift's pose and motion
-    ovrHmd_StartSensor(HMD, ovrHmdCap_Orientation |
-                            ovrHmdCap_YawCorrection |
-                            ovrHmdCap_Position |
-                            ovrHmdCap_LowPersistence |
-                            ovrHmdCap_LatencyTest, 0);
+    ovrHmd_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence |
+                               ovrHmdCap_LatencyTest);
+
+	// Start the sensor which informs of the Rift's pose and motion
+    ovrHmd_StartSensor(HMD, ovrSensorCap_Orientation |
+                            ovrSensorCap_YawCorrection |
+                            ovrSensorCap_Position, 0);
 
     // This creates lights and models.
-      pRoomScene = new Scene;
+  	pRoomScene = new Scene;
     PopulateRoomScene(pRoomScene, pRender);
 
     return 0;
@@ -181,70 +181,67 @@ void ProcessAndRender()
     ovrFrameTiming frameTiming = ovrHmd_BeginFrameTiming(HMD, 0); 
 #endif
 
-    //Adjust eye position and rotation from controls, maintaining y position from HMD.
-    static Vector3f EyePos(0.0f, 1.6f, -5.0f);
-    static float    EyeYaw(3.141592f);
+	//Adjust eye position and rotation from controls, maintaining y position from HMD.
+	static Vector3f EyePos(0.0f, 1.6f, -5.0f);
+	static float    EyeYaw(3.141592f);
 
-    Posef     movePose = ovrHmd_GetSensorState(HMD, frameTiming.ScanoutMidpointSeconds).Predicted.Pose;
-    ovrPosef  eyeRenderPose[2];
+    Transformf movePose = ovrHmd_GetSensorState(HMD, frameTiming.ScanoutMidpointSeconds).Predicted.Pose;
+    static ovrPosef eyeRenderPose[2]; 
 
-    EyePos.y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, EyePos.y);
-    bool freezeEyeRender = Util_RespondToControls(EyeYaw, EyePos,
-                                frameTiming.DeltaSeconds, movePose.Orientation);
+	EyePos.y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, EyePos.y);
+	bool freezeEyeRender = Util_RespondToControls(EyeYaw, EyePos,
+                                frameTiming.DeltaSeconds, movePose.Rotation);
 
     pRender->BeginScene();
     
-    //Render the two undistorted eye views into their render buffers.
+	//Render the two undistorted eye views into their render buffers.
     if (!freezeEyeRender) // freeze to debug, especially for time warp
     {
         pRender->SetRenderTarget ( pRendertargetTexture );
         pRender->SetViewport (Recti(0,0, pRendertargetTexture->GetWidth(),
                                          pRendertargetTexture->GetHeight() ));  
         pRender->Clear();
-        for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
-        {
+		for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
+		{
             ovrEyeType eye = HMDDesc.EyeRenderOrder[eyeIndex];
 #if SDK_RENDER
-            eyeRenderPose[eye] = ovrHmd_BeginEyeRender(HMD, eye);
+		    eyeRenderPose[eye] = ovrHmd_BeginEyeRender(HMD, eye);
 #else
             eyeRenderPose[eye] = ovrHmd_GetEyePose(HMD, eye);
 #endif
 
-            // Get view matrix
-            Matrix4f rollPitchYaw       = Matrix4f::RotationY(EyeYaw);
-            Matrix4f finalRollPitchYaw  = rollPitchYaw * Matrix4f(eyeRenderPose[eye].Orientation);
-            Vector3f finalUp            = finalRollPitchYaw.Transform(Vector3f(0,1,0));
-            Vector3f finalForward       = finalRollPitchYaw.Transform(Vector3f(0,0,-1));
-            Vector3f shiftedEyePos      = EyePos + rollPitchYaw.Transform(eyeRenderPose[eye].Position);
-            
+			// Get view matrix
+			Matrix4f rollPitchYaw       = Matrix4f::RotationY(EyeYaw);
+			Matrix4f finalRollPitchYaw  = rollPitchYaw * Matrix4f(eyeRenderPose[eye].Orientation);
+			Vector3f finalUp            = finalRollPitchYaw.Transform(Vector3f(0,1,0));
+			Vector3f finalForward       = finalRollPitchYaw.Transform(Vector3f(0,0,-1));
+			Vector3f shiftedEyePos      = EyePos + rollPitchYaw.Transform(eyeRenderPose[eye].Position);
+			
             Matrix4f view = Matrix4f::LookAtRH(shiftedEyePos,
                                                shiftedEyePos + finalForward, finalUp); 
 
-            Matrix4f proj = ovrMatrix4f_Projection(EyeRenderDesc[eye].Desc.Fov, 0.01f, 10000.0f, true);
+			Matrix4f proj = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, 0.01f, 10000.0f, true);
 
-            pRender->SetViewport(EyeRenderDesc[eye].Desc.RenderViewport.Pos.x,
-                                 EyeRenderDesc[eye].Desc.RenderViewport.Pos.y,
-                                 EyeRenderDesc[eye].Desc.RenderViewport.Size.w,
-                                 EyeRenderDesc[eye].Desc.RenderViewport.Size.h);
-            pRender->SetProjection(proj);
-            pRender->SetDepthMode(true, true);
-            pRoomScene->Render(pRender, Matrix4f::Translation(EyeRenderDesc[eye].ViewAdjust) * view);
+			pRender->SetViewport(Recti(EyeRenderViewport[eye]));
+			pRender->SetProjection(proj);
+			pRender->SetDepthMode(true, true);
+			pRoomScene->Render(pRender, Matrix4f::Translation(EyeRenderDesc[eye].ViewAdjust) * view);
 
-        #if SDK_RENDER
-            ovrHmd_EndEyeRender(HMD, eye, eyeRenderPose[eye], &EyeTexture[eye].Texture);
-        #endif
-        }
+		#if SDK_RENDER
+			ovrHmd_EndEyeRender(HMD, eye, eyeRenderPose[eye], &EyeTexture[eye].Texture);
+		#endif
+		}
     }
     pRender->FinishScene();
 
-    // Now render the distorted view and finish.
+	// Now render the distorted view and finish.
 #if SDK_RENDER
     // Let OVR do distortion rendering, Present and flush/sync
     ovrHmd_EndFrame(HMD);
 
 #else
     DistortionMeshRender(DistortionCaps, HMD, frameTiming.TimewarpPointSeconds,
-                         eyeRenderPose, pRender, pRendertargetTexture);    
+                         eyeRenderPose, pRender, pRendertargetTexture);	
     pRender->Present( VSyncEnabled );
     pRender->WaitUntilGpuIdle();  //for lowest latency
     ovrHmd_EndFrameTiming(HMD);
@@ -274,8 +271,10 @@ ovrHmd_EndFrame(hmd);
 //-------------------------------------------------------------------------------------
 void Release(void)
 {
-    pRendertargetTexture->Release();
-    pRendertargetTexture = 0;
+	if (pRendertargetTexture) {
+		pRendertargetTexture->Release();
+		pRendertargetTexture = 0;
+	}
     ovrHmd_Destroy(HMD);
     Util_ReleaseWindowAndGraphics(pRender);
     pRender = 0;

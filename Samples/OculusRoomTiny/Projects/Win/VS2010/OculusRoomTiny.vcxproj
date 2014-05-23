@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{6C6ECAC4-DB5C-4301-8371-9C7CC8C623C2}</ProjectGuid>
+    <ProjectGuid>{80523489-2881-4F64-8C3B-FAF88B60ABCD}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>OculusRoomTiny</RootNamespace>
     <ProjectName>OculusRoomTiny</ProjectName>

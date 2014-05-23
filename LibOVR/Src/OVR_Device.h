@@ -347,7 +347,7 @@ public:
     char      DisplayDeviceName[32];
     
     // MacOS:
-    long      DisplayId;
+    int      DisplayId;
 
 
     // Constructor initializes all values to 0s.
@@ -492,50 +492,120 @@ private:
     void operator = (const SensorInfo&) { OVR_ASSERT(0); } // Assignment not allowed.
 };
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serial Number feature report. (DK1)
+struct SerialReport
+{
+    static const int SERIAL_NUMBER_SIZE = 12;  // Serial Number size = 12 bytes. (Refer 'Tracker Firmware Specification Section 4.9, Pg 18)
+
+	SerialReport()
+        : CommandId(0)
+	{
+        memset(SerialNumberValue, 0, sizeof(SerialNumberValue));
+    }
+                
+    SerialReport(UInt16 commandId,
+                UByte SNo[SERIAL_NUMBER_SIZE])
+        :	    CommandId(commandId)
+    { 
+        for (int i=0; i < SERIAL_NUMBER_SIZE; i++)
+        {
+            SerialNumberValue[i] = SNo[i];
+        }
+    }
+
+    UInt16      CommandId;
+	UByte	    SerialNumberValue[SERIAL_NUMBER_SIZE];          // See 'Tracker Firmware Specification' document for
+													  // a description of Serial Report.
+};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Added Serial Report Implementation.
+
+struct SerialImpl
+{
+    enum  { PacketSize = 15 };
+    UByte   Buffer[PacketSize];
+
+    SerialReport Settings;
+
+	SerialImpl()
+	{
+	memset(Buffer, 0, sizeof(Buffer));
+	Buffer[0] = 10;
+	}
+
+	SerialImpl(const SerialReport& settings)
+			:Settings(settings)
+	{
+		Pack();
+	}
+
+	void  Pack()
+	{
+    Buffer[0] = 10;
+    Alg::EncodeUInt16(Buffer+1, Settings.CommandId);
+	for (int i = 0; i < Settings.SERIAL_NUMBER_SIZE; ++i)
+		Buffer[3 + i] = Settings.SerialNumberValue[i];
+	}
+
+	void Unpack()
+	{
+		Settings.CommandId = Alg::DecodeUInt16(Buffer+1);
+		for (int i = 0; i < Settings.SERIAL_NUMBER_SIZE; ++i)
+			Settings.SerialNumberValue[i] = Buffer[3 + i];
+	}
+
+};
+
+
 // Tracking settings (DK2).
 struct TrackingReport
 {
-    TrackingReport()
+	TrackingReport()
       : CommandId(0), Pattern(0), 
         Enable(0), Autoincrement(0), UseCarrier(0), 
         SyncInput(0), VsyncLock(0), CustomPattern(0),
         ExposureLength(0), FrameInterval(0), 
         VsyncOffset(0), DutyCycle(0)
-    {}
+	{}
 
     TrackingReport( UInt16 commandId, 
                     UByte pattern,
                     bool enable, 
-                    bool autoincrement, 
-                    bool useCarrier, 
+					bool autoincrement, 
+					bool useCarrier, 
                     bool syncInput, 
-                    bool vsyncLock, 
-                    bool customPattern, 
+					bool vsyncLock, 
+					bool customPattern, 
                     UInt16 exposureLength, 
                     UInt16 frameInterval, 
                     UInt16 vsyncOffset, 
                     UByte dutyCycle)
-        :        CommandId(commandId), Pattern(pattern), 
+        :	    CommandId(commandId), Pattern(pattern), 
                 Enable(enable), Autoincrement(autoincrement), UseCarrier(useCarrier), 
                 SyncInput(syncInput), VsyncLock(vsyncLock), CustomPattern(customPattern),
-                ExposureLength(exposureLength), FrameInterval(frameInterval), 
-                VsyncOffset(vsyncOffset), DutyCycle(dutyCycle)
+			    ExposureLength(exposureLength), FrameInterval(frameInterval), 
+			    VsyncOffset(vsyncOffset), DutyCycle(dutyCycle)
     { }
 
     UInt16  CommandId;
-    UByte    Pattern;            // Tracking LED pattern index.
+	UByte	Pattern;            // Tracking LED pattern index.
     bool    Enable;             // Enables the tracking LED exposure and updating.
     bool    Autoincrement;      // Autoincrement pattern after each exposure.
     bool    UseCarrier;         // Modulate tracking LEDs at 85kHz.
     bool    SyncInput;          // Trigger LED exposure from wired sync signal.
     bool    VsyncLock;          // Trigger LED exposure from panel Vsync.
     bool    CustomPattern;      // Use custom LED sequence.
-    UInt16    ExposureLength;     // Tracking LED illumination (and exposure) length in microseconds.
-    UInt16    FrameInterval;      // LED exposure interval in microseconds when in 
+    UInt16	ExposureLength;     // Tracking LED illumination (and exposure) length in microseconds.
+	UInt16	FrameInterval;      // LED exposure interval in microseconds when in 
                                 // 'internal timer' mode (when SyncInput = VsyncLock = false).
-    UInt16    VsyncOffset;        // Exposure offset in microseconds from vsync when in 
+    UInt16	VsyncOffset;        // Exposure offset in microseconds from vsync when in 
                                 // 'vsync lock' mode (when VsyncLock = true).
-    UByte    DutyCycle;          // Duty cycle of 85kHz modulation when in 'use carrier' mode 
+	UByte	DutyCycle;          // Duty cycle of 85kHz modulation when in 'use carrier' mode 
                                 // (when UseCarrier = true). 128 = 50% duty cycle.
 };
 
@@ -554,14 +624,14 @@ struct DisplayReport
         CurrentLimit_Default     = 0,
     };
 
-    DisplayReport()
-      :    CommandId(0), Brightness(0), 
+	DisplayReport()
+      :	CommandId(0), Brightness(0), 
         ShutterType(ShutterType_Default), CurrentLimit(CurrentLimit_Default), UseRolling(0), 
         ReverseRolling(0), HighBrightness(0), SelfRefresh(0),
         ReadPixel(0), DirectPentile(0), 
         Persistence(0), LightingOffset(0),
         PixelSettle(0), TotalRows(0)
-    {}
+	{}
 
     DisplayReport(  UInt16 commandId,
                     UByte brightness,
@@ -577,16 +647,16 @@ struct DisplayReport
                     UInt16 lightingOffset,
                     UInt16 pixelSettle,
                     UInt16 totalRows)
-        :        CommandId(commandId), Brightness(brightness), 
+        :	    CommandId(commandId), Brightness(brightness), 
                 ShutterType(shutterType), CurrentLimit(currentLimit), UseRolling(useRolling), 
                 ReverseRolling(reverseRolling), HighBrightness(highBrightness), SelfRefresh(selfRefresh),
-                ReadPixel(readPixel), DirectPentile(directPentile), 
-                Persistence(persistence), LightingOffset(lightingOffset),
-                PixelSettle(pixelSettle), TotalRows(totalRows)
+			    ReadPixel(readPixel), DirectPentile(directPentile), 
+			    Persistence(persistence), LightingOffset(lightingOffset),
+			    PixelSettle(pixelSettle), TotalRows(totalRows)
     { }
 
     UInt16              CommandId;
-    UByte                Brightness;         // See 'DK2 Firmware Specification' document for a description of
+	UByte	            Brightness;         // See 'DK2 Firmware Specification' document for a description of
     ShutterTypeEnum     ShutterType;        // display settings.
     CurrentLimitEnum    CurrentLimit;
     bool                UseRolling;
@@ -595,27 +665,27 @@ struct DisplayReport
     bool                SelfRefresh;
     bool                ReadPixel;
     bool                DirectPentile;
-    UInt16                Persistence;
-    UInt16                LightingOffset;
-    UInt16                PixelSettle;
-    UInt16                TotalRows;
+    UInt16	            Persistence;
+	UInt16	            LightingOffset;
+    UInt16	            PixelSettle;
+	UInt16	            TotalRows;
 };
 
 // MagCalibration matrix (DK2).
 struct MagCalibrationReport
 {
-    MagCalibrationReport()
-        :        CommandId(0), Version(0), Calibration()
-    {}
+	MagCalibrationReport()
+        :	    CommandId(0), Version(0), Calibration()
+	{}
 
     MagCalibrationReport(   UInt16 commandId,
                             UByte version,
                             const Matrix4f& calibration)
-        :        CommandId(commandId), Version(version), Calibration(calibration)
+        :	    CommandId(commandId), Version(version), Calibration(calibration)
     { }
 
     UInt16      CommandId;
-    UByte        Version;            // Version of the calibration procedure used to generate the calibration matrix.
+	UByte	    Version;            // Version of the calibration procedure used to generate the calibration matrix.
     Matrix4f    Calibration;        // Calibration matrix. Note only the first three rows are used by the feature report.
 };
 
@@ -630,58 +700,58 @@ struct PositionCalibrationReport
     };
 
     PositionCalibrationReport()
-      :    CommandId(0), Version(0), 
-        Position(0), Normal(0), Rotation(0),
+      :	CommandId(0), Version(0), 
+        Position(0), Normal(0), Angle(0),
         PositionIndex(0), NumPositions(0), PositionType(PositionType_LED)
-    {}
+	{}
 
     PositionCalibrationReport(UInt16 commandId,
                         UByte version,
-                        const Vector3f& position,
-                        const Vector3f& normal,
-                        float rotation,
+                        const Vector3d& position,
+						const Vector3d& normal,
+						double rotation,
                         UInt16 positionIndex,
                         UInt16 numPositions,
                         PositionTypeEnum positionType)
-        :        CommandId(commandId), Version(version), 
-                Position(position),    Normal(normal), Rotation(rotation),
+        :	    CommandId(commandId), Version(version), 
+				Position(position),	Normal(normal), Angle(rotation),
                 PositionIndex(positionIndex), NumPositions(numPositions), PositionType(positionType)
     {
-    }
+	}
 
-    UInt16            CommandId;
-    UByte            Version;            // The version of the calibration procedure used to generate the stored positions.
+    UInt16			CommandId;
+	UByte			Version;            // The version of the calibration procedure used to generate the stored positions.
     Vector3d        Position;           // Position of the LED or inertial tracker in meters. This is relative to the 
-                                        // center of the emitter plane of the display at nominal focus.
-    Vector3d        Normal;                // Normal of the LED or inertial tracker. This is a signed integer in 
-                                        // meters. The normal is relative to the position. 
-    double          Rotation;            // The rotation about the normal. This is in radians.
-    UInt16            PositionIndex;      // The current position being read or written to. Autoincrements on reads, gets set
-                                        // to the written value on writes.
-    UInt16            NumPositions;       // The read-only number of items with positions stored. The last position is that of
-                                        // the inertial tracker, all others are LED positions.
+										// center of the emitter plane of the display at nominal focus.
+	Vector3d        Normal;				// Normal of the LED or inertial tracker. This is a signed integer in 
+										// meters. The normal is relative to the position. 
+	double          Angle;			    // The rotation about the normal. This is in radians.
+    UInt16			PositionIndex;      // The current position being read or written to. Autoincrements on reads, gets set
+										// to the written value on writes.
+    UInt16			NumPositions;       // The read-only number of items with positions stored. The last position is that of
+										// the inertial tracker, all others are LED positions.
     PositionTypeEnum PositionType;      // The type of the item which has its position reported in the current report
 };
 
 // CustomPattern values (DK2).
 struct CustomPatternReport
 {
-    CustomPatternReport()
-      :    CommandId(0), SequenceLength(0), Sequence(0),
+	CustomPatternReport()
+      :	CommandId(0), SequenceLength(0), Sequence(0),
         LEDIndex(0), NumLEDs(0)
-    {}
+	{}
 
     CustomPatternReport(UInt16 commandId,
                         UByte sequenceLength,
                         UInt32 sequence,
                         UInt16 ledIndex,
                         UInt16 numLEDs)
-        :        CommandId(commandId), SequenceLength(sequenceLength), Sequence(sequence),
+        :	    CommandId(commandId), SequenceLength(sequenceLength), Sequence(sequence),
                 LEDIndex(ledIndex), NumLEDs(numLEDs)
     { }
 
     UInt16      CommandId;
-    UByte        SequenceLength;     // See 'DK2 Firmware Specification' document for a description of
+	UByte	    SequenceLength;     // See 'DK2 Firmware Specification' document for a description of
     UInt32      Sequence;           // LED custom patterns.
     UInt16      LEDIndex;
     UInt16      NumLEDs;
@@ -690,46 +760,46 @@ struct CustomPatternReport
 // KeepAliveMux settings (DK2).
 struct KeepAliveMuxReport
 {
-    KeepAliveMuxReport()
+	KeepAliveMuxReport()
         : CommandId(0), INReport(0), Interval(0)
-    {}
+	{}
 
     KeepAliveMuxReport( UInt16 commandId,
                         UByte inReport,
                         UInt16 interval)
-        :        CommandId(commandId), INReport(inReport), Interval(interval)
+        :	    CommandId(commandId), INReport(inReport), Interval(interval)
     { }
 
     UInt16      CommandId;
-    UByte        INReport;           // Requested IN report type (1 = DK1, 11 = DK2).
+	UByte	    INReport;           // Requested IN report type (1 = DK1, 11 = DK2).
     UInt16      Interval;           // Keep alive period in milliseconds.
 };
 
 // Manufacturing test result (DK2).
 struct ManufacturingReport
 {
-    ManufacturingReport()
+	ManufacturingReport()
       : CommandId(0), NumStages(0), Stage(0),
-        StageLocation(0), StageTime(0), Result(0), StageVersion(0)
-    {}
+        StageVersion(0), StageLocation(0), StageTime(0), Result(0)
+	{}
 
     ManufacturingReport(    UInt16 commandId,
                             UByte numStages,
                             UByte stage,
-                            UByte  version,
+							UByte  version,
                             UInt16 stageLocation,
                             UInt32 stageTime,
                             UInt32 result)
-        :        CommandId(commandId), NumStages(numStages), Stage(stage),
-                StageLocation(stageLocation), StageTime(stageTime), Result(result), StageVersion(version)
+        :	    CommandId(commandId), NumStages(numStages), Stage(stage),
+                StageVersion(version), StageLocation(stageLocation), StageTime(stageTime), Result(result)
     { }
 
     UInt16      CommandId;
-    UByte        NumStages;          // See 'DK2 Firmware Specification' document for a description of
-    UByte        Stage;              // manufacturing test results.
-    UByte        StageVersion;
-    UInt16        StageLocation;
-    UInt32        StageTime;
+	UByte	    NumStages;          // See 'DK2 Firmware Specification' document for a description of
+	UByte	    Stage;              // manufacturing test results.
+	UByte		StageVersion;
+	UInt16	    StageLocation;
+	UInt32	    StageTime;
     UInt32      Result;
 };
 
@@ -738,15 +808,15 @@ struct UUIDReport
 {
     static const int UUID_SIZE = 20;
 
-    UUIDReport()
+	UUIDReport()
         : CommandId(0)
-    {
+	{
         memset(UUIDValue, 0, sizeof(UUIDValue));
     }
                 
     UUIDReport( UInt16 commandId,
                 UByte uuid[UUID_SIZE])
-        :        CommandId(commandId)
+        :	    CommandId(commandId)
     { 
         for (int i=0; i<UUID_SIZE; i++)
         {
@@ -755,15 +825,15 @@ struct UUIDReport
     }
 
     UInt16      CommandId;
-    UByte        UUIDValue[UUID_SIZE];          // See 'DK2 Firmware Specification' document for
+	UByte	    UUIDValue[UUID_SIZE];          // See 'DK2 Firmware Specification' document for
                                         // a description of UUID.
 };
 
 // Lens Distortion (DK2).
 struct LensDistortionReport
 {
-    LensDistortionReport()
-      :    CommandId(0),
+	LensDistortionReport()
+      :	CommandId(0),
         NumDistortions(0),
         DistortionIndex(0),
         Bitmask(0),
@@ -772,11 +842,11 @@ struct LensDistortionReport
         EyeRelief(0),
         MaxR(0),
         MetersPerTanAngleAtCenter(0)
-    {}
+	{}
                 
     LensDistortionReport( UInt16 commandId,
-                          UByte numDistortions,
-                          UByte distortionIndex,
+						  UByte numDistortions,
+						  UByte distortionIndex,
                           UByte bitmask,
                           UInt16 lensType,
                           UInt16 version,
@@ -785,38 +855,38 @@ struct LensDistortionReport
                           UInt16 maxR,
                           UInt16 metersPerTanAngleAtCenter,
                           UInt16 chromaticAberration[4])
-        :        CommandId(commandId),
-                NumDistortions(numDistortions),
-                DistortionIndex(distortionIndex),
-                Bitmask(bitmask),
-                LensType(lensType),
-                Version(version),
-                EyeRelief(eyeRelief),
-                MaxR(maxR),
-                MetersPerTanAngleAtCenter(metersPerTanAngleAtCenter)
+        :	    CommandId(commandId),
+				NumDistortions(numDistortions),
+				DistortionIndex(distortionIndex),
+				Bitmask(bitmask),
+				LensType(lensType),
+				Version(version),
+				EyeRelief(eyeRelief),
+				MaxR(maxR),
+				MetersPerTanAngleAtCenter(metersPerTanAngleAtCenter)
     {
-        memcpy(KCoefficients, kCoefficients, sizeof(KCoefficients));
-        memcpy(ChromaticAberration, chromaticAberration, sizeof(ChromaticAberration));
+		memcpy(KCoefficients, kCoefficients, sizeof(KCoefficients));
+		memcpy(ChromaticAberration, chromaticAberration, sizeof(ChromaticAberration));
     }
 
     UInt16      CommandId;
-    UByte        NumDistortions;
-    UByte        DistortionIndex;
-    UByte        Bitmask;
-    UInt16        LensType;
-    UInt16        Version;
-    UInt16        EyeRelief;
-    UInt16        KCoefficients[11];
-    UInt16        MaxR;
-    UInt16        MetersPerTanAngleAtCenter;
-    UInt16        ChromaticAberration[4];
+	UByte		NumDistortions;
+	UByte		DistortionIndex;
+	UByte		Bitmask;
+	UInt16		LensType;
+	UInt16		Version;
+	UInt16		EyeRelief;
+	UInt16		KCoefficients[11];
+	UInt16		MaxR;
+	UInt16		MetersPerTanAngleAtCenter;
+	UInt16		ChromaticAberration[4];
 };
 
 // Temperature calibration result (DK2).
 struct TemperatureReport
 {
     TemperatureReport()
-      :    CommandId(0), Version(0), 
+      :	CommandId(0), Version(0), 
         NumBins(0), Bin(0), NumSamples(0), Sample(0), 
         TargetTemperature(0), ActualTemperature(0),
         Time(0), Offset(0)
@@ -832,20 +902,20 @@ struct TemperatureReport
                         double actualTemperature,
                         UInt32 time,
                         Vector3d offset)
-        :        CommandId(commandId), Version(version), 
+        :	    CommandId(commandId), Version(version), 
                 NumBins(numBins), Bin(bin), NumSamples(numSamples), Sample(sample), 
                 TargetTemperature(targetTemperature), ActualTemperature(actualTemperature),
                 Time(time), Offset(offset)
     { }
 
     UInt16      CommandId;
-    UByte        Version;          // See 'DK2 Firmware Specification' document for a description of
-    UByte        NumBins;          // temperature calibration data.
-    UByte        Bin;
-    UByte        NumSamples;
-    UByte        Sample;
-    double        TargetTemperature;
-    double        ActualTemperature;
+    UByte	    Version;          // See 'DK2 Firmware Specification' document for a description of
+    UByte	    NumBins;          // temperature calibration data.
+    UByte	    Bin;
+    UByte	    NumSamples;
+    UByte	    Sample;
+    double	    TargetTemperature;
+    double	    ActualTemperature;
     UInt32      Time;             // Better hope nobody tries to use this in 2038
     Vector3d    Offset;
 };
@@ -862,16 +932,16 @@ struct GyroOffsetReport
     };
 
     GyroOffsetReport()
-      :    CommandId(0), Version(Version_NoOffset), 
+      :	CommandId(0), Version(Version_NoOffset), 
         Offset(0), Temperature(0)
     {}
 
-    GyroOffsetReport(    UInt16        commandId,
-                        VersionEnum version,
-                        Vector3d    offset,
-                        double        temperature)
-        :        CommandId(commandId), Version(version), 
-                Offset(offset), Temperature(temperature)
+    GyroOffsetReport(	UInt16		commandId,
+						VersionEnum version,
+						Vector3d	offset,
+						double		temperature)
+		:		CommandId(commandId), Version(version), 
+				Offset(offset), Temperature(temperature)
     {}
 
     UInt16      CommandId;
@@ -879,6 +949,8 @@ struct GyroOffsetReport
     Vector3d    Offset;
     double      Temperature;
 };
+
+
 
 //-------------------------------------------------------------------------------------
 // ***** SensorDevice
@@ -900,7 +972,7 @@ public:
 
     virtual DeviceType GetType() const   { return Device_Sensor; }
 
-    virtual UByte GetDeviceInterfaceVersion() = 0;
+	virtual UByte GetDeviceInterfaceVersion() = 0;
 
 
     // CoordinateFrame defines whether messages come in the coordinate frame
@@ -925,7 +997,7 @@ public:
     // Returns currently set report rate, in Hz. If 0 - error occurred.
     // Note, this value may be different from the one provided for SetReportRate. The return
     // value will contain the actual rate.
-    virtual unsigned    GetReportRate() const = 0;
+    virtual unsigned	GetReportRate() const = 0;
 
     // Sets maximum range settings for the sensor described by SensorRange.    
     // The function will fail if you try to pass values outside Maximum supported
@@ -933,11 +1005,11 @@ public:
     // Pass waitFlag == true to wait for command completion. For waitFlag == true,
     // returns true if the range was applied successfully (no HW error).
     // For waitFlag = false, return 'true' means that command was enqueued successfully.
-    virtual bool        SetRange(const SensorRange& range, bool waitFlag = false) = 0;
+    virtual bool		SetRange(const SensorRange& range, bool waitFlag = false) = 0;
 
     // Return the current sensor range settings for the device. These may not exactly
     // match the values applied through SetRange.
-    virtual void        GetRange(SensorRange* range) const = 0;
+    virtual void		GetRange(SensorRange* range) const = 0;
 
     // Return the factory calibration parameters for the IMU
     virtual void        GetFactoryCalibration(Vector3f* AccelOffset, Vector3f* GyroOffset,
@@ -946,39 +1018,45 @@ public:
     // Enable/disable onboard IMU calibration
     // If set to false, the device will return raw values
     virtual void        SetOnboardCalibrationEnabled(bool enabled) = 0;
+    // Return true if the mag is calibrated
+    virtual bool        IsMagCalibrated() { return false; }
+
+	// Get/set feature reports from DK1 added to DK2. See 'Tracker Firmware Specification' document for details.
+	virtual bool		SetSerialReport(const SerialReport&) { return false; }
+	virtual bool		GetSerialReport(SerialReport*) { return false; }
 
     // Get/set feature reports added to DK2. See 'DK2 Firmware Specification' document for details.
-    virtual bool        SetTrackingReport(const TrackingReport&) { return false; }
-    virtual bool        GetTrackingReport(TrackingReport*) { return false; }
+    virtual bool		SetTrackingReport(const TrackingReport&) { return false; }
+	virtual bool		GetTrackingReport(TrackingReport*) { return false; }
 
-    virtual bool        SetDisplayReport(const DisplayReport&) { return false; }
-    virtual bool        GetDisplayReport(DisplayReport*) { return false; }
+    virtual bool		SetDisplayReport(const DisplayReport&) { return false; }
+	virtual bool		GetDisplayReport(DisplayReport*) { return false; }
 
-    virtual bool        SetMagCalibrationReport(const MagCalibrationReport&) { return false; }
-    virtual bool        GetMagCalibrationReport(MagCalibrationReport*) { return false; }
+    virtual bool		SetMagCalibrationReport(const MagCalibrationReport&) { return false; }
+	virtual bool		GetMagCalibrationReport(MagCalibrationReport*) { return false; }
 
-    virtual bool        SetPositionCalibrationReport(const PositionCalibrationReport&) { return false; }
-    virtual bool        GetAllPositionCalibrationReports(Array<PositionCalibrationReport>*) { return false; }
+    virtual bool		SetPositionCalibrationReport(const PositionCalibrationReport&) { return false; }
+	virtual bool		GetAllPositionCalibrationReports(Array<PositionCalibrationReport>*) { return false; }
 
-    virtual bool        SetCustomPatternReport(const CustomPatternReport&) { return false; }
-    virtual bool        GetCustomPatternReport(CustomPatternReport*) { return false; }
+    virtual bool		SetCustomPatternReport(const CustomPatternReport&) { return false; }
+	virtual bool		GetCustomPatternReport(CustomPatternReport*) { return false; }
 
-    virtual bool        SetKeepAliveMuxReport(const KeepAliveMuxReport&) { return false; }
-    virtual bool        GetKeepAliveMuxReport(KeepAliveMuxReport*) { return false; }
+    virtual bool		SetKeepAliveMuxReport(const KeepAliveMuxReport&) { return false; }
+	virtual bool		GetKeepAliveMuxReport(KeepAliveMuxReport*) { return false; }
 
-    virtual bool        SetManufacturingReport(const ManufacturingReport&) { return false; }
-    virtual bool        GetManufacturingReport(ManufacturingReport*) { return false; }
+    virtual bool		SetManufacturingReport(const ManufacturingReport&) { return false; }
+	virtual bool		GetManufacturingReport(ManufacturingReport*) { return false; }
 
-    virtual bool        SetUUIDReport(const UUIDReport&) { return false; }
-    virtual bool        GetUUIDReport(UUIDReport*) { return false; }
+    virtual bool		SetUUIDReport(const UUIDReport&) { return false; }
+	virtual bool		GetUUIDReport(UUIDReport*) { return false; }
 
-    virtual bool        SetTemperatureReport(const TemperatureReport&) { return false; }
+    virtual bool		SetTemperatureReport(const TemperatureReport&) { return false; }
     virtual bool        GetAllTemperatureReports(Array<Array<TemperatureReport> >*) { return false; }
 
     virtual bool        GetGyroOffsetReport(GyroOffsetReport*) { return false; }
 
-    virtual bool        SetLensDistortionReport(const LensDistortionReport&) { return false; }
-    virtual bool        GetLensDistortionReport(LensDistortionReport*) { return false; }
+    virtual bool		SetLensDistortionReport(const LensDistortionReport&) { return false; }
+    virtual bool		GetLensDistortionReport(LensDistortionReport*) { return false; }
 };
 
 //-------------------------------------------------------------------------------------

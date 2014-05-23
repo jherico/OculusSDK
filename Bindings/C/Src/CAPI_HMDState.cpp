@@ -35,7 +35,8 @@ namespace OVR { namespace CAPI {
 
 
 HMDState::HMDState(HMDDevice* device)
-    : pHMD(device), HMDInfoW(device), HMDInfo(HMDInfoW.h),
+    : pHMD(device), HMDInfoW(device), HMDInfo(HMDInfoW.h),    
+      EnabledHmdCaps(0), HmdCapsAppliedToSensor(0),
       SensorStarted(0), SensorCreated(0), SensorCaps(0),
       AddSensorCount(0), AddLatencyTestCount(0), AddLatencyTestDisplayCount(0),
       RenderState(getThis(), pHMD->GetProfile(), HMDInfoW.h),
@@ -66,6 +67,7 @@ HMDState::HMDState(HMDDevice* device)
 
 HMDState::HMDState(ovrHmdType hmdType)
   : pHMD(0), HMDInfoW(hmdType), HMDInfo(HMDInfoW.h),
+    EnabledHmdCaps(0),
     SensorStarted(0), SensorCreated(0), SensorCaps(0),
     AddSensorCount(0), AddLatencyTestCount(0), AddLatencyTestDisplayCount(0),
     RenderState(getThis(), 0, HMDInfoW.h), // No profile. 
@@ -97,12 +99,13 @@ HMDState::~HMDState()
     OVR_ASSERT(GlobalState::pInstance);
    
     StopSensor();
-    ConfigureRendering(0,0,0,0,0);
+    ConfigureRendering(0,0,0,0);
 
     OVR_CAPI_VISION_CODE( OVR_ASSERT(pPoseTracker == 0); )
 
     GlobalState::pInstance->RemoveHMD(this);
 }
+
 
 
 //-------------------------------------------------------------------------------------
@@ -112,143 +115,102 @@ bool HMDState::StartSensor(unsigned supportedCaps, unsigned requiredCaps)
 {
     Lock::Locker lockScope(&DevicesLock);
 
-    // TBD: Implement an optimized path that allows you to change caps such as yaw.
-    if (SensorStarted)
-    {
-        
-        if ((SensorCaps ^ ovrHmdCap_LowPersistence) == supportedCaps)
-        {
-            // TBD: Fast persistance switching; redesign to make this better.
-            if (HMDInfo.HmdType == HmdType_CrystalCoveProto || HMDInfo.HmdType == HmdType_DK2)
-            {
-                // switch to full persistence
-                updateLowPersistenceMode((supportedCaps & ovrHmdCap_LowPersistence) != 0);
-                SensorCaps = supportedCaps;
-                return true;
-            }
-        }
-
-        if ((SensorCaps ^ ovrHmdCap_DynamicPrediction) == supportedCaps)
-        {
-            // TBD: Fast persistance switching; redesign to make this better.
-            if (HMDInfo.HmdType == HmdType_DK2)
-            {
-                // switch to full persistence
-                TimeManager.ResetFrameTiming(TimeManager.GetFrameTiming().FrameIndex,
-                                             (supportedCaps & ovrHmdCap_NoVSync) ? false : true,
-                                             (supportedCaps & ovrHmdCap_DynamicPrediction) ? true : false,
-                                             RenderingConfigured);
-                SensorCaps = supportedCaps;
-                return true;
-            }
-        }
-
-        StopSensor();
-    }
-
-    supportedCaps |= requiredCaps;
+    bool crystalCoveOrBetter = (HMDInfo.HmdType == HmdType_CrystalCoveProto) ||
+                               (HMDInfo.HmdType == HmdType_DK2);
+    bool sensorCreatedJustNow = false;
 
     // TBD: In case of sensor not being immediately available, it would be good to check
     //      yaw config availability to match it with ovrHmdCap_YawCorrection requirement.
     // 
 
-    if (requiredCaps & ovrHmdCap_Position)
+    if (!crystalCoveOrBetter)
     {
-        if (HMDInfo.HmdType != HmdType_CrystalCoveProto && HMDInfo.HmdType != HmdType_DK2)
+        if (requiredCaps & ovrSensorCap_Position)
         {
-            pLastError = "ovrHmdCap_Position not supported on this HMD.";
-            return false;
-        }
-    }
-    if (requiredCaps & ovrHmdCap_LowPersistence)
-    {
-        if (HMDInfo.HmdType != HmdType_CrystalCoveProto && HMDInfo.HmdType != HmdType_DK2)
-        {
-            pLastError = "ovrHmdCap_LowPersistence not supported on this HMD.";
-            return false;
+            pLastError = "ovrSensorCap_Position not supported on this HMD.";
+            return false;            
         }
     }
 
+    supportedCaps |= requiredCaps;
 
-    SensorCreated = false;
-    pSensor.Clear();
-    if (pHMD)
+    if (pHMD && !pSensor)
     {
         // Zero AddSensorCount before creation, in case it fails (or succeeds but then
         // immediately gets disconnected) followed by another Add notification.        
-        AddSensorCount = 0;
-        pSensor        = *pHMD->GetSensor();
-    }
+        AddSensorCount      = 0;
+        pSensor             = *pHMD->GetSensor();
+        sensorCreatedJustNow= true;
 
-    if (!pSensor)
-    {        
-        if (requiredCaps & ovrHmdCap_Orientation)
+        if (pSensor)
         {
-            pLastError = "Failed to create sensor.";
-            return false;
-        }        
-        // Succeed, waiting for sensor become available later.
-        LogText("StartSensor succeeded - waiting for sensor.\n");
-    }
-    else
-    {
-        pSensor->SetReportRate(500);
-        SFusion.AttachToSensor(pSensor);
-        applyProfileToSensorFusion();
-
-        if (requiredCaps & ovrHmdCap_YawCorrection)
-        {
-            if (!SFusion.HasMagCalibration())
-            {
-                pLastError = "ovrHmdCap_YawCorrection not available.";
-                SFusion.AttachToSensor(0);
-                SFusion.Reset();
-                pSensor.Clear();
-                return false;
-            }
-        }        
-
-        SFusion.SetYawCorrectionEnabled((supportedCaps & ovrHmdCap_YawCorrection) != 0);
-        LogText("Sensor created.\n");
-
-        if (supportedCaps & ovrHmdCap_LowPersistence)
-        {
-            updateLowPersistenceMode(true);
+            pSensor->SetReportRate(500);
+            SFusion.AttachToSensor(pSensor);
+            applyProfileToSensorFusion();
         }
         else
         {
-            if (HMDInfo.HmdType == HmdType_CrystalCoveProto || HMDInfo.HmdType == HmdType_DK2)
+            if (requiredCaps & ovrSensorCap_Orientation)
             {
-                // switch to full persistence
-                updateLowPersistenceMode(false);
+                pLastError = "Failed to create sensor.";
+                return false;
             }
         }
+    }
 
-        if (HMDInfo.HmdType == HmdType_DK2)
+
+    if ((requiredCaps & ovrSensorCap_YawCorrection) && !pSensor->IsMagCalibrated())
+    {
+        pLastError = "ovrHmdCap_YawCorrection not available.";
+        if (sensorCreatedJustNow)
         {
-            updateLatencyTestForHmd((supportedCaps & ovrHmdCap_LatencyTest) != 0);
-        }        
+            SFusion.AttachToSensor(0);
+            SFusion.Reset();
+            pSensor.Clear();
+        }
+        return false;
+    }        
+
+    SFusion.SetYawCorrectionEnabled((supportedCaps & ovrSensorCap_YawCorrection) != 0);
+
+    if (pSensor && sensorCreatedJustNow)
+    {
+        LogText("Sensor created.\n");
+        SensorCreated = true;
+    }
+
+    updateDK2FeaturesTiedToSensor(sensorCreatedJustNow);    
+    
 
 #ifdef OVR_CAPI_VISIONSUPPORT
-        if (supportedCaps & ovrHmdCap_Position)
+
+    if (crystalCoveOrBetter && (supportedCaps & ovrSensorCap_Position))
+    {
+        if (!pPoseTracker)
         {
             pPoseTracker = new Vision::PoseTracker(SFusion);
             if (pPoseTracker)
             {
                 pPoseTracker->AssociateHMD(pSensor);
+                LogText("Sensor Pose tracker created.\n");
             }
-            LogText("Sensor Pose tracker created.\n");
         }
+
         // TBD: How do we verify that position tracking is actually available
         //      i.e. camera is plugged in?
+    }
+    else if (pPoseTracker)
+    {
+        // TBD: Internals not thread safe - must fix!!
+        delete pPoseTracker;
+        pPoseTracker = 0;
+        LogText("Sensor Pose tracker destroyed.\n");
+    }
 
 #endif // OVR_CAPI_VISIONSUPPORT
 
-        SensorCreated = true;
-    }
-    
     SensorCaps    = supportedCaps;
-    SensorStarted = true;    
+    SensorStarted = true;
 
     return true;
 }
@@ -274,6 +236,7 @@ void HMDState::StopSensor()
         SFusion.AttachToSensor(0);
         SFusion.Reset();
         pSensor.Clear();
+        HmdCapsAppliedToSensor = 0;
         AddSensorCount = 0;
         SensorCaps     = 0;
         SensorCreated  = false;
@@ -319,7 +282,8 @@ ovrSensorState HMDState::PredictedSensorState(double absTime)
             // Not needed yet; SFusion.AttachToSensor(0);
             // This seems to reset orientation anyway...
             pSensor.Clear();
-            SensorCreated = false;
+            SensorCreated = false;         
+            HmdCapsAppliedToSensor = 0;
         }
     }
     else
@@ -361,11 +325,11 @@ bool  HMDState::checkCreateSensor()
         {
             pSensor->SetReportRate(500);
             SFusion.AttachToSensor(pSensor);
-            SFusion.SetYawCorrectionEnabled((SensorCaps & ovrHmdCap_YawCorrection) != 0);
+            SFusion.SetYawCorrectionEnabled((SensorCaps & ovrSensorCap_YawCorrection) != 0);
             applyProfileToSensorFusion();
 
 #ifdef OVR_CAPI_VISIONSUPPORT
-            if (SensorCaps & ovrHmdCap_Position)
+            if (SensorCaps & ovrSensorCap_Position)
             {
                 pPoseTracker = new Vision::PoseTracker(SFusion);
                 if (pPoseTracker)
@@ -407,20 +371,31 @@ bool HMDState::GetSensorDesc(ovrSensorDesc* descOut)
 
 void HMDState::applyProfileToSensorFusion()
 {
-    Profile* profile = pHMD ? pHMD->GetProfile() : 0;
-    SFusion.SetUserHeadDimensions ( profile, RenderState.RenderInfo );
+    if (!pHMD)
+        return;
+    Profile* profile = pHMD->GetProfile();
+    if (!profile)
+    {
+        OVR_ASSERT(false);
+        return;
+    }
+    SFusion.SetUserHeadDimensions ( *profile, RenderState.RenderInfo );
 }
 
 void HMDState::updateLowPersistenceMode(bool lowPersistence) const
 {
-    OVR_ASSERT(pSensor);
-    DisplayReport dr;
-    pSensor->GetDisplayReport(&dr);
-
-    dr.Persistence = (UInt16) (dr.TotalRows * (lowPersistence ? 0.18f : 1.0f));
-    dr.Brightness = lowPersistence ? 255 : 0;
+	OVR_ASSERT(pSensor);
+	DisplayReport dr;
     
-    pSensor->SetDisplayReport(dr);
+    if (pSensor.GetPtr())
+    {
+	    pSensor->GetDisplayReport(&dr);
+
+	    dr.Persistence = (UInt16) (dr.TotalRows * (lowPersistence ? 0.18f : 1.0f));
+	    dr.Brightness = lowPersistence ? 255 : 0;
+    
+	    pSensor->SetDisplayReport(dr);
+    }
 }
 
 void HMDState::updateLatencyTestForHmd(bool latencyTesting)
@@ -445,6 +420,63 @@ void HMDState::updateLatencyTestForHmd(bool latencyTesting)
     }
 }
 
+
+void HMDState::updateDK2FeaturesTiedToSensor(bool sensorCreatedJustNow)
+{
+    Lock::Locker lockScope(&DevicesLock);
+
+    if (!SensorCreated || (HMDInfo.HmdType != HmdType_DK2))
+        return;
+
+    // Only send display reports if state changed or sensor initializing first time.
+    if (sensorCreatedJustNow ||
+         ((HmdCapsAppliedToSensor ^ EnabledHmdCaps) & ovrHmdCap_LowPersistence))
+    {
+        updateLowPersistenceMode((EnabledHmdCaps & ovrHmdCap_LowPersistence) ? true : false);         
+    }
+
+    if (sensorCreatedJustNow || ((HmdCapsAppliedToSensor ^ EnabledHmdCaps) & ovrHmdCap_LatencyTest))
+    {
+        updateLatencyTestForHmd((EnabledHmdCaps & ovrHmdCap_LatencyTest) != 0);
+    }
+
+    HmdCapsAppliedToSensor = EnabledHmdCaps & (ovrHmdCap_LowPersistence|ovrHmdCap_LatencyTest);
+}
+
+
+
+void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
+{
+    
+    if (HMDInfo.HmdType == HmdType_DK2)
+    {
+        if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_DynamicPrediction)
+        {
+            // DynamicPrediction change
+            TimeManager.ResetFrameTiming(TimeManager.GetFrameTiming().FrameIndex,
+                                         (hmdCaps & ovrHmdCap_DynamicPrediction) ? true : false,
+                                         RenderingConfigured);
+        }
+    }
+
+    if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_NoVSync)
+    {
+        TimeManager.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
+    }
+
+
+    EnabledHmdCaps             = hmdCaps & ovrHmdCap_Writable_Mask;
+    RenderState.EnabledHmdCaps = EnabledHmdCaps;
+
+    // Unfortunately, LowPersistance and other flags are tied to sensor.
+    // This flag will apply the state of sensor is created; otherwise this will be delayed
+    // till StartSensor.
+    // Such behavior is less then ideal, but should be resolved with the service model.
+
+    updateDK2FeaturesTiedToSensor(false);
+}
+
+
 //-------------------------------------------------------------------------------------
 // ***** Property Access
 
@@ -452,23 +484,23 @@ void HMDState::updateLatencyTestForHmd(bool latencyTesting)
 
 float HMDState::getFloatValue(const char* propertyName, float defaultVal)
 {
-    if (OVR_strcmp(propertyName, "LensSeparation") == 0)
-    {
-        return HMDInfo.LensSeparationInMeters;
-    }
+	if (OVR_strcmp(propertyName, "LensSeparation") == 0)
+	{
+		return HMDInfo.LensSeparationInMeters;
+	}
     else if (OVR_strcmp(propertyName, "CenterPupilDepth") == 0)
     {        
         return SFusion.GetCenterPupilDepth();
     }
-    else if (pHMD)
-    {
-        Profile* p = pHMD->GetProfile();
-        if (p)
-        {
-            return p->GetFloatValue(propertyName, defaultVal);
-        }
-    }
-    return defaultVal;
+	else if (pHMD)
+	{
+		Profile* p = pHMD->GetProfile();
+		if (p)
+		{
+			return p->GetFloatValue(propertyName, defaultVal);
+		}
+	}
+	return defaultVal;
 }
 
 bool HMDState::setFloatValue(const char* propertyName, float value)
@@ -494,14 +526,14 @@ static unsigned CopyFloatArrayWithLimit(float dest[], unsigned destSize,
 
 unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsigned arraySize)
 {
-    if (arraySize)
-    {
-        if (OVR_strcmp(propertyName, "ScreenSize") == 0)
-        {
+	if (arraySize)
+	{
+		if (OVR_strcmp(propertyName, "ScreenSize") == 0)
+		{
             float data[2] = { HMDInfo.ScreenSizeInMeters.w, HMDInfo.ScreenSizeInMeters.h };
 
             return CopyFloatArrayWithLimit(values, arraySize, data, 2);
-        }
+		}
         else if (OVR_strcmp(propertyName, "DistortionClearColor") == 0)
         {
             return CopyFloatArrayWithLimit(values, arraySize, RenderState.ClearColor, 4);
@@ -527,21 +559,21 @@ unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsig
             }
             return 0;
         } */
-        else if (pHMD)
-        {        
-            Profile* p = pHMD->GetProfile();
+		else if (pHMD)
+		{        
+			Profile* p = pHMD->GetProfile();
 
-            // TBD: Not quite right. Should update profile interface, so that
-            //      we can return 0 in all conditions if property doesn't exist.
-            if (p)
-            {
-                unsigned count = p->GetFloatValues(propertyName, values, arraySize);
-                return count;
-            }
-        }
-    }
+			// TBD: Not quite right. Should update profile interface, so that
+			//      we can return 0 in all conditions if property doesn't exist.
+			if (p)
+			{
+				unsigned count = p->GetFloatValues(propertyName, values, arraySize);
+				return count;
+			}
+		}
+	}
 
-    return 0;
+	return 0;
 }
 
 bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned arraySize)
@@ -560,19 +592,19 @@ bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned 
 
 const char* HMDState::getString(const char* propertyName, const char* defaultVal)
 {
-    if (pHMD)
-    {
-        // For now, just access the profile.
-        Profile* p = pHMD->GetProfile();
+	if (pHMD)
+	{
+		// For now, just access the profile.
+		Profile* p = pHMD->GetProfile();
 
-        LastGetStringValue[0] = 0;
-        if (p && p->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
-        {
-            return LastGetStringValue;
-        }
-    }
+		LastGetStringValue[0] = 0;
+		if (p && p->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
+		{
+			return LastGetStringValue;
+		}
+	}
 
-    return defaultVal;
+	return defaultVal;
 }
 
 //-------------------------------------------------------------------------------------
@@ -623,7 +655,7 @@ bool HMDState::ProcessLatencyTest(unsigned char rgbColorOut[3])
 void HMDState::ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTime)
 {
     // Check create.
-    if (!(SensorCaps & ovrHmdCap_LatencyTest))
+    if (!(EnabledHmdCaps & ovrHmdCap_LatencyTest))
         return;
 
     if (pLatencyTesterDisplay && !LatencyUtil2.HasDisplayDevice())
@@ -667,9 +699,8 @@ void HMDState::ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTim
 // *** Rendering
 
 bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
-                                  const ovrEyeDesc eyeDescIn[2],
-                                  const ovrRenderAPIConfig* apiConfig,
-                                  unsigned hmdCaps,
+                                  const ovrFovPort eyeFovIn[2],
+                                  const ovrRenderAPIConfig* apiConfig,                                  
                                   unsigned distortionCaps)
 {
     ThreadChecker::Scope checkScope(&RenderAPIThreadChecker, "ovrHmd_ConfigureRendering");
@@ -693,13 +724,12 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
 
 
     // Step 1: do basic setup configuration
-    RenderState.setupRenderDesc(eyeRenderDescOut, eyeDescIn);
-    RenderState.HMDCaps        = hmdCaps;         // Any cleaner way?
+    RenderState.setupRenderDesc(eyeRenderDescOut, eyeFovIn);
+    RenderState.EnabledHmdCaps = EnabledHmdCaps;     // This is a copy... Any cleaner way?
     RenderState.DistortionCaps = distortionCaps;
 
     TimeManager.ResetFrameTiming(0,
-                                 (hmdCaps & ovrHmdCap_NoVSync) ? false : true,
-                                 (hmdCaps & ovrHmdCap_DynamicPrediction) ? true : false,
+                                 (EnabledHmdCaps & ovrHmdCap_DynamicPrediction) ? true : false,
                                  true);
 
     LastFrameTimeSeconds = 0.0f;
@@ -714,7 +744,7 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
     }
 
     if (!pRenderer ||
-        !pRenderer->Initialize(apiConfig, hmdCaps, distortionCaps))
+        !pRenderer->Initialize(apiConfig, distortionCaps))
     {
         RenderingConfigured = false;
         return false;

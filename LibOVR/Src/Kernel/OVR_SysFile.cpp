@@ -31,6 +31,7 @@ limitations under the License.
 #include <stdio.h>
 
 #include "OVR_SysFile.h"
+#include "OVR_Log.h"
 
 namespace OVR {
 
@@ -100,6 +101,7 @@ bool SysFile::Open(const String& path, int flags, int mode)
     if ((!pFile) || (!pFile->IsValid()))
     {
         pFile = *new UnopenedFile;
+        OVR_DEBUG_LOG(("Failed to open file: %s", path.ToCStr()));
         return 0;
     }
     //pFile = *OVR_NEW DelegatedFile(pFile); // MA Testing

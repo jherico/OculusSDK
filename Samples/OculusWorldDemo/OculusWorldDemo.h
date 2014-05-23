@@ -4,7 +4,7 @@ Filename    :   OculusWorldDemo.h
 Content     :   First-person view test application for Oculus Rift - Header file
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
-                Peter Hoff, Dan Goodman, Bryan Croteau                
+				Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -31,6 +31,8 @@ limitations under the License.
 #include "../CommonSrc/Render/Render_Device.h"
 #include "../CommonSrc/Render/Render_XmlSceneLoader.h"
 #include "../CommonSrc/Platform/Gamepad.h"
+#include "../CommonSrc/Util/OptionMenu.h"
+#include "../CommonSrc/Util/RenderProfiler.h"
 
 #include "Util/Util_Render_Stereo.h"
 using namespace OVR::Util::Render;
@@ -41,9 +43,6 @@ using namespace OVR::Util::Render;
 
 #include "Player.h"
 #include "OVR_DeviceConstants.h"
-
-#include "OptionMenu.h"
-#include "RenderProfiler.h"
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
@@ -75,12 +74,12 @@ using namespace OVR::Render;
 // Important Oculus-specific logic can be found at following locations:
 //
 //  OculusWorldDemoApp::OnStartup - This function will initialize the SDK, creating the Hmd
-//                                    and delegating to CalculateHmdValues to initialize it.
+//									and delegating to CalculateHmdValues to initialize it.
 //
 //  OculusWorldDemoApp::OnIdle    - Here we poll SensorFusion for orientation, apply it
-//                                    to the scene and handle movement.
-//                                    Stereo rendering is also done here, by delegating to
-//                                    to the RenderEyeView() function for each eye.
+//									to the scene and handle movement.
+//									Stereo rendering is also done here, by delegating to
+//									to the RenderEyeView() function for each eye.
 //
 
 //-------------------------------------------------------------------------------------
@@ -116,7 +115,7 @@ public:
     void         InitMainFilePath();
     void         PopulateScene(const char* fileName);
     void         PopulatePreloadScene();
-    void         ClearScene();
+    void		 ClearScene();
     void         PopulateOptionMenu();
 
 
@@ -133,7 +132,7 @@ public:
     void         RenderAnimatedBlocks(ovrEyeType eye, double appTime);
     void         RenderGrid(ovrEyeType eye);
     
-    Matrix4f     CalculateViewFromPose(const Posef& pose);
+    Matrix4f     CalculateViewFromPose(const Transformf& pose);
 
     // Determine whether this frame needs rendering based on timewarp timing and flags.
     bool        FrameNeedsRendering(double curtime);
@@ -191,9 +190,10 @@ protected:
     ovrHmd              Hmd;
     ovrHmdDesc          HmdDesc;
     ovrEyeRenderDesc    EyeRenderDesc[2];
-    Matrix4f            Projection[2];      // Projection matrix for eye.
-    Matrix4f            OrthoProjection[2]; // Projection for 2D.
+    Matrix4f            Projection[2];          // Projection matrix for eye.
+    Matrix4f            OrthoProjection[2];     // Projection for 2D.
     ovrTexture          EyeTexture[2];
+    Sizei               EyeRenderSize[2];       // Saved render eye sizes; base for dynamic sizing.
     // Sensor caps applied.
     unsigned            StartSensorCaps;    
     bool                UsingDebugHmd;
@@ -201,7 +201,7 @@ protected:
     // Frame timing logic.
     enum { SecondsOfFpsMeasurement = 1 };
     int                 FrameCounter;
-    double              NextFPSUpdate;    
+    double              NextFPSUpdate;	
     float               SecondsPerFrame;
     float               FPS;
     double              LastFpsUpdate;
@@ -210,7 +210,7 @@ protected:
     double              LastUpdate;         
   
     // Loaded data.
-    String                        MainFilePath;
+    String	                    MainFilePath;
     Array<Ptr<CollisionModel> > CollisionModels;
     Array<Ptr<CollisionModel> > GroundCollisionModels;
 
@@ -228,15 +228,15 @@ protected:
     
     GamepadState        LastGamepadState;
 
-    Player                ThePlayer;
+    Player				ThePlayer;
     Matrix4f            View;
     Scene               MainScene;
     Scene               LoadingScene;
     Scene               SmallGreenCube;
 
-    Scene                OculusCubesScene;
-    Scene               RedCubesScene;
-    Scene                BlueCubesScene;
+	Scene				OculusCubesScene;
+	Scene               RedCubesScene;
+	Scene				BlueCubesScene;
 
     // Last frame asn sensor data reported by BeginFrame().
     ovrFrameTiming      HmdFrameTiming;
@@ -286,8 +286,8 @@ protected:
     enum SceneRenderMode
     {
         Scene_World,
-        Scene_Cubes,
-        Scene_OculusCubes
+		Scene_Cubes,
+		Scene_OculusCubes
     };
     SceneRenderMode    SceneMode;
 

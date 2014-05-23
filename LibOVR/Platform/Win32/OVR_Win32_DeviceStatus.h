@@ -47,31 +47,31 @@ class DeviceStatus : public RefCountBase<DeviceStatus>
 {
 public:
 
-    // Notifier used for device messages.
-    class Notifier  
-    {
-    public:
-        enum MessageType
-        {
-            DeviceAdded     = 0,
-            DeviceRemoved   = 1,
-        };
+	// Notifier used for device messages.
+	class Notifier  
+	{
+	public:
+		enum MessageType
+		{
+			DeviceAdded     = 0,
+			DeviceRemoved   = 1,
+		};
 
-        virtual bool OnMessage(MessageType type, const String& devicePath) 
+		virtual bool OnMessage(MessageType type, const String& devicePath) 
         { OVR_UNUSED2(type, devicePath); return true; }
-    };
+	};
 
-    DeviceStatus(Notifier* const pClient);
-    ~DeviceStatus();
+	DeviceStatus(Notifier* const pClient);
+	~DeviceStatus();
 
-    void operator = (const DeviceStatus&);    // No assignment implementation.
+	void operator = (const DeviceStatus&);	// No assignment implementation.
 
-    bool Initialize();
-    void ShutDown();
+	bool Initialize();
+	void ShutDown();
 
-    void ProcessMessages();
+	void ProcessMessages();
 
-private:    
+private:	
     enum 
     { 
         MaxUSBRecoveryAttempts  = 20,
@@ -84,19 +84,19 @@ private:
         unsigned    NumAttempts;
     };
 
-    static LRESULT CALLBACK WindowsMessageCallback( HWND hwnd, 
+	static LRESULT CALLBACK WindowsMessageCallback( HWND hwnd, 
                                                     UINT message, 
                                                     WPARAM wParam, 
                                                     LPARAM lParam);
 
-    bool MessageCallback(WORD messageType, const String& devicePath);
+	bool MessageCallback(WORD messageType, const String& devicePath);
 
     void CleanupRecoveryTimer(UPInt index);
     RecoveryTimerDesc* FindRecoveryTimer(UINT_PTR timerId, UPInt* pindex);
     void FindAndCleanupRecoveryTimer(const String& devicePath);
 
 private: // data
-    Notifier* const     pNotificationClient;    // Don't reference count a back-pointer.
+    Notifier* const     pNotificationClient;	// Don't reference count a back-pointer.
 
     HWND                hMessageWindow;
     HDEVNOTIFY          hDeviceNotify;

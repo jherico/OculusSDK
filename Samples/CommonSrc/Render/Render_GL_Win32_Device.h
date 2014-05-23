@@ -42,23 +42,22 @@ class RenderDevice : public GL::RenderDevice
 
     HWND Window;
     HGLRC WglContext;
-    HDC GdiDc;
     Recti PreFullscreen;
     Recti FSDesktop;
     HMONITOR HMonitor;
 
 public:
-    RenderDevice(const Render::RendererParams& p, HWND win, HDC dc, HGLRC gl);
+    RenderDevice(const Render::RendererParams& p, HWND win, HGLRC gl);
     virtual ~RenderDevice() { Shutdown(); }
 
     // Implement static initializer function to create this class.
     static Render::RenderDevice* CreateDevice(const RendererParams& rp, void* oswnd);
-    
-    virtual ovrRenderAPIConfig Get_ovrRenderAPIConfig() const;
+	
+	virtual ovrRenderAPIConfig Get_ovrRenderAPIConfig() const;
 
     virtual void Shutdown();
     virtual void Present(bool withVsync);
-    bool SetParams(const RendererParams& newParams);
+	bool SetParams(const RendererParams& newParams);
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
 };

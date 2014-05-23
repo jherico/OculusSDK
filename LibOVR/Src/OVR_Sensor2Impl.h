@@ -62,81 +62,81 @@ public:
 
     // Get/set feature reports added for DK2. See 'DK2 Firmware Specification' document details.
     virtual bool        SetTrackingReport(const TrackingReport& data);
-    virtual bool        GetTrackingReport(TrackingReport* data);
+	virtual bool        GetTrackingReport(TrackingReport* data);
 
     virtual bool        SetDisplayReport(const DisplayReport& data);
-    virtual bool        GetDisplayReport(DisplayReport* data);
+	virtual bool		GetDisplayReport(DisplayReport* data);
 
-    virtual bool        SetMagCalibrationReport(const MagCalibrationReport& data);
-    virtual bool        GetMagCalibrationReport(MagCalibrationReport* data);
+    virtual bool		SetMagCalibrationReport(const MagCalibrationReport& data);
+	virtual bool		GetMagCalibrationReport(MagCalibrationReport* data);
 
-    virtual bool        SetPositionCalibrationReport(const PositionCalibrationReport& data);
-            bool        GetPositionCalibrationReport(PositionCalibrationReport* data);
-    virtual bool        GetAllPositionCalibrationReports(Array<PositionCalibrationReport>* data);
+    virtual bool		SetPositionCalibrationReport(const PositionCalibrationReport& data);
+	virtual bool        GetAllPositionCalibrationReports(Array<PositionCalibrationReport>* data);
 
-    virtual bool        SetCustomPatternReport(const CustomPatternReport& data);
-    virtual bool        GetCustomPatternReport(CustomPatternReport* data);
+    virtual bool		SetCustomPatternReport(const CustomPatternReport& data);
+	virtual bool		GetCustomPatternReport(CustomPatternReport* data);
 
-    virtual bool        SetKeepAliveMuxReport(const KeepAliveMuxReport& data);
-    virtual bool        GetKeepAliveMuxReport(KeepAliveMuxReport* data);
+    virtual bool		SetKeepAliveMuxReport(const KeepAliveMuxReport& data);
+	virtual bool		GetKeepAliveMuxReport(KeepAliveMuxReport* data);
 
-    virtual bool        SetManufacturingReport(const ManufacturingReport& data);
-    virtual bool        GetManufacturingReport(ManufacturingReport* data);
+    virtual bool		SetManufacturingReport(const ManufacturingReport& data);
+	virtual bool		GetManufacturingReport(ManufacturingReport* data);
 
-    virtual bool        SetUUIDReport(const UUIDReport& data);
-    virtual bool        GetUUIDReport(UUIDReport* data);
+    virtual bool		SetUUIDReport(const UUIDReport& data);
+    virtual bool		GetUUIDReport(UUIDReport* data);
 
-    virtual bool        SetTemperatureReport(const TemperatureReport& data);
-            bool        GetTemperatureReport(TemperatureReport* data);
+    virtual bool		SetTemperatureReport(const TemperatureReport& data);
     virtual bool        GetAllTemperatureReports(Array<Array<TemperatureReport> >*);
 
     virtual bool        GetGyroOffsetReport(GyroOffsetReport* data);
 
-    virtual bool        SetLensDistortionReport(const LensDistortionReport& data);
-    virtual bool        GetLensDistortionReport(LensDistortionReport* data);
+    virtual bool		SetLensDistortionReport(const LensDistortionReport& data);
+	virtual bool		GetLensDistortionReport(LensDistortionReport* data);
 
 protected:
     virtual void        openDevice();
 
     bool                decodeTracker2Message(Tracker2Message* message, UByte* buffer, int size);
 
-    bool                setTrackingReport(const TrackingReport& data);
+    bool	            setTrackingReport(const TrackingReport& data);
     bool                getTrackingReport(TrackingReport* data);
 
-    bool                setDisplayReport(const DisplayReport& data);
+    bool	            setDisplayReport(const DisplayReport& data);
     bool                getDisplayReport(DisplayReport* data);
 
-    bool                setMagCalibrationReport(const MagCalibrationReport& data);
+    bool	            setMagCalibrationReport(const MagCalibrationReport& data);
     bool                getMagCalibrationReport(MagCalibrationReport* data);
 
-    bool                setPositionCalibrationReport(const PositionCalibrationReport& data);
+    bool	            setPositionCalibrationReport(const PositionCalibrationReport& data);
     bool                getPositionCalibrationReport(PositionCalibrationReport* data);
+    bool                getAllPositionCalibrationReports(Array<PositionCalibrationReport>* data);
 
-    bool                setCustomPatternReport(const CustomPatternReport& data);
+    bool	            setCustomPatternReport(const CustomPatternReport& data);
     bool                getCustomPatternReport(CustomPatternReport* data);
 
-    bool                setKeepAliveMuxReport(const KeepAliveMuxReport& data);
+    bool	            setKeepAliveMuxReport(const KeepAliveMuxReport& data);
     bool                getKeepAliveMuxReport(KeepAliveMuxReport* data);
 
-    bool                setManufacturingReport(const ManufacturingReport& data);
+    bool	            setManufacturingReport(const ManufacturingReport& data);
     bool                getManufacturingReport(ManufacturingReport* data);
 
-    bool                setUUIDReport(const UUIDReport& data);
+    bool	            setUUIDReport(const UUIDReport& data);
     bool                getUUIDReport(UUIDReport* data);
 
-    bool                setTemperatureReport(const TemperatureReport& data);
-    bool                getTemperatureReport(TemperatureReport* data);
+    bool		        setTemperatureReport(const TemperatureReport& data);
+    bool		        getTemperatureReport(TemperatureReport* data);
+    bool                getAllTemperatureReports(Array<Array<TemperatureReport> >*);
 
     bool                getGyroOffsetReport(GyroOffsetReport* data);
 
-    bool                setLensDistortionReport(const LensDistortionReport& data);
+    bool	            setLensDistortionReport(const LensDistortionReport& data);
     bool                getLensDistortionReport(LensDistortionReport* data);
 
     // Called for decoded messages
     void                onTrackerMessage(Tracker2Message* message);
 
     UByte                   LastNumSamples;
-    UInt16                    LastRunningSampleCount;
+    UInt16		            LastRunningSampleCount;
     UInt32                  FullCameraFrameCount;
 
     SensorTimestampMapping  LastCameraTime;
@@ -146,10 +146,6 @@ protected:
     UInt32                  LastFrameTimestamp;
 
     SensorCalibration       *pCalibration;
-
-    // This lock is used to protect operations with auto-incrementing indices 
-    // (see TemperatureReport and PositionCalibrationReport)
-    Lock                    IndexedReportLock;
 };
 
 } // namespace OVR

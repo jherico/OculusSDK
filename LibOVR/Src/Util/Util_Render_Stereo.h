@@ -65,7 +65,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                            bool bRendertargetSharedByBothEyes,
                                            bool bRightHanded = true,
                                            float zNear = 0.01f, float zFar = 10000.0f,
-                                           Sizei const *pOverrideRenderedPixelSize = NULL,
+										   Sizei const *pOverrideRenderedPixelSize = NULL,
                                            FovPort const *pOverrideFovport = NULL,
                                            float zoomFactor = 1.0f );
 
@@ -201,7 +201,7 @@ public:
     // Supply just left = set both to the same.
     // Supply neither = remove override.
     void        SetFov ( FovPort const *pfovLeft  = NULL,
-                         FovPort const *pfovRight = NULL );
+					     FovPort const *pfovRight = NULL );
     
     void        SetFovPortRadians ( float horizontal, float vertical )
     {
@@ -349,6 +349,37 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
 void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices );
 
 
+//-----------------------------------------------------------------------------------
+// *****  Heightmap Mesh Rendering
+//
+
+// Stores both texture UV coords, or tan(angle) values.
+// This struct *must* be binary compatible with CAPI ovrHeightmapVertex.
+struct HeightmapMeshVertexData
+{
+    // [-1,+1],[-1,+1] over the entire framebuffer.
+    Vector2f    ScreenPosNDC;
+    // [0.0-1.0] interpolation value for timewarping - see documentation for details.
+    float       TimewarpLerp;
+    // The vectors in tan(angle) space.
+    // Scale and offset by the values in StereoEyeParams.EyeToSourceUV.Scale
+    // and StereoParams.EyeToSourceUV.Offset to get to real texture UV coords.
+    Vector2f    TanEyeAngles;    
+};
+
+
+void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+    int *pNumVertices, int *pNumTriangles,
+    const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo );
+
+// Generate heightmap mesh for a eye. This version requires less data then stereoParms, supporting
+// dynamic change in render target viewport.
+void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+    int *pNumVertices, int *pNumTriangles, bool rightEye,
+    const HmdRenderInfo &hmdRenderInfo, const ScaleAndOffset2D &eyeToSourceNDC );
+
+void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices );
+
 
 
 //-----------------------------------------------------------------------------------
@@ -380,7 +411,8 @@ PredictionValues PredictionGetDeviceValues ( const HmdRenderInfo &hmdRenderInfo,
 // (which may have been computed later on, and thus is more accurate), and this
 // will return the matrix to pass to the timewarp distortion shader.
 // TODO: deal with different handedness?
-Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld );
+Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust );
+Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust );
 
 
 
@@ -402,7 +434,7 @@ public:
     // and the predicted pose of the HMD at that time.
     // You usually only need to call one of these functions.
     double      GetViewRenderPredictionTime();
-    Posef       GetViewRenderPredictionPose(SensorFusion &sfusion);
+    Transformf  GetViewRenderPredictionPose(SensorFusion &sfusion);
 
 
     // Timewarp prediction functions. You usually only need to call one of these three sets of functions.
@@ -411,13 +443,13 @@ public:
     double      GetVisiblePixelTimeStart();
     double      GetVisiblePixelTimeEnd();
     // Predicted poses of the HMD at those first and last pixels.
-    Posef       GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion);
-    Posef       GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion);
+    Transformf  GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion);
+    Transformf  GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion);
     // The delta matrices to feed to the timewarp distortion code,
     // given the pose that was used for rendering.
     // (usually the one returned by GetViewRenderPredictionPose() earlier)
-    Matrix4f    GetTimewarpDeltaStart(SensorFusion &sfusion, Posef const &renderedPose);
-    Matrix4f    GetTimewarpDeltaEnd  (SensorFusion &sfusion, Posef const &renderedPose);
+    Matrix4f    GetTimewarpDeltaStart(SensorFusion &sfusion, Transformf const &renderedPose);
+    Matrix4f    GetTimewarpDeltaEnd  (SensorFusion &sfusion, Transformf const &renderedPose);
 
 
     // Just-In-Time distortion aims to delay the second sensor reading & distortion
@@ -448,7 +480,7 @@ private:
     float               DistortionTimeAverage;
 
     // Pose at which last time the eye was rendered.
-    Posef               EyeRenderPoses[2];
+    Transformf               EyeRenderPoses[2];
 
     // Absolute time of the last present+flush
     double              LastFramePresentFlushTime;

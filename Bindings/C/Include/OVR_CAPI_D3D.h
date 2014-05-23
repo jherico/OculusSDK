@@ -45,7 +45,7 @@ struct ovrD3D11ConfigData
 {
     // General device settings.
     ovrRenderAPIConfigHeader Header;
-    ID3D11Device*            pDevice;
+	ID3D11Device*            pDevice;
     ID3D11DeviceContext*     pDeviceContext;
     ID3D11RenderTargetView*  pBackBufferRT;
     IDXGISwapChain*          pSwapChain;
@@ -122,9 +122,8 @@ struct ovrD3D9ConfigData
     // General device settings.
     ovrRenderAPIConfigHeader Header;
     
-    IDirect3DDevice9   *        pDevice;               
-    ///ID3D10RenderTargetView*  pBackBufferRT;
-    ///IDXGISwapChain*          pSwapChain;
+	IDirect3DDevice9*           pDevice;
+    IDirect3DSwapChain9*        pSwapChain;
 };
 
 union ovrD3D9Config
@@ -138,8 +137,7 @@ struct ovrD3D9TextureData
 {
     // General device settings.
     ovrTextureHeader            Header;
-    IDirect3DTexture9         * pTexture;  
-   ///ID3D10ShaderResourceView* pSRView;
+    IDirect3DTexture9*          pTexture;  
 };
 
 union ovrD3D9Texture
@@ -148,9 +146,6 @@ union ovrD3D9Texture
     ovrD3D9TextureData D3D9;
 };
 
-
-
 #endif
 
-
-#endif    // OVR_CAPI_h
+#endif	// OVR_CAPI_h

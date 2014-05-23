@@ -3,7 +3,7 @@
 Filename    :   OVR_SensorFusion.cpp
 Content     :   Methods that determine head orientation from sensor data over time
 Created     :   October 9, 2012
-Authors     :   Michael Antonov, Steve LaValle, Dov Katz, Max Katsev
+Authors     :   Michael Antonov, Steve LaValle, Dov Katz, Max Katsev, Dan Gierl
 
 Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
@@ -30,47 +30,33 @@ limitations under the License.
 #include "OVR_JSON.h"
 #include "OVR_Profile.h"
 #include "OVR_Stereo.h"
-#include "Recording/Recorder.h"
+#include "OVR_Recording.h"
 
 // Temporary for debugging
 bool Global_Flag_1 = true;
 
-//Convenient global variable to temporarily extract this data.
-float TPH_CameraPoseOrientationWxyz[4];
+//Convenient global variables to temporarily extract this data.
+float  TPH_CameraPoseOrientationWxyz[4];
+double TPH_CameraPoseConfidence;
+double TPH_CameraPoseConfidenceThresholdOverrideIfNonZero = 0;
+bool   TPH_IsPositionTracked = false;
 
 
 namespace OVR {
-// ***** SensorState
 
-SensorState::SensorState(const ovrSensorState& s)
-{
-    Predicted       = s.Predicted;
-    Recorded        = s.Recorded;
-    Temperature     = s.Temperature;
-    StatusFlags     = s.StatusFlags;
-}
-
-SensorState::operator const ovrSensorState() const
-{
-    ovrSensorState result;
-    result.Predicted    = Predicted;
-    result.Recorded     = Recorded;
-    result.Temperature  = Temperature;
-    result.StatusFlags  = StatusFlags;
-    return result;
-}
+const Transformd DefaultWorldFromCamera(Quatd(), Vector3d(0, 0, -1));
 
 //-------------------------------------------------------------------------------------
 // ***** Sensor Fusion
 
 SensorFusion::SensorFusion(SensorDevice* sensor)
-  : MotionTrackingEnabled(true), VisionPositionEnabled(true),
-    EnableGravity(true), EnableYawCorrection(true), MagCalibrated(true), EnableCameraTiltCorrection(true), 
-    FAngV(20), FAccelHeadset(1000), FAccelCamera(1000),
-    ExposureRecordHistory(100), LastMessageExposureFrame(NULL),
-    VisionMaxIMUTrackTime(4.0/60.0), // Integrate IMU up to 4 frames
-    HeadModel(0, OVR_DEFAULT_NECK_TO_EYE_VERTICAL, -OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL),
-    DefaultCameraPosition(0, 0, -1)
+  : ExposureRecordHistory(100), LastMessageExposureFrame(NULL),
+    FocusDirection(Vector3d(0, 0, 0)), FocusFOV(0.0),
+    FAccelInImuFrame(1000), FAccelInCameraFrame(1000), FAngV(20),
+    EnableGravity(true), EnableYawCorrection(true), MagCalibrated(false),
+    EnableCameraTiltCorrection(true),
+    MotionTrackingEnabled(true), VisionPositionEnabled(true),
+    CenterPupilDepth(0.0)
 {
    pHandler = new BodyFrameHandler(this);
 
@@ -80,9 +66,6 @@ SensorFusion::SensorFusion(SensorDevice* sensor)
    if (sensor)
        AttachToSensor(sensor);
    
-   // MA: 1/25/2014 for DK2
-   SetCenterPupilDepth(0.076f);
-
    Reset();
 }
 
@@ -93,50 +76,47 @@ SensorFusion::~SensorFusion()
 
 bool SensorFusion::AttachToSensor(SensorDevice* sensor)
 {
-    if (sensor != NULL)
-    {
-        // Load IMU position
-        Array<PositionCalibrationReport> reports;
-
-        bool result = sensor->GetAllPositionCalibrationReports(&reports);
-        if(result)
-        {
-            PositionCalibrationReport const& imu = reports[reports.GetSize() - 1];
-            OVR_ASSERT(imu.PositionType == PositionCalibrationReport::PositionType_IMU);
-            IMUPosition = imu.Position;
-
-            Recorder::Buffer(imu);
-            Recorder::Buffer(reports);
-
-            // convert from vision to the world frame
-            IMUPosition.x *= -1.0;
-            IMUPosition.z *= -1.0;
-        }
-        else
-        {
-            // TODO: set up IMUPosition for devices that don't have this report.
-        }
-        // Repopulate CPFOrigin
-        SetCenterPupilDepth(CenterPupilDepth);
-    }
-
     pHandler->RemoveHandlerFromDevices();
-
-    if (sensor != NULL)
-    {
-        sensor->AddMessageHandler(pHandler);
-    }
-
     Reset();
 
-    // Initialize the sensor state
-    // TBD: This is a hack to avoid a race condition if sensor status is checked immediately 
-    // after sensor creation but before any data has flowed through.  We should probably
-    // not depend strictly on data flow to determine capabilites like orientation and position
-    // tracking, or else use some sort of synchronous method to wait for data
-    LocklessState init;
-    init.StatusFlags = Status_OrientationTracked;   
-    UpdatedState.SetState(init);
+    if (sensor != NULL)
+    {
+        // cache mag calibration state
+        MagCalibrated = sensor->IsMagCalibrated();
+        
+        // Load IMU position
+        Array<PositionCalibrationReport> reports;
+        bool result = sensor->GetAllPositionCalibrationReports(&reports);
+        if (result)
+        {
+            PositionCalibrationReport imu = reports[reports.GetSize() - 1];
+            OVR_ASSERT(imu.PositionType == PositionCalibrationReport::PositionType_IMU);
+            // convert from vision to the world frame
+            // TBD convert rotation as necessary?
+            imu.Position.x *= -1.0;
+            imu.Position.z *= -1.0;
+
+            ImuFromScreen = Transformd(Quatd(imu.Normal, imu.Angle), imu.Position).Inverted();
+
+            Recording::GetRecorder().RecordLedPositions(reports);
+            Recording::GetRecorder().RecordDeviceIfcVersion(sensor->GetDeviceInterfaceVersion());
+		}
+        
+        // Repopulate CPFOrigin
+        SetCenterPupilDepth(CenterPupilDepth);
+
+        // Subscribe to sensor updates
+        sensor->AddMessageHandler(pHandler);
+
+        // Initialize the sensor state
+        // TBD: This is a hack to avoid a race condition if sensor status is checked immediately 
+        // after sensor creation but before any data has flowed through.  We should probably
+        // not depend strictly on data flow to determine capabilities like orientation and position
+        // tracking, or else use some sort of synchronous method to wait for data
+        LocklessState init;
+        init.StatusFlags = Status_OrientationTracked;   
+        UpdatedState.SetState(init);
+    }
 
     return true;
 }
@@ -147,31 +127,29 @@ void SensorFusion::Reset()
     Lock::Locker lockScope(pHandler->GetHandlerLock());
 
     UpdatedState.SetState(LocklessState());
-    State                               = PoseState<double>();
-    State.Transform.Position                 = -CPFPositionInIMUFrame; // place CPF at the origin, not the IMU
-    VisionState                         = PoseState<double>();
+    WorldFromImu                        = PoseState<double>();
+    WorldFromImu.Pose                   = ImuFromCpf.Inverted(); // place CPF at the origin, not the IMU
+    CameraFromImu                       = PoseState<double>();
     VisionError                         = PoseState<double>();
-    CurrentExposureIMUDelta             = PoseState<double>();
-    CameraPose                          = Pose<double>(Quatd(), DefaultCameraPosition);
-    CameraPoseConfidence                = -1;
+    WorldFromCamera                     = DefaultWorldFromCamera;
+    WorldFromCameraConfidence           = -1;
 
     ExposureRecordHistory.Clear();
+    NextExposureRecord                  = ExposureRecord();
     LastMessageExposureFrame            = MessageExposureFrame(NULL);
     LastVisionAbsoluteTime              = 0;
-    FullVisionCorrectionExposureCounter = 0;
     Stage                               = 0;
     
-    MagNumReferences                    = 0;
+    MagRefs.Clear();
     MagRefIdx                           = -1;
-    MagRefScore                         = 0;
     MagCorrectionIntegralTerm           = Quatd();
     AccelOffset                         = Vector3d();
 
-    FAccelCamera.Clear();
-    FAccelHeadset.Clear();
+    FAccelInCameraFrame.Clear();
+    FAccelInImuFrame.Clear();
     FAngV.Clear();
 
-    setNeckPivotFromPose ( State.Transform );
+    setNeckPivotFromPose ( WorldFromImu.Pose );
 }
 
 //-------------------------------------------------------------------------------------
@@ -180,19 +158,22 @@ void SensorFusion::Reset()
 void SensorFusion::OnVisionFailure()
 {
     // do nothing
+    Recording::GetRecorder().RecordVisionSuccess(false);
 }
 
-void SensorFusion::OnVisionPreviousFrame(const Pose<double>& pose)
+void SensorFusion::OnVisionPreviousFrame(const Transform<double>& cameraFromImu)
 {
     // simply save the observation for use in the next OnVisionSuccess call;
     // this should not have unintended side-effects for position filtering, 
     // since the vision time is not updated and the system keeps thinking we don't have vision yet
-    VisionState.Transform = pose;
+    CameraFromImu.Pose = cameraFromImu;
 }
 
-void SensorFusion::OnVisionSuccess(const Pose<double>& pose, UInt32 exposureCounter)
+void SensorFusion::OnVisionSuccess(const Transform<double>& cameraFromImu, UInt32 exposureCounter)
 {
     Lock::Locker lockScope(pHandler->GetHandlerLock());
+
+    Recording::GetRecorder().RecordVisionSuccess(true);
 
     LastVisionAbsoluteTime = GetTime();
 
@@ -209,49 +190,54 @@ void SensorFusion::OnVisionSuccess(const Pose<double>& pose, UInt32 exposureCoun
     // Right now, this will happen if we get first frame after prediction failure,
     // and this exposure wasn't in the buffer.  (TBD: Unlikely.. unless IMU message wasn't sent?)
     if (LastVisionExposureRecord.ExposureCounter != exposureCounter)
-        LastVisionExposureRecord = ExposureRecord(exposureCounter, GetTime(), State, PoseState<double>());
+        LastVisionExposureRecord = ExposureRecord(exposureCounter, GetTime(), WorldFromImu, PoseState<double>());
 
-    // ********* VisionState *********
+    // ********* CameraFromImu *********
     
     // This is stored in the camera frame, so need to be careful when combining with the IMU data,
     // which is in the world frame
 
-    // convert to the world frame
-    Vector3d positionChangeW = CameraPose.Orientation.Rotate(pose.Position - VisionState.Transform.Position);
-
-    VisionState.TimeInSeconds = LastVisionExposureRecord.ExposureTime;
-    VisionState.Transform = pose; 
+    Transformd cameraFromImuPrev = CameraFromImu.Pose;
+    CameraFromImu.Pose = cameraFromImu; 
+    CameraFromImu.TimeInSeconds = LastVisionExposureRecord.ExposureTime;
 
     // Check LastVisionExposureRecord.Delta.TimeInSeconds to avoid divide by zero, which we could (rarely)
     // get if we didn't have exposures delta for history (skipped exposure counters
     // due to video mode change that stalls USB, etc).
-    if (LastVisionExposureRecord.Delta.TimeInSeconds > 0.001)
+    if (LastVisionExposureRecord.ImuOnlyDelta.TimeInSeconds > 0.001)
     {
+        Vector3d visionVelocityInImuFrame = (cameraFromImu.Translation - cameraFromImuPrev.Translation) /
+                                            LastVisionExposureRecord.ImuOnlyDelta.TimeInSeconds;
         // Use the accel data to estimate the velocity at the exposure time
         // (as opposed to the average velocity between exposures)
-        Vector3d velocityW = LastVisionExposureRecord.Delta.LinearVelocity + 
-                             (positionChangeW - LastVisionExposureRecord.Delta.Transform.Position) / 
-                             LastVisionExposureRecord.Delta.TimeInSeconds;
-        VisionState.LinearVelocity = CameraPose.Orientation.Inverted().Rotate(velocityW);
+        Vector3d imuVelocityInWorldFrame = LastVisionExposureRecord.ImuOnlyDelta.LinearVelocity -
+            LastVisionExposureRecord.ImuOnlyDelta.Pose.Translation / LastVisionExposureRecord.ImuOnlyDelta.TimeInSeconds;
+        CameraFromImu.LinearVelocity = visionVelocityInImuFrame + 
+            WorldFromCamera.Inverted().Rotate(imuVelocityInWorldFrame);
     }
     else
     {
-        VisionState.LinearVelocity = Vector3d(0,0,0);
-    } 
-
-    // ********* VisionError *********
-
-    // This is in the world frame, so transform the vision data appropriately
-
-    VisionError.Transform.Position    = CameraPose.Orientation.Rotate(VisionState.Transform.Position) + CameraPose.Position - 
-                                   LastVisionExposureRecord.State.Transform.Position;
-    VisionError.LinearVelocity   = CameraPose.Orientation.Rotate(VisionState.LinearVelocity) - 
-                                   LastVisionExposureRecord.State.LinearVelocity;
-    VisionError.Transform.Orientation = CameraPose.Orientation * VisionState.Transform.Orientation * 
-                                   LastVisionExposureRecord.State.Transform.Orientation.Inverted();
+        CameraFromImu.LinearVelocity = Vector3d(0,0,0);
+    }
 }
 
-Pose<double> SensorFusion::GetVisionPrediction(UInt32 exposureCounter)
+PoseStated SensorFusion::computeVisionError()
+{
+    PoseStated worldFromImuVision = WorldFromCamera * CameraFromImu;
+    // Here we need to compute the difference between worldFromImuVision and WorldFromImu.
+    // However this difference needs to be represented in the World frame, not IMU frame.
+    // Therefore the computation is different from simply worldFromImuVision.Pose * WorldFromImu.Pose.Inverted().
+    PoseStated err;
+    err.Pose.Rotation = worldFromImuVision.Pose.Rotation * 
+        LastVisionExposureRecord.WorldFromImu.Pose.Rotation.Inverted();
+    err.Pose.Translation = worldFromImuVision.Pose.Translation - 
+        LastVisionExposureRecord.WorldFromImu.Pose.Translation;
+    err.LinearVelocity = worldFromImuVision.LinearVelocity - 
+        LastVisionExposureRecord.WorldFromImu.LinearVelocity;
+    return err;
+}
+
+Transform<double> SensorFusion::GetVisionPrediction(UInt32 exposureCounter)
 {
     Lock::Locker lockScope(pHandler->GetHandlerLock());
 
@@ -259,23 +245,41 @@ Pose<double> SensorFusion::GetVisionPrediction(UInt32 exposureCounter)
     // Should only be one iteration, unless we are skipping camera frames
     ExposureRecord record;
     PoseState<double> delta = PoseState<double>();
+
     while (!ExposureRecordHistory.IsEmpty() && 
            (ExposureRecordHistory.PeekFront().ExposureCounter <= exposureCounter))
     {
         record = ExposureRecordHistory.PopFront();
-        delta.AdvanceByDelta(record.Delta);
+        delta.AdvanceByDelta(record.ImuOnlyDelta);
     }
     // Put the combine exposure record back in the history, for use in HandleVisionSuccess(...)
-    record.Delta = delta;
+    record.ImuOnlyDelta = delta;
     ExposureRecordHistory.PushFront(record);
 
-    // Add the effect of initial pose and velocity from vision.
-    // Don't forget to transform IMU to the camera frame
-    Pose<double> c(VisionState.Transform.Orientation * delta.Transform.Orientation,
-                   VisionState.Transform.Position + VisionState.LinearVelocity * delta.TimeInSeconds +
-                   CameraPose.Orientation.Inverted().Rotate(delta.Transform.Position));
+    Transformd result;
+    if (record.VisionTrackingAvailable)
+    {
+        // if the tracking is working normally, use the change in the main state (SFusion output)
+        // to compute the prediction
+        result = CameraFromImu.Pose *
+            LastVisionExposureRecord.WorldFromImu.Pose.Inverted() * record.WorldFromImu.Pose;
+    }
+    else
+    {
+        // if we just acquired vision, the main state probably doesn't have the correct position,
+        // so can't rely on it for prediction
 
-    return c;
+        // solution: use the accelerometer and vision velocity to propagate the previous sample forward
+        // (don't forget to transform IMU to the camera frame)
+        result = Transform<double>
+            (
+                CameraFromImu.Pose.Rotation * delta.Pose.Rotation,
+                CameraFromImu.Pose.Translation + CameraFromImu.LinearVelocity * delta.TimeInSeconds +
+                WorldFromCamera.Inverted().Rotate(delta.Pose.Translation)
+            );
+    }
+
+    return result;
 }
 
 void SensorFusion::handleMessage(const MessageBodyFrame& msg)
@@ -288,24 +292,26 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     Vector3d accel(msg.Acceleration); 
     Vector3d mag(msg.MagneticField);
     double DeltaT = msg.TimeDelta;
-    MagCalibrated = msg.MagCalibrated;
 
     // Keep track of time
-    State.TimeInSeconds = msg.AbsoluteTimeSeconds;
+    WorldFromImu.TimeInSeconds = msg.AbsoluteTimeSeconds;
     // We got an update in the last 60ms and the data is not very old
-    bool visionIsRecent = (GetTime() - LastVisionAbsoluteTime < VisionMaxIMUTrackTime) && (GetVisionLatency() < 0.25);
+    bool visionIsRecent = (GetTime() - LastVisionAbsoluteTime < 0.07) && (GetVisionLatency() < 0.25);
     Stage++;
 
     // Insert current sensor data into filter history
     FAngV.PushBack(gyro);
-    FAccelHeadset.Update(accel, DeltaT, Quatd(gyro, gyro.Length() * DeltaT));
+    FAccelInImuFrame.Update(accel, DeltaT, Quatd(gyro, gyro.Length() * DeltaT));
 
     // Process raw inputs
     // in the future the gravity offset can be calibrated using vision feedback
-    Vector3d accelW = State.Transform.Orientation.Rotate(accel) - Vector3d(0, 9.8, 0);
+    Vector3d accelInWorldFrame = WorldFromImu.Pose.Rotate(accel) - Vector3d(0, 9.8, 0);
+
+    // Recompute the vision error to account for all the corrections and the new data
+    VisionError = computeVisionError();
 
     // Update headset orientation   
-    State.StoreAndIntegrateGyro(gyro, DeltaT);
+    WorldFromImu.StoreAndIntegrateGyro(gyro, DeltaT);
     // Tilt correction based on accelerometer
     if (EnableGravity)
         applyTiltCorrection(DeltaT);
@@ -313,8 +319,11 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     if (EnableYawCorrection && visionIsRecent)
         applyVisionYawCorrection(DeltaT);
     // Yaw correction based on magnetometer
-    if (EnableYawCorrection && MagCalibrated) // MagCalibrated is always false for DK2 for now
-        applyMagYawCorrection(mag, DeltaT);
+	if (EnableYawCorrection && MagCalibrated) // MagCalibrated is always false for DK2 for now
+		applyMagYawCorrection(mag, DeltaT);
+	// Focus Correction
+	if ((FocusDirection.x != 0.0f || FocusDirection.z != 0.0f) && FocusFOV < Mathf::Pi)
+		applyFocusCorrection(DeltaT);
 
     // Update camera orientation
     if (EnableCameraTiltCorrection && visionIsRecent)
@@ -324,49 +333,50 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
     // so it is periodically normalized.
     if ((Stage & 0xFF) == 0)
     {
-        State.Transform.Orientation.Normalize();
-        CameraPose.Orientation.Normalize();
+        WorldFromImu.Pose.Rotation.Normalize();
+        WorldFromCamera.Rotation.Normalize();
     }
 
     // Update headset position
     if (VisionPositionEnabled && visionIsRecent)
     {
         // Integrate UMI and velocity here up to a fixed amount of time after vision. 
-        State.StoreAndIntegrateAccelerometer(accelW + AccelOffset, DeltaT);
+        WorldFromImu.StoreAndIntegrateAccelerometer(accelInWorldFrame + AccelOffset, DeltaT);
         // Position correction based on camera
         applyPositionCorrection(DeltaT); 
         // Compute where the neck pivot would be.
-        setNeckPivotFromPose(State.Transform);
+        setNeckPivotFromPose(WorldFromImu.Pose);
     }
     else
     {
         // Fall back onto internal head model
         // Use the last-known neck pivot position to figure out the expected IMU position.
         // (should be the opposite of SensorFusion::setNeckPivotFromPose)
-        Vector3d imuInNeckPivotFrame = HeadModel - CPFPositionInIMUFrame;
-        State.Transform.Position = NeckPivotPosition + State.Transform.Orientation.Rotate(imuInNeckPivotFrame);
+        WorldFromNeck.Rotation = WorldFromImu.Pose.Rotation;
+        WorldFromImu.Pose = WorldFromNeck * (ImuFromCpf * CpfFromNeck).Inverted();
 
         // We can't trust velocity past this point.
-        State.LinearVelocity = Vector3d(0,0,0);
-        State.LinearAcceleration = accelW;
+        WorldFromImu.LinearVelocity = Vector3d(0,0,0);
+        WorldFromImu.LinearAcceleration = accelInWorldFrame;
     }
 
     // Compute the angular acceleration
-    State.AngularAcceleration = (FAngV.GetSize() >= 12 && DeltaT > 0) ? 
+    WorldFromImu.AngularAcceleration = (FAngV.GetSize() >= 12 && DeltaT > 0) ? 
         (FAngV.SavitzkyGolayDerivative12() / DeltaT) : Vector3d();
 
     // Update the dead reckoning state used for incremental vision tracking
-    CurrentExposureIMUDelta.StoreAndIntegrateGyro(gyro, DeltaT);
-    CurrentExposureIMUDelta.StoreAndIntegrateAccelerometer(accelW, DeltaT);
+    NextExposureRecord.ImuOnlyDelta.StoreAndIntegrateGyro(gyro, DeltaT);
+    NextExposureRecord.ImuOnlyDelta.StoreAndIntegrateAccelerometer(accelInWorldFrame, DeltaT);
+    NextExposureRecord.ImuOnlyDelta.TimeInSeconds = WorldFromImu.TimeInSeconds - LastMessageExposureFrame.CameraTimeSeconds;
+    NextExposureRecord.VisionTrackingAvailable &= (VisionPositionEnabled && visionIsRecent);
 
-    // If we only compiled the stub version of Recorder, then branch prediction shouldn't
-    // have any problem with this if statement. Actually, it should be optimized out, but need to verify.
-    if(Recorder::GetRecorder())
-    {
-        Posed savePose = static_cast<Posed>(GetPoseAtTime(GetTime()));
-        Recorder::LogData("sfTimeSeconds", State.TimeInSeconds);
-        Recorder::LogData("sfPose", savePose);
-    }
+	Recording::GetRecorder().LogData("sfTimeSeconds", WorldFromImu.TimeInSeconds);
+    Recording::GetRecorder().LogData("sfStage", (double)Stage);
+	Recording::GetRecorder().LogData("sfPose", WorldFromImu.Pose);
+	//Recorder::LogData("sfAngAcc", State.AngularAcceleration);
+	//Recorder::LogData("sfAngVel", State.AngularVelocity);
+	//Recorder::LogData("sfLinAcc", State.LinearAcceleration);
+	//Recorder::LogData("sfLinVel", State.LinearVelocity);
 
     // Store the lockless state.    
     LocklessState lstate;
@@ -375,7 +385,11 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
         lstate.StatusFlags  |= Status_PositionConnected;
     if (VisionPositionEnabled && visionIsRecent)
         lstate.StatusFlags  |= Status_PositionTracked;
-    lstate.State        = State;
+
+	//A convenient means to temporarily extract this flag
+	TPH_IsPositionTracked = visionIsRecent;
+
+    lstate.State        = WorldFromImu;
     lstate.Temperature  = msg.Temperature;
     lstate.Magnetometer = mag;    
     UpdatedState.SetState(lstate);
@@ -383,44 +397,21 @@ void SensorFusion::handleMessage(const MessageBodyFrame& msg)
 
 void SensorFusion::handleExposure(const MessageExposureFrame& msg)
 {
-    if (msg.CameraFrameCount > LastMessageExposureFrame.CameraFrameCount + 1)
-    {
-        LogText("Skipped %d tracker exposure counters\n",
-            msg.CameraFrameCount - (LastMessageExposureFrame.CameraFrameCount + 1));
-    }
-    else
-    {
-        // MA: Check timing deltas
-        //     Is seems repetitive tracking loss occurs when timing gets out of sync
-        //     Could be caused by some bug in HW timing + time filter?
-        if (fabs(State.TimeInSeconds - msg.CameraTimeSeconds) > 0.1f)
-        {
-            static int logLimiter = 0;
-            if ((logLimiter & 0x3F) == 0)
-            {
-                LogText("Timing out of sync: State.T=%f, ExposureT=%f, delta=%f, Time()=%f\n",
-                    State.TimeInSeconds, msg.CameraTimeSeconds,
-                    State.TimeInSeconds - msg.CameraTimeSeconds, GetTime());
-            }
-            logLimiter++;
-        }
-
-    }
-
-    CurrentExposureIMUDelta.TimeInSeconds = msg.CameraTimeSeconds - LastMessageExposureFrame.CameraTimeSeconds;
-    ExposureRecordHistory.PushBack(ExposureRecord(
-        msg.CameraFrameCount, msg.CameraTimeSeconds, State, CurrentExposureIMUDelta));
+    NextExposureRecord.ExposureCounter = msg.CameraFrameCount;
+    NextExposureRecord.ExposureTime = msg.CameraTimeSeconds;
+    NextExposureRecord.WorldFromImu = WorldFromImu;
+    NextExposureRecord.ImuOnlyDelta.TimeInSeconds = msg.CameraTimeSeconds - LastMessageExposureFrame.CameraTimeSeconds;
+    ExposureRecordHistory.PushBack(NextExposureRecord);
 
     // Every new exposure starts from zero
-    CurrentExposureIMUDelta = PoseState<double>(); 
+    NextExposureRecord = ExposureRecord(); 
     LastMessageExposureFrame = msg;
 }
 
 // If you have a known-good pose, this sets the neck pivot position.
-void SensorFusion::setNeckPivotFromPose(Posed const &pose)
+void SensorFusion::setNeckPivotFromPose(Transformd const &worldFromImu)
 {
-    Vector3d imuInNeckPivotFrame = HeadModel - CPFPositionInIMUFrame;
-    NeckPivotPosition = pose.Position - pose.Orientation.Rotate(imuInNeckPivotFrame);
+    WorldFromNeck = worldFromImu * ImuFromCpf * CpfFromNeck;
 }
 
 // These two functions need to be moved into Quat class
@@ -448,28 +439,46 @@ Quatd extractYawRotation(const Quatd &error)
 void SensorFusion::applyPositionCorrection(double deltaT)
 {
     // Each component of gainPos is equivalent to a Kalman gain of (sigma_process / sigma_observation)
-    const Vector3d gainPos = Vector3d(10, 10, 8);
+	const Vector3d gainPos = Vector3d(10, 10, 8);
     const Vector3d gainVel = gainPos.EntrywiseMultiply(gainPos) * 0.5;
+    const Vector3d gainAccel = gainVel * 0.5;
     const double snapThreshold = 0.1; // Large value (previously 0.01, which caused frequent jumping)
 
-    if (LastVisionExposureRecord.ExposureCounter <= FullVisionCorrectionExposureCounter)
-        return;
-
-    if (VisionError.Transform.Position.LengthSq() > (snapThreshold * snapThreshold) ||
+    Vector3d correctionPos, correctionVel;
+    if (VisionError.Pose.Translation.LengthSq() > (snapThreshold * snapThreshold) ||
         !(UpdatedState.GetState().StatusFlags & Status_PositionTracked))
     {
         // high error or just reacquired position from vision - apply full correction
-        State.Transform.Position += VisionError.Transform.Position;
-        State.LinearVelocity += VisionError.LinearVelocity;
-        // record the frame counter to avoid additional correction until we see the new data
-        FullVisionCorrectionExposureCounter = LastMessageExposureFrame.CameraFrameCount;        
+
+        // to know where we are right now, take the vision pose (which is slightly old)
+        // and update it using the imu data since then
+        PoseStated worldFromImuVision = WorldFromCamera * CameraFromImu;
+        for (unsigned int i = 0; i < ExposureRecordHistory.GetSize(); i++)
+            worldFromImuVision.AdvanceByDelta(ExposureRecordHistory.PeekFront(i).ImuOnlyDelta);
+        worldFromImuVision.AdvanceByDelta(NextExposureRecord.ImuOnlyDelta);
+
+        correctionPos = worldFromImuVision.Pose.Translation - WorldFromImu.Pose.Translation;
+        correctionVel = worldFromImuVision.LinearVelocity - WorldFromImu.LinearVelocity;
+        AccelOffset   = Vector3d();
     }
     else
     {
-        State.Transform.Position += VisionError.Transform.Position.EntrywiseMultiply(gainPos) * deltaT;
-        State.LinearVelocity += VisionError.Transform.Position.EntrywiseMultiply(gainVel) * deltaT;
-        // Uncomment the line below to try acclerometer bias estimation in filter
-        //AccelOffset += VisionError.Pose.Position * gainAccel * deltaT;
+        correctionPos = VisionError.Pose.Translation.EntrywiseMultiply(gainPos) * deltaT;
+        correctionVel = VisionError.Pose.Translation.EntrywiseMultiply(gainVel) * deltaT;
+        AccelOffset  += VisionError.Pose.Translation.EntrywiseMultiply(gainAccel) * deltaT;
+    }
+
+    WorldFromImu.Pose.Translation += correctionPos;
+    WorldFromImu.LinearVelocity += correctionVel;
+
+    // Update the exposure records so that we don't apply the same correction twice
+    LastVisionExposureRecord.WorldFromImu.Pose.Translation += correctionPos;
+    LastVisionExposureRecord.WorldFromImu.LinearVelocity += correctionVel;
+    for (unsigned int i = 0; i < ExposureRecordHistory.GetSize(); i++)
+    {
+        PoseStated& state = ExposureRecordHistory.PeekBack(i).WorldFromImu;
+        state.Pose.Translation += correctionPos;
+        state.LinearVelocity += correctionVel;
     }
 }
 
@@ -478,23 +487,24 @@ void SensorFusion::applyVisionYawCorrection(double deltaT)
     const double gain = 0.25;
     const double snapThreshold = 0.1;
 
-    if (LastVisionExposureRecord.ExposureCounter <= FullVisionCorrectionExposureCounter)
-        return;
-
-    Quatd yawError = extractYawRotation(VisionError.Transform.Orientation);
+    Quatd yawError = extractYawRotation(VisionError.Pose.Rotation);
 
     Quatd correction;
     if (Alg::Abs(yawError.w) < cos(snapThreshold / 2)) // angle(yawError) > snapThreshold
-    {
         // high error, jump to the vision position
         correction = yawError;
-        // record the frame counter to avoid additional correction until we see the new data
-        FullVisionCorrectionExposureCounter = LastMessageExposureFrame.CameraFrameCount;        
-    }
     else
         correction = yawError.Nlerp(Quatd(), gain * deltaT);
 
-    State.Transform.Orientation = correction * State.Transform.Orientation;
+    WorldFromImu.Pose.Rotation = correction * WorldFromImu.Pose.Rotation;
+
+    // Update the exposure records so that we don't apply the same correction twice
+    LastVisionExposureRecord.WorldFromImu.Pose.Rotation = correction * LastVisionExposureRecord.WorldFromImu.Pose.Rotation;
+    for (unsigned int i = 0; i < ExposureRecordHistory.GetSize(); i++)
+    {
+        PoseStated& state = ExposureRecordHistory.PeekBack(i).WorldFromImu;
+        state.Pose.Rotation = correction * state.Pose.Rotation;
+    }
 }
 
 void SensorFusion::applyMagYawCorrection(Vector3d mag, double deltaT)
@@ -505,74 +515,69 @@ void SensorFusion::applyMagYawCorrection(Vector3d mag, double deltaT)
     const double proportionalGain = 0.01;
     const double integralGain     = 0.0005;
 
-    Vector3d magW = State.Transform.Orientation.Rotate(mag);
+    Vector3d magInWorldFrame = WorldFromImu.Pose.Rotate(mag);
     // verify that the horizontal component is sufficient
-    if (magW.x * magW.x + magW.z * magW.z < minMagLengthSq)
+    if (magInWorldFrame.x * magInWorldFrame.x + magInWorldFrame.z * magInWorldFrame.z < minMagLengthSq)
         return;
-    magW.Normalize();
+    magInWorldFrame.Normalize();
+
+    // Delete a bad point
+    if (MagRefIdx >= 0 && MagRefs[MagRefIdx].Score < 0)
+    {
+        MagRefs.RemoveAtUnordered(MagRefIdx);
+        MagRefIdx = -1;
+    }
 
     // Update the reference point if needed
-    if (MagRefScore < 0 || MagRefIdx < 0 ||
-        mag.Distance(MagRefsInBodyFrame[MagRefIdx]) > maxMagRefDist)
+    if (MagRefIdx < 0 || mag.Distance(MagRefs[MagRefIdx].InImuFrame) > maxMagRefDist)
     {
-        // Delete a bad point
-        if (MagRefIdx >= 0 && MagRefScore < 0)
-        {
-            MagNumReferences--;
-            MagRefsInBodyFrame[MagRefIdx]  = MagRefsInBodyFrame[MagNumReferences];
-            MagRefsInWorldFrame[MagRefIdx] = MagRefsInWorldFrame[MagNumReferences];
-            MagRefsPoses[MagRefIdx] = MagRefsPoses[MagRefIdx];
-        }
         // Find a new one
         MagRefIdx = -1;
-        MagRefScore = 1000;
         double bestDist = maxMagRefDist;
-        for (int i = 0; i < MagNumReferences; i++)
+        for (unsigned int i = 0; i < MagRefs.GetSize(); i++)
         {
-            double dist = mag.Distance(MagRefsInBodyFrame[i]);
+            double dist = mag.Distance(MagRefs[i].InImuFrame);
             if (bestDist > dist)
             {
                 bestDist = dist;
                 MagRefIdx = i;
             }
         }
+
         // Create one if needed
-        if (MagRefIdx < 0 && MagNumReferences < MagMaxReferences)
-        {
-            MagRefIdx = MagNumReferences;
-            MagRefsInBodyFrame[MagRefIdx] = mag;
-            MagRefsInWorldFrame[MagRefIdx] = magW;
-            MagRefsPoses[MagRefIdx] = State.Transform.Orientation;
-            MagNumReferences++;
-        }
+        if (MagRefIdx < 0 && MagRefs.GetSize() < MagMaxReferences)
+		{
+            MagRefs.PushBack(MagReferencePoint(mag, WorldFromImu.Pose, 1000));
+		}
     }
 
     if (MagRefIdx >= 0)
     {
-        Vector3d magRefW = MagRefsInWorldFrame[MagRefIdx];
+        Vector3d magRefInWorldFrame = MagRefs[MagRefIdx].WorldFromImu.Rotate(MagRefs[MagRefIdx].InImuFrame);
+        magRefInWorldFrame.Normalize();
 
         // If the vertical angle is wrong, decrease the score and do nothing
-        if (Alg::Abs(magRefW.y - magW.y) > maxTiltError)
+        if (Alg::Abs(magRefInWorldFrame.y - magInWorldFrame.y) > maxTiltError)
         {
-            MagRefScore -= 1;
+            MagRefs[MagRefIdx].Score -= 1;
             return;
         }
 
-        MagRefScore += 2;
+        MagRefs[MagRefIdx].Score += 2;
 #if 0
         // this doesn't seem to work properly, need to investigate
         Quatd error = vectorAlignmentRotation(magW, magRefW);
         Quatd yawError = extractYawRotation(error);
 #else
         // Correction is computed in the horizontal plane
-        magW.y = magRefW.y = 0;
-        Quatd yawError = vectorAlignmentRotation(magW, magRefW);
+        magInWorldFrame.y = magRefInWorldFrame.y = 0;
+        Quatd yawError = vectorAlignmentRotation(magInWorldFrame, magRefInWorldFrame);
 #endif                                                 
         Quatd correction = yawError.Nlerp(Quatd(), proportionalGain * deltaT) *
                            MagCorrectionIntegralTerm.Nlerp(Quatd(), deltaT);
         MagCorrectionIntegralTerm = MagCorrectionIntegralTerm * yawError.Nlerp(Quatd(), integralGain * deltaT);
 
-        State.Transform.Orientation = correction * State.Transform.Orientation;
+        WorldFromImu.Pose.Rotation = correction * WorldFromImu.Pose.Rotation;
     }
 }
 
@@ -582,22 +587,22 @@ void SensorFusion::applyTiltCorrection(double deltaT)
     const double snapThreshold = 0.1;
     const Vector3d up(0, 1, 0);
 
-    Vector3d accelW = State.Transform.Orientation.Rotate(FAccelHeadset.GetFilteredValue());
-    Quatd error = vectorAlignmentRotation(accelW, up);
+    Vector3d accelInWorldFrame = WorldFromImu.Pose.Rotate(FAccelInImuFrame.GetFilteredValue());
+    Quatd error = vectorAlignmentRotation(accelInWorldFrame, up);
 
     Quatd correction;
-    if (FAccelHeadset.GetSize() == 1 || 
-        ((Alg::Abs(error.w) < cos(snapThreshold / 2) && FAccelHeadset.Confidence() > 0.75)))
+    if (FAccelInImuFrame.GetSize() == 1 || 
+        ((Alg::Abs(error.w) < cos(snapThreshold / 2) && FAccelInImuFrame.Confidence() > 0.75)))
         // full correction for start-up
         // or large error with high confidence
         correction = error;
-    else if (FAccelHeadset.Confidence() > 0.5)
+    else if (FAccelInImuFrame.Confidence() > 0.5)
         correction = error.Nlerp(Quatd(), gain * deltaT);
     else
         // accelerometer is unreliable due to movement
         return;
 
-    State.Transform.Orientation = correction * State.Transform.Orientation;
+    WorldFromImu.Pose.Rotation = correction * WorldFromImu.Pose.Rotation;
 }
 
 void SensorFusion::applyCameraTiltCorrection(Vector3d accel, double deltaT)
@@ -606,49 +611,50 @@ void SensorFusion::applyCameraTiltCorrection(Vector3d accel, double deltaT)
     const double maxCameraPositionOffset = 0.2;
     const Vector3d up(0, 1, 0), forward(0, 0, -1);
 
-    if (LastVisionExposureRecord.ExposureCounter <= FullVisionCorrectionExposureCounter)
-        return;
-
     // for startup use filtered value instead of instantaneous for stability
-    if (FAccelCamera.IsEmpty())
-        accel = FAccelHeadset.GetFilteredValue();
+    if (FAccelInCameraFrame.IsEmpty())
+        accel = FAccelInImuFrame.GetFilteredValue();
 
-    Quatd headsetToCamera = CameraPose.Orientation.Inverted() * VisionError.Transform.Orientation * State.Transform.Orientation;
+    Transformd cameraFromImu = WorldFromCamera.Inverted() * VisionError.Pose * WorldFromImu.Pose;
     // this is what the hypothetical camera-mounted accelerometer would show
-    Vector3d accelCamera = headsetToCamera.Rotate(accel);
-    FAccelCamera.Update(accelCamera, deltaT);
-    Vector3d accelCameraW = CameraPose.Orientation.Rotate(FAccelCamera.GetFilteredValue());
+    Vector3d accelInCameraFrame = cameraFromImu.Rotate(accel);
+    FAccelInCameraFrame.Update(accelInCameraFrame, deltaT);
+    Vector3d cameraAccelInWorldFrame = WorldFromCamera.Rotate(FAccelInCameraFrame.GetFilteredValue());
    
-    Quatd error1 = vectorAlignmentRotation(accelCameraW, up);
+    Quatd error1 = vectorAlignmentRotation(cameraAccelInWorldFrame, up);
     // cancel out yaw rotation
-    Vector3d forwardCamera = (error1 * CameraPose.Orientation).Rotate(forward);
+    Vector3d forwardCamera = (error1 * WorldFromCamera.Rotation).Rotate(forward);
     forwardCamera.y = 0;
     Quatd error2 = vectorAlignmentRotation(forwardCamera, forward);
     // combined error
     Quatd error = error2 * error1;
 
-    double confidence = FAccelCamera.Confidence();
+    double confidence = FAccelInCameraFrame.Confidence();
     // penalize the confidence if looking away from the camera
     // TODO: smooth fall-off
-    if (VisionState.Transform.Orientation.Rotate(forward).Angle(forward) > 1)
+    if (CameraFromImu.Pose.Rotate(forward).Angle(forward) > 1)
         confidence *= 0.5;
 
+	//Convenient global variable to temporarily extract this data.
+	TPH_CameraPoseConfidence = confidence;
+	//Allow override of confidence threshold
+	double confidenceThreshold = 0.75f;
+	if (TPH_CameraPoseConfidenceThresholdOverrideIfNonZero)
+    {
+		confidenceThreshold = TPH_CameraPoseConfidenceThresholdOverrideIfNonZero;
+	}
+
     Quatd correction;
-    if (FAccelCamera.GetSize() == 1 ||
-        confidence > CameraPoseConfidence + 0.2 ||
+    if (FAccelInCameraFrame.GetSize() == 1 ||
+        confidence > WorldFromCameraConfidence + 0.2 ||
         // disabled due to false positives when moving side to side
 //        (Alg::Abs(error.w) < cos(5 * snapThreshold / 2) && confidence > 0.55) ||    
-        (Alg::Abs(error.w) < cos(snapThreshold / 2) && confidence > 0.75))
+        (Alg::Abs(error.w) < cos(snapThreshold / 2) && confidence > confidenceThreshold))
     {
         // large error with high confidence
         correction = error;
         // update the confidence level
-        CameraPoseConfidence = confidence;
-        // record the frame counter to avoid additional correction until we see the new data
-        FullVisionCorrectionExposureCounter = LastMessageExposureFrame.CameraFrameCount;
-
-        LogText("adjust camera tilt confidence %f angle %f\n",
-                CameraPoseConfidence, RadToDegree(correction.Angle(Quatd())));
+        WorldFromCameraConfidence = confidence;
     }
     else
     {
@@ -656,49 +662,104 @@ void SensorFusion::applyCameraTiltCorrection(Vector3d accel, double deltaT)
         return;
     }
 
-    Quatd newOrientation = correction * CameraPose.Orientation;
+    Transformd newWorldFromCamera(correction * WorldFromCamera.Rotation, Vector3d());
+
     // compute a camera position change that together with the camera rotation would result in zero player movement
-    Vector3d newPosition = CameraPose.Orientation.Rotate(VisionState.Transform.Position) + CameraPose.Position - 
-                            newOrientation.Rotate(VisionState.Transform.Position);
+    newWorldFromCamera.Translation += (WorldFromCamera * CameraFromImu.Pose).Translation -
+        (newWorldFromCamera * CameraFromImu.Pose).Translation;
     // if the new position is too far, reset to default 
     // (can't hide the rotation, might as well use it to reset the position)
-    if (newPosition.DistanceSq(DefaultCameraPosition) > maxCameraPositionOffset * maxCameraPositionOffset)
-        newPosition = DefaultCameraPosition;
+    if (newWorldFromCamera.Translation.DistanceSq(DefaultWorldFromCamera.Translation) > maxCameraPositionOffset * maxCameraPositionOffset)
+        newWorldFromCamera.Translation = DefaultWorldFromCamera.Translation;
 
-    CameraPose.Orientation = newOrientation;
-    CameraPose.Position    = newPosition;
+    WorldFromCamera = newWorldFromCamera;
 
-    //Convenient global variable to temporarily extract this data.
-    TPH_CameraPoseOrientationWxyz[0] = (float) newOrientation.w;
-    TPH_CameraPoseOrientationWxyz[1] = (float) newOrientation.x;
-    TPH_CameraPoseOrientationWxyz[2] = (float) newOrientation.y;
-    TPH_CameraPoseOrientationWxyz[3] = (float) newOrientation.z;
+	//Convenient global variable to temporarily extract this data.
+	TPH_CameraPoseOrientationWxyz[0] = (float) WorldFromCamera.Rotation.w;
+	TPH_CameraPoseOrientationWxyz[1] = (float) WorldFromCamera.Rotation.x;
+	TPH_CameraPoseOrientationWxyz[2] = (float) WorldFromCamera.Rotation.y;
+	TPH_CameraPoseOrientationWxyz[3] = (float) WorldFromCamera.Rotation.z;
+}
 
+void SensorFusion::applyFocusCorrection(double deltaT)
+{
+	Vector3d up = Vector3d(0, 1, 0);
+	double gain = 0.01;
+	Vector3d currentDir = WorldFromImu.Pose.Rotate(Vector3d(0, 0, 1));
 
-    LogText("adjust camera position %f %f %f\n", newPosition.x, newPosition.y, newPosition.z);
+	Vector3d focusYawComponent = FocusDirection.ProjectToPlane(up);
+	Vector3d currentYawComponent = currentDir.ProjectToPlane(up);
+
+	double angle = focusYawComponent.Angle(currentYawComponent);
+
+	if( angle > FocusFOV )
+	{
+		Quatd yawError;
+		if ( FocusFOV != 0.0f)
+		{
+			Vector3d lFocus = Quatd(up, -FocusFOV).Rotate(focusYawComponent);
+			Vector3d rFocus = Quatd(up, FocusFOV).Rotate(focusYawComponent);
+			double lAngle = lFocus.Angle(currentYawComponent);
+			double rAngle = rFocus.Angle(currentYawComponent);
+			if(lAngle < rAngle)
+			{
+				yawError = vectorAlignmentRotation(currentDir, lFocus);
+			} 
+            else
+			{
+				yawError = vectorAlignmentRotation(currentDir, rFocus);
+			}
+		} 
+        else
+		{
+			yawError = vectorAlignmentRotation(currentYawComponent, focusYawComponent);
+		}
+
+		Quatd correction = yawError.Nlerp(Quatd(), gain * deltaT);
+        WorldFromImu.Pose.Rotation = correction * WorldFromImu.Pose.Rotation;
+	}
+}
+
+//------------------------------------------------------------------------------------
+// Focus filter setting functions
+
+void SensorFusion::SetFocusDirection()
+{
+	SetFocusDirection(WorldFromImu.Pose.Rotate(Vector3d(0.0, 0.0, 1.0)));
+}
+
+void SensorFusion::SetFocusDirection(Vector3d direction)
+{
+	FocusDirection = direction;
+}
+
+void SensorFusion::SetFocusFOV(double fov)
+{
+	OVR_ASSERT(fov >= 0.0);
+	FocusFOV = fov;
+}
+
+void SensorFusion::ClearFocus()
+{
+	FocusDirection = Vector3d(0.0, 0.0, 0.0);
+	FocusFOV = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------
 // Head model functions.
 
 // Sets up head-and-neck model and device-to-pupil dimensions from the user's profile.
-void SensorFusion::SetUserHeadDimensions(Profile const *profile, HmdRenderInfo const &hmdRenderInfo)
+void SensorFusion::SetUserHeadDimensions(Profile const &profile, HmdRenderInfo const &hmdRenderInfo)
 {
-    float neckEyeHori = OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL;
-    float neckEyeVert = OVR_DEFAULT_NECK_TO_EYE_VERTICAL;
-    if ( profile != NULL )
-    {
-        float neckeye[2];
-        if (profile->GetFloatValues(OVR_KEY_NECK_TO_EYE_DISTANCE, neckeye, 2) == 2)
-        {
-            neckEyeHori = neckeye[0];
-            neckEyeVert = neckeye[1];
-        }
-    }
+    float neckeye[2];
+    int count = profile.GetFloatValues(OVR_KEY_NECK_TO_EYE_DISTANCE, neckeye, 2);
     // Make sure these are vaguely sensible values.
-    OVR_ASSERT ( ( neckEyeHori > 0.05f ) && ( neckEyeHori < 0.5f ) );
-    OVR_ASSERT ( ( neckEyeVert > 0.05f ) && ( neckEyeVert < 0.5f ) );
-    SetHeadModel ( Vector3f ( 0.0, neckEyeVert, -neckEyeHori ) );
+    if (count == 2)
+    {
+        OVR_ASSERT ( ( neckeye[0] > 0.05f ) && ( neckeye[0] < 0.5f ) );
+        OVR_ASSERT ( ( neckeye[1] > 0.05f ) && ( neckeye[1] < 0.5f ) );
+        SetHeadModel ( Vector3f ( 0.0, neckeye[1], -neckeye[0] ) );
+    }
 
     // Find the distance from the center of the screen to the "center eye"
     // This center eye is used by systems like rendering & audio to represent the player,
@@ -710,20 +771,16 @@ void SensorFusion::SetUserHeadDimensions(Profile const *profile, HmdRenderInfo c
     // Crystal Cove was measured to be roughly 0.025 screen->faceplate which agrees with this assumption.
     // TODO: do this properly!  Update:  Measured this at 0.02733 with a CC prototype, CES era (PT7), on 2/19/14 -Steve
     float screenCenterToMidplate = 0.02733f;
-
     float centerEyeRelief = hmdRenderInfo.GetEyeCenter().ReliefInMeters;
-    if ( profile == NULL )
-    {
-        // No valid profile, so the eye-relief won't be correct either, so fill in a default that feels good
-        centerEyeRelief = 0.020f;
-    }
     float centerPupilDepth = screenCenterToMidplate + hmdRenderInfo.LensSurfaceToMidplateInMeters + centerEyeRelief;
     SetCenterPupilDepth ( centerPupilDepth );
+
+    Recording::GetRecorder().RecordUserParams(GetHeadModel(), GetCenterPupilDepth());
 }
 
 Vector3f SensorFusion::GetHeadModel() const
 {
-    return (Vector3f)HeadModel;
+    return (Vector3f)CpfFromNeck.Inverted().Translation;
 }
 
 void SensorFusion::SetHeadModel(const Vector3f &headModel, bool resetNeckPivot /*= true*/ )
@@ -734,10 +791,10 @@ void SensorFusion::SetHeadModel(const Vector3f &headModel, bool resetNeckPivot /
     // they can be subtle but nauseating!
     OVR_ASSERT ( headModel.y > 0.0f );
     OVR_ASSERT ( headModel.z < 0.0f );
-    HeadModel = (Vector3d)headModel;
+    CpfFromNeck = Transformd(Quatd(), (Vector3d)headModel).Inverted();
     if ( resetNeckPivot )
     {
-        setNeckPivotFromPose ( State.Transform );
+        setNeckPivotFromPose ( WorldFromImu.Pose );
     }
 }
 
@@ -746,81 +803,77 @@ float SensorFusion::GetCenterPupilDepth() const
     return CenterPupilDepth;
 }
 
-
 void SensorFusion::SetCenterPupilDepth(float centerPupilDepth)
 {
     CenterPupilDepth = centerPupilDepth;
 
-    CPFPositionInIMUFrame = -IMUPosition;
-    CPFPositionInIMUFrame.z += CenterPupilDepth;
-    
-    setNeckPivotFromPose ( State.Transform );
+    Transformd screenFromCpf(Quatd(), Vector3d(0, 0, centerPupilDepth));
+    ImuFromCpf = ImuFromScreen * screenFromCpf;
+	
+    setNeckPivotFromPose ( WorldFromImu.Pose );
 }
 
 //-------------------------------------------------------------------------------------
 
 // This is a "perceptually tuned predictive filter", which means that it is optimized
 // for improvements in the VR experience, rather than pure error.  In particular,
-// jitter is more perceptible at lower speeds whereas latency is more perceptable
+// jitter is more perceptible at lower speeds whereas latency is more perceptible
 // after a high-speed motion.  Therefore, the prediction interval is dynamically
 // adjusted based on speed.  Significant more research is needed to further improve
 // this family of filters.
-static Pose<double> calcPredictedPose(const PoseState<double>& poseState, double predictionDt)
+static Transform<double> calcPredictedPose(const PoseState<double>& poseState, double predictionDt)
 {
-    Pose<double> pose        = poseState.Transform;
-    const double linearCoef  = 1.0;
-    Vector3d angularVelocity = poseState.AngularVelocity;
-    double   angularSpeed    = angularVelocity.Length();
+    Transform<double> pose   = poseState.Pose;
+	const double linearCoef  = 1.0;
+	Vector3d angularVelocity = poseState.AngularVelocity;
+	double   angularSpeed    = angularVelocity.Length();
 
-    // This could be tuned so that linear and angular are combined with different coefficients
-    double speed             = angularSpeed + linearCoef * poseState.LinearVelocity.Length();
+	// This could be tuned so that linear and angular are combined with different coefficients
+	double speed             = angularSpeed + linearCoef * poseState.LinearVelocity.Length();
 
-    const double slope       = 0.2; // The rate at which the dynamic prediction interval varies
-    double candidateDt       = slope * speed; // TODO: Replace with smoothstep function
+	const double slope       = 0.2; // The rate at which the dynamic prediction interval varies
+	double candidateDt       = slope * speed; // TODO: Replace with smoothstep function
 
-    double dynamicDt         = predictionDt;
+	double dynamicDt         = predictionDt;
 
-    // Choose the candidate if it is shorter, to improve stability
-    if (candidateDt < predictionDt)
-        dynamicDt = candidateDt;
+	// Choose the candidate if it is shorter, to improve stability
+	if (candidateDt < predictionDt)
+		dynamicDt = candidateDt;
 
     if (angularSpeed > 0.001)
-        pose.Orientation = pose.Orientation * Quatd(angularVelocity, angularSpeed * dynamicDt);
+        pose.Rotation = pose.Rotation * Quatd(angularVelocity, angularSpeed * dynamicDt);
 
-    pose.Position += poseState.LinearVelocity * dynamicDt;
+    pose.Translation += poseState.LinearVelocity * dynamicDt;
 
     return pose;
 }
 
 
-Posef SensorFusion::GetPoseAtTime(double absoluteTime) const
+Transformf SensorFusion::GetPoseAtTime(double absoluteTime) const
 {
     SensorState ss = GetSensorStateAtTime ( absoluteTime );
-    return ss.Predicted.Transform;
+    return ss.Predicted.Pose;
 }
 
 
 SensorState SensorFusion::GetSensorStateAtTime(double absoluteTime) const
 {          
      const LocklessState lstate = UpdatedState.GetState();
-     // Delta time from the last processed message
-     const double        pdt   = absoluteTime - lstate.State.TimeInSeconds;
+     // Delta time from the last available data
+     const double pdt = absoluteTime - lstate.State.TimeInSeconds;
      
      SensorState ss;
      ss.Recorded     = PoseStatef(lstate.State);
      ss.Temperature  = lstate.Temperature;
      ss.Magnetometer = Vector3f(lstate.Magnetometer);
-     ss.StatusFlags       = lstate.StatusFlags;
+     ss.StatusFlags  = lstate.StatusFlags;
 
-     // Do prediction logic
      ss.Predicted               = ss.Recorded;
      ss.Predicted.TimeInSeconds = absoluteTime;
-     ss.Predicted.Transform          = Posef(calcPredictedPose(lstate.State, pdt));
     
-     // CPFOriginInIMUFrame transformation
-     const Vector3f cpfOriginInIMUFrame(CPFPositionInIMUFrame);
-     ss.Recorded.Transform.Position  += ss.Recorded.Transform.Orientation.Rotate(cpfOriginInIMUFrame);
-     ss.Predicted.Transform.Position += ss.Predicted.Transform.Orientation.Rotate(cpfOriginInIMUFrame);
+     // Do prediction logic and ImuFromCpf transformation
+     ss.Recorded.Pose  = Transformf(lstate.State.Pose * ImuFromCpf);
+     ss.Predicted.Pose = Transformf(calcPredictedPose(lstate.State, pdt) * ImuFromCpf);
      return ss;
 }
 
@@ -841,7 +894,7 @@ void SensorFusion::OnMessage(const MessageBodyFrame& msg)
 
 void SensorFusion::BodyFrameHandler::OnMessage(const Message& msg)
 {
-    Recorder::Buffer(msg);
+	Recording::GetRecorder().RecordMessage(msg);
     if (msg.Type == Message_BodyFrame)
         pFusion->handleMessage(static_cast<const MessageBodyFrame&>(msg));
     if (msg.Type == Message_ExposureFrame)

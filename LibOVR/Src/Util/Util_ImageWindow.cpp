@@ -7,16 +7,16 @@ Authors     :   Dean Beeler
 
 Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -25,451 +25,487 @@ limitations under the License.
 *************************************************************************************/
 #include "../../Include/OVR.h"
 
-#ifdef OVR_OS_WIN32
 #include "Util_ImageWindow.h"
+
+#if defined(OVR_OS_WIN32)
 
 #include <Windows.h>
 
+#include "DWrite.h"
+
 typedef HRESULT (WINAPI *D2D1CreateFactoryFn)(
-    _In_      D2D1_FACTORY_TYPE,
-    _In_      REFIID,
-    _In_opt_  const D2D1_FACTORY_OPTIONS*,
-    _Out_     ID2D1Factory **
-    );
+	_In_      D2D1_FACTORY_TYPE,
+	_In_      REFIID,
+	_In_opt_  const D2D1_FACTORY_OPTIONS*,
+	_Out_     ID2D1Factory **
+	);
+
+typedef HRESULT (WINAPI *DWriteCreateFactoryFn)(
+	_In_   DWRITE_FACTORY_TYPE factoryType,
+	_In_   REFIID iid,
+	_Out_  IUnknown **factory
+	);
 
 
 namespace OVR { namespace Util {
-
+	
 ID2D1Factory* ImageWindow::pD2DFactory = NULL;
-ImageWindow* ImageWindow::globalWindow = NULL;
+IDWriteFactory* ImageWindow::pDWriteFactory = NULL;
+ImageWindow* ImageWindow::globalWindow[4];
+int ImageWindow::windowCount = 0;
 
 LRESULT CALLBACK MainWndProc(
-    HWND hwnd,
-    UINT uMsg,
-    WPARAM wParam,
-    LPARAM lParam)
+	HWND hwnd,
+	UINT uMsg,
+	WPARAM wParam,
+	LPARAM lParam)
 {
-    switch (uMsg)
-    {
-    case WM_CREATE:
-        return 0;
+	switch (uMsg) 
+	{ 
+	case WM_CREATE: 
+		return 0; 
 
-    case WM_PAINT:
-        {
-            LONG_PTR ptr = GetWindowLongPtr( hwnd, GWLP_USERDATA );
-            if( ptr )
-            {
-                ImageWindow* iw = (ImageWindow*)ptr;
-                iw->OnPaint();
-            }
-        }
+	case WM_PAINT: 
+		{
+			LONG_PTR ptr = GetWindowLongPtr( hwnd, GWLP_USERDATA );
+			if( ptr )
+			{
+				ImageWindow* iw = (ImageWindow*)ptr;
+				iw->OnPaint();
+			}
+		}
+		
+		return 0; 
 
-        return 0;
+	case WM_SIZE: 
+		// Set the size and position of the window. 
+		return 0; 
 
-    case WM_SIZE:
-        // Set the size and position of the window.
-        return 0;
+	case WM_DESTROY: 
+		// Clean up window-specific data objects. 
+		return 0; 
 
-    case WM_DESTROY:
-        // Clean up window-specific data objects.
-        return 0;
+		// 
+		// Process other messages. 
+		// 
 
-        //
-        // Process other messages.
-        //
-
-    default:
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-    //return 0;
+	default: 
+		return DefWindowProc(hwnd, uMsg, wParam, lParam); 
+	} 
+	//return 0; 
 }
 
-ImageWindow::ImageWindow() :
-    frontBufferMutex( new Mutex() )
+ImageWindow::ImageWindow( uint32_t width, uint32_t height ) :
+	frontBufferMutex( new Mutex() )
 {
 
-    HINSTANCE hInst = LoadLibrary( L"d2d1.dll" );
+	HINSTANCE hInst = LoadLibrary( L"d2d1.dll" );
+	HINSTANCE hInstWrite = LoadLibrary( L"Dwrite.dll" );
 
-    D2D1CreateFactoryFn createFactory = NULL;
+	D2D1CreateFactoryFn createFactory = NULL;
+	DWriteCreateFactoryFn writeFactory = NULL;
 
-    if( hInst )
-    {
-        createFactory = (D2D1CreateFactoryFn)GetProcAddress( hInst, "D2D1CreateFactory" );
-    }
+	if( hInst )
+	{
+		createFactory = (D2D1CreateFactoryFn)GetProcAddress( hInst, "D2D1CreateFactory" );
+	}
 
-    globalWindow = this;
+	if( hInstWrite )
+	{
+		writeFactory = (DWriteCreateFactoryFn)GetProcAddress( hInstWrite, "DWriteCreateFactory" );
+	}
 
-    int width = 752;
-    int height = 480;
+	globalWindow[windowCount] = this;
 
-    if( pD2DFactory == NULL && createFactory )
-    {
-        createFactory(
-            D2D1_FACTORY_TYPE_MULTI_THREADED,
-            __uuidof(ID2D1Factory),
-            NULL,
-            &pD2DFactory
-            );
-    }
+	++windowCount;
 
-    resolution = D2D1::SizeU( width, height );
+	if( pD2DFactory == NULL && createFactory && writeFactory )
+	{
+		createFactory( 
+			D2D1_FACTORY_TYPE_MULTI_THREADED,
+			__uuidof(ID2D1Factory),
+			NULL,
+			&pD2DFactory
+			);
 
-    SetWindowLongPtr( hWindow, GWLP_USERDATA, (LONG_PTR)this );
+		// Create a DirectWrite factory.
+		writeFactory(
+			DWRITE_FACTORY_TYPE_SHARED,
+			__uuidof(pDWriteFactory),
+			reinterpret_cast<IUnknown **>(&pDWriteFactory)
+			);
 
-    pRT = NULL;
-    greyBitmap = NULL;
-    colorBitmap = NULL;
-}
+	}
 
-ImageWindow::ImageWindow( UINT width, UINT height ) :
-    frontBufferMutex( new Mutex() )
-{
+	resolution = D2D1::SizeU( width, height );
 
+	SetWindowLongPtr( hWindow, GWLP_USERDATA, (LONG_PTR)this );
 
-    HINSTANCE hInstance = GetModuleHandle( NULL );
-
-    WNDCLASS wc;
-    wc.lpszClassName = L"ImageWindowClass";
-    wc.lpfnWndProc = MainWndProc;
-    wc.style = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-    wc.hInstance = hInstance;
-    wc.hIcon = LoadIcon( NULL, IDI_APPLICATION );
-    wc.hCursor = LoadCursor( NULL, IDC_ARROW );
-    wc.hbrBackground = (HBRUSH)( COLOR_WINDOW+1 );
-    wc.lpszMenuName = L"";
-    wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
-
-    RegisterClass(&wc);
-
-    hWindow = CreateWindow(
-        L"ImageWindowClass",
-        L"ImageWindow",
-        WS_OVERLAPPEDWINDOW & ~WS_SYSMENU,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        width,
-        height,
-        NULL,
-        NULL,
-        hInstance,
-        NULL);
-
-    resolution = D2D1::SizeU( width, height );
-
-    SetWindowLongPtr( hWindow, GWLP_USERDATA, (LONG_PTR)this );
-
-    ShowWindow( hWindow, SW_SHOW );
-
-    RECT rc = {0};
-    GetClientRect( hWindow, &rc );
-
-    D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties();
-    D2D1_HWND_RENDER_TARGET_PROPERTIES hwndProps = D2D1::HwndRenderTargetProperties(
-        hWindow,
-        resolution
-        );
-
-    ID2D1HwndRenderTarget* hwndTarget = NULL;
-    // Create a Direct2D render target
-    pRT = NULL;
-    pD2DFactory->CreateHwndRenderTarget(
-        &props,
-        &hwndProps,
-        &hwndTarget
-        );
-
-    pRT = hwndTarget;
-
-    D2D1_SIZE_U size = D2D1::SizeU( width, height );
-
-    D2D1_PIXEL_FORMAT pixelFormat = D2D1::PixelFormat(
-        DXGI_FORMAT_A8_UNORM,
-        D2D1_ALPHA_MODE_PREMULTIPLIED
-        );
-
-    D2D1_BITMAP_PROPERTIES bitmapProps;
-    bitmapProps.dpiX = 72;
-    bitmapProps.dpiY = 72;
-    bitmapProps.pixelFormat = pixelFormat;
-
-    HRESULT result = pRT->CreateBitmap( size, bitmapProps, &greyBitmap );
-    result = pRT->CreateBitmap( size, bitmapProps, &colorBitmap );
+	pRT = NULL;
+	greyBitmap = NULL;
+	colorBitmap = NULL;
 }
 
 ImageWindow::~ImageWindow()
 {
-    if( greyBitmap )
-        greyBitmap->Release();
+	for( int i = 0; i < MaxWindows; ++i )
+	{
+		if( globalWindow[i] == this )
+		{
+			globalWindow[i] = NULL;
+			break;
+		}
+}
 
-    if( colorBitmap )
-        colorBitmap->Release();
+	if( greyBitmap )
+		greyBitmap->Release();
 
-    if( pRT )
-        pRT->Release();
+	if( colorBitmap )
+		colorBitmap->Release();
 
-    delete frontBufferMutex;
+	if( pRT )
+		pRT->Release();
 
-    ShowWindow( hWindow, SW_HIDE );
-    DestroyWindow( hWindow );
+	{
+		Mutex::Locker locker( frontBufferMutex  );
+
+		while( frames.GetSize() )
+		{
+			Ptr<Frame> aFrame = frames.PopBack();
+		}
+	}
+
+	delete frontBufferMutex;
+
+	ShowWindow( hWindow, SW_HIDE );
+	DestroyWindow( hWindow );
 }
 
 void ImageWindow::AssociateSurface( void* surface )
 {
-    // Assume an IUnknown
-    IUnknown* unknown = (IUnknown*)surface;
+	// Assume an IUnknown
+	IUnknown* unknown = (IUnknown*)surface;
 
-    IDXGISurface *pDxgiSurface = NULL;
-    HRESULT hr = unknown->QueryInterface(&pDxgiSurface);
-    if( hr == S_OK )
-    {
-        D2D1_RENDER_TARGET_PROPERTIES props =
-            D2D1::RenderTargetProperties(
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-            96,
-            96
-            );
+	IDXGISurface *pDxgiSurface = NULL;
+	HRESULT hr = unknown->QueryInterface(&pDxgiSurface);
+	if( hr == S_OK )
+	{
+		D2D1_RENDER_TARGET_PROPERTIES props =
+			D2D1::RenderTargetProperties(
+			D2D1_RENDER_TARGET_TYPE_DEFAULT,
+			D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
+			96,
+			96
+			);
 
 
-        pRT = NULL;
-        ID2D1RenderTarget* tmpTarget;
+		pRT = NULL;			
+		ID2D1RenderTarget* tmpTarget;
 
-        hr = pD2DFactory->CreateDxgiSurfaceRenderTarget( pDxgiSurface, &props, &tmpTarget );
+		hr = pD2DFactory->CreateDxgiSurfaceRenderTarget( pDxgiSurface, &props, &tmpTarget );
 
-        if( hr == S_OK )
-        {
-            DXGI_SURFACE_DESC desc = {0};
-            pDxgiSurface->GetDesc( &desc );
-            int width = desc.Width;
-            int height = desc.Height;
+		if( hr == S_OK )
+		{
+			DXGI_SURFACE_DESC desc = {0};
+			pDxgiSurface->GetDesc( &desc );
+			int width = desc.Width;
+			int height = desc.Height;
 
-            D2D1_SIZE_U size = D2D1::SizeU( width, height );
+			D2D1_SIZE_U size = D2D1::SizeU( width, height );
 
-            D2D1_PIXEL_FORMAT pixelFormat = D2D1::PixelFormat(
-                DXGI_FORMAT_A8_UNORM,
-                D2D1_ALPHA_MODE_PREMULTIPLIED
-                );
+			D2D1_PIXEL_FORMAT pixelFormat = D2D1::PixelFormat(
+				DXGI_FORMAT_A8_UNORM,
+				D2D1_ALPHA_MODE_PREMULTIPLIED
+				);
 
-            D2D1_PIXEL_FORMAT colorPixelFormat = D2D1::PixelFormat(
-                DXGI_FORMAT_B8G8R8A8_UNORM,
-                D2D1_ALPHA_MODE_PREMULTIPLIED
-                );
+			D2D1_PIXEL_FORMAT colorPixelFormat = D2D1::PixelFormat(
+				DXGI_FORMAT_B8G8R8A8_UNORM,
+				D2D1_ALPHA_MODE_PREMULTIPLIED
+				);
 
-            D2D1_BITMAP_PROPERTIES bitmapProps;
-            bitmapProps.dpiX = 96;
-            bitmapProps.dpiY = 96;
-            bitmapProps.pixelFormat = pixelFormat;
+			D2D1_BITMAP_PROPERTIES bitmapProps;
+			bitmapProps.dpiX = 96;
+			bitmapProps.dpiY = 96;
+			bitmapProps.pixelFormat = pixelFormat;
 
-            D2D1_BITMAP_PROPERTIES colorBitmapProps;
-            colorBitmapProps.dpiX = 96;
-            colorBitmapProps.dpiY = 96;
-            colorBitmapProps.pixelFormat = colorPixelFormat;
+			D2D1_BITMAP_PROPERTIES colorBitmapProps;
+			colorBitmapProps.dpiX = 96;
+			colorBitmapProps.dpiY = 96;
+			colorBitmapProps.pixelFormat = colorPixelFormat;
 
-            HRESULT result = tmpTarget->CreateBitmap( size, bitmapProps, &greyBitmap );
-            if( result != S_OK )
-            {
-                tmpTarget->Release();
-                tmpTarget = NULL;
-            }
+			HRESULT result = tmpTarget->CreateBitmap( size, bitmapProps, &greyBitmap );
+			if( result != S_OK )
+			{
+				tmpTarget->Release();
+				tmpTarget = NULL;
+			}
 
-            result = tmpTarget->CreateBitmap( size, colorBitmapProps, &colorBitmap );
-            if( result != S_OK )
-            {
-                greyBitmap->Release();
-                greyBitmap = NULL;
+			result = tmpTarget->CreateBitmap( size, colorBitmapProps, &colorBitmap );
+			if( result != S_OK )
+			{
+				greyBitmap->Release();
+				greyBitmap = NULL;
 
-                tmpTarget->Release();
-                tmpTarget = NULL;
-            }
-            pRT = tmpTarget;
-        }
-    }
+				tmpTarget->Release();
+				tmpTarget = NULL;
+			}
+			pRT = tmpTarget;
+		}
+	}
 }
 
 void ImageWindow::Process()
 {
-    if( pRT && greyBitmap )
-    {
-        OnPaint();
-    }
+	if( pRT && greyBitmap )
+	{
+		OnPaint();
+
+		pRT->Flush();
+	}
 }
 
 void ImageWindow::Complete()
 {
-    Mutex::Locker locker( frontBufferMutex  );
+	Mutex::Locker locker( frontBufferMutex  );
 
-    if( frames.IsEmpty() )
-        return;
+	if( frames.IsEmpty() )
+		return;
 
-    if( frames.PeekBack(0).ready )
-        return;
+	if( frames.PeekBack(0)->ready )
+		return;
 
-    Frame& frame = frames.PeekBack(0);
+	Ptr<Frame> frame = frames.PeekBack(0);
 
-    frame.ready = true;
+	frame->ready = true;
 }
 
 void ImageWindow::OnPaint()
 {
-    static float mover = -752.0f;
+	Mutex::Locker locker( frontBufferMutex  );
 
-    Mutex::Locker locker( frontBufferMutex  );
+	// Nothing to do
+	if( frames.IsEmpty() )
+		return;
 
-    // Nothing to do
-    if( frames.IsEmpty() )
-        return;
+	if( !frames.PeekFront(0)->ready )
+		return;
 
-    if( !frames.PeekFront(0).ready )
-        return;
+	Ptr<Frame> currentFrame = frames.PopFront();
 
-    Frame currentFrame = frames.PopFront();
-    Frame dummyFrame = {0};
+	Ptr<Frame> nextFrame = NULL;
 
-    Frame& nextFrame = dummyFrame;
+	if( !frames.IsEmpty() )
+		nextFrame = frames.PeekFront(0);
+	
+	while( nextFrame && nextFrame->ready )
+	{
+		// Free up the current frame since it's been removed from the deque
+		currentFrame = frames.PopFront();
 
-    if( !frames.IsEmpty() )
-        nextFrame = frames.PeekFront(0);
+		if( frames.IsEmpty() )
+			break;
 
-    while( nextFrame.ready )
-    {
-        // Free up the current frame since it's been removed from the deque
-        free( currentFrame.imageData );
-        if( currentFrame.colorImageData )
-            free( currentFrame.colorImageData );
+		nextFrame = frames.PeekFront(0);
+	}
 
-        currentFrame = frames.PopFront();
+	if( currentFrame->imageData )
+		greyBitmap->CopyFromMemory( NULL, currentFrame->imageData, currentFrame->width );
 
-        if( frames.IsEmpty() )
-            return;
+	if( currentFrame->colorImageData )
+		colorBitmap->CopyFromMemory( NULL, currentFrame->colorImageData, currentFrame->colorPitch );
 
-        nextFrame = frames.PeekFront(0);
-    }
+	pRT->BeginDraw();
 
-    if( currentFrame.imageData )
-        greyBitmap->CopyFromMemory( NULL, currentFrame.imageData, currentFrame.width );
+	pRT->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED); 
 
-    if( currentFrame.colorImageData )
-        colorBitmap->CopyFromMemory( NULL, currentFrame.colorImageData, currentFrame.colorPitch );
+	pRT->Clear( D2D1::ColorF(D2D1::ColorF::Black) );
 
-    pRT->BeginDraw();
+	// This will mirror our image
+	D2D1_MATRIX_3X2_F m;
+	m._11 = -1; m._12 = 0;
+	m._21 = 0; m._22 = 1;
+	m._31 = 0; m._32 = 0;
+	pRT->SetTransform( m );
 
-    pRT->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+	ID2D1SolidColorBrush* whiteBrush;
 
-    pRT->Clear( D2D1::ColorF(D2D1::ColorF::Black) );
+	pRT->CreateSolidColorBrush( D2D1::ColorF(D2D1::ColorF::White, 1.0f), &whiteBrush );
 
-    // This will mirror our image
-    D2D1_MATRIX_3X2_F m;
-    m._11 = -1; m._12 = 0;
-    m._21 = 0; m._22 = 1;
-    m._31 = 0; m._32 = 0;
-    pRT->SetTransform( m );
+	if( currentFrame->imageData )
+	{
+		pRT->FillOpacityMask( greyBitmap, whiteBrush, 
+			D2D1_OPACITY_MASK_CONTENT_TEXT_NATURAL, 
+			D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ), 
+			//D2D1::RectF( 0.0f, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ), 
+			D2D1::RectF( 0.0f, 0.0f, (FLOAT)resolution.width, (FLOAT)resolution.height ) );
+	}
+	else if( currentFrame->colorImageData )
+	{
+		pRT->DrawBitmap( colorBitmap,
+			D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ) );
 
-    ID2D1SolidColorBrush* whiteBrush;
+	}
 
-    pRT->CreateSolidColorBrush( D2D1::ColorF(D2D1::ColorF::White, 1.0f), &whiteBrush );
+	pRT->SetTransform(D2D1::Matrix3x2F::Identity());
 
-    if( currentFrame.imageData )
-    {
-        pRT->FillOpacityMask( greyBitmap, whiteBrush,
-            D2D1_OPACITY_MASK_CONTENT_TEXT_NATURAL,
-            D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ),
-            D2D1::RectF( 0.0f, 0.0f, (FLOAT)resolution.width, (FLOAT)resolution.height ) );
-    }
-    else if( currentFrame.colorImageData )
-    {
-        pRT->DrawBitmap( colorBitmap,
-            D2D1::RectF( -(FLOAT)resolution.width, 0.0f, (FLOAT)0.0f, (FLOAT)resolution.height ) );
+	whiteBrush->Release();
 
-    }
+	Array<CirclePlot>::Iterator it;
 
-    pRT->SetTransform(D2D1::Matrix3x2F::Identity());
+	for( it = currentFrame->plots.Begin(); it != currentFrame->plots.End(); ++it )
+	{
+		ID2D1SolidColorBrush* aBrush;
 
-    whiteBrush->Release();
+		pRT->CreateSolidColorBrush( D2D1::ColorF( it->r, it->g, it->b), &aBrush );
 
-    Array<CirclePlot>::Iterator it;
+		D2D1_ELLIPSE ellipse;
+		ellipse.point.x = it->x;
+		ellipse.point.y = it->y;
+		ellipse.radiusX = it->radius;
+		ellipse.radiusY = it->radius;
 
-    for( it = currentFrame.plots.Begin(); it != currentFrame.plots.End(); ++it )
-    {
-        ID2D1SolidColorBrush* aBrush;
+		if( it->fill )
+			pRT->FillEllipse( &ellipse, aBrush );
+		else
+			pRT->DrawEllipse( &ellipse, aBrush );
 
-        pRT->CreateSolidColorBrush( D2D1::ColorF( it->r, it->g, it->b), &aBrush );
+		aBrush->Release();
+	}
 
-        D2D1_ELLIPSE ellipse;
-        ellipse.point.x = it->x;
-        ellipse.point.y = it->y;
-        ellipse.radiusX = it->radius;
-        ellipse.radiusY = it->radius;
+	static const WCHAR msc_fontName[] = L"Verdana";
+	static const FLOAT msc_fontSize = 20;
 
-        if( it->fill )
-            pRT->FillEllipse( &ellipse, aBrush );
-        else
-            pRT->DrawEllipse( &ellipse, aBrush );
+	IDWriteTextFormat* textFormat = NULL;
 
-        aBrush->Release();
-    }
+	// Create a DirectWrite text format object.
+	pDWriteFactory->CreateTextFormat(
+		msc_fontName,
+		NULL,
+		DWRITE_FONT_WEIGHT_NORMAL,
+		DWRITE_FONT_STYLE_NORMAL,
+		DWRITE_FONT_STRETCH_NORMAL,
+		msc_fontSize,
+		L"", //locale
+		&textFormat
+		);
 
-    pRT->EndDraw();
+	D2D1_SIZE_F renderTargetSize = pRT->GetSize();
 
-    if( currentFrame.imageData )
-        free( currentFrame.imageData );
-    if( currentFrame.colorImageData )
-        free( currentFrame.colorImageData );
+	Array<TextPlot>::Iterator textIt;
+	for( textIt = currentFrame->textLines.Begin(); textIt != currentFrame->textLines.End(); ++textIt )
+	{
+		ID2D1SolidColorBrush* aBrush;
+
+		pRT->CreateSolidColorBrush( D2D1::ColorF( textIt->r, textIt->g, textIt->b), &aBrush );
+
+		WCHAR* tmpString = (WCHAR*)calloc( textIt->text.GetLength(),  sizeof( WCHAR ) );
+		for( unsigned i = 0; i < textIt->text.GetLength(); ++i )
+		{
+			tmpString[i] = (WCHAR)textIt->text.GetCharAt( i );
+		}
+					
+		pRT->DrawTextW( tmpString, (UINT32)textIt->text.GetLength(), textFormat,
+			D2D1::RectF(textIt->x, textIt->y, renderTargetSize.width, renderTargetSize.height), aBrush );
+
+		free( tmpString );
+
+		aBrush->Release();
+	}
+
+	if( textFormat )
+		textFormat->Release();
+
+	pRT->EndDraw();
+
+	pRT->Flush();
 }
 
-void ImageWindow::UpdateImageBW( const UINT8* imageData, UINT width, UINT height )
+Ptr<Frame> ImageWindow::lastUnreadyFrame()
 {
-    if( pRT && greyBitmap )
-    {
-        Mutex::Locker locker( frontBufferMutex );
+	static int framenumber = 0;
 
-        Frame frame = {0};
-        frame.imageData = malloc( width * height );
-        frame.width = width;
-        frame.height = height;
-        memcpy( frame.imageData, imageData, width * height );
+	if( frames.GetSize() && !frames.PeekBack( 0 )->ready )
+		return frames.PeekBack( 0 );
 
-        frames.PushBack( frame );
-    }
+	// Create a new frame if an unready one doesn't already exist
+	Ptr<Frame> tmpFrame = *new Frame( framenumber );
+	frames.PushBack( tmpFrame );
+
+	++framenumber;
+
+	return tmpFrame;
 }
 
-void ImageWindow::UpdateImageRGBA( const UINT8* imageData, UINT width, UINT height, UINT pitch )
+void ImageWindow::UpdateImageBW( const uint8_t* imageData, uint32_t width, uint32_t height )
 {
-    if( pRT && colorBitmap )
-    {
-        Mutex::Locker locker( frontBufferMutex );
+	if( pRT && greyBitmap )
+	{
+		Mutex::Locker locker( frontBufferMutex );
 
-        Frame frame = {0};
-        frame.colorImageData = malloc( pitch * height );
-        frame.width = width;
-        frame.height = height;
-        frame.colorPitch = pitch;
-        memcpy( frame.colorImageData, imageData, pitch * height );
+		Ptr<Frame> frame = lastUnreadyFrame();
+		frame->imageData = malloc( width * height );
+		frame->width = width;
+		frame->height = height;
+		memcpy( frame->imageData, imageData, width * height );
+	}
+}
 
-        frames.PushBack( frame );
-    }
+void ImageWindow::UpdateImageRGBA( const uint8_t* imageData, uint32_t width, uint32_t height, uint32_t pitch )
+{
+	if( pRT && colorBitmap )
+	{
+		Mutex::Locker locker( frontBufferMutex );
+
+		Ptr<Frame> frame = lastUnreadyFrame();
+		frame->colorImageData = malloc( pitch * height );
+		frame->width = width;
+		frame->height = height;
+		frame->colorPitch = pitch;
+		memcpy( frame->colorImageData, imageData, pitch * height );
+	}
 }
 
 void ImageWindow::addCircle( float x, float y, float radius, float r, float g, float b, bool fill )
 {
-    if( pRT )
-    {
-        CirclePlot cp;
+	if( pRT )
+	{
+		CirclePlot cp;
 
-        cp.x = x;
-        cp.y = y;
-        cp.radius = radius;
-        cp.r = r;
-        cp.g = g;
-        cp.b = b;
-        cp.fill = fill;
+		cp.x = x;
+		cp.y = y;
+		cp.radius = radius;
+		cp.r = r;
+		cp.g = g;
+		cp.b = b;
+		cp.fill = fill;
 
-        Mutex::Locker locker( frontBufferMutex );
-        Frame& frame = frames.PeekBack( 0 );
-        frame.plots.PushBack( cp );
-    }
+		Mutex::Locker locker( frontBufferMutex );
+
+		Ptr<Frame> frame = lastUnreadyFrame();
+		frame->plots.PushBack( cp );
+	}
 
 }
 
+void ImageWindow::addText( float x, float y, float r, float g, float b, OVR::String text )
+{
+	if( pRT )
+	{
+		TextPlot tp;
+
+		tp.x = x;
+		tp.y = y;
+		tp.r = r;
+		tp.g = g;
+		tp.b = b;
+		tp.text = text;
+
+		Mutex::Locker locker( frontBufferMutex );
+		Ptr<Frame> frame = lastUnreadyFrame();
+		frame->textLines.PushBack( tp );
+	}
+}
+
 }}
-#endif
+
+#endif //defined(OVR_OS_WIN32)

@@ -77,94 +77,94 @@ void OnKey(unsigned vk, bool down)
 
 void OnMouseMove(int x)
 {
-      const float                Sensitivity = 1.0f;
+ 	 const float                Sensitivity = 1.0f;
      AdditionalYawFromMouse -= (Sensitivity * x)/ 360.0f;
 }
 
 bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos,
                             float deltaTime, Quatf PoseOrientation)
 {
-    #if 0//Optional debug output
-    char debugString[1000];
-    sprintf_s(debugString,"Pos = (%0.2f, %0.2f, %0.2f)\n",EyePos.x,EyePos.y,EyePos.z);
-    OutputDebugStringA(debugString);
-    #endif
+	#if 0//Optional debug output
+	char debugString[1000];
+	sprintf_s(debugString,"Pos = (%0.2f, %0.2f, %0.2f)\n",EyePos.x,EyePos.y,EyePos.z);
+	OutputDebugStringA(debugString);
+	#endif
 
-     //Mouse rotation
-    EyeYaw += AdditionalYawFromMouse;
-    AdditionalYawFromMouse = 0;
+ 	//Mouse rotation
+	EyeYaw += AdditionalYawFromMouse;
+	AdditionalYawFromMouse = 0;
 
-    //Get HeadYaw
-    float HeadPitch, HeadRoll, HeadYaw;
-    PoseOrientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&HeadYaw,&HeadPitch, &HeadRoll);
+	//Get HeadYaw
+	float HeadPitch, HeadRoll, HeadYaw;
+	PoseOrientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&HeadYaw,&HeadPitch, &HeadRoll);
 
-    //Move on Eye pos from controls
+	//Move on Eye pos from controls
     Vector3f localMoveVector(0,0,0);
     Matrix4f yawRotate = Matrix4f::RotationY(EyeYaw + HeadYaw);
 
-    if (MoveForward) localMoveVector += Vector3f(0,0,-1); 
+	if (MoveForward) localMoveVector += Vector3f(0,0,-1); 
     if (MoveBack)    localMoveVector += Vector3f(0,0,+1); 
     if (MoveRight)   localMoveVector += Vector3f(1,0,0); 
     if (MoveLeft)    localMoveVector += Vector3f(-1,0,0);
 
-    Vector3f    orientationVector = yawRotate.Transform(localMoveVector);
+	Vector3f    orientationVector = yawRotate.Transform(localMoveVector);
 
     orientationVector *= MoveSpeed * deltaTime * (ShiftDown ? 3.0f : 1.0f);
-    EyePos += orientationVector;
+	EyePos += orientationVector;
 
-    //Some rudimentary limitation of movement, so not to go through walls
-    const float minDistanceToWall = 0.30f;
-    EyePos.x = max(EyePos.x,-10.0f + minDistanceToWall);
-    EyePos.x = min(EyePos.x, 10.0f - minDistanceToWall);
-    EyePos.z = max(EyePos.z,-20.0f + minDistanceToWall);
+	//Some rudimentary limitation of movement, so not to go through walls
+	const float minDistanceToWall = 0.30f;
+	EyePos.x = max(EyePos.x,-10.0f + minDistanceToWall);
+	EyePos.x = min(EyePos.x, 10.0f - minDistanceToWall);
+	EyePos.z = max(EyePos.z,-20.0f + minDistanceToWall);
 
-    //Return if need to freeze or not
-    return(FreezeEyeRender);
+	//Return if need to freeze or not
+	return(FreezeEyeRender);
 }
 
 
 LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    switch (msg)
+	switch (msg)
     {
-        case(WM_NCCREATE):  hWnd = arg_hwnd; break;
+		case(WM_NCCREATE):  hWnd = arg_hwnd; break;
 
-        case WM_MOUSEMOVE:    {
-                            // Convert mouse motion to be relative
-                            // (report the offset and re-center).
-                            POINT newPos = { LOWORD(lp), HIWORD(lp) };
-                            ::ClientToScreen(hWnd, &newPos);
-                            if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
-                                break;
-                            ::SetCursorPos(WindowCenter.x, WindowCenter.y);
-                            OnMouseMove(newPos.x - WindowCenter.x);
-                            break;
-                            }
+		case WM_MOUSEMOVE:	{
+							// Convert mouse motion to be relative
+							// (report the offset and re-center).
+							POINT newPos = { LOWORD(lp), HIWORD(lp) };
+							::ClientToScreen(hWnd, &newPos);
+							if ((newPos.x == WindowCenter.x) && (newPos.y == WindowCenter.y))
+								break;
+							::SetCursorPos(WindowCenter.x, WindowCenter.y);
+							OnMouseMove(newPos.x - WindowCenter.x);
+							break;
+							}
 
-        case WM_MOVE:        RECT r;
-                            GetClientRect(hWnd, &r);
-                            WindowCenter.x = r.right/2;
-                            WindowCenter.y = r.bottom/2;
-                            ::ClientToScreen(hWnd, &WindowCenter);
-                            break;
+		case WM_MOVE:		RECT r;
+							GetClientRect(hWnd, &r);
+							WindowCenter.x = r.right/2;
+							WindowCenter.y = r.bottom/2;
+							::ClientToScreen(hWnd, &WindowCenter);
+							break;
 
-        case WM_KEYDOWN:    OnKey((unsigned)wp, true);    break;
-        case WM_KEYUP:      OnKey((unsigned)wp, false);   break;
-        case WM_CREATE:     SetTimer(hWnd, 0, 100, NULL); break;
-        case WM_TIMER:      KillTimer(hWnd, 0);
+		case WM_KEYDOWN:    OnKey((unsigned)wp, true);    break;
+		case WM_KEYUP:      OnKey((unsigned)wp, false);   break;
+		case WM_CREATE:     SetTimer(hWnd, 0, 100, NULL); break;
+		case WM_TIMER:      KillTimer(hWnd, 0);
 
-        case WM_SETFOCUS:   
-                            SetCursorPos(WindowCenter.x, WindowCenter.y);
-                            SetCapture(hWnd);
-                            ShowCursor(FALSE);
-                            break;
-       case WM_KILLFOCUS:
-                            ReleaseCapture();
-                            ShowCursor(TRUE);
-                            break;
+		case WM_SETFOCUS:   
+							SetCursorPos(WindowCenter.x, WindowCenter.y);
+							SetCapture(hWnd);
+							ShowCursor(FALSE);
+							break;
+	   case WM_KILLFOCUS:
+							ReleaseCapture();
+							ShowCursor(TRUE);
+							break;
 
-        case WM_QUIT:
-        case WM_CLOSE:      Quit = true;
+		case WM_QUIT:
+		case WM_CLOSE:      Quit = true;
                             return 0;
     }
 
@@ -174,7 +174,7 @@ LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount)
 {
-    // Window
+	// Window
     WNDCLASS wc;
     memset(&wc, 0, sizeof(wc));
     wc.lpszClassName = L"OVRAppWindow";
@@ -183,10 +183,10 @@ RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSamp
     wc.cbWndExtra    = NULL;
     RegisterClass(&wc);
    
-    RECT winSize = { 0, 0, vp.w, vp.h };
+	RECT winSize = { 0, 0, vp.w, vp.h };
     AdjustWindowRect(&winSize, WS_POPUP, false);
     hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny", WS_POPUP |WS_VISIBLE,
-                         vp.x, vp.y,
+		                 vp.x, vp.y,
                          winSize.right-winSize.left, winSize.bottom-winSize.top,
                          NULL, NULL, hInstance, NULL);
 
@@ -194,11 +194,11 @@ RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSamp
     ::ClientToScreen(hWnd, &center);
     WindowCenter = center;
 
-    if (!hWnd) return(NULL);
+	if (!hWnd) return(NULL);
 
-    // Graphics
+	// Graphics
     RendererParams  renderParams;
-    renderParams.Multisample = multiSampleCount; 
+	renderParams.Multisample = multiSampleCount; 
     renderParams.Fullscreen  = fullscreen;
     return (RenderDevice::CreateDevice(renderParams, (void*)hWnd));
 }
@@ -206,10 +206,10 @@ RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSamp
 
 void Util_ReleaseWindowAndGraphics(RenderDevice * prender)
 {    
-    if (prender)
-        prender->Release();
+	if (prender)
+		prender->Release();
 
-    DistortionMeshRelease();
+	DistortionMeshRelease();
 
     if (hWnd)
     {
@@ -225,29 +225,29 @@ void Util_ReleaseWindowAndGraphics(RenderDevice * prender)
 // 
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR , int)
 {
-    hInstance = hinst;
+	hInstance = hinst;
 
     if (!Init())
     {
         // Processes messages and calls OnIdle() to do rendering.
-       while (!Quit)
-        {
-            MSG msg;
-            if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-            {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-            }
-            else
-            {
-                 ProcessAndRender();
+	   while (!Quit)
+		{
+			MSG msg;
+			if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			else
+			{
+				 ProcessAndRender();
 
-                // Keep sleeping when we're minimized.
-                if (IsIconic(hWnd)) Sleep(10);
-            }
-        }
+				// Keep sleeping when we're minimized.
+				if (IsIconic(hWnd)) Sleep(10);
+			}
+		}
     }
-      Release();
+  	Release();
     OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
     return (0);
 }

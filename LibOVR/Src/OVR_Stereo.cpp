@@ -28,39 +28,13 @@ limitations under the License.
 #include "OVR_Profile.h"
 #include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_Alg.h"
-#include "../../Bindings/C/Include/OVR_CAPI.h"
+
 //To allow custom distortion to be introduced to CatMulSpline.
 float (*CustomDistortion)(float) = NULL;
 float (*CustomDistortionInv)(float) = NULL;
 
 
 namespace OVR {
-
-
-// ***** FovPort
-
-// C-interop support: FovPort <-> ovrFovPort
-FovPort::FovPort(const ovrFovPort &src)
-    : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
-{ }
-
-FovPort::operator const ovrFovPort () const
-{
-    ovrFovPort result;
-    result.LeftTan  = LeftTan;
-    result.RightTan = RightTan;
-    result.UpTan    = UpTan;
-    result.DownTan  = DownTan;
-    return result;
-}
-
-// Converts Fov Tan angle units to [-1,1] render target NDC space
-Vector2f FovPort::TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle)
-{
-    ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(*this);
-    return tanEyeAngle * eyeToSourceNDC.Scale + eyeToSourceNDC.Offset;
-}
-
 
 
 using namespace Alg;
@@ -211,11 +185,11 @@ float LensConfig::DistortionFnScaleRadiusSquared (float rsq) const
         scale = EvalCatmullRom10Spline ( K, scaledRsq );
 
 
-        //Intercept, and overrule if needed
-        if (CustomDistortion)
-        {
-            scale = CustomDistortion(rsq);
-        }
+		//Intercept, and overrule if needed
+		if (CustomDistortion)
+		{
+			scale = CustomDistortion(rsq);
+		}
 
         }break;
     default:
@@ -299,11 +273,11 @@ float LensConfig::DistortionFnInverseApprox(float r) const
         float scaledRsq = (float)(NumSegments-1) * rsq / ( MaxInvR * MaxInvR );
         scale = EvalCatmullRom10Spline ( InvK, scaledRsq );
 
-        //Intercept, and overrule if needed
-        if (CustomDistortionInv)
-        {
-            scale = CustomDistortionInv(rsq);
-        }
+		//Intercept, and overrule if needed
+		if (CustomDistortionInv)
+		{
+			scale = CustomDistortionInv(rsq);
+		}
 
         }break;
     default:
@@ -390,6 +364,9 @@ void LensConfig::SetUpInverseApprox()
 #endif
 
         }break;
+
+    default:
+        break;
     }
 }
 
@@ -466,7 +443,7 @@ bool LoadLensConfig ( LensConfig *presult, UByte const *pbuffer, int bufferSizeI
     {
     case LCSV_CatmullRom10Version1:
         {
-            if ( bufferSizeInBytes < sizeof(LensConfigStored_CatmullRom10Version1) )
+            if ( bufferSizeInBytes < (int)sizeof(LensConfigStored_CatmullRom10Version1) )
             {
                 return false;
             }
@@ -529,7 +506,7 @@ int SaveLensConfigSizeInBytes ( LensConfig const &config )
 // Returns true on success.
 bool SaveLensConfig ( UByte *pbuffer, int bufferSizeInBytes, LensConfig const &config )
 {
-    if ( bufferSizeInBytes < sizeof ( LensConfigStored_CatmullRom10Version1 ) )
+    if ( bufferSizeInBytes < (int)sizeof ( LensConfigStored_CatmullRom10Version1 ) )
     {
         return false;
     }
@@ -670,6 +647,9 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
         info.Shutter.FirstScanlineToLastScanline    = 0.0131033f;
         info.Shutter.PixelSettleTime                = 0.0f;
         info.Shutter.PixelPersistence               = 0.18f * info.Shutter.VsyncToNextVsync;
+        break;
+
+    default:
         break;
     }
 
@@ -894,7 +874,7 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
     };
 
     DistortionDescriptor distortions[10];
-    for ( int i = 0; i < sizeof(distortions)/sizeof(distortions[0]); i++ )
+    for ( unsigned int i = 0; i < sizeof(distortions)/sizeof(distortions[0]); i++ )
     {
         distortions[i].Config.SetToIdentity();
         distortions[i].EyeRelief = 0.0f;
@@ -1400,6 +1380,11 @@ FovPort CalculateFovFromHmdInfo ( StereoEye eyeType,
         offsetToRightInMeters = -(hmd.EyeLeft.NoseToPupilInMeters - 0.5f * hmd.LensSeparationInMeters);
     }
 
+    // Limit the eye-relief to 6 mm for FOV calculations since this just tends to spread off-screen
+    // and get clamped anyways on DK1 (but in Unity it continues to spreads and causes 
+    // unnecessarily large render targets)
+    eyeReliefInMeters = Alg::Max(eyeReliefInMeters, 0.006f);
+
     // Central view.
     fovPort = CalculateFovFromEyePosition ( eyeReliefInMeters,
                                             offsetToRightInMeters,
@@ -1548,7 +1533,7 @@ ScaleAndOffset2D CreateUVScaleAndOffsetfromNDCScaleandOffset ( ScaleAndOffset2D 
     Vector2f offset( (float)renderedViewport.x / (float)renderTargetSize.w,
                      (float)renderedViewport.y / (float)renderTargetSize.h );
 
-    result.Scale  = result.Scale.EntrywiseMultiply(scale);
+	result.Scale  = result.Scale.EntrywiseMultiply(scale);
     result.Offset  = result.Offset.EntrywiseMultiply(scale) + offset;
     return result;
 }
@@ -1814,7 +1799,7 @@ Vector2f TransformRendertargetNDCToTanFovSpace( const ScaleAndOffset2D &eyeToSou
 //Just want to make a copy disentangled from all these namespaces!
 float ExtEvalCatmullRom10Spline ( float const *K, float scaledVal )
 {
-    return(OVR::EvalCatmullRom10Spline ( K, scaledVal ));
+	return(OVR::EvalCatmullRom10Spline ( K, scaledVal ));
 }
 
 

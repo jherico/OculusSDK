@@ -4,16 +4,16 @@ Content     :   Linux HID device implementation.
 Created     :   June 13, 2013
 Authors     :   Brant Lewis
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR SDK License Version 2.0 (the "License"); 
-you may not use the Oculus VR SDK except in compliance with the License, 
+Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-2.0 
+http://www.oculusvr.com/licenses/LICENSE-3.1 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,11 +55,11 @@ public:
     void HIDShutdown();
     
     virtual bool SetFeatureReport(UByte* data, UInt32 length);
-    virtual bool GetFeatureReport(UByte* data, UInt32 length);
+	virtual bool GetFeatureReport(UByte* data, UInt32 length);
 
     // DeviceManagerThread::Notifier
     void OnEvent(int i, int fd);
-    UInt64 OnTicks(UInt64 ticksMks);
+    double OnTicks(double tickSeconds);
 
     bool OnDeviceNotification(MessageType messageType,
                               HIDDeviceDesc* device_info,
@@ -91,7 +91,7 @@ private:
 
 class HIDDeviceManager : public OVR::HIDDeviceManager, public DeviceManagerThread::Notifier
 {
-    friend class HIDDevice;
+	friend class HIDDevice;
 
 public:
     HIDDeviceManager(Linux::DeviceManager* Manager);
