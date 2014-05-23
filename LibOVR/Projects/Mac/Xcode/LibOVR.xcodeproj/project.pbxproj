@@ -1,0 +1,731 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E8754F81190F1B71005FD401 /* OVR_Recording.h in Headers */ = {isa = PBXBuildFile; fileRef = E8754F7F190F1B71005FD401 /* OVR_Recording.h */; };
+		E886FE9E190737FA00D5DB45 /* OVR_CAPI_GL.h in Headers */ = {isa = PBXBuildFile; fileRef = E886FE9B190737FA00D5DB45 /* OVR_CAPI_GL.h */; };
+		E886FE9F190737FA00D5DB45 /* OVR_CAPI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E886FE9C190737FA00D5DB45 /* OVR_CAPI.cpp */; };
+		E886FEA0190737FA00D5DB45 /* OVR_CAPI.h in Headers */ = {isa = PBXBuildFile; fileRef = E886FE9D190737FA00D5DB45 /* OVR_CAPI.h */; };
+		E886FEA21907528C00D5DB45 /* CAPI_DistortionRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E886FEA11907528C00D5DB45 /* CAPI_DistortionRenderer.cpp */; };
+		E8AA40D11907221900D5F144 /* OVR_Alg.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40A61907221900D5F144 /* OVR_Alg.cpp */; };
+		E8AA40D21907221900D5F144 /* OVR_Alg.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40A71907221900D5F144 /* OVR_Alg.h */; };
+		E8AA40D31907221900D5F144 /* OVR_Allocator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40A81907221900D5F144 /* OVR_Allocator.cpp */; };
+		E8AA40D41907221900D5F144 /* OVR_Allocator.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40A91907221900D5F144 /* OVR_Allocator.h */; };
+		E8AA40D51907221900D5F144 /* OVR_Array.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40AA1907221900D5F144 /* OVR_Array.h */; };
+		E8AA40D61907221900D5F144 /* OVR_Atomic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40AB1907221900D5F144 /* OVR_Atomic.cpp */; };
+		E8AA40D71907221900D5F144 /* OVR_Atomic.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40AC1907221900D5F144 /* OVR_Atomic.h */; };
+		E8AA40D81907221900D5F144 /* OVR_Color.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40AD1907221900D5F144 /* OVR_Color.h */; };
+		E8AA40D91907221900D5F144 /* OVR_ContainerAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40AE1907221900D5F144 /* OVR_ContainerAllocator.h */; };
+		E8AA40DA1907221900D5F144 /* OVR_Deque.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40AF1907221900D5F144 /* OVR_Deque.h */; };
+		E8AA40DB1907221900D5F144 /* OVR_File.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40B01907221900D5F144 /* OVR_File.cpp */; };
+		E8AA40DC1907221900D5F144 /* OVR_File.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B11907221900D5F144 /* OVR_File.h */; };
+		E8AA40DD1907221900D5F144 /* OVR_FileFILE.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40B21907221900D5F144 /* OVR_FileFILE.cpp */; };
+		E8AA40DE1907221900D5F144 /* OVR_Hash.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B31907221900D5F144 /* OVR_Hash.h */; };
+		E8AA40DF1907221900D5F144 /* OVR_KeyCodes.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B41907221900D5F144 /* OVR_KeyCodes.h */; };
+		E8AA40E01907221900D5F144 /* OVR_List.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B51907221900D5F144 /* OVR_List.h */; };
+		E8AA40E11907221900D5F144 /* OVR_Lockless.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40B61907221900D5F144 /* OVR_Lockless.cpp */; };
+		E8AA40E21907221900D5F144 /* OVR_Lockless.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B71907221900D5F144 /* OVR_Lockless.h */; };
+		E8AA40E31907221900D5F144 /* OVR_Log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40B81907221900D5F144 /* OVR_Log.cpp */; };
+		E8AA40E41907221900D5F144 /* OVR_Log.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40B91907221900D5F144 /* OVR_Log.h */; };
+		E8AA40E51907221900D5F144 /* OVR_Math.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40BA1907221900D5F144 /* OVR_Math.cpp */; };
+		E8AA40E61907221900D5F144 /* OVR_Math.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40BB1907221900D5F144 /* OVR_Math.h */; };
+		E8AA40E71907221900D5F144 /* OVR_RefCount.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40BC1907221900D5F144 /* OVR_RefCount.cpp */; };
+		E8AA40E81907221900D5F144 /* OVR_RefCount.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40BD1907221900D5F144 /* OVR_RefCount.h */; };
+		E8AA40E91907221900D5F144 /* OVR_Std.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40BE1907221900D5F144 /* OVR_Std.cpp */; };
+		E8AA40EA1907221900D5F144 /* OVR_Std.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40BF1907221900D5F144 /* OVR_Std.h */; };
+		E8AA40EB1907221900D5F144 /* OVR_String.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40C01907221900D5F144 /* OVR_String.cpp */; };
+		E8AA40EC1907221900D5F144 /* OVR_String.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40C11907221900D5F144 /* OVR_String.h */; };
+		E8AA40ED1907221900D5F144 /* OVR_String_FormatUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40C21907221900D5F144 /* OVR_String_FormatUtil.cpp */; };
+		E8AA40EE1907221900D5F144 /* OVR_String_PathUtil.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40C31907221900D5F144 /* OVR_String_PathUtil.cpp */; };
+		E8AA40EF1907221900D5F144 /* OVR_StringHash.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40C41907221900D5F144 /* OVR_StringHash.h */; };
+		E8AA40F01907221900D5F144 /* OVR_SysFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40C51907221900D5F144 /* OVR_SysFile.cpp */; };
+		E8AA40F11907221900D5F144 /* OVR_SysFile.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40C61907221900D5F144 /* OVR_SysFile.h */; };
+		E8AA40F21907221900D5F144 /* OVR_System.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40C71907221900D5F144 /* OVR_System.cpp */; };
+		E8AA40F31907221900D5F144 /* OVR_System.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40C81907221900D5F144 /* OVR_System.h */; };
+		E8AA40F41907221900D5F144 /* OVR_Threads.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40C91907221900D5F144 /* OVR_Threads.h */; };
+		E8AA40F51907221900D5F144 /* OVR_ThreadsPthread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40CA1907221900D5F144 /* OVR_ThreadsPthread.cpp */; };
+		E8AA40F71907221900D5F144 /* OVR_Timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40CC1907221900D5F144 /* OVR_Timer.cpp */; };
+		E8AA40F81907221900D5F144 /* OVR_Timer.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40CD1907221900D5F144 /* OVR_Timer.h */; };
+		E8AA40F91907221900D5F144 /* OVR_Types.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40CE1907221900D5F144 /* OVR_Types.h */; };
+		E8AA40FA1907221900D5F144 /* OVR_UTF8Util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA40CF1907221900D5F144 /* OVR_UTF8Util.cpp */; };
+		E8AA40FB1907221900D5F144 /* OVR_UTF8Util.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA40D01907221900D5F144 /* OVR_UTF8Util.h */; };
+		E8AA410D1907224700D5F144 /* Util_Interface.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41011907224700D5F144 /* Util_Interface.cpp */; };
+		E8AA410E1907224700D5F144 /* Util_Interface.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41021907224700D5F144 /* Util_Interface.h */; };
+		E8AA410F1907224700D5F144 /* Util_LatencyTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41031907224700D5F144 /* Util_LatencyTest.cpp */; };
+		E8AA41101907224700D5F144 /* Util_LatencyTest.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41041907224700D5F144 /* Util_LatencyTest.h */; };
+		E8AA41111907224700D5F144 /* Util_LatencyTest2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41051907224700D5F144 /* Util_LatencyTest2.cpp */; };
+		E8AA41121907224700D5F144 /* Util_LatencyTest2.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41061907224700D5F144 /* Util_LatencyTest2.h */; };
+		E8AA41131907224700D5F144 /* Util_Render_Stereo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41071907224700D5F144 /* Util_Render_Stereo.cpp */; };
+		E8AA41141907224700D5F144 /* Util_Render_Stereo.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41081907224700D5F144 /* Util_Render_Stereo.h */; };
+		E8AA4169190722BB00D5F144 /* OVR_Device.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4121190722BB00D5F144 /* OVR_Device.h */; };
+		E8AA416A190722BB00D5F144 /* OVR_DeviceConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4122190722BB00D5F144 /* OVR_DeviceConstants.h */; };
+		E8AA416B190722BB00D5F144 /* OVR_DeviceHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4123190722BB00D5F144 /* OVR_DeviceHandle.cpp */; };
+		E8AA416C190722BB00D5F144 /* OVR_DeviceHandle.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4124190722BB00D5F144 /* OVR_DeviceHandle.h */; };
+		E8AA416D190722BB00D5F144 /* OVR_DeviceImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4125190722BB00D5F144 /* OVR_DeviceImpl.cpp */; };
+		E8AA416E190722BB00D5F144 /* OVR_DeviceImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4126190722BB00D5F144 /* OVR_DeviceImpl.h */; };
+		E8AA416F190722BB00D5F144 /* OVR_DeviceMessages.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4127190722BB00D5F144 /* OVR_DeviceMessages.h */; };
+		E8AA4170190722BB00D5F144 /* OVR_HIDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4128190722BB00D5F144 /* OVR_HIDDevice.h */; };
+		E8AA4171190722BB00D5F144 /* OVR_HIDDeviceBase.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4129190722BB00D5F144 /* OVR_HIDDeviceBase.h */; };
+		E8AA4172190722BB00D5F144 /* OVR_HIDDeviceImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA412A190722BB00D5F144 /* OVR_HIDDeviceImpl.h */; };
+		E8AA4173190722BB00D5F144 /* OVR_JSON.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA412B190722BB00D5F144 /* OVR_JSON.cpp */; };
+		E8AA4174190722BB00D5F144 /* OVR_JSON.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA412C190722BB00D5F144 /* OVR_JSON.h */; };
+		E8AA4175190722BB00D5F144 /* OVR_LatencyTestImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA412D190722BB00D5F144 /* OVR_LatencyTestImpl.cpp */; };
+		E8AA4176190722BB00D5F144 /* OVR_LatencyTestImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA412E190722BB00D5F144 /* OVR_LatencyTestImpl.h */; };
+		E8AA417E190722BB00D5F144 /* OVR_OSX_DeviceManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4136190722BB00D5F144 /* OVR_OSX_DeviceManager.cpp */; };
+		E8AA417F190722BB00D5F144 /* OVR_OSX_DeviceManager.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4137190722BB00D5F144 /* OVR_OSX_DeviceManager.h */; };
+		E8AA4180190722BB00D5F144 /* OVR_OSX_HIDDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4138190722BB00D5F144 /* OVR_OSX_HIDDevice.cpp */; };
+		E8AA4181190722BB00D5F144 /* OVR_OSX_HIDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4139190722BB00D5F144 /* OVR_OSX_HIDDevice.h */; };
+		E8AA4182190722BB00D5F144 /* OVR_OSX_HMDDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA413A190722BB00D5F144 /* OVR_OSX_HMDDevice.cpp */; };
+		E8AA4183190722BB00D5F144 /* OVR_OSX_HMDDevice.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA413B190722BB00D5F144 /* OVR_OSX_HMDDevice.h */; };
+		E8AA4184190722BB00D5F144 /* OVR_OSX_SensorDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA413C190722BB00D5F144 /* OVR_OSX_SensorDevice.cpp */; };
+		E8AA4185190722BB00D5F144 /* OVR_Profile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA413D190722BB00D5F144 /* OVR_Profile.cpp */; };
+		E8AA4186190722BB00D5F144 /* OVR_Profile.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA413E190722BB00D5F144 /* OVR_Profile.h */; };
+		E8AA4187190722BB00D5F144 /* OVR_Sensor2Impl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA413F190722BB00D5F144 /* OVR_Sensor2Impl.cpp */; };
+		E8AA4188190722BB00D5F144 /* OVR_Sensor2Impl.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4140190722BB00D5F144 /* OVR_Sensor2Impl.h */; };
+		E8AA4189190722BB00D5F144 /* OVR_Sensor2ImplUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4141190722BB00D5F144 /* OVR_Sensor2ImplUtil.h */; };
+		E8AA418A190722BB00D5F144 /* OVR_SensorCalibration.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4142190722BB00D5F144 /* OVR_SensorCalibration.cpp */; };
+		E8AA418B190722BB00D5F144 /* OVR_SensorCalibration.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4143190722BB00D5F144 /* OVR_SensorCalibration.h */; };
+		E8AA418C190722BB00D5F144 /* OVR_SensorFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4144190722BB00D5F144 /* OVR_SensorFilter.cpp */; };
+		E8AA418D190722BB00D5F144 /* OVR_SensorFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4145190722BB00D5F144 /* OVR_SensorFilter.h */; };
+		E8AA418E190722BB00D5F144 /* OVR_SensorFusion.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4146190722BB00D5F144 /* OVR_SensorFusion.cpp */; };
+		E8AA418F190722BB00D5F144 /* OVR_SensorFusion.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4147190722BB00D5F144 /* OVR_SensorFusion.h */; };
+		E8AA4190190722BB00D5F144 /* OVR_SensorFusionDebug.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4148190722BB00D5F144 /* OVR_SensorFusionDebug.h */; };
+		E8AA4191190722BB00D5F144 /* OVR_SensorImpl_Common.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4149190722BB00D5F144 /* OVR_SensorImpl_Common.cpp */; };
+		E8AA4192190722BB00D5F144 /* OVR_SensorImpl_Common.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA414A190722BB00D5F144 /* OVR_SensorImpl_Common.h */; };
+		E8AA4193190722BB00D5F144 /* OVR_SensorImpl.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA414B190722BB00D5F144 /* OVR_SensorImpl.cpp */; };
+		E8AA4194190722BB00D5F144 /* OVR_SensorImpl.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA414C190722BB00D5F144 /* OVR_SensorImpl.h */; };
+		E8AA4195190722BB00D5F144 /* OVR_SensorTimeFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA414D190722BB00D5F144 /* OVR_SensorTimeFilter.cpp */; };
+		E8AA4196190722BB00D5F144 /* OVR_SensorTimeFilter.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA414E190722BB00D5F144 /* OVR_SensorTimeFilter.h */; };
+		E8AA4197190722BB00D5F144 /* OVR_Stereo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA414F190722BB00D5F144 /* OVR_Stereo.cpp */; };
+		E8AA4198190722BB00D5F144 /* OVR_Stereo.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4150190722BB00D5F144 /* OVR_Stereo.h */; };
+		E8AA4199190722BB00D5F144 /* OVR_ThreadCommandQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA4151190722BB00D5F144 /* OVR_ThreadCommandQueue.cpp */; };
+		E8AA419A190722BB00D5F144 /* OVR_ThreadCommandQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA4152190722BB00D5F144 /* OVR_ThreadCommandQueue.h */; };
+		E8AA41E2190724E600D5F144 /* CAPI_DistortionRenderer.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41BA190724E600D5F144 /* CAPI_DistortionRenderer.h */; };
+		E8AA41E3190724E600D5F144 /* CAPI_FrameTimeManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41BB190724E600D5F144 /* CAPI_FrameTimeManager.cpp */; };
+		E8AA41E4190724E600D5F144 /* CAPI_FrameTimeManager.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41BC190724E600D5F144 /* CAPI_FrameTimeManager.h */; };
+		E8AA41E5190724E600D5F144 /* CAPI_GlobalState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41BD190724E600D5F144 /* CAPI_GlobalState.cpp */; };
+		E8AA41E6190724E600D5F144 /* CAPI_GlobalState.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41BE190724E600D5F144 /* CAPI_GlobalState.h */; };
+		E8AA41E7190724E600D5F144 /* CAPI_HMDRenderState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41BF190724E600D5F144 /* CAPI_HMDRenderState.cpp */; };
+		E8AA41E8190724E600D5F144 /* CAPI_HMDRenderState.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41C0190724E600D5F144 /* CAPI_HMDRenderState.h */; };
+		E8AA41E9190724E600D5F144 /* CAPI_HMDState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41C1190724E600D5F144 /* CAPI_HMDState.cpp */; };
+		E8AA41EA190724E600D5F144 /* CAPI_HMDState.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41C2190724E600D5F144 /* CAPI_HMDState.h */; };
+		E8AA41F6190724E600D5F144 /* CAPI_GL_DistortionRenderer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41D0190724E600D5F144 /* CAPI_GL_DistortionRenderer.cpp */; };
+		E8AA41F7190724E600D5F144 /* CAPI_GL_DistortionRenderer.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41D1190724E600D5F144 /* CAPI_GL_DistortionRenderer.h */; };
+		E8AA41F8190724E600D5F144 /* CAPI_GL_Util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8AA41D2190724E600D5F144 /* CAPI_GL_Util.cpp */; };
+		E8AA41F9190724E600D5F144 /* CAPI_GL_Util.h in Headers */ = {isa = PBXBuildFile; fileRef = E8AA41D3190724E600D5F144 /* CAPI_GL_Util.h */; };
+		E8F1F13E1921911D000EC969 /* OVR_Recording.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E8F1F13D1921911D000EC969 /* OVR_Recording.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		E82D4CD31906FE640070CB3F /* libovr.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libovr.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		E8754F7F190F1B71005FD401 /* OVR_Recording.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Recording.h; path = ../../../Src/OVR_Recording.h; sourceTree = "<group>"; };
+		E886FE9B190737FA00D5DB45 /* OVR_CAPI_GL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_CAPI_GL.h; path = ../../../Src/OVR_CAPI_GL.h; sourceTree = "<group>"; };
+		E886FE9C190737FA00D5DB45 /* OVR_CAPI.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_CAPI.cpp; path = ../../../Src/OVR_CAPI.cpp; sourceTree = "<group>"; };
+		E886FE9D190737FA00D5DB45 /* OVR_CAPI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_CAPI.h; path = ../../../Src/OVR_CAPI.h; sourceTree = "<group>"; };
+		E886FEA11907528C00D5DB45 /* CAPI_DistortionRenderer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_DistortionRenderer.cpp; sourceTree = "<group>"; };
+		E8AA40A61907221900D5F144 /* OVR_Alg.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Alg.cpp; sourceTree = "<group>"; };
+		E8AA40A71907221900D5F144 /* OVR_Alg.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Alg.h; sourceTree = "<group>"; };
+		E8AA40A81907221900D5F144 /* OVR_Allocator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Allocator.cpp; sourceTree = "<group>"; };
+		E8AA40A91907221900D5F144 /* OVR_Allocator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Allocator.h; sourceTree = "<group>"; };
+		E8AA40AA1907221900D5F144 /* OVR_Array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Array.h; sourceTree = "<group>"; };
+		E8AA40AB1907221900D5F144 /* OVR_Atomic.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Atomic.cpp; sourceTree = "<group>"; };
+		E8AA40AC1907221900D5F144 /* OVR_Atomic.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Atomic.h; sourceTree = "<group>"; };
+		E8AA40AD1907221900D5F144 /* OVR_Color.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Color.h; sourceTree = "<group>"; };
+		E8AA40AE1907221900D5F144 /* OVR_ContainerAllocator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_ContainerAllocator.h; sourceTree = "<group>"; };
+		E8AA40AF1907221900D5F144 /* OVR_Deque.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Deque.h; sourceTree = "<group>"; };
+		E8AA40B01907221900D5F144 /* OVR_File.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_File.cpp; sourceTree = "<group>"; };
+		E8AA40B11907221900D5F144 /* OVR_File.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_File.h; sourceTree = "<group>"; };
+		E8AA40B21907221900D5F144 /* OVR_FileFILE.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_FileFILE.cpp; sourceTree = "<group>"; };
+		E8AA40B31907221900D5F144 /* OVR_Hash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Hash.h; sourceTree = "<group>"; };
+		E8AA40B41907221900D5F144 /* OVR_KeyCodes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_KeyCodes.h; sourceTree = "<group>"; };
+		E8AA40B51907221900D5F144 /* OVR_List.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_List.h; sourceTree = "<group>"; };
+		E8AA40B61907221900D5F144 /* OVR_Lockless.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Lockless.cpp; sourceTree = "<group>"; };
+		E8AA40B71907221900D5F144 /* OVR_Lockless.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Lockless.h; sourceTree = "<group>"; };
+		E8AA40B81907221900D5F144 /* OVR_Log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Log.cpp; sourceTree = "<group>"; };
+		E8AA40B91907221900D5F144 /* OVR_Log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Log.h; sourceTree = "<group>"; };
+		E8AA40BA1907221900D5F144 /* OVR_Math.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Math.cpp; sourceTree = "<group>"; };
+		E8AA40BB1907221900D5F144 /* OVR_Math.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Math.h; sourceTree = "<group>"; };
+		E8AA40BC1907221900D5F144 /* OVR_RefCount.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_RefCount.cpp; sourceTree = "<group>"; };
+		E8AA40BD1907221900D5F144 /* OVR_RefCount.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_RefCount.h; sourceTree = "<group>"; };
+		E8AA40BE1907221900D5F144 /* OVR_Std.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Std.cpp; sourceTree = "<group>"; };
+		E8AA40BF1907221900D5F144 /* OVR_Std.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Std.h; sourceTree = "<group>"; };
+		E8AA40C01907221900D5F144 /* OVR_String.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String.cpp; sourceTree = "<group>"; };
+		E8AA40C11907221900D5F144 /* OVR_String.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_String.h; sourceTree = "<group>"; };
+		E8AA40C21907221900D5F144 /* OVR_String_FormatUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String_FormatUtil.cpp; sourceTree = "<group>"; };
+		E8AA40C31907221900D5F144 /* OVR_String_PathUtil.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_String_PathUtil.cpp; sourceTree = "<group>"; };
+		E8AA40C41907221900D5F144 /* OVR_StringHash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_StringHash.h; sourceTree = "<group>"; };
+		E8AA40C51907221900D5F144 /* OVR_SysFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_SysFile.cpp; sourceTree = "<group>"; };
+		E8AA40C61907221900D5F144 /* OVR_SysFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_SysFile.h; sourceTree = "<group>"; };
+		E8AA40C71907221900D5F144 /* OVR_System.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_System.cpp; sourceTree = "<group>"; };
+		E8AA40C81907221900D5F144 /* OVR_System.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_System.h; sourceTree = "<group>"; };
+		E8AA40C91907221900D5F144 /* OVR_Threads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Threads.h; sourceTree = "<group>"; };
+		E8AA40CA1907221900D5F144 /* OVR_ThreadsPthread.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_ThreadsPthread.cpp; sourceTree = "<group>"; };
+		E8AA40CC1907221900D5F144 /* OVR_Timer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_Timer.cpp; sourceTree = "<group>"; };
+		E8AA40CD1907221900D5F144 /* OVR_Timer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Timer.h; sourceTree = "<group>"; };
+		E8AA40CE1907221900D5F144 /* OVR_Types.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Types.h; sourceTree = "<group>"; };
+		E8AA40CF1907221900D5F144 /* OVR_UTF8Util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_UTF8Util.cpp; sourceTree = "<group>"; };
+		E8AA40D01907221900D5F144 /* OVR_UTF8Util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_UTF8Util.h; sourceTree = "<group>"; };
+		E8AA41011907224700D5F144 /* Util_Interface.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_Interface.cpp; sourceTree = "<group>"; };
+		E8AA41021907224700D5F144 /* Util_Interface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Util_Interface.h; sourceTree = "<group>"; };
+		E8AA41031907224700D5F144 /* Util_LatencyTest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_LatencyTest.cpp; sourceTree = "<group>"; };
+		E8AA41041907224700D5F144 /* Util_LatencyTest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Util_LatencyTest.h; sourceTree = "<group>"; };
+		E8AA41051907224700D5F144 /* Util_LatencyTest2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_LatencyTest2.cpp; sourceTree = "<group>"; };
+		E8AA41061907224700D5F144 /* Util_LatencyTest2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Util_LatencyTest2.h; sourceTree = "<group>"; };
+		E8AA41071907224700D5F144 /* Util_Render_Stereo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_Render_Stereo.cpp; sourceTree = "<group>"; };
+		E8AA41081907224700D5F144 /* Util_Render_Stereo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Util_Render_Stereo.h; sourceTree = "<group>"; };
+		E8AA4121190722BB00D5F144 /* OVR_Device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Device.h; path = ../../../Src/OVR_Device.h; sourceTree = "<group>"; };
+		E8AA4122190722BB00D5F144 /* OVR_DeviceConstants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_DeviceConstants.h; path = ../../../Src/OVR_DeviceConstants.h; sourceTree = "<group>"; };
+		E8AA4123190722BB00D5F144 /* OVR_DeviceHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_DeviceHandle.cpp; path = ../../../Src/OVR_DeviceHandle.cpp; sourceTree = "<group>"; };
+		E8AA4124190722BB00D5F144 /* OVR_DeviceHandle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_DeviceHandle.h; path = ../../../Src/OVR_DeviceHandle.h; sourceTree = "<group>"; };
+		E8AA4125190722BB00D5F144 /* OVR_DeviceImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_DeviceImpl.cpp; path = ../../../Src/OVR_DeviceImpl.cpp; sourceTree = "<group>"; };
+		E8AA4126190722BB00D5F144 /* OVR_DeviceImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_DeviceImpl.h; path = ../../../Src/OVR_DeviceImpl.h; sourceTree = "<group>"; };
+		E8AA4127190722BB00D5F144 /* OVR_DeviceMessages.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_DeviceMessages.h; path = ../../../Src/OVR_DeviceMessages.h; sourceTree = "<group>"; };
+		E8AA4128190722BB00D5F144 /* OVR_HIDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_HIDDevice.h; path = ../../../Src/OVR_HIDDevice.h; sourceTree = "<group>"; };
+		E8AA4129190722BB00D5F144 /* OVR_HIDDeviceBase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_HIDDeviceBase.h; path = ../../../Src/OVR_HIDDeviceBase.h; sourceTree = "<group>"; };
+		E8AA412A190722BB00D5F144 /* OVR_HIDDeviceImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_HIDDeviceImpl.h; path = ../../../Src/OVR_HIDDeviceImpl.h; sourceTree = "<group>"; };
+		E8AA412B190722BB00D5F144 /* OVR_JSON.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_JSON.cpp; path = ../../../Src/OVR_JSON.cpp; sourceTree = "<group>"; };
+		E8AA412C190722BB00D5F144 /* OVR_JSON.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_JSON.h; path = ../../../Src/OVR_JSON.h; sourceTree = "<group>"; };
+		E8AA412D190722BB00D5F144 /* OVR_LatencyTestImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_LatencyTestImpl.cpp; path = ../../../Src/OVR_LatencyTestImpl.cpp; sourceTree = "<group>"; };
+		E8AA412E190722BB00D5F144 /* OVR_LatencyTestImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_LatencyTestImpl.h; path = ../../../Src/OVR_LatencyTestImpl.h; sourceTree = "<group>"; };
+		E8AA4136190722BB00D5F144 /* OVR_OSX_DeviceManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_OSX_DeviceManager.cpp; path = ../../../Src/OVR_OSX_DeviceManager.cpp; sourceTree = "<group>"; };
+		E8AA4137190722BB00D5F144 /* OVR_OSX_DeviceManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_OSX_DeviceManager.h; path = ../../../Src/OVR_OSX_DeviceManager.h; sourceTree = "<group>"; };
+		E8AA4138190722BB00D5F144 /* OVR_OSX_HIDDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_OSX_HIDDevice.cpp; path = ../../../Src/OVR_OSX_HIDDevice.cpp; sourceTree = "<group>"; };
+		E8AA4139190722BB00D5F144 /* OVR_OSX_HIDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_OSX_HIDDevice.h; path = ../../../Src/OVR_OSX_HIDDevice.h; sourceTree = "<group>"; };
+		E8AA413A190722BB00D5F144 /* OVR_OSX_HMDDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_OSX_HMDDevice.cpp; path = ../../../Src/OVR_OSX_HMDDevice.cpp; sourceTree = "<group>"; };
+		E8AA413B190722BB00D5F144 /* OVR_OSX_HMDDevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_OSX_HMDDevice.h; path = ../../../Src/OVR_OSX_HMDDevice.h; sourceTree = "<group>"; };
+		E8AA413C190722BB00D5F144 /* OVR_OSX_SensorDevice.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_OSX_SensorDevice.cpp; path = ../../../Src/OVR_OSX_SensorDevice.cpp; sourceTree = "<group>"; };
+		E8AA413D190722BB00D5F144 /* OVR_Profile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_Profile.cpp; path = ../../../Src/OVR_Profile.cpp; sourceTree = "<group>"; };
+		E8AA413E190722BB00D5F144 /* OVR_Profile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Profile.h; path = ../../../Src/OVR_Profile.h; sourceTree = "<group>"; };
+		E8AA413F190722BB00D5F144 /* OVR_Sensor2Impl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_Sensor2Impl.cpp; path = ../../../Src/OVR_Sensor2Impl.cpp; sourceTree = "<group>"; };
+		E8AA4140190722BB00D5F144 /* OVR_Sensor2Impl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Sensor2Impl.h; path = ../../../Src/OVR_Sensor2Impl.h; sourceTree = "<group>"; };
+		E8AA4141190722BB00D5F144 /* OVR_Sensor2ImplUtil.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Sensor2ImplUtil.h; path = ../../../Src/OVR_Sensor2ImplUtil.h; sourceTree = "<group>"; };
+		E8AA4142190722BB00D5F144 /* OVR_SensorCalibration.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorCalibration.cpp; path = ../../../Src/OVR_SensorCalibration.cpp; sourceTree = "<group>"; };
+		E8AA4143190722BB00D5F144 /* OVR_SensorCalibration.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorCalibration.h; path = ../../../Src/OVR_SensorCalibration.h; sourceTree = "<group>"; };
+		E8AA4144190722BB00D5F144 /* OVR_SensorFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorFilter.cpp; path = ../../../Src/OVR_SensorFilter.cpp; sourceTree = "<group>"; };
+		E8AA4145190722BB00D5F144 /* OVR_SensorFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorFilter.h; path = ../../../Src/OVR_SensorFilter.h; sourceTree = "<group>"; };
+		E8AA4146190722BB00D5F144 /* OVR_SensorFusion.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorFusion.cpp; path = ../../../Src/OVR_SensorFusion.cpp; sourceTree = "<group>"; };
+		E8AA4147190722BB00D5F144 /* OVR_SensorFusion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorFusion.h; path = ../../../Src/OVR_SensorFusion.h; sourceTree = "<group>"; };
+		E8AA4148190722BB00D5F144 /* OVR_SensorFusionDebug.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorFusionDebug.h; path = ../../../Src/OVR_SensorFusionDebug.h; sourceTree = "<group>"; };
+		E8AA4149190722BB00D5F144 /* OVR_SensorImpl_Common.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorImpl_Common.cpp; path = ../../../Src/OVR_SensorImpl_Common.cpp; sourceTree = "<group>"; };
+		E8AA414A190722BB00D5F144 /* OVR_SensorImpl_Common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorImpl_Common.h; path = ../../../Src/OVR_SensorImpl_Common.h; sourceTree = "<group>"; };
+		E8AA414B190722BB00D5F144 /* OVR_SensorImpl.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorImpl.cpp; path = ../../../Src/OVR_SensorImpl.cpp; sourceTree = "<group>"; };
+		E8AA414C190722BB00D5F144 /* OVR_SensorImpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorImpl.h; path = ../../../Src/OVR_SensorImpl.h; sourceTree = "<group>"; };
+		E8AA414D190722BB00D5F144 /* OVR_SensorTimeFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_SensorTimeFilter.cpp; path = ../../../Src/OVR_SensorTimeFilter.cpp; sourceTree = "<group>"; };
+		E8AA414E190722BB00D5F144 /* OVR_SensorTimeFilter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_SensorTimeFilter.h; path = ../../../Src/OVR_SensorTimeFilter.h; sourceTree = "<group>"; };
+		E8AA414F190722BB00D5F144 /* OVR_Stereo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_Stereo.cpp; path = ../../../Src/OVR_Stereo.cpp; sourceTree = "<group>"; };
+		E8AA4150190722BB00D5F144 /* OVR_Stereo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_Stereo.h; path = ../../../Src/OVR_Stereo.h; sourceTree = "<group>"; };
+		E8AA4151190722BB00D5F144 /* OVR_ThreadCommandQueue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_ThreadCommandQueue.cpp; path = ../../../Src/OVR_ThreadCommandQueue.cpp; sourceTree = "<group>"; };
+		E8AA4152190722BB00D5F144 /* OVR_ThreadCommandQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_ThreadCommandQueue.h; path = ../../../Src/OVR_ThreadCommandQueue.h; sourceTree = "<group>"; };
+		E8AA41BA190724E600D5F144 /* CAPI_DistortionRenderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_DistortionRenderer.h; sourceTree = "<group>"; };
+		E8AA41BB190724E600D5F144 /* CAPI_FrameTimeManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_FrameTimeManager.cpp; sourceTree = "<group>"; };
+		E8AA41BC190724E600D5F144 /* CAPI_FrameTimeManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_FrameTimeManager.h; sourceTree = "<group>"; };
+		E8AA41BD190724E600D5F144 /* CAPI_GlobalState.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_GlobalState.cpp; sourceTree = "<group>"; };
+		E8AA41BE190724E600D5F144 /* CAPI_GlobalState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_GlobalState.h; sourceTree = "<group>"; };
+		E8AA41BF190724E600D5F144 /* CAPI_HMDRenderState.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_HMDRenderState.cpp; sourceTree = "<group>"; };
+		E8AA41C0190724E600D5F144 /* CAPI_HMDRenderState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_HMDRenderState.h; sourceTree = "<group>"; };
+		E8AA41C1190724E600D5F144 /* CAPI_HMDState.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_HMDState.cpp; sourceTree = "<group>"; };
+		E8AA41C2190724E600D5F144 /* CAPI_HMDState.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_HMDState.h; sourceTree = "<group>"; };
+		E8AA41D0190724E600D5F144 /* CAPI_GL_DistortionRenderer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_GL_DistortionRenderer.cpp; sourceTree = "<group>"; };
+		E8AA41D1190724E600D5F144 /* CAPI_GL_DistortionRenderer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_GL_DistortionRenderer.h; sourceTree = "<group>"; };
+		E8AA41D2190724E600D5F144 /* CAPI_GL_Util.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_GL_Util.cpp; sourceTree = "<group>"; };
+		E8AA41D3190724E600D5F144 /* CAPI_GL_Util.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_GL_Util.h; sourceTree = "<group>"; };
+		E8F1F13D1921911D000EC969 /* OVR_Recording.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = OVR_Recording.cpp; path = ../../../Src/OVR_Recording.cpp; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		E82D4CD01906FE640070CB3F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E82D4CCA1906FE640070CB3F = {
+			isa = PBXGroup;
+			children = (
+				E8AA41B8190724E600D5F144 /* CAPI */,
+				E8AA40A51907221900D5F144 /* Kernel */,
+				E8AA40FC1907224700D5F144 /* Util */,
+				E886FE9B190737FA00D5DB45 /* OVR_CAPI_GL.h */,
+				E886FE9C190737FA00D5DB45 /* OVR_CAPI.cpp */,
+				E886FE9D190737FA00D5DB45 /* OVR_CAPI.h */,
+				E8AA4121190722BB00D5F144 /* OVR_Device.h */,
+				E8AA4122190722BB00D5F144 /* OVR_DeviceConstants.h */,
+				E8AA4123190722BB00D5F144 /* OVR_DeviceHandle.cpp */,
+				E8AA4124190722BB00D5F144 /* OVR_DeviceHandle.h */,
+				E8AA4125190722BB00D5F144 /* OVR_DeviceImpl.cpp */,
+				E8AA4126190722BB00D5F144 /* OVR_DeviceImpl.h */,
+				E8AA4127190722BB00D5F144 /* OVR_DeviceMessages.h */,
+				E8AA4128190722BB00D5F144 /* OVR_HIDDevice.h */,
+				E8AA4129190722BB00D5F144 /* OVR_HIDDeviceBase.h */,
+				E8AA412A190722BB00D5F144 /* OVR_HIDDeviceImpl.h */,
+				E8AA412B190722BB00D5F144 /* OVR_JSON.cpp */,
+				E8AA412C190722BB00D5F144 /* OVR_JSON.h */,
+				E8AA412D190722BB00D5F144 /* OVR_LatencyTestImpl.cpp */,
+				E8AA412E190722BB00D5F144 /* OVR_LatencyTestImpl.h */,
+				E8AA4136190722BB00D5F144 /* OVR_OSX_DeviceManager.cpp */,
+				E8AA4137190722BB00D5F144 /* OVR_OSX_DeviceManager.h */,
+				E8AA4138190722BB00D5F144 /* OVR_OSX_HIDDevice.cpp */,
+				E8AA4139190722BB00D5F144 /* OVR_OSX_HIDDevice.h */,
+				E8AA413A190722BB00D5F144 /* OVR_OSX_HMDDevice.cpp */,
+				E8AA413B190722BB00D5F144 /* OVR_OSX_HMDDevice.h */,
+				E8AA413C190722BB00D5F144 /* OVR_OSX_SensorDevice.cpp */,
+				E8AA413D190722BB00D5F144 /* OVR_Profile.cpp */,
+				E8AA413E190722BB00D5F144 /* OVR_Profile.h */,
+				E8F1F13D1921911D000EC969 /* OVR_Recording.cpp */,
+				E8754F7F190F1B71005FD401 /* OVR_Recording.h */,
+				E8AA413F190722BB00D5F144 /* OVR_Sensor2Impl.cpp */,
+				E8AA4140190722BB00D5F144 /* OVR_Sensor2Impl.h */,
+				E8AA4141190722BB00D5F144 /* OVR_Sensor2ImplUtil.h */,
+				E8AA4142190722BB00D5F144 /* OVR_SensorCalibration.cpp */,
+				E8AA4143190722BB00D5F144 /* OVR_SensorCalibration.h */,
+				E8AA4144190722BB00D5F144 /* OVR_SensorFilter.cpp */,
+				E8AA4145190722BB00D5F144 /* OVR_SensorFilter.h */,
+				E8AA4146190722BB00D5F144 /* OVR_SensorFusion.cpp */,
+				E8AA4147190722BB00D5F144 /* OVR_SensorFusion.h */,
+				E8AA4148190722BB00D5F144 /* OVR_SensorFusionDebug.h */,
+				E8AA4149190722BB00D5F144 /* OVR_SensorImpl_Common.cpp */,
+				E8AA414A190722BB00D5F144 /* OVR_SensorImpl_Common.h */,
+				E8AA414B190722BB00D5F144 /* OVR_SensorImpl.cpp */,
+				E8AA414C190722BB00D5F144 /* OVR_SensorImpl.h */,
+				E8AA414D190722BB00D5F144 /* OVR_SensorTimeFilter.cpp */,
+				E8AA414E190722BB00D5F144 /* OVR_SensorTimeFilter.h */,
+				E8AA414F190722BB00D5F144 /* OVR_Stereo.cpp */,
+				E8AA4150190722BB00D5F144 /* OVR_Stereo.h */,
+				E8AA4151190722BB00D5F144 /* OVR_ThreadCommandQueue.cpp */,
+				E8AA4152190722BB00D5F144 /* OVR_ThreadCommandQueue.h */,
+				E82D4CD41906FE640070CB3F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E82D4CD41906FE640070CB3F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E82D4CD31906FE640070CB3F /* libovr.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E8AA40A51907221900D5F144 /* Kernel */ = {
+			isa = PBXGroup;
+			children = (
+				E8AA40A61907221900D5F144 /* OVR_Alg.cpp */,
+				E8AA40A71907221900D5F144 /* OVR_Alg.h */,
+				E8AA40A81907221900D5F144 /* OVR_Allocator.cpp */,
+				E8AA40A91907221900D5F144 /* OVR_Allocator.h */,
+				E8AA40AA1907221900D5F144 /* OVR_Array.h */,
+				E8AA40AB1907221900D5F144 /* OVR_Atomic.cpp */,
+				E8AA40AC1907221900D5F144 /* OVR_Atomic.h */,
+				E8AA40AD1907221900D5F144 /* OVR_Color.h */,
+				E8AA40AE1907221900D5F144 /* OVR_ContainerAllocator.h */,
+				E8AA40AF1907221900D5F144 /* OVR_Deque.h */,
+				E8AA40B01907221900D5F144 /* OVR_File.cpp */,
+				E8AA40B11907221900D5F144 /* OVR_File.h */,
+				E8AA40B21907221900D5F144 /* OVR_FileFILE.cpp */,
+				E8AA40B31907221900D5F144 /* OVR_Hash.h */,
+				E8AA40B41907221900D5F144 /* OVR_KeyCodes.h */,
+				E8AA40B51907221900D5F144 /* OVR_List.h */,
+				E8AA40B61907221900D5F144 /* OVR_Lockless.cpp */,
+				E8AA40B71907221900D5F144 /* OVR_Lockless.h */,
+				E8AA40B81907221900D5F144 /* OVR_Log.cpp */,
+				E8AA40B91907221900D5F144 /* OVR_Log.h */,
+				E8AA40BA1907221900D5F144 /* OVR_Math.cpp */,
+				E8AA40BB1907221900D5F144 /* OVR_Math.h */,
+				E8AA40BC1907221900D5F144 /* OVR_RefCount.cpp */,
+				E8AA40BD1907221900D5F144 /* OVR_RefCount.h */,
+				E8AA40BE1907221900D5F144 /* OVR_Std.cpp */,
+				E8AA40BF1907221900D5F144 /* OVR_Std.h */,
+				E8AA40C01907221900D5F144 /* OVR_String.cpp */,
+				E8AA40C11907221900D5F144 /* OVR_String.h */,
+				E8AA40C21907221900D5F144 /* OVR_String_FormatUtil.cpp */,
+				E8AA40C31907221900D5F144 /* OVR_String_PathUtil.cpp */,
+				E8AA40C41907221900D5F144 /* OVR_StringHash.h */,
+				E8AA40C51907221900D5F144 /* OVR_SysFile.cpp */,
+				E8AA40C61907221900D5F144 /* OVR_SysFile.h */,
+				E8AA40C71907221900D5F144 /* OVR_System.cpp */,
+				E8AA40C81907221900D5F144 /* OVR_System.h */,
+				E8AA40C91907221900D5F144 /* OVR_Threads.h */,
+				E8AA40CA1907221900D5F144 /* OVR_ThreadsPthread.cpp */,
+				E8AA40CC1907221900D5F144 /* OVR_Timer.cpp */,
+				E8AA40CD1907221900D5F144 /* OVR_Timer.h */,
+				E8AA40CE1907221900D5F144 /* OVR_Types.h */,
+				E8AA40CF1907221900D5F144 /* OVR_UTF8Util.cpp */,
+				E8AA40D01907221900D5F144 /* OVR_UTF8Util.h */,
+			);
+			name = Kernel;
+			path = ../../../Src/Kernel;
+			sourceTree = "<group>";
+		};
+		E8AA40FC1907224700D5F144 /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				E8AA41011907224700D5F144 /* Util_Interface.cpp */,
+				E8AA41021907224700D5F144 /* Util_Interface.h */,
+				E8AA41031907224700D5F144 /* Util_LatencyTest.cpp */,
+				E8AA41041907224700D5F144 /* Util_LatencyTest.h */,
+				E8AA41051907224700D5F144 /* Util_LatencyTest2.cpp */,
+				E8AA41061907224700D5F144 /* Util_LatencyTest2.h */,
+				E8AA41071907224700D5F144 /* Util_Render_Stereo.cpp */,
+				E8AA41081907224700D5F144 /* Util_Render_Stereo.h */,
+			);
+			name = Util;
+			path = ../../../Src/Util;
+			sourceTree = "<group>";
+		};
+		E8AA41B8190724E600D5F144 /* CAPI */ = {
+			isa = PBXGroup;
+			children = (
+				E886FEA11907528C00D5DB45 /* CAPI_DistortionRenderer.cpp */,
+				E8AA41BA190724E600D5F144 /* CAPI_DistortionRenderer.h */,
+				E8AA41BB190724E600D5F144 /* CAPI_FrameTimeManager.cpp */,
+				E8AA41BC190724E600D5F144 /* CAPI_FrameTimeManager.h */,
+				E8AA41BD190724E600D5F144 /* CAPI_GlobalState.cpp */,
+				E8AA41BE190724E600D5F144 /* CAPI_GlobalState.h */,
+				E8AA41BF190724E600D5F144 /* CAPI_HMDRenderState.cpp */,
+				E8AA41C0190724E600D5F144 /* CAPI_HMDRenderState.h */,
+				E8AA41C1190724E600D5F144 /* CAPI_HMDState.cpp */,
+				E8AA41C2190724E600D5F144 /* CAPI_HMDState.h */,
+				E8AA41CF190724E600D5F144 /* GL */,
+			);
+			name = CAPI;
+			path = ../../../Src/CAPI;
+			sourceTree = "<group>";
+		};
+		E8AA41CF190724E600D5F144 /* GL */ = {
+			isa = PBXGroup;
+			children = (
+				E8AA41D0190724E600D5F144 /* CAPI_GL_DistortionRenderer.cpp */,
+				E8AA41D1190724E600D5F144 /* CAPI_GL_DistortionRenderer.h */,
+				E8AA41D2190724E600D5F144 /* CAPI_GL_Util.cpp */,
+				E8AA41D3190724E600D5F144 /* CAPI_GL_Util.h */,
+			);
+			path = GL;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		E82D4CD11906FE640070CB3F /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E8AA4198190722BB00D5F144 /* OVR_Stereo.h in Headers */,
+				E8AA41E2190724E600D5F144 /* CAPI_DistortionRenderer.h in Headers */,
+				E8AA41101907224700D5F144 /* Util_LatencyTest.h in Headers */,
+				E8AA40DF1907221900D5F144 /* OVR_KeyCodes.h in Headers */,
+				E8AA40D51907221900D5F144 /* OVR_Array.h in Headers */,
+				E8AA41F7190724E600D5F144 /* CAPI_GL_DistortionRenderer.h in Headers */,
+				E8AA416F190722BB00D5F144 /* OVR_DeviceMessages.h in Headers */,
+				E8AA40DC1907221900D5F144 /* OVR_File.h in Headers */,
+				E8AA40D41907221900D5F144 /* OVR_Allocator.h in Headers */,
+				E8AA410E1907224700D5F144 /* Util_Interface.h in Headers */,
+				E8AA418B190722BB00D5F144 /* OVR_SensorCalibration.h in Headers */,
+				E886FEA0190737FA00D5DB45 /* OVR_CAPI.h in Headers */,
+				E8AA417F190722BB00D5F144 /* OVR_OSX_DeviceManager.h in Headers */,
+				E8AA4170190722BB00D5F144 /* OVR_HIDDevice.h in Headers */,
+				E8AA419A190722BB00D5F144 /* OVR_ThreadCommandQueue.h in Headers */,
+				E8AA41F9190724E600D5F144 /* CAPI_GL_Util.h in Headers */,
+				E8AA40E21907221900D5F144 /* OVR_Lockless.h in Headers */,
+				E8AA40F31907221900D5F144 /* OVR_System.h in Headers */,
+				E8AA41E8190724E600D5F144 /* CAPI_HMDRenderState.h in Headers */,
+				E8AA41141907224700D5F144 /* Util_Render_Stereo.h in Headers */,
+				E8AA40E61907221900D5F144 /* OVR_Math.h in Headers */,
+				E8AA418D190722BB00D5F144 /* OVR_SensorFilter.h in Headers */,
+				E8AA40F91907221900D5F144 /* OVR_Types.h in Headers */,
+				E8AA40D91907221900D5F144 /* OVR_ContainerAllocator.h in Headers */,
+				E8754F81190F1B71005FD401 /* OVR_Recording.h in Headers */,
+				E8AA40D71907221900D5F144 /* OVR_Atomic.h in Headers */,
+				E8AA41E4190724E600D5F144 /* CAPI_FrameTimeManager.h in Headers */,
+				E8AA41E6190724E600D5F144 /* CAPI_GlobalState.h in Headers */,
+				E8AA416E190722BB00D5F144 /* OVR_DeviceImpl.h in Headers */,
+				E8AA40D21907221900D5F144 /* OVR_Alg.h in Headers */,
+				E8AA40E01907221900D5F144 /* OVR_List.h in Headers */,
+				E8AA4194190722BB00D5F144 /* OVR_SensorImpl.h in Headers */,
+				E8AA40EF1907221900D5F144 /* OVR_StringHash.h in Headers */,
+				E886FE9E190737FA00D5DB45 /* OVR_CAPI_GL.h in Headers */,
+				E8AA41EA190724E600D5F144 /* CAPI_HMDState.h in Headers */,
+				E8AA40D81907221900D5F144 /* OVR_Color.h in Headers */,
+				E8AA4172190722BB00D5F144 /* OVR_HIDDeviceImpl.h in Headers */,
+				E8AA416C190722BB00D5F144 /* OVR_DeviceHandle.h in Headers */,
+				E8AA4196190722BB00D5F144 /* OVR_SensorTimeFilter.h in Headers */,
+				E8AA418F190722BB00D5F144 /* OVR_SensorFusion.h in Headers */,
+				E8AA4181190722BB00D5F144 /* OVR_OSX_HIDDevice.h in Headers */,
+				E8AA4174190722BB00D5F144 /* OVR_JSON.h in Headers */,
+				E8AA4183190722BB00D5F144 /* OVR_OSX_HMDDevice.h in Headers */,
+				E8AA4171190722BB00D5F144 /* OVR_HIDDeviceBase.h in Headers */,
+				E8AA4190190722BB00D5F144 /* OVR_SensorFusionDebug.h in Headers */,
+				E8AA4176190722BB00D5F144 /* OVR_LatencyTestImpl.h in Headers */,
+				E8AA40F11907221900D5F144 /* OVR_SysFile.h in Headers */,
+				E8AA40DE1907221900D5F144 /* OVR_Hash.h in Headers */,
+				E8AA4189190722BB00D5F144 /* OVR_Sensor2ImplUtil.h in Headers */,
+				E8AA40EC1907221900D5F144 /* OVR_String.h in Headers */,
+				E8AA4169190722BB00D5F144 /* OVR_Device.h in Headers */,
+				E8AA4186190722BB00D5F144 /* OVR_Profile.h in Headers */,
+				E8AA4188190722BB00D5F144 /* OVR_Sensor2Impl.h in Headers */,
+				E8AA40EA1907221900D5F144 /* OVR_Std.h in Headers */,
+				E8AA41121907224700D5F144 /* Util_LatencyTest2.h in Headers */,
+				E8AA40E81907221900D5F144 /* OVR_RefCount.h in Headers */,
+				E8AA40DA1907221900D5F144 /* OVR_Deque.h in Headers */,
+				E8AA416A190722BB00D5F144 /* OVR_DeviceConstants.h in Headers */,
+				E8AA40FB1907221900D5F144 /* OVR_UTF8Util.h in Headers */,
+				E8AA4192190722BB00D5F144 /* OVR_SensorImpl_Common.h in Headers */,
+				E8AA40F41907221900D5F144 /* OVR_Threads.h in Headers */,
+				E8AA40F81907221900D5F144 /* OVR_Timer.h in Headers */,
+				E8AA40E41907221900D5F144 /* OVR_Log.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		E82D4CD21906FE640070CB3F /* LibOVR */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E82D4CD71906FE640070CB3F /* Build configuration list for PBXNativeTarget "LibOVR" */;
+			buildPhases = (
+				E82D4CCF1906FE640070CB3F /* Sources */,
+				E82D4CD01906FE640070CB3F /* Frameworks */,
+				E82D4CD11906FE640070CB3F /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LibOVR;
+			productName = LibOVR;
+			productReference = E82D4CD31906FE640070CB3F /* libovr.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E82D4CCB1906FE640070CB3F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0510;
+				ORGANIZATIONNAME = "Oculus VR Inc.";
+			};
+			buildConfigurationList = E82D4CCE1906FE640070CB3F /* Build configuration list for PBXProject "LibOVR" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = E82D4CCA1906FE640070CB3F;
+			productRefGroup = E82D4CD41906FE640070CB3F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E82D4CD21906FE640070CB3F /* LibOVR */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E82D4CCF1906FE640070CB3F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E8AA4175190722BB00D5F144 /* OVR_LatencyTestImpl.cpp in Sources */,
+				E8AA41E3190724E600D5F144 /* CAPI_FrameTimeManager.cpp in Sources */,
+				E8AA4199190722BB00D5F144 /* OVR_ThreadCommandQueue.cpp in Sources */,
+				E8AA417E190722BB00D5F144 /* OVR_OSX_DeviceManager.cpp in Sources */,
+				E8AA41131907224700D5F144 /* Util_Render_Stereo.cpp in Sources */,
+				E8AA4182190722BB00D5F144 /* OVR_OSX_HMDDevice.cpp in Sources */,
+				E8AA4185190722BB00D5F144 /* OVR_Profile.cpp in Sources */,
+				E8AA40F01907221900D5F144 /* OVR_SysFile.cpp in Sources */,
+				E8AA40DB1907221900D5F144 /* OVR_File.cpp in Sources */,
+				E8AA40ED1907221900D5F144 /* OVR_String_FormatUtil.cpp in Sources */,
+				E8F1F13E1921911D000EC969 /* OVR_Recording.cpp in Sources */,
+				E8AA41111907224700D5F144 /* Util_LatencyTest2.cpp in Sources */,
+				E8AA4173190722BB00D5F144 /* OVR_JSON.cpp in Sources */,
+				E8AA40D61907221900D5F144 /* OVR_Atomic.cpp in Sources */,
+				E8AA40E31907221900D5F144 /* OVR_Log.cpp in Sources */,
+				E8AA40E91907221900D5F144 /* OVR_Std.cpp in Sources */,
+				E8AA4193190722BB00D5F144 /* OVR_SensorImpl.cpp in Sources */,
+				E8AA41F6190724E600D5F144 /* CAPI_GL_DistortionRenderer.cpp in Sources */,
+				E8AA40DD1907221900D5F144 /* OVR_FileFILE.cpp in Sources */,
+				E8AA410F1907224700D5F144 /* Util_LatencyTest.cpp in Sources */,
+				E8AA40E51907221900D5F144 /* OVR_Math.cpp in Sources */,
+				E8AA4180190722BB00D5F144 /* OVR_OSX_HIDDevice.cpp in Sources */,
+				E8AA40D31907221900D5F144 /* OVR_Allocator.cpp in Sources */,
+				E8AA41E9190724E600D5F144 /* CAPI_HMDState.cpp in Sources */,
+				E8AA40FA1907221900D5F144 /* OVR_UTF8Util.cpp in Sources */,
+				E8AA410D1907224700D5F144 /* Util_Interface.cpp in Sources */,
+				E8AA40F71907221900D5F144 /* OVR_Timer.cpp in Sources */,
+				E8AA40D11907221900D5F144 /* OVR_Alg.cpp in Sources */,
+				E8AA4197190722BB00D5F144 /* OVR_Stereo.cpp in Sources */,
+				E8AA40F21907221900D5F144 /* OVR_System.cpp in Sources */,
+				E8AA40EB1907221900D5F144 /* OVR_String.cpp in Sources */,
+				E8AA416B190722BB00D5F144 /* OVR_DeviceHandle.cpp in Sources */,
+				E8AA418C190722BB00D5F144 /* OVR_SensorFilter.cpp in Sources */,
+				E886FE9F190737FA00D5DB45 /* OVR_CAPI.cpp in Sources */,
+				E8AA40E71907221900D5F144 /* OVR_RefCount.cpp in Sources */,
+				E8AA416D190722BB00D5F144 /* OVR_DeviceImpl.cpp in Sources */,
+				E8AA41E5190724E600D5F144 /* CAPI_GlobalState.cpp in Sources */,
+				E8AA418A190722BB00D5F144 /* OVR_SensorCalibration.cpp in Sources */,
+				E8AA418E190722BB00D5F144 /* OVR_SensorFusion.cpp in Sources */,
+				E8AA4184190722BB00D5F144 /* OVR_OSX_SensorDevice.cpp in Sources */,
+				E8AA40E11907221900D5F144 /* OVR_Lockless.cpp in Sources */,
+				E8AA41E7190724E600D5F144 /* CAPI_HMDRenderState.cpp in Sources */,
+				E8AA4187190722BB00D5F144 /* OVR_Sensor2Impl.cpp in Sources */,
+				E8AA41F8190724E600D5F144 /* CAPI_GL_Util.cpp in Sources */,
+				E8AA4191190722BB00D5F144 /* OVR_SensorImpl_Common.cpp in Sources */,
+				E8AA40EE1907221900D5F144 /* OVR_String_PathUtil.cpp in Sources */,
+				E8AA4195190722BB00D5F144 /* OVR_SensorTimeFilter.cpp in Sources */,
+				E886FEA21907528C00D5DB45 /* CAPI_DistortionRenderer.cpp in Sources */,
+				E8AA40F51907221900D5F144 /* OVR_ThreadsPthread.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		E82D4CD51906FE640070CB3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				CONFIGURATION_TEMP_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				OBJROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SYMROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+			};
+			name = Debug;
+		};
+		E82D4CD61906FE640070CB3F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = NO;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				CONFIGURATION_TEMP_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				OBJROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				SDKROOT = macosx;
+				SYMROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+			};
+			name = Release;
+		};
+		E82D4CD81906FE640070CB3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				CONFIGURATION_TEMP_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				EXECUTABLE_PREFIX = "";
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					OVR_BUILD_DEBUG,
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				OBJROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = libovr;
+				SYMROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+			};
+			name = Debug;
+		};
+		E82D4CD91906FE640070CB3F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_32_64_BIT)";
+				CONFIGURATION_BUILD_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				CONFIGURATION_TEMP_DIR = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				EXECUTABLE_PREFIX = "";
+				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				OBJROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_NAME = libovr;
+				SYMROOT = "$(SRCROOT)/../../../Lib/Mac/Xcode/$(CONFIGURATION)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E82D4CCE1906FE640070CB3F /* Build configuration list for PBXProject "LibOVR" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E82D4CD51906FE640070CB3F /* Debug */,
+				E82D4CD61906FE640070CB3F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E82D4CD71906FE640070CB3F /* Build configuration list for PBXNativeTarget "LibOVR" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E82D4CD81906FE640070CB3F /* Debug */,
+				E82D4CD91906FE640070CB3F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E82D4CCB1906FE640070CB3F /* Project object */;
+}
