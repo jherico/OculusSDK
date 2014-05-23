@@ -41,6 +41,29 @@ typedef char ovrBool;
     #endif
 #endif
 
+
+#if (defined(__APPLE__) && (defined(__GNUC__) ||\
+     defined(__xlC__) || defined(__xlc__))) || defined(__MACOS__)
+#  if (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) || defined(__IPHONE_OS_VERSION_MIN_REQUIRED))
+#    define OVR_OS_IPHONE
+#  else
+#    define OVR_OS_DARWIN
+#    define OVR_OS_MAC
+#  endif
+#elif (defined(WIN64) || defined(_WIN64) || defined(__WIN64__))
+#  define OVR_OS_WIN32
+#elif (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__))
+#  define OVR_OS_WIN32
+#elif defined(__linux__) || defined(__linux)
+#  define OVR_OS_LINUX
+#else
+#  define OVR_OS_OTHER
+#endif
+
+#if defined(ANDROID)
+#  define OVR_OS_ANDROID
+#endif
+
 //-----------------------------------------------------------------------------------
 // ***** Simple Math Structures
 

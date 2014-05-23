@@ -31,9 +31,9 @@ limitations under the License.
 #include "OVR_Stereo.h"
 #include "OVR_Profile.h"
 
-#include "CAPI/CAPI_GlobalState.h"
-#include "CAPI/CAPI_HMDState.h"
-#include "CAPI/CAPI_FrameTimeManager.h"
+#include "CAPI_GlobalState.h"
+#include "CAPI_HMDState.h"
+#include "CAPI_FrameTimeManager.h"
 
 
 using namespace OVR;

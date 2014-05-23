@@ -24,7 +24,7 @@ limitations under the License.
 
 ************************************************************************************/
 
-#include "../../Kernel/OVR_Types.h"
+#include <Kernel/OVR_Types.h>
 
 #undef new
 

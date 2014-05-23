@@ -26,7 +26,6 @@ limitations under the License.
 
 #include "Util_LatencyTest2.h"
 
-#include "../OVR_CAPI.h"
 #include "../Kernel/OVR_Log.h"
 #include "../Kernel/OVR_Timer.h"
 
@@ -115,7 +114,7 @@ void LatencyTest2::BeginTest(double startTime)
         if (startTime > 0.0)
             StartTiming = startTime;
         else
-            StartTiming = ovr_GetTimeInSeconds();
+            StartTiming = Timer::GetSeconds(); 
           
     }
 }

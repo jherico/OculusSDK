@@ -17,7 +17,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "CAPI_GL_DistortionShaders.h"
 
-#include "../../OVR_CAPI_GL.h"
+#include "OVR_CAPI_GL.h"
 
 namespace OVR { namespace CAPI { namespace GL {
 
@@ -103,14 +103,14 @@ DistortionRenderer::~DistortionRenderer()
     destroy();
 }
 
+extern void InitGl();
+
 // static
 CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
                                                      FrameTimeManager& timeManager,
                                                      const HMDRenderState& renderState)
 {
-#if !defined(OVR_OS_MAC)
-    InitGLExtensions();
-#endif
+  InitGl();
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
 
@@ -224,8 +224,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers,
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
 		int swapInterval = (useVsync) ? 1 : 0;
 #if defined(OVR_OS_WIN32)
-		if (wglGetSwapIntervalEXT() != swapInterval)
-            wglSwapIntervalEXT(swapInterval);
+//		if (glfwGetSwapInterval() != swapInterval)
+//            glfwSwapInterval(swapInterval);
 
         HDC dc = GetDC(RParams.Window);
 		BOOL success = SwapBuffers(dc);

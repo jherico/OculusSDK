@@ -29,17 +29,15 @@ limitations under the License.
 // once with OVR_D3D_VERSION=11.
 
 
-#ifndef OVR_D3D_VERSION
-#error define OVR_D3D_VERSION to 10 or 11
-#endif
+#ifdef OVR_D3D_VERSION
 
 // Custom include guard, allowing one of each D3D10/11.
 #if (OVR_D3D_VERSION == 10 && !defined(INC_OVR_CAPI_D3D10_Util_h)) || \
     (OVR_D3D_VERSION == 11 && !defined(INC_OVR_CAPI_D3D11_Util_h))
 
-#include "../../Kernel/OVR_String.h"
-#include "../../Kernel/OVR_Array.h"
-#include "../../Kernel/OVR_Math.h"
+#include <Kernel/OVR_String.h>
+#include <Kernel/OVR_Array.h>
+#include <Kernel/OVR_Math.h>
 
 #if defined(OVR_OS_WIN32)
 #include <Windows.h>
@@ -503,5 +501,6 @@ protected:
 };
 
 }}} // OVR::CAPI::D3D1X
+#endif
 
 #endif // INC_OVR_CAPI_D3D10/11_Util_h

@@ -25,6 +25,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_D3D1X_Util.h"
+#ifdef OVR_D3D_VERSION
 
 #include <d3dcompiler.h>
 
@@ -414,3 +415,4 @@ float GpuTimer::GetTiming(bool blockUntilValid)
 }
 
 }}} // OVR::CAPI::D3DX
+#endif

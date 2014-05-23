@@ -25,8 +25,9 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_D3D1X_DistortionRenderer.h"
+#ifdef OVR_D3D_VERSION
 
-#include "../../OVR_CAPI_D3D.h"
+#include "OVR_CAPI_D3D.h"
 
 namespace OVR { namespace CAPI { namespace D3D_NS {
 
@@ -802,3 +803,4 @@ void DistortionRenderer::GraphicsState::Restore()
 }
 
 }}} // OVR::CAPI::D3D1X
+#endif

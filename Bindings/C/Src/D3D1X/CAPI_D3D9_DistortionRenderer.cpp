@@ -23,10 +23,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ************************************************************************************/
-
 #include "CAPI_D3D9_DistortionRenderer.h"
 #define OVR_D3D_VERSION 9
-#include "../../OVR_CAPI_D3D.h"
+#include "OVR_CAPI_D3D.h"
 
 namespace OVR { namespace CAPI { namespace D3D9 {
 
@@ -275,5 +274,3 @@ void DistortionRenderer::GraphicsState::Restore()
 
 
 }}} // OVR::CAPI::D3D1X
-
-

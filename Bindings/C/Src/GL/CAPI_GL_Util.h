@@ -24,134 +24,21 @@ limitations under the License.
 #ifndef INC_OVR_CAPI_GL_Util_h
 #define INC_OVR_CAPI_GL_Util_h
 
-#include "../../OVR_CAPI.h"  
-#include "../../Kernel/OVR_Array.h"
-#include "../../Kernel/OVR_Math.h"
-#include "../../Kernel/OVR_RefCount.h"
-#include "../../Kernel/OVR_String.h"
-#include "../../Kernel/OVR_Types.h"
-#include "../../Kernel/OVR_Log.h"
+#include "OVR_CAPI.h"
+#include <Kernel/OVR_Array.h>
+#include <Kernel/OVR_Math.h>
+#include <Kernel/OVR_RefCount.h>
+#include <Kernel/OVR_String.h>
+#include <Kernel/OVR_Types.h>
+#include <Kernel/OVR_Log.h>
 
 #if defined(OVR_OS_WIN32)
 #include <Windows.h>
 #endif
 
-#if defined(OVR_OS_MAC)
-#include <OpenGL/gl3.h>
-#include <OpenGL/gl3ext.h>
-#else
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
-#if defined(OVR_OS_WIN32)
-#include <GL/wglext.h>
-#elif defined(OVR_OS_LINUX)
-#include <GL/glx.h>
-#endif
-#endif
+#include <GL/glew.h>
 
 namespace OVR { namespace CAPI { namespace GL {
-
-// GL extension Hooks for Non-Mac.
-#if !defined(OVR_OS_MAC)
-
-// Let Windows apps build without linking GL.
-#if defined(OVR_OS_WIN32)
-
-typedef void (__stdcall *PFNGLENABLEPROC) (GLenum);
-typedef void (__stdcall *PFNGLDISABLEPROC) (GLenum);
-typedef void (__stdcall *PFNGLGETFLOATVPROC) (GLenum, GLfloat*);
-typedef const GLubyte * (__stdcall *PFNGLGETSTRINGPROC) (GLenum);
-typedef void (__stdcall *PFNGLGETINTEGERVPROC) (GLenum, GLint*);
-typedef PROC (__stdcall *PFNWGLGETPROCADDRESS) (LPCSTR);
-typedef void (__stdcall *PFNGLFLUSHPROC) ();
-typedef void (__stdcall *PFNGLFINISHPROC) ();
-typedef void (__stdcall *PFNGLDRAWARRAYSPROC) (GLenum mode, GLint first, GLsizei count);
-typedef void (__stdcall *PFNGLCLEARPROC) (GLbitfield);
-typedef void (__stdcall *PFNGLCOLORMASKPROC) (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
-typedef void (__stdcall *PFNGLDRAWELEMENTSPROC) (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
-typedef void (__stdcall *PFNGLGENTEXTURESPROC) (GLsizei n, GLuint *textures);
-typedef void (__stdcall *PFNGLDELETETEXTURESPROC) (GLsizei n, GLuint *textures);
-typedef void (__stdcall *PFNGLBINDTEXTUREPROC) (GLenum target, GLuint texture);
-typedef void (__stdcall *PFNGLCLEARCOLORPROC) (GLfloat r, GLfloat g, GLfloat b, GLfloat a);
-typedef void (__stdcall *PFNGLCLEARDEPTHPROC) (GLclampd depth);
-typedef void (__stdcall *PFNGLTEXPARAMETERIPROC) (GLenum target, GLenum pname, GLint param);
-typedef void (__stdcall *PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
-
-extern PFNWGLGETPROCADDRESS                     wglGetProcAddress;
-extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
-extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
-
-extern PFNGLENABLEPROC                          glEnable;
-extern PFNGLDISABLEPROC                         glDisable;
-extern PFNGLCOLORMASKPROC                       glColorMask;
-extern PFNGLGETFLOATVPROC                       glGetFloatv;
-extern PFNGLGETSTRINGPROC                       glGetString;
-extern PFNGLGETINTEGERVPROC                     glGetIntegerv;
-extern PFNGLCLEARPROC                           glClear;
-extern PFNGLCLEARCOLORPROC                      glClearColor;
-extern PFNGLCLEARDEPTHPROC                      glClearDepth;
-extern PFNGLVIEWPORTPROC                        glViewport;
-extern PFNGLDRAWARRAYSPROC                      glDrawArrays;
-extern PFNGLDRAWELEMENTSPROC                    glDrawElements;
-extern PFNGLGENTEXTURESPROC                     glGenTextures;
-extern PFNGLDELETETEXTURESPROC                  glDeleteTextures;
-extern PFNGLBINDTEXTUREPROC                     glBindTexture;
-extern PFNGLTEXPARAMETERIPROC                   glTexParameteri;
-extern PFNGLFLUSHPROC                           glFlush;
-extern PFNGLFINISHPROC                          glFinish;
-
-#elif defined(OVR_OS_LINUX)
-
-extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
-
-#endif // defined(OVR_OS_WIN32)
-
-extern PFNGLDELETESHADERPROC                    glDeleteShader;
-extern PFNGLBINDFRAMEBUFFERPROC                 glBindFramebuffer;
-extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
-extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
-extern PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
-extern PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
-extern PFNGLBINDBUFFERPROC                      glBindBuffer;
-extern PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
-extern PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
-extern PFNGLBUFFERDATAPROC                      glBufferData;
-extern PFNGLGENBUFFERSPROC                      glGenBuffers;
-extern PFNGLMAPBUFFERPROC                       glMapBuffer;
-extern PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
-extern PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
-extern PFNGLGETSHADERIVPROC                     glGetShaderiv;
-extern PFNGLCOMPILESHADERPROC                   glCompileShader;
-extern PFNGLSHADERSOURCEPROC                    glShaderSource;
-extern PFNGLCREATESHADERPROC                    glCreateShader;
-extern PFNGLCREATEPROGRAMPROC                   glCreateProgram;
-extern PFNGLATTACHSHADERPROC                    glAttachShader;
-extern PFNGLDETACHSHADERPROC                    glDetachShader;
-extern PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
-extern PFNGLUNIFORM1IPROC                       glUniform1i;
-extern PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
-extern PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
-extern PFNGLUSEPROGRAMPROC                      glUseProgram;
-extern PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
-extern PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
-extern PFNGLLINKPROGRAMPROC                     glLinkProgram;
-extern PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
-extern PFNGLGETATTRIBLOCATIONPROC               glGetAttribLocation;
-extern PFNGLUNIFORM4FVPROC                      glUniform4fv;
-extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
-extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
-extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
-extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
-extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
-extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
-
-extern void InitGLExtensions();
-
-#endif // !defined(OVR_OS_MAC)
-
 
 // Rendering primitive type used to render Model.
 enum PrimitiveType
