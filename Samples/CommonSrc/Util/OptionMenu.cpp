@@ -24,11 +24,11 @@ limitations under the License.
 #include "OptionMenu.h"
 
 // Embed the font.
-#include "../CommonSrc/Render/Render_FontEmbed_DejaVu48.h"
+#include "../Render/Render_FontEmbed_DejaVu48.h"
 
 
 //-------------------------------------------------------------------------------------
-bool OptionShortcut::MatchKey(KeyCode key, bool shift) const
+bool OptionShortcut::MatchKey(OVR::KeyCode key, bool shift) const
 {
     for (UInt32 i = 0; i < Keys.GetSize(); i++)
     {
@@ -252,7 +252,7 @@ String OptionVar::HandleShortcutUpdate()
     return Label + " - " + GetValue();
 }
 
-String OptionVar::ProcessShortcutKey(KeyCode key, bool shift)
+String OptionVar::ProcessShortcutKey(OVR::KeyCode key, bool shift)
 {
     if (ShortcutUp.MatchKey(key, shift) || ShortcutDown.MatchKey(key, shift))
     {
@@ -432,7 +432,7 @@ bool OptionSelectionMenu::OnGamepad(UInt32 buttonMask)
     return false;
 }
 
-String OptionSelectionMenu::ProcessShortcutKey(KeyCode key, bool shift)
+String OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
 {
     String s;
 
@@ -702,10 +702,10 @@ void OptionSelectionMenu::Select()
 
 OptionSelectionMenu* OptionSelectionMenu::GetSubmenu()
 {
-    if (!SelectionActive)
+    if (!SelectionActive || !Items[SelectedIndex]->IsMenu())
         return NULL;
 
-    OptionSelectionMenu* submenu = dynamic_cast<OptionSelectionMenu*>(Items[SelectedIndex]);
+    OptionSelectionMenu* submenu = static_cast<OptionSelectionMenu*>(Items[SelectedIndex]);
     return submenu;
 }
 
@@ -714,9 +714,12 @@ OptionSelectionMenu* OptionSelectionMenu::GetOrCreateSubmenu(String submenuName)
 {
     for (UInt32 i = 0; i < Items.GetSize(); i++)
     {
-        OptionSelectionMenu* submenu = dynamic_cast<OptionSelectionMenu*>(Items[i]);
+        if (!Items[i]->IsMenu())
+            continue;
 
-        if (submenu != NULL && submenu->Label == submenuName)
+        OptionSelectionMenu* submenu = static_cast<OptionSelectionMenu*>(Items[i]);
+
+        if (submenu->Label == submenuName)
         {
             return submenu;
         }

@@ -198,11 +198,11 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\3rdParty\TinyXml\tinyxml2.cpp" />
     <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\OptionMenu.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\RenderProfiler.cpp" />
     <ClCompile Include="..\..\..\OculusWorldDemo.cpp" />
     <ClCompile Include="..\..\..\OculusWorldDemo_Scene.cpp" />
-    <ClCompile Include="..\..\..\OptionMenu.cpp" />
     <ClCompile Include="..\..\..\Player.cpp" />
-    <ClCompile Include="..\..\..\RenderProfiler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\CommonSrc\Platform\Gamepad.h" />
@@ -217,11 +217,12 @@
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_D3D1X_Device.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Device.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Win32_Device.h" />
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\OptionMenu.h" />
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\RenderProfiler.h" />
     <ClInclude Include="..\..\3rdParty\TinyXml\tinyxml2.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.h" />
     <ClInclude Include="..\..\..\OculusWorldDemo.h" />
     <ClInclude Include="..\..\..\Player.h" />
-    <ClInclude Include="..\..\..\RenderProfiler.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\..\OculusWorldDemo.rc" />

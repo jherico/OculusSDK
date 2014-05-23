@@ -9457,7 +9457,7 @@ const unsigned char DejaVu_tex[] = {
        0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, 
        0,   0,   0,   0,   0,   0,   0,   0};
 
-Font DejaVu = {56, 45, -11, DejaVu_chars, DejaVu_kern, 1016, 141, DejaVu_tex};
+Font DejaVu = {56, 45, -11, DejaVu_chars, DejaVu_kern, 1016, 141, DejaVu_tex, 0};
 
 }}
 

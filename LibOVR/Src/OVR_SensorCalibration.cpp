@@ -26,6 +26,7 @@ limitations under the License.
 
 #include "OVR_SensorCalibration.h"
 #include "Kernel/OVR_Log.h"
+#include "Kernel/OVR_Threads.h"
 #include <time.h>
 
 namespace OVR {
@@ -36,7 +37,7 @@ const UByte VERSION = 2;
 const UByte MAX_COMPAT_VERSION = 15;
 
 SensorCalibration::SensorCalibration(SensorDevice* pSensor)
-    : MagCalibrated(false), GyroAutoTemperature(0), GyroFilter(6000)
+    : MagCalibrated(false), GyroFilter(6000), GyroAutoTemperature(0)
 {
     this->pSensor = pSensor;
 };
@@ -56,10 +57,10 @@ void SensorCalibration::Initialize()
     }
     
     // read the temperature tables and prepare the interpolation structures
-    result = pSensor->GetAllTemperatureReports(&temperatureReports);
+    result = pSensor->GetAllTemperatureReports(&TemperatureReports);
     OVR_ASSERT(result);
     for (int i = 0; i < 3; i++)
-        Interpolators[i].Initialize(temperatureReports, i);
+        Interpolators[i].Initialize(TemperatureReports, i);
 
     // read the mag calibration
     MagCalibrationReport report;
@@ -71,6 +72,66 @@ void SensorCalibration::Initialize()
         // OVR_ASSERT(false);
         LogError("Magnetometer calibration not found!\n");
     }
+}
+
+void SensorCalibration::DebugPrintLocalTemperatureTable()
+{
+	LogText("TemperatureReports:\n");
+	for (int i = 0; i < (int)TemperatureReports.GetSize(); i++)
+	{
+		for (int j = 0; j < (int)TemperatureReports[i].GetSize(); j++)
+		{
+			TemperatureReport& tr = TemperatureReports[i][j];
+
+			LogText("[%d][%d]: Version=%3d, Bin=%d/%d, "
+					"Sample=%d/%d, TargetTemp=%3.1lf, "
+					"ActualTemp=%4.1lf, "
+					"Offset=(%7.2lf, %7.2lf, %7.2lf), "
+					"Time=%d\n",	i, j, tr.Version,
+									tr.Bin, tr.NumBins,
+									tr.Sample, tr.NumSamples,
+									tr.TargetTemperature,
+									tr.ActualTemperature,
+									tr.Offset.x, tr.Offset.y, tr.Offset.z,
+									tr.Time);
+		}
+	}
+}
+
+void SensorCalibration::DebugClearHeadsetTemperatureReports()
+{
+    OVR_ASSERT(pSensor != NULL);
+
+    bool result;
+
+	Array<Array<TemperatureReport> > temperatureReports;
+	pSensor->GetAllTemperatureReports(&temperatureReports);
+
+	OVR_ASSERT(temperatureReports.GetSize() > 0);
+	OVR_ASSERT(temperatureReports[0].GetSize() > 0);
+
+	TemperatureReport& tr = TemperatureReports[0][0];
+
+	tr.ActualTemperature = 0.0;
+	tr.Time = 0;
+	tr.Version = 0;
+	tr.Offset.x = tr.Offset.y = tr.Offset.z = 0.0;
+
+	for (UByte i = 0; i < tr.NumBins; i++)
+	{
+		tr.Bin = i;
+
+		for (UByte j = 0; j < tr.NumSamples; j++)
+		{
+			tr.Sample = j;
+
+			result = pSensor->SetTemperatureReport(tr);
+			OVR_ASSERT(result);
+			
+			// Need to wait for the tracker board to finish writing to eeprom.
+			Thread::MSleep(50);
+		}
+	}
 }
 
 void SensorCalibration::Apply(MessageBodyFrame& msg)
@@ -87,8 +148,6 @@ void SensorCalibration::Apply(MessageBodyFrame& msg)
     msg.Acceleration = AccelMatrix.Transform(msg.Acceleration - AccelOffset);
     if (MagCalibrated)
         msg.MagneticField = MagMatrix.Transform(msg.MagneticField);
-    // TBD: don't report mag calibration for now, since it is used to enable the yaw correction
-    msg.MagCalibrated = false;
 }
 
 void SensorCalibration::AutocalibrateGyro(MessageBodyFrame const& msg)
@@ -127,26 +186,26 @@ void SensorCalibration::StoreAutoOffset()
 
     // find the best bin
     UPInt binIdx = 0;
-    for (UPInt i = 1; i < temperatureReports.GetSize(); i++) 
-        if (Abs(GyroAutoTemperature - temperatureReports[i][0].TargetTemperature) < 
-            Abs(GyroAutoTemperature - temperatureReports[binIdx][0].TargetTemperature))
+    for (UPInt i = 1; i < TemperatureReports.GetSize(); i++) 
+        if (Abs(GyroAutoTemperature - TemperatureReports[i][0].TargetTemperature) < 
+            Abs(GyroAutoTemperature - TemperatureReports[binIdx][0].TargetTemperature))
             binIdx = i;
 
     // find the oldest and newest samples
     // NB: uninitialized samples have Time == 0, so they will get picked as the oldest
     UPInt newestIdx = 0, oldestIdx = 0;
-    for (UPInt i = 1; i < temperatureReports[binIdx].GetSize(); i++)
+    for (UPInt i = 1; i < TemperatureReports[binIdx].GetSize(); i++)
     {
         // if the version is newer - do nothing
-        if (temperatureReports[binIdx][i].Version > VERSION)
+        if (TemperatureReports[binIdx][i].Version > VERSION)
             return;
-        if (temperatureReports[binIdx][i].Time > temperatureReports[binIdx][newestIdx].Time)
+        if (TemperatureReports[binIdx][i].Time > TemperatureReports[binIdx][newestIdx].Time)
             newestIdx = i;
-        if (temperatureReports[binIdx][i].Time < temperatureReports[binIdx][oldestIdx].Time)
+        if (TemperatureReports[binIdx][i].Time < TemperatureReports[binIdx][oldestIdx].Time)
             oldestIdx = i;
     }
-    TemperatureReport& oldestReport = temperatureReports[binIdx][oldestIdx];
-    TemperatureReport& newestReport = temperatureReports[binIdx][newestIdx];
+    TemperatureReport& oldestReport = TemperatureReports[binIdx][oldestIdx];
+    TemperatureReport& newestReport = TemperatureReports[binIdx][newestIdx];
     OVR_ASSERT((oldestReport.Sample == 0 && newestReport.Sample == 0 && newestReport.Version == 0) || 
                 oldestReport.Sample == (newestReport.Sample + 1) % newestReport.NumSamples);
 
@@ -185,7 +244,27 @@ void SensorCalibration::StoreAutoOffset()
     // but if performance is a problem, it's possible to only recompute the data that has changed
     if (writeSuccess)
         for (int i = 0; i < 3; i++)
-            Interpolators[i].Initialize(temperatureReports, i);
+            Interpolators[i].Initialize(TemperatureReports, i);
+}
+
+const TemperatureReport& median(const Array<TemperatureReport>& temperatureReportsBin, int coord)
+{
+    Array<double> values;
+    values.Reserve(temperatureReportsBin.GetSize());
+    for (unsigned i = 0; i < temperatureReportsBin.GetSize(); i++)
+        if (temperatureReportsBin[i].ActualTemperature != 0)
+            values.PushBack(temperatureReportsBin[i].Offset[coord]);
+    if (values.GetSize() > 0)
+    {
+        double med = Median(values);
+        // this is kind of a hack
+        for (unsigned i = 0; i < temperatureReportsBin.GetSize(); i++)
+            if (temperatureReportsBin[i].Offset[coord] == med)
+                return temperatureReportsBin[i];
+        // if we haven't found the median in the original array, something is wrong
+        OVR_DEBUG_BREAK;
+    }
+    return temperatureReportsBin[0];
 }
 
 void OffsetInterpolator::Initialize(Array<Array<TemperatureReport> > const& temperatureReports, int coord)
@@ -199,8 +278,7 @@ void OffsetInterpolator::Initialize(Array<Array<TemperatureReport> > const& temp
     for (int bin = 0; bin < bins; bin++)
     {
         OVR_ASSERT(temperatureReports[bin].GetSize() == temperatureReports[0].GetSize());
-        //const TemperatureReport& report = median(temperatureReports[bin], coord);
-        const TemperatureReport& report = temperatureReports[bin][0];
+        const TemperatureReport& report = median(temperatureReports[bin], coord);
         if (report.Version > 0 && report.Version <= MAX_COMPAT_VERSION)
         {
             Temperatures.PushBack(report.ActualTemperature);

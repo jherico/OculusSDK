@@ -262,7 +262,7 @@ typedef uint64_t        UInt64;
 // BaseTypes namespace is explicitly declared to allow base types to be used
 // by customers directly without other contents of OVR namespace.
 //
-// Its is expected that GFx samples will declare 'using namespace OVR::BaseTypes'
+// Its is expected that OVR samples will declare 'using namespace OVR::BaseTypes'
 // to allow using these directly without polluting the target scope with other
 // OVR declarations, such as Ptr<>, String or Mutex.
 namespace BaseTypes

@@ -39,7 +39,6 @@ public:
     };
 
     Deque(int capacity = DefaultCapacity);
-    Deque(const Deque<Elem> &OtherDeque);
     virtual ~Deque(void);
 
     virtual void         PushBack   (const Elem &Item);    // Adds Item to the end
@@ -67,6 +66,7 @@ protected:
 
 private:
     Deque&      operator= (const Deque& q) { }; // forbidden
+    Deque(const Deque<Elem> &OtherDeque) { };
 };
 
 template <class Elem>
@@ -76,19 +76,19 @@ public:
     InPlaceMutableDeque( int capacity = Deque<Elem>::DefaultCapacity ) : Deque<Elem>( capacity ) {}
 	virtual ~InPlaceMutableDeque() {};
 
+    using Deque<Elem>::PeekBack;
+    using Deque<Elem>::PeekFront;
 	virtual Elem& PeekBack  (int count = 0); // Returns count-th Item from the end
 	virtual Elem& PeekFront (int count = 0); // Returns count-th Item from the beginning
-private:
-	InPlaceMutableDeque& operator=(const InPlaceMutableDeque& q) {};
 };
 
 // Same as Deque, but allows to write more elements than maximum capacity
 // Old elements are lost as they are overwritten with the new ones
 template <class Elem>
-class CircularBuffer : public Deque<Elem>
+class CircularBuffer : public InPlaceMutableDeque<Elem>
 {
 public:
-    CircularBuffer(int MaxSize = Deque<Elem>::DefaultCapacity) : Deque<Elem>(MaxSize) { };
+    CircularBuffer(int MaxSize = Deque<Elem>::DefaultCapacity) : InPlaceMutableDeque<Elem>(MaxSize) { };
 
     // The following methods are inline as a workaround for a VS bug causing erroneous C4505 warnings
     // See: http://stackoverflow.com/questions/3051992/compiler-warning-at-c-template-base-class
@@ -105,20 +105,6 @@ Capacity( capacity ), Beginning(0), End(0), ElemCount(0)
 {
     Data = (Elem*) OVR_ALLOC(Capacity * sizeof(Elem));
     ConstructArray<Elem>(Data, Capacity);
-}
-
-// Deque Copy Constructor function
-template <class Elem>
-Deque<Elem>::Deque(const Deque &OtherDeque) :
-Capacity( OtherDeque.Capacity )  // Initialize the constant
-{
-    Beginning = OtherDeque.Beginning;
-    End       = OtherDeque.End;
-    ElemCount = OtherDeque.ElemCount;
-
-    Data      = (Elem*) OVR_ALLOC(Capacity * sizeof(Elem));
-    for (int i = 0; i < Capacity; i++)
-        Data[i] = OtherDeque.Data[i];
 }
 
 // Deque Destructor function
@@ -242,7 +228,7 @@ const Elem& Deque<Elem>::PeekBack(int count) const
 template <class Elem>
 Elem& InPlaceMutableDeque<Elem>::PeekFront(int count)
 {
-	// Error Check: Make sure we aren't reading from an empty Deque
+    // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( Deque<Elem>::ElemCount > count );
 
     int idx = Deque<Elem>::Beginning + count;
@@ -254,11 +240,11 @@ Elem& InPlaceMutableDeque<Elem>::PeekFront(int count)
 template <class Elem>
 Elem& InPlaceMutableDeque<Elem>::PeekBack(int count)
 {
-	// Error Check: Make sure we aren't reading from an empty Deque
+    // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( Deque<Elem>::ElemCount > count );
 
     int idx = Deque<Elem>::End - count - 1;
-	if (idx < 0)
+    if (idx < 0)
         idx += Deque<Elem>::Capacity;
     return Deque<Elem>::Data[ idx ];
 }

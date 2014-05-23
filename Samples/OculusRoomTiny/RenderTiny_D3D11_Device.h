@@ -777,7 +777,7 @@ public:
     virtual void SetRenderTarget(Texture* color,
                                  Texture* depth = NULL,
                                  Texture* stencil = NULL);
-
+            void SetDefaultRenderTarget() { SetRenderTarget(NULL, NULL); }
     virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less);
     virtual void SetProjection(const Matrix4f& proj);
     virtual void SetWorldUniforms(const Matrix4f& proj);

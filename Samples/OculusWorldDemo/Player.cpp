@@ -39,21 +39,21 @@ Player::~Player()
 
 Vector3f Player::GetPosition()
 {
-    return BodyPos + Quatf(Vector3f(0,1,0), BodyYaw.Get()).Rotate(HeadPose.Position);
+    return BodyPos + Quatf(Vector3f(0,1,0), BodyYaw.Get()).Rotate(HeadPose.Translation);
 }
 
 Quatf Player::GetOrientation(bool baseOnly)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
-    return baseOnly ? baseQ : baseQ * HeadPose.Orientation;
+    return baseOnly ? baseQ : baseQ * HeadPose.Rotation;
 }
 
-Posef Player::VirtualWorldPoseFromRealPose(const Posef &sensorHeadPose)
+Transformf Player::VirtualWorldTransformfromRealPose(const Transformf &sensorHeadPose)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
 
-    return Posef(baseQ * sensorHeadPose.Orientation,
-                 BodyPos + baseQ.Rotate(sensorHeadPose.Position));
+    return Transformf(baseQ * sensorHeadPose.Rotation,
+                 BodyPos + baseQ.Rotate(sensorHeadPose.Translation));
 }
 
 
@@ -187,8 +187,8 @@ bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
     case OVR::Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); return true;
     case OVR::Key_Left:  MoveLeft    = down ? (MoveLeft    | 2) : (MoveLeft    & ~2); return true;
     case OVR::Key_Right: MoveRight   = down ? (MoveRight   | 2) : (MoveRight   & ~2); return true;
+    default: return false;
     }
-    return false;
 }
 
 

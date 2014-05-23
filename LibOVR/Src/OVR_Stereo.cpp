@@ -364,6 +364,9 @@ void LensConfig::SetUpInverseApprox()
 #endif
 
         }break;
+
+    default:
+        break;
     }
 }
 
@@ -440,7 +443,7 @@ bool LoadLensConfig ( LensConfig *presult, UByte const *pbuffer, int bufferSizeI
     {
     case LCSV_CatmullRom10Version1:
         {
-            if ( bufferSizeInBytes < sizeof(LensConfigStored_CatmullRom10Version1) )
+            if ( bufferSizeInBytes < (int)sizeof(LensConfigStored_CatmullRom10Version1) )
             {
                 return false;
             }
@@ -503,7 +506,7 @@ int SaveLensConfigSizeInBytes ( LensConfig const &config )
 // Returns true on success.
 bool SaveLensConfig ( UByte *pbuffer, int bufferSizeInBytes, LensConfig const &config )
 {
-    if ( bufferSizeInBytes < sizeof ( LensConfigStored_CatmullRom10Version1 ) )
+    if ( bufferSizeInBytes < (int)sizeof ( LensConfigStored_CatmullRom10Version1 ) )
     {
         return false;
     }
@@ -644,6 +647,9 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
         info.Shutter.FirstScanlineToLastScanline    = 0.0131033f;
         info.Shutter.PixelSettleTime                = 0.0f;
         info.Shutter.PixelPersistence               = 0.18f * info.Shutter.VsyncToNextVsync;
+        break;
+
+    default:
         break;
     }
 
@@ -868,7 +874,7 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
     };
 
     DistortionDescriptor distortions[10];
-    for ( int i = 0; i < sizeof(distortions)/sizeof(distortions[0]); i++ )
+    for ( unsigned int i = 0; i < sizeof(distortions)/sizeof(distortions[0]); i++ )
     {
         distortions[i].Config.SetToIdentity();
         distortions[i].EyeRelief = 0.0f;
@@ -1373,6 +1379,11 @@ FovPort CalculateFovFromHmdInfo ( StereoEye eyeType,
         eyeReliefInMeters     = hmd.EyeLeft.ReliefInMeters;
         offsetToRightInMeters = -(hmd.EyeLeft.NoseToPupilInMeters - 0.5f * hmd.LensSeparationInMeters);
     }
+
+    // Limit the eye-relief to 6 mm for FOV calculations since this just tends to spread off-screen
+    // and get clamped anyways on DK1 (but in Unity it continues to spreads and causes 
+    // unnecessarily large render targets)
+    eyeReliefInMeters = Alg::Max(eyeReliefInMeters, 0.006f);
 
     // Central view.
     fovPort = CalculateFovFromEyePosition ( eyeReliefInMeters,

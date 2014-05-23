@@ -57,10 +57,10 @@ public:
     ovrHmdDesc GetDesc();
     ovrSizei   GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel);
 
-    ovrEyeRenderDesc calcRenderDesc(const ovrEyeDesc& eyeDesc);
+    ovrEyeRenderDesc calcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov);
 
     void       setupRenderDesc(ovrEyeRenderDesc eyeRenderDescOut[2],
-                               const ovrEyeDesc eyeDescIn[2]);
+                               const ovrFovPort eyeFovIn[2]);
 public:
     
     // HMDInfo shouldn't change, as its string pointers are passed out.    
@@ -71,7 +71,7 @@ public:
 
     HmdRenderInfo            RenderInfo;    
     DistortionRenderDesc     Distortion[2];
-    ovrEyeRenderDesc         EyeRenderDesc[2];
+    ovrEyeRenderDesc         EyeRenderDesc[2]; 
 
     // Clear color used for distortion
     float                    ClearColor[4];
@@ -80,7 +80,7 @@ public:
     ovrPosef                 EyeRenderPoses[2];
 
     // Capabilities passed to Configure.
-    unsigned                 HMDCaps;
+    unsigned                 EnabledHmdCaps;
     unsigned                 DistortionCaps;
 };
 

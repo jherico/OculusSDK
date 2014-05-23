@@ -10,6 +10,9 @@
     <Filter Include="CommonSrc\Render">
       <UniqueIdentifier>{1b6d51ae-a405-4f3d-be93-41a50db4f328}</UniqueIdentifier>
     </Filter>
+    <Filter Include="CommonSrc\Util">
+      <UniqueIdentifier>{7fda3cf5-3371-45bc-b3b6-3b0424b46d93}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\CommonSrc\Platform\Platform.cpp">
@@ -45,14 +48,18 @@
       <Filter>CommonSrc\Platform</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\OculusWorldDemo_Scene.cpp" />
-    <ClCompile Include="..\..\..\OptionMenu.cpp" />
-    <ClCompile Include="..\..\..\RenderProfiler.cpp" />
     <ClCompile Include="..\..\..\..\..\3rdParty\TinyXml\tinyxml2.cpp" />
     <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_GL_Win32_Device.cpp">
       <Filter>CommonSrc\Render</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_GL_Device.cpp">
       <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\OptionMenu.cpp">
+      <Filter>CommonSrc\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\RenderProfiler.cpp">
+      <Filter>CommonSrc\Util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -91,13 +98,18 @@
       <Filter>CommonSrc\Platform</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\OculusWorldDemo.h" />
-    <ClInclude Include="..\..\..\RenderProfiler.h" />
     <ClInclude Include="..\..\..\Player.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Win32_Device.h">
       <Filter>CommonSrc\Render</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Device.h">
       <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\RenderProfiler.h">
+      <Filter>CommonSrc\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\OptionMenu.h">
+      <Filter>CommonSrc\Util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -129,6 +129,7 @@
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp">
       <Filter>CAPI\GL</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Src\OVR_Recording.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Src\OVR_CAPI.h" />
@@ -282,6 +283,8 @@
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.h">
       <Filter>CAPI\GL</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Src\OVR_Recording.h" />
+    <ClInclude Include="..\..\..\Src\OVR_RecordingDefs.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionTimewarpChroma_vs.vsh">
@@ -326,7 +329,7 @@
       <UniqueIdentifier>{470c25c2-99a2-439b-9f6b-761e8c70f84e}</UniqueIdentifier>
     </Filter>
     <Filter Include="CAPI\GL">
-      <UniqueIdentifier>{b8c0476b-d36b-4d31-8141-4d42f78b9e51}</UniqueIdentifier>
+      <UniqueIdentifier>{47ac92b1-d962-4180-90a5-846feef19a6b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

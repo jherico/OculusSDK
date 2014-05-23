@@ -391,7 +391,11 @@ struct LatencyTestDisplayImpl
 //-------------------------------------------------------------------------------------
 // ***** LatencyTestDeviceFactory
 
-LatencyTestDeviceFactory LatencyTestDeviceFactory::Instance;
+LatencyTestDeviceFactory &LatencyTestDeviceFactory::GetInstance()
+{
+	static LatencyTestDeviceFactory instance;
+	return instance;
+}
 
 void LatencyTestDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 {

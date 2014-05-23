@@ -29,8 +29,11 @@ limitations under the License.
 namespace OVR { namespace Render {
 
 static const UPInt OVR_DDS_PF_FOURCC = 0x4;
-static const UInt32 OVR_DTX1_MAGIC_NUMBER = 827611204;
-static const UInt32 OVR_DTX5_MAGIC_NUMBER = 894720068;
+static const UInt32 OVR_DXT1_MAGIC_NUMBER = 0x31545844; // "DXT1"
+static const UInt32 OVR_DXT2_MAGIC_NUMBER = 0x32545844; // "DXT2"
+static const UInt32 OVR_DXT3_MAGIC_NUMBER = 0x33545844; // "DXT3"
+static const UInt32 OVR_DXT4_MAGIC_NUMBER = 0x34545844; // "DXT4"
+static const UInt32 OVR_DXT5_MAGIC_NUMBER = 0x35545844; // "DXT5"
 
 struct OVR_DDS_PIXELFORMAT
 {
@@ -62,6 +65,20 @@ struct OVR_DDS_HEADER
     UInt32				Reserved2;
 };
 
+// Returns -1 on failure, or a valid TextureFormat value on success
+static inline int InterpretPixelFormatFourCC(UInt32 fourCC) {
+	switch (fourCC) {
+	case OVR_DXT1_MAGIC_NUMBER: return Texture_DXT1;
+	case OVR_DXT2_MAGIC_NUMBER: return Texture_DXT3;
+	case OVR_DXT3_MAGIC_NUMBER: return Texture_DXT3;
+	case OVR_DXT4_MAGIC_NUMBER: return Texture_DXT5;
+	case OVR_DXT5_MAGIC_NUMBER: return Texture_DXT5;
+	}
+
+	// Unrecognized FourCC
+	return -1;
+}
+
 Texture* LoadTextureDDS(RenderDevice* ren, File* f)
 {
     OVR_DDS_HEADER header;
@@ -87,24 +104,20 @@ Texture* LoadTextureDDS(RenderDevice* ren, File* f)
     }
     if(header.PixelFormat.Flags & OVR_DDS_PF_FOURCC)
     {
-        if(header.PixelFormat.FourCC == OVR_DTX1_MAGIC_NUMBER)
-        {
-            format = Texture_DXT1;
-        }
-        else if(header.PixelFormat.FourCC == OVR_DTX5_MAGIC_NUMBER)
-        {
-            format = Texture_DXT5;
-        }
-        else
-        {
-            return NULL;
-        }
+		format = InterpretPixelFormatFourCC(header.PixelFormat.FourCC);
+		if (format == -1) {
+			return NULL;
+		}
     }
 
     int            byteLen = f->BytesAvailable();
     unsigned char* bytes   = new unsigned char[byteLen];
     f->Read(bytes, byteLen);
     Texture* out = ren->CreateTexture(format, (int)width, (int)height, bytes, mipCount);
+	if (!out) {
+		return NULL;
+	}
+
     if(strstr(f->GetFilePath(), "_c."))
     {
         out->SetSampleMode(Sample_Clamp);

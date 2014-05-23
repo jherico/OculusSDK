@@ -89,7 +89,7 @@ public:
 class SysErrorModeDisabler
 {
 public:
-    SysErrorModeDisabler(const char* pfileName) { }
+    SysErrorModeDisabler(const char* pfileName) { OVR_UNUSED(pfileName); }
 };
 #endif // OVR_OS_WIN32
 

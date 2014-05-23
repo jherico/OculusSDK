@@ -84,7 +84,6 @@ private:
 };
 
 
-
 //-------------------------------------------------------------------------------------
 
 // DeviceManagerLock is a synchronization lock used by DeviceManager for Devices

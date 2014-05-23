@@ -51,7 +51,7 @@ FovPort::FovPort(const ovrFovPort &src)
     : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
 { }    
 
-FovPort::operator const ovrFovPort () const
+FovPort::operator ovrFovPort () const
 {
     ovrFovPort result;
     result.LeftTan  = LeftTan;
@@ -79,7 +79,7 @@ SensorState::SensorState(const ovrSensorState& s)
     StatusFlags     = s.StatusFlags;
 }
 
-SensorState::operator const ovrSensorState() const
+SensorState::operator ovrSensorState() const
 {
     ovrSensorState result;
     result.Predicted    = Predicted;
@@ -206,23 +206,23 @@ OVR_EXPORT double ovr_WaitTillTime(double absTime)
 
 // 1. Init/shutdown.
 
-static ovrBool CAPI_SystemInitCalled = FALSE;
+static ovrBool CAPI_SystemInitCalled = 0;
 
 OVR_EXPORT ovrBool ovr_Initialize()
 {
     if (OVR::CAPI::GlobalState::pInstance)
-        return TRUE;
+        return 1;
 
     // We must set up the system for the plugin to work
     if (!OVR::System::IsInitialized())
     {        
         OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
-        CAPI_SystemInitCalled = TRUE;
+        CAPI_SystemInitCalled = 1;
     }
 
     // Constructor detects devices
     GlobalState::pInstance = new GlobalState;
-    return TRUE;
+    return 1;
 }
 
 OVR_EXPORT void ovr_Shutdown()
@@ -237,7 +237,7 @@ OVR_EXPORT void ovr_Shutdown()
     if (CAPI_SystemInitCalled)
     {
         OVR::System::Destroy();
-        CAPI_SystemInitCalled = FALSE;
+        CAPI_SystemInitCalled = 0;
     }    
     return;
 }
@@ -320,6 +320,27 @@ OVR_EXPORT const char* ovrHmd_GetLastError(ovrHmd hmd)
 
 
 //-------------------------------------------------------------------------------------
+
+// Returns capability bits that are enabled at this time; described by ovrHmdCapBits.
+// Note that this value is different font ovrHmdDesc::Caps, which describes what
+// capabilities are available.
+OVR_EXPORT unsigned int ovrHmd_GetEnabledCaps(ovrHmd hmd)
+{
+    HMDState* p = (HMDState*)hmd;
+    return p ? p->EnabledHmdCaps : 0;
+}
+
+// Modifies capability bits described by ovrHmdCapBits that can be modified,
+// such as ovrHmd_LowPersistance.
+OVR_EXPORT void ovrHmd_SetEnabledCaps(ovrHmd hmd, unsigned int capsBits)
+{
+    HMDState* p = (HMDState*)hmd;
+    if (p)
+        p->SetEnabledHmdCaps(capsBits);
+}
+
+
+//-------------------------------------------------------------------------------------
 // *** Sensor
 
 // Sensor APIs are separated from Create & Configure for several reasons:
@@ -363,7 +384,7 @@ OVR_EXPORT ovrSensorState ovrHmd_GetSensorState(ovrHmd hmd, double absTime)
 OVR_EXPORT ovrBool ovrHmd_GetSensorDesc(ovrHmd hmd, ovrSensorDesc* descOut)
 {
     HMDState* p = (HMDState*)hmd;
-    return p->GetSensorDesc(descOut) ? TRUE : FALSE;
+    return p->GetSensorDesc(descOut) ? 1 : 0;
 }
 
 
@@ -396,14 +417,13 @@ OVR_EXPORT ovrSizei ovrHmd_GetFovTextureSize(ovrHmd hmd, ovrEyeType eye, ovrFovP
 OVR_EXPORT 
 ovrBool ovrHmd_ConfigureRendering( ovrHmd hmd,
                                    const ovrRenderAPIConfig* apiConfig,
-                                   unsigned int hmdCaps,
                                    unsigned int distortionCaps,
-                                   const ovrEyeDesc eyeDescIn[2],
+                                   const ovrFovPort eyeFovIn[2],
                                    ovrEyeRenderDesc eyeRenderDescOut[2] )
 {
-    if (!hmd) return FALSE;
-    return ((HMDState*)hmd)->ConfigureRendering(eyeRenderDescOut, eyeDescIn,
-                                                apiConfig, hmdCaps, distortionCaps);
+    if (!hmd) return 0;
+    return ((HMDState*)hmd)->ConfigureRendering(eyeRenderDescOut, eyeFovIn,
+                                                apiConfig, distortionCaps);
 }
 
 
@@ -451,7 +471,7 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmd)
 
     // TBD: Move directly into renderer
     bool dk2LatencyTest = (hmds->HMDInfo.HmdType == HmdType_DK2) &&
-                           (hmds->SensorCaps & ovrHmdCap_LatencyTest);
+                           (hmds->EnabledHmdCaps & ovrHmdCap_LatencyTest);
     if (dk2LatencyTest)
     {
         hmds->LatencyTest2DrawColor[0] = hmds->TimeManager.GetFrameLatencyTestDrawColor();
@@ -460,14 +480,16 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmd)
     }
 
     if (hmds->pRenderer)
-    {
+	{
+		hmds->pRenderer->SaveGraphicsState();
         hmds->pRenderer->EndFrame(true,
                                   hmds->LatencyTestActive ? hmds->LatencyTestDrawColor : NULL,
                             
                                   // MA: Use this color since we are running DK2 test all the time.
                                   dk2LatencyTest ? hmds->LatencyTest2DrawColor : 0
                                   //hmds->LatencyTest2Active ? hmds->LatencyTest2DrawColor : NULL
-                                  );
+								  );
+		hmds->pRenderer->RestoreGraphicsState();
     }
     // Call after present
     ovrHmd_EndFrameTiming(hmd);
@@ -582,12 +604,13 @@ OVR_EXPORT void ovrHmd_EndFrameTiming(ovrHmd hmd)
 }
 
 
-OVR_EXPORT void ovrHmd_ResetFrameTiming(ovrHmd hmd,  unsigned int frameIndex, bool vsync) 
+OVR_EXPORT void ovrHmd_ResetFrameTiming(ovrHmd hmd,  unsigned int frameIndex) 
 {
     HMDState* hmds = (HMDState*)hmd;
     if (!hmds) return;
     
-    hmds->TimeManager.ResetFrameTiming(frameIndex, vsync, false,
+    hmds->TimeManager.ResetFrameTiming(frameIndex, 
+                                       false,
                                        hmds->RenderingConfigured);
     hmds->LastFrameTimeSeconds    = 0.0;
     hmds->LastGetFrameTimeSeconds = 0.0;
@@ -630,7 +653,8 @@ OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmd, ovrEyeType eye,
 
 
 
-OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd, const ovrEyeDesc eyeDesc)
+OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd,
+                                                 ovrEyeType eyeType, ovrFovPort fov)
 {
     ovrEyeRenderDesc erd;
    
@@ -641,7 +665,7 @@ OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd, const ovrEyeDesc ey
         return erd;
     }
 
-    return hmds->RenderState.calcRenderDesc(eyeDesc);
+    return hmds->RenderState.calcRenderDesc(eyeType, fov);
 }
 
 
@@ -652,18 +676,19 @@ OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd, const ovrEyeDesc ey
 
 // Generate distortion mesh per eye.
 // scaleAndOffsetOut - this will be needed for shader
-OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmd, ovrEyeDesc eyeDesc,
+OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmd,
+                                                ovrEyeType eyeType, ovrFovPort fov,
                                                 unsigned int distortionCaps,
-                                                ovrVector2f uvScaleOffsetOut[2], 
                                                 ovrDistortionMesh *meshData )
 {
     if (!meshData)
-        return FALSE;
+        return 0;
     HMDState* hmds = (HMDState*)hmd;
 
     // Not used now, but Chromatic flag or others could possibly be checked for in the future.
     OVR_UNUSED1(distortionCaps); 
     
+#if defined (OVR_OS_WIN32)
     // TBD: We should probably be sharing some C API structures with C++ to avoid this mess...
     OVR_COMPILER_ASSERT(sizeof(DistortionMeshVertexData)                       == sizeof(ovrDistortionVertex));
     OVR_COMPILER_ASSERT(OVR_OFFSET_OF(DistortionMeshVertexData, ScreenPosNDC)  == OVR_OFFSET_OF(ovrDistortionVertex, Pos));
@@ -672,6 +697,7 @@ OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmd, ovrEyeDesc eyeDesc,
     OVR_COMPILER_ASSERT(OVR_OFFSET_OF(DistortionMeshVertexData, TanEyeAnglesR) == OVR_OFFSET_OF(ovrDistortionVertex, TexR));
     OVR_COMPILER_ASSERT(OVR_OFFSET_OF(DistortionMeshVertexData, TanEyeAnglesG) == OVR_OFFSET_OF(ovrDistortionVertex, TexG));
     OVR_COMPILER_ASSERT(OVR_OFFSET_OF(DistortionMeshVertexData, TanEyeAnglesB) == OVR_OFFSET_OF(ovrDistortionVertex, TexB));
+#endif
 
 
     // *** Calculate a part of "StereoParams" needed for mesh generation
@@ -681,21 +707,13 @@ OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmd, ovrEyeDesc eyeDesc,
     // eyeToSourceUV is computed here for convenience, so that users don't need
     // to call ovrHmd_GetRenderScaleAndOffset unless changing RT dynamically.
 
-    
     const HmdRenderInfo&  hmdri          = hmds->RenderState.RenderInfo;    
-    StereoEye             stereoEye      = (eyeDesc.Eye == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
+    StereoEye             stereoEye      = (eyeType == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
 
-    const DistortionRenderDesc& distortion = hmds->RenderState.Distortion[eyeDesc.Eye];
+    const DistortionRenderDesc& distortion = hmds->RenderState.Distortion[eyeType];
 
     // Find the mapping from TanAngle space to target NDC space.
-    ScaleAndOffset2D      eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(eyeDesc.Fov);
-    // Find the mapping from TanAngle space to textureUV space.
-    ScaleAndOffset2D      eyeToSourceUV  = CreateUVScaleAndOffsetfromNDCScaleandOffset(
-                                            eyeToSourceNDC,
-                                            Recti(eyeDesc.RenderViewport), eyeDesc.TextureSize );
-
-    uvScaleOffsetOut[0] = eyeToSourceUV.Scale;
-    uvScaleOffsetOut[1] = eyeToSourceUV.Offset;
+    ScaleAndOffset2D      eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
 
     int triangleCount = 0;
     int vertexCount = 0;
@@ -710,10 +728,10 @@ OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmd, ovrEyeDesc eyeDesc,
         // Convert to index
         meshData->IndexCount = triangleCount * 3;
         meshData->VertexCount = vertexCount;
-        return TRUE;
+        return 1;
     }
 
-    return FALSE;
+    return 0;
 }
 
 
@@ -734,20 +752,16 @@ OVR_EXPORT void ovrHmd_DestroyDistortionMesh(ovrDistortionMesh* meshData)
 
 // Computes updated 'uvScaleOffsetOut' to be used with a distortion if render target size or
 // viewport changes after the fact. This can be used to adjust render size every frame, if desired.
-OVR_EXPORT void ovrHmd_GetRenderScaleAndOffset( ovrHmd hmd, ovrEyeDesc eyeDesc,
-                                                unsigned int distortionCaps,
+OVR_EXPORT void ovrHmd_GetRenderScaleAndOffset( ovrFovPort fov,
+                                                ovrSizei textureSize, ovrRecti renderViewport,
                                                 ovrVector2f uvScaleOffsetOut[2] )
 {        
-    OVR_UNUSED2(hmd, distortionCaps);
-    // TBD: We could remove dependency on HMD here, but what if we need it in the future?
-    //HMDState*        hmds = (HMDState*)hmd;
-
     // Find the mapping from TanAngle space to target NDC space.
-    ScaleAndOffset2D  eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(eyeDesc.Fov);
+    ScaleAndOffset2D  eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
     // Find the mapping from TanAngle space to textureUV space.
     ScaleAndOffset2D  eyeToSourceUV  = CreateUVScaleAndOffsetfromNDCScaleandOffset(
                                          eyeToSourceNDC,
-                                         eyeDesc.RenderViewport, eyeDesc.TextureSize );
+                                         renderViewport, textureSize );
 
     uvScaleOffsetOut[0] = eyeToSourceUV.Scale;
     uvScaleOffsetOut[1] = eyeToSourceUV.Offset;

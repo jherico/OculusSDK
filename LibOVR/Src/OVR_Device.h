@@ -347,7 +347,7 @@ public:
     char      DisplayDeviceName[32];
     
     // MacOS:
-    long      DisplayId;
+    int      DisplayId;
 
 
     // Constructor initializes all values to 0s.
@@ -492,6 +492,76 @@ private:
     void operator = (const SensorInfo&) { OVR_ASSERT(0); } // Assignment not allowed.
 };
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serial Number feature report. (DK1)
+struct SerialReport
+{
+    static const int SERIAL_NUMBER_SIZE = 12;  // Serial Number size = 12 bytes. (Refer 'Tracker Firmware Specification Section 4.9, Pg 18)
+
+	SerialReport()
+        : CommandId(0)
+	{
+        memset(SerialNumberValue, 0, sizeof(SerialNumberValue));
+    }
+                
+    SerialReport(UInt16 commandId,
+                UByte SNo[SERIAL_NUMBER_SIZE])
+        :	    CommandId(commandId)
+    { 
+        for (int i=0; i < SERIAL_NUMBER_SIZE; i++)
+        {
+            SerialNumberValue[i] = SNo[i];
+        }
+    }
+
+    UInt16      CommandId;
+	UByte	    SerialNumberValue[SERIAL_NUMBER_SIZE];          // See 'Tracker Firmware Specification' document for
+													  // a description of Serial Report.
+};
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+//Added Serial Report Implementation.
+
+struct SerialImpl
+{
+    enum  { PacketSize = 15 };
+    UByte   Buffer[PacketSize];
+
+    SerialReport Settings;
+
+	SerialImpl()
+	{
+	memset(Buffer, 0, sizeof(Buffer));
+	Buffer[0] = 10;
+	}
+
+	SerialImpl(const SerialReport& settings)
+			:Settings(settings)
+	{
+		Pack();
+	}
+
+	void  Pack()
+	{
+    Buffer[0] = 10;
+    Alg::EncodeUInt16(Buffer+1, Settings.CommandId);
+	for (int i = 0; i < Settings.SERIAL_NUMBER_SIZE; ++i)
+		Buffer[3 + i] = Settings.SerialNumberValue[i];
+	}
+
+	void Unpack()
+	{
+		Settings.CommandId = Alg::DecodeUInt16(Buffer+1);
+		for (int i = 0; i < Settings.SERIAL_NUMBER_SIZE; ++i)
+			Settings.SerialNumberValue[i] = Buffer[3 + i];
+	}
+
+};
+
+
 // Tracking settings (DK2).
 struct TrackingReport
 {
@@ -631,20 +701,20 @@ struct PositionCalibrationReport
 
     PositionCalibrationReport()
       :	CommandId(0), Version(0), 
-        Position(0), Normal(0), Rotation(0),
+        Position(0), Normal(0), Angle(0),
         PositionIndex(0), NumPositions(0), PositionType(PositionType_LED)
 	{}
 
     PositionCalibrationReport(UInt16 commandId,
                         UByte version,
-                        const Vector3f& position,
-						const Vector3f& normal,
-						float rotation,
+                        const Vector3d& position,
+						const Vector3d& normal,
+						double rotation,
                         UInt16 positionIndex,
                         UInt16 numPositions,
                         PositionTypeEnum positionType)
         :	    CommandId(commandId), Version(version), 
-				Position(position),	Normal(normal), Rotation(rotation),
+				Position(position),	Normal(normal), Angle(rotation),
                 PositionIndex(positionIndex), NumPositions(numPositions), PositionType(positionType)
     {
 	}
@@ -655,7 +725,7 @@ struct PositionCalibrationReport
 										// center of the emitter plane of the display at nominal focus.
 	Vector3d        Normal;				// Normal of the LED or inertial tracker. This is a signed integer in 
 										// meters. The normal is relative to the position. 
-	double          Rotation;			// The rotation about the normal. This is in radians.
+	double          Angle;			    // The rotation about the normal. This is in radians.
     UInt16			PositionIndex;      // The current position being read or written to. Autoincrements on reads, gets set
 										// to the written value on writes.
     UInt16			NumPositions;       // The read-only number of items with positions stored. The last position is that of
@@ -710,7 +780,7 @@ struct ManufacturingReport
 {
 	ManufacturingReport()
       : CommandId(0), NumStages(0), Stage(0),
-        StageLocation(0), StageTime(0), Result(0), StageVersion(0)
+        StageVersion(0), StageLocation(0), StageTime(0), Result(0)
 	{}
 
     ManufacturingReport(    UInt16 commandId,
@@ -721,7 +791,7 @@ struct ManufacturingReport
                             UInt32 stageTime,
                             UInt32 result)
         :	    CommandId(commandId), NumStages(numStages), Stage(stage),
-                StageLocation(stageLocation), StageTime(stageTime), Result(result), StageVersion(version)
+                StageVersion(version), StageLocation(stageLocation), StageTime(stageTime), Result(result)
     { }
 
     UInt16      CommandId;
@@ -880,6 +950,8 @@ struct GyroOffsetReport
     double      Temperature;
 };
 
+
+
 //-------------------------------------------------------------------------------------
 // ***** SensorDevice
 
@@ -946,6 +1018,12 @@ public:
     // Enable/disable onboard IMU calibration
     // If set to false, the device will return raw values
     virtual void        SetOnboardCalibrationEnabled(bool enabled) = 0;
+    // Return true if the mag is calibrated
+    virtual bool        IsMagCalibrated() { return false; }
+
+	// Get/set feature reports from DK1 added to DK2. See 'Tracker Firmware Specification' document for details.
+	virtual bool		SetSerialReport(const SerialReport&) { return false; }
+	virtual bool		GetSerialReport(SerialReport*) { return false; }
 
     // Get/set feature reports added to DK2. See 'DK2 Firmware Specification' document for details.
     virtual bool		SetTrackingReport(const TrackingReport&) { return false; }

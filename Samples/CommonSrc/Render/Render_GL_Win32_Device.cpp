@@ -36,11 +36,10 @@ PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition;
 
 // ***** GL::Win32::RenderDevice
     
-RenderDevice::RenderDevice(const Render::RendererParams& p, HWND win, HDC dc, HGLRC gl)
+RenderDevice::RenderDevice(const Render::RendererParams& p, HWND win, HGLRC gl)
     : GL::RenderDevice(p)
     , Window(win)
     , WglContext(gl)
-    , GdiDc(dc)
 	, PreFullscreen(0, 0, 0, 0)
     , HMonitor(0)
 	, FSDesktop(0, 0, 0, 0)
@@ -52,6 +51,7 @@ RenderDevice::RenderDevice(const Render::RendererParams& p, HWND win, HDC dc, HG
 Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
 {
     HWND hwnd = (HWND)oswnd;
+	HDC dc = GetDC(hwnd);
     
     if (!DwmEnableComposition)
     {
@@ -62,40 +62,93 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
     }
 
     DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
+    {
+		PIXELFORMATDESCRIPTOR pfd;
+		memset(&pfd, 0, sizeof(pfd));
 
-    PIXELFORMATDESCRIPTOR pfd;
-    memset(&pfd, 0, sizeof(pfd));
+		pfd.nSize       = sizeof(pfd);
+		pfd.nVersion    = 1;
+		pfd.iPixelType  = PFD_TYPE_RGBA;
+		pfd.dwFlags     = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+		pfd.cColorBits  = 32;
+		pfd.cDepthBits  = 16;
 
-    pfd.nSize       = sizeof(pfd);
-    pfd.nVersion    = 1;
-    pfd.iPixelType  = PFD_TYPE_RGBA;
-    pfd.dwFlags     = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-    pfd.cColorBits  = 32;
-    pfd.cDepthBits  = 16;
+		int pf = ChoosePixelFormat(dc, &pfd);
+		if (!pf)
+		{
+			ReleaseDC(hwnd, dc);
+			return NULL;
+		}
+		
+		if (!SetPixelFormat(dc, pf, &pfd))
+		{
+			ReleaseDC(hwnd, dc);
+			return NULL;
+		}
 
-    HDC dc = GetDC(hwnd);
-    int pf = ChoosePixelFormat(dc, &pfd);
-    if (!pf)
+		HGLRC context = wglCreateContext(dc);
+		if (!wglMakeCurrent(dc, context))
+		{
+			wglDeleteContext(context);
+			ReleaseDC(hwnd, dc);
+			return NULL;
+		}
+		
+		wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
+		wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+
+		wglDeleteContext(context);
+    }
+
+
+	int iAttributes[] = {
+		//WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+        WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+        WGL_COLOR_BITS_ARB, 32,
+        WGL_DEPTH_BITS_ARB, 16,
+        WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+		WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
+        0, 0};
+
+    float fAttributes[] = {0,0};
+
+	int pf = 0;
+	UINT numFormats = 0;
+
+	if (!wglChoosePixelFormatARB(dc, iAttributes, fAttributes, 1, &pf, &numFormats))
     {
         ReleaseDC(hwnd, dc);
         return NULL;
     }
+
+    PIXELFORMATDESCRIPTOR pfd;
+    memset(&pfd, 0, sizeof(pfd));
+
     if (!SetPixelFormat(dc, pf, &pfd))
     {
         ReleaseDC(hwnd, dc);
         return NULL;
     }
-    HGLRC context = wglCreateContext(dc);
-    if (!wglMakeCurrent(dc, context))
-    {
-        wglDeleteContext(context);
-        ReleaseDC(hwnd, dc);
-        return NULL;
-    }
+
+	GLint attribs[] =
+	{
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 1,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		0
+	};
+
+	HGLRC context = wglCreateContextAttribsARB(dc, 0, attribs);
+	if (!wglMakeCurrent(dc, context))
+	{
+		wglDeleteContext(context);
+		ReleaseDC(hwnd, dc);
+		return NULL;
+	}
 
     InitGLExtensions();
 
-    return new RenderDevice(rp, hwnd, dc, context);
+    return new RenderDevice(rp, hwnd, context);
 }
 
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
@@ -104,9 +157,7 @@ ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 	cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
 	cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
 	cfg.OGL.Header.Multisample = Params.Multisample;
-	cfg.OGL.WglContext         = WglContext;
 	cfg.OGL.Window             = Window;
-	cfg.OGL.GdiDc              = GdiDc;
 
 	return cfg.Config;
 }
@@ -118,7 +169,10 @@ void RenderDevice::Present(bool useVsync)
 	if (wglGetSwapIntervalEXT() != swapInterval)
 		wglSwapIntervalEXT(swapInterval);
 
-	success = SwapBuffers(GdiDc);
+	HDC dc = GetDC(Window);
+	success = SwapBuffers(dc);
+	ReleaseDC(Window, dc);
+
     OVR_ASSERT(success);
 }
 
@@ -131,9 +185,7 @@ void RenderDevice::Shutdown()
     {
         wglMakeCurrent(NULL,NULL);
         wglDeleteContext(WglContext);
-        ReleaseDC(Window, GdiDc);
         WglContext = NULL;
-        GdiDc = NULL;
         Window = NULL;
     }
 }
@@ -263,25 +315,6 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
         monInfo.cbSize = sizeof(MONITORINFOEX);
         GetMonitorInfo(HMonitor, &monInfo);
 
-        // Find the requested device mode
-        DEVMODE dmode;
-        bool foundMode = false;
-        memset(&dmode, 0, sizeof(DEVMODE));
-        dmode.dmSize = sizeof(DEVMODE);
-		Recti vp = VP;
-        for(int i=0 ; EnumDisplaySettings(monInfo.szDevice, i, &dmode); ++i)
-        {
-            foundMode = (dmode.dmPelsWidth==(DWORD)vp.w) &&
-                        (dmode.dmPelsHeight==(DWORD)vp.h) &&
-                        (dmode.dmBitsPerPel==(DWORD)32);
-            if (foundMode)
-                break;
-        }
-        if(!foundMode)
-            return false;
-
-        dmode.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
-
         // Save the current window position/size
         RECT rect;
         GetWindowRect(Window, &rect);
@@ -296,26 +329,20 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
         SetWindowLongPtr(Window, GWL_STYLE, style & (~WS_OVERLAPPEDWINDOW));
         SetWindowLongPtr(Window, GWL_EXSTYLE, exstyle | WS_EX_APPWINDOW | WS_EX_TOPMOST);
 
-        // Attempt to change the resolution
-        LONG ret = ChangeDisplaySettingsEx(monInfo.szDevice, &dmode, NULL, CDS_FULLSCREEN, NULL);
-        //LONG ret = ChangeDisplaySettings(&dmode, CDS_FULLSCREEN);
-
-        // If it failed, clean up and return.
-        if (ret != DISP_CHANGE_SUCCESSFUL)
-        {
-            SetWindowLongPtr(Window, GWL_STYLE, style);
-            SetWindowLongPtr(Window, GWL_EXSTYLE, exstyle);
-            return false;
-        }
+		ChangeDisplaySettingsEx(monInfo.szDevice, NULL, NULL, CDS_FULLSCREEN, NULL);
 
         // We need to call GetMonitorInfo() again becase
         // details may have changed with the resolution
         GetMonitorInfo(HMonitor, &monInfo);
 
+		int x = monInfo.rcMonitor.left;
+		int y = monInfo.rcMonitor.top;
+		int w = monInfo.rcMonitor.right - monInfo.rcMonitor.left;
+		int h = monInfo.rcMonitor.bottom - monInfo.rcMonitor.top;
+
         // Set the window's size and position so
         // that it covers the entire screen
-        SetWindowPos(Window, HWND_TOPMOST, monInfo.rcMonitor.left, monInfo.rcMonitor.top, vp.w, vp.h,
-                        SWP_SHOWWINDOW | SWP_NOZORDER | SWP_FRAMECHANGED);
+        SetWindowPos(Window, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
 
     Params.Fullscreen = fullscreen;

@@ -31,6 +31,8 @@ limitations under the License.
 #include "../CommonSrc/Render/Render_Device.h"
 #include "../CommonSrc/Render/Render_XmlSceneLoader.h"
 #include "../CommonSrc/Platform/Gamepad.h"
+#include "../CommonSrc/Util/OptionMenu.h"
+#include "../CommonSrc/Util/RenderProfiler.h"
 
 #include "Util/Util_Render_Stereo.h"
 using namespace OVR::Util::Render;
@@ -41,9 +43,6 @@ using namespace OVR::Util::Render;
 
 #include "Player.h"
 #include "OVR_DeviceConstants.h"
-
-#include "OptionMenu.h"
-#include "RenderProfiler.h"
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
@@ -133,7 +132,7 @@ public:
     void         RenderAnimatedBlocks(ovrEyeType eye, double appTime);
     void         RenderGrid(ovrEyeType eye);
     
-    Matrix4f     CalculateViewFromPose(const Posef& pose);
+    Matrix4f     CalculateViewFromPose(const Transformf& pose);
 
     // Determine whether this frame needs rendering based on timewarp timing and flags.
     bool        FrameNeedsRendering(double curtime);
@@ -191,9 +190,10 @@ protected:
     ovrHmd              Hmd;
     ovrHmdDesc          HmdDesc;
     ovrEyeRenderDesc    EyeRenderDesc[2];
-    Matrix4f            Projection[2];      // Projection matrix for eye.
-    Matrix4f            OrthoProjection[2]; // Projection for 2D.
+    Matrix4f            Projection[2];          // Projection matrix for eye.
+    Matrix4f            OrthoProjection[2];     // Projection for 2D.
     ovrTexture          EyeTexture[2];
+    Sizei               EyeRenderSize[2];       // Saved render eye sizes; base for dynamic sizing.
     // Sensor caps applied.
     unsigned            StartSensorCaps;    
     bool                UsingDebugHmd;

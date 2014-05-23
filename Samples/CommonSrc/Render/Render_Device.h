@@ -83,6 +83,7 @@ enum BuiltinShaders
     VShader_PostProcessMesh                         ,
     VShader_PostProcessMeshTimewarp                 ,
     VShader_PostProcessMeshPositionalTimewarp       ,
+    VShader_PostProcessHeightmapTimewarp            ,
     VShader_Count                                   ,
                                                     
     FShader_Solid                                   = 0,
@@ -96,6 +97,7 @@ enum BuiltinShaders
     FShader_PostProcessMeshWithChromAb              ,
     FShader_PostProcessMeshWithChromAbTimewarp      ,
     FShader_PostProcessMeshWithChromAbPositionalTimewarp ,
+    FShader_PostProcessHeightmapTimewarp            ,
     FShader_Count                                   ,
 };
 
@@ -151,6 +153,12 @@ enum SampleMode
     Sample_Count        =13,
 };
 
+enum MeshType
+{
+    Mesh_Scene,
+    Mesh_Distortion,
+    Mesh_Heightmap,
+};
 
 struct Color4f
 {
@@ -354,7 +362,12 @@ public:
 	virtual void* GetInternalImplementation() { return NULL; };
 };
 
-
+struct RenderTarget
+{
+    Ptr<Texture>        pColorTex;
+    Ptr<Texture>        pDepthTex;
+    Sizei               Size;
+};
 
 //-----------------------------------------------------------------------------------
 
@@ -438,7 +451,7 @@ struct Vertex
 
     Vertex (const Vector3f& p, const Color& c = Color(64,0,0,255), 
             float u = 0, float v = 0, Vector3f n = Vector3f(1,0,0))
-      : Pos(p), C(c), U(u), V(v), Norm(n), U2(u), V2(v) {}
+      : Pos(p), C(c), U(u), V(v), U2(u), V2(v), Norm(n) {}
     Vertex(float x, float y, float z, const Color& c = Color(64,0,0,255),
            float u = 0, float v = 0) : Pos(x,y,z), C(c), U(u), V(v), U2(u), V2(v) { }
 
@@ -459,6 +472,12 @@ struct DistortionVertex
     Vector2f TexG;
     Vector2f TexB;
     Color Col;
+};
+
+struct HeightmapVertex
+{
+    Vector2f Pos;
+    Vector3f Tex;
 };
 
 // this is stored in a uniform buffer, don't change it without fixing all renderers
@@ -685,6 +704,7 @@ enum PostProcessType
     PostProcess_MeshDistortion,
     PostProcess_MeshDistortionTimewarp,
     PostProcess_MeshDistortionPositionalTimewarp,
+    PostProcess_MeshDistortionHeightmapTimewarp,
     PostProcess_NoDistortion,
 };
 
@@ -701,11 +721,11 @@ struct DisplayId
     String MonitorName; // Monitor name for fullscreen mode
     
     // MacOS
-    long   CgDisplayId; // CGDirectDisplayID
+    int   CgDisplayId; // CGDirectDisplayID
     
     DisplayId() : CgDisplayId(0) {}
-    DisplayId(long id) : CgDisplayId(id) {}
-    DisplayId(String m, long id=0) : MonitorName(m), CgDisplayId(id) {}
+    DisplayId(int id) : CgDisplayId(id) {}
+    DisplayId(String m, int id=0) : MonitorName(m), CgDisplayId(id) {}
     
     operator bool () const
     {
@@ -754,6 +774,7 @@ protected:
     PostProcessType     PostProcessingType;
 
     Ptr<ShaderSet>      pPostProcessShader;
+    Ptr<ShaderSet>      pPostProcessHeightmapShader;
     Ptr<Buffer>         pFullScreenVertexBuffer;
     Color               DistortionClearColor;
     UPInt		        TotalTextureMemoryUsage;
@@ -763,8 +784,14 @@ protected:
     Ptr<Buffer>         pDistortionMeshVertexBuffer[2];
     Ptr<Buffer>         pDistortionMeshIndexBuffer[2];
 
+    int                 HeightmapMeshNumTris[2];
+    Ptr<Buffer>         pHeightmapMeshVertexBuffer[2];
+    Ptr<Buffer>         pHeightmapMeshIndexBuffer[2];
+
     // For lighting on platforms with uniform buffers
     Ptr<Buffer>         LightingBuffer;
+
+    RenderTarget        HeightmapTimewarpRTs[2];  // one for each eye
 
 public:
     enum CompareFunc
@@ -784,7 +811,11 @@ public:
 
     virtual void Init() {}
     virtual void Shutdown();
-    virtual bool SetParams(const RendererParams&) { return 0; }
+    virtual bool SetParams(const RendererParams& rp)
+    {
+        Params = rp;
+        return true;
+    }
 
     const RendererParams& GetParams() const { return Params; }
 
@@ -859,10 +890,11 @@ public:
     virtual void ApplyPostProcess(Matrix4f const &matNowFromWorldStart,   Matrix4f const &matNowFromWorldEnd,
                                   Matrix4f const &matRenderFromWorldLeft, Matrix4f const &matRenderFromWorldRight,
                                   StereoEyeParams const &stereoParamsLeft, StereoEyeParams const &stereoParamsRight,
-                                  Ptr<Texture> pSourceTextureLeftOrOnly,
-                                  Ptr<Texture> pSourceTextureRight,
-                                  Ptr<Texture> pSourceTextureLeftOrOnlyDepth,
-                                  Ptr<Texture> pSourceTextureRightDepth);
+                                  RenderTarget* pHmdSpaceLayerRenderTargetLeftOrBothEyes,
+                                  RenderTarget* pHmdSpaceLayerRenderTargetRight,
+                                  RenderTarget* pStaticLayerRenderTargetLeftOrBothEyes,
+                                  RenderTarget* pStaticLayerRenderTargetRight);
+
     // Finish scene.
     virtual void FinishScene();
 
@@ -870,6 +902,12 @@ public:
     // NULL depth buffer means use an internal, temporary one.
     virtual void SetRenderTarget(Texture* color, Texture* depth = NULL, Texture* stencil = NULL)
     { OVR_UNUSED3(color, depth, stencil); }
+    void SetRenderTarget(const RenderTarget& renderTarget)
+    {
+        SetRenderTarget(renderTarget.pColorTex, renderTarget.pDepthTex);
+    }
+    // go to back buffer
+    void SetDefaultRenderTarget() { SetRenderTarget(NULL, NULL); }
     virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less) = 0;
     virtual void SetProjection(const Matrix4f& proj);
     virtual void SetWorldUniforms(const Matrix4f& proj) = 0;
@@ -887,7 +925,7 @@ public:
     virtual void Render(const Matrix4f& matrix, Model* model) = 0;
     // offset is in bytes; indices can be null.
     virtual void Render(const Fill* fill, Buffer* vertices, Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false) = 0;
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene) = 0;
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) = 0;
 
@@ -913,7 +951,11 @@ public:
     }
 
     // Don't call these directly, use App/Platform instead
-    virtual bool SetFullscreen(DisplayMode fullscreen) { OVR_UNUSED(fullscreen); return false; }
+    virtual bool SetFullscreen(DisplayMode fullscreen)
+    {
+        Params.Fullscreen = fullscreen;
+        return true;
+    }
     virtual void SetWindowSize(int w, int h)
 	{
 		WindowWidth = w;
@@ -932,6 +974,7 @@ public:
         PostProcessShader_MeshDistortionAndChromAb,
         PostProcessShader_MeshDistortionAndChromAbTimewarp,
         PostProcessShader_MeshDistortionAndChromAbPositionalTimewarp,
+        PostProcessShader_MeshDistortionAndChromAbHeightmapTimewarp,
         PostProcessShader_Count
     };
 

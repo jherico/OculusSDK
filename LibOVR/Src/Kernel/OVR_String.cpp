@@ -569,7 +569,7 @@ StringBuffer::StringBuffer(UPInt growSize)
 StringBuffer::StringBuffer(const char* data)
     : pData(NULL), Size(0), BufferSize(0), GrowSize(OVR_SBUFF_DEFAULT_GROW_SIZE), LengthIsSize(false)
 {
-    *this = data;
+    AppendString(data);
 }
 
 StringBuffer::StringBuffer(const char* data, UPInt dataSize)
@@ -585,10 +585,9 @@ StringBuffer::StringBuffer(const String& src)
 }
 
 StringBuffer::StringBuffer(const StringBuffer& src)
-    : pData(NULL), Size(0), BufferSize(src.GetGrowSize()), GrowSize(OVR_SBUFF_DEFAULT_GROW_SIZE), LengthIsSize(false)
+    : pData(NULL), Size(0), BufferSize(0), GrowSize(OVR_SBUFF_DEFAULT_GROW_SIZE), LengthIsSize(false)
 {
     AppendString(src.ToCStr(), src.GetSize());
-    LengthIsSize = src.LengthIsSize;
 }
 
 StringBuffer::StringBuffer(const wchar_t* data)
@@ -726,6 +725,12 @@ void      StringBuffer::operator = (const String& src)
 {
     Resize(src.GetSize());
     memcpy(pData, src.ToCStr(), src.GetSize());
+}
+
+void      StringBuffer::operator = (const StringBuffer& src)
+{
+	Clear();
+	AppendString(src.ToCStr(), src.GetSize());
 }
 
 

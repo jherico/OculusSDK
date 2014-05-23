@@ -253,7 +253,7 @@ private:
 public:
 	SensorFilterBodyFrame(int capacity = SensorFilterBase<Vector3d>::DefaultCapacity) 
         : SensorFilterBase<Vector3d>(capacity), gain(2.5), 
-        output(), Q(), runningTotalLengthSq(0) { };
+        runningTotalLengthSq(0), Q(), output()  { };
 
     // return the scalar variance of the filter values (rotated to be in the same frame)
     double Variance() const

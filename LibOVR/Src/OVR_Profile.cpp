@@ -161,7 +161,7 @@ bool ProfileManager::GetDeviceTags(const DeviceBase* device, String& product, St
 
             // If the HMD is unrecognized then use the name stamped into the
             // sensor firmware
-            if (hmdinfo.HmdType == HmdType_None || hmdinfo.Type == HmdType_Unknown)
+            if (hmdinfo.HmdType == HmdType_None || hmdinfo.HmdType == HmdType_Unknown)
                 product_name = sinfo.ProductName.ToCStr();
             else
                 product_name = hmdinfo.ProductName.ToCStr();
@@ -758,7 +758,7 @@ Profile* ProfileManager::GetTaggedProfile(const char** tag_names, const char** t
     JSON* tagged_data = ProfileCache->GetItemByName("TaggedData");
     OVR_ASSERT(tagged_data);
     if (tagged_data == NULL)
-        return false;
+        return NULL;
     
     Profile* profile = new Profile();
     
@@ -1450,7 +1450,7 @@ void Profile::SetFloatValues(const char* key, const float* vals, int num_vals)
         ValMap.Set(key, value);
     }
 
-    for (val_count; val_count < num_vals; val_count++)
+    for (; val_count < num_vals; val_count++)
         value->AddArrayNumber(vals[val_count]);
 }
 
@@ -1510,7 +1510,7 @@ void Profile::SetDoubleValues(const char* key, const double* vals, int num_vals)
         ValMap.Set(key, value);
     }
 
-    for (val_count; val_count < num_vals; val_count++)
+    for (; val_count < num_vals; val_count++)
         value->AddArrayNumber(vals[val_count]);
 }
 

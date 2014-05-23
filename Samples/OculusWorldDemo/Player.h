@@ -61,7 +61,7 @@ public:
 	Anglef				BodyYaw;
 
     // Where the player head is positioned and oriented in the real world
-    Posef               HeadPose;
+    Transformf          HeadPose;
 
     // Where the avatar head is positioned and oriented in the virtual world
     Vector3f            GetPosition();
@@ -69,7 +69,7 @@ public:
 
     // Returns virtual world position based on a real world head pose.
     // Allows predicting eyes separately based on scanout time.
-    Posef               VirtualWorldPoseFromRealPose(const Posef &sensorHeadPose);
+    Transformf          VirtualWorldTransformfromRealPose(const Transformf &sensorHeadPose);
 
     // Handle directional movement. Returns 'true' if movement was processed.
     bool                HandleMoveKey(OVR::KeyCode key, bool down);

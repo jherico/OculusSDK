@@ -121,29 +121,53 @@ typedef enum
 } ovrHmdType;
 
 // HMD capability bits reported by device.
+// 
 typedef enum
 {
+    // Read-only flags.
     ovrHmdCap_Present           = 0x0001,   //  This HMD exists (as opposed to being unplugged).
     ovrHmdCap_Available         = 0x0002,   //  HMD and is sensor is available for use
-                                            //  (if not owned by another app).    
-    ovrHmdCap_Orientation       = 0x0010,   //  Support orientation tracking (IMU).
-    ovrHmdCap_YawCorrection     = 0x0020,   //  Supports yaw correction through magnetometer or other means.
-    ovrHmdCap_Position          = 0x0040,   //  Supports positional tracking.
+                                            //  (if not owned by another app).       
+
+    // These flags are intended for use with the new driver display mode.
+    /*
+    ovrHmdCap_ExtendDesktop     = 0x0004,   // Read only, means display driver is in compatibility mode.
+
+    ovrHmdCap_DisplayOff        = 0x0040,   // Turns off Oculus HMD screen and output.
+    ovrHmdCap_NoMirrorToWindow  = 0x2000,   // Disables mirrowing of HMD output to the window;
+                                            // may improve rendering performance slightly.
+    */
+
+    // Modifiable flags (through ovrHmd_SetEnabledCaps).
     ovrHmdCap_LowPersistence    = 0x0080,   //  Supports low persistence mode.
-	ovrHmdCap_LatencyTest       = 0x0100,   //  Supports pixel reading for continous latency testing.
+	ovrHmdCap_LatencyTest       = 0x0100,   //  Supports pixel reading for continuous latency testing.
     ovrHmdCap_DynamicPrediction = 0x0200,   //  Adjust prediction dynamically based on DK2 Latency.
-
     // Support rendering without VSync for debugging
-    ovrHmdCap_NoVSync           = 0x1000
-} ovrHmdCapBits;
+    ovrHmdCap_NoVSync           = 0x1000,
+	ovrHmdCap_NoRestore         = 0x4000,
 
-// Describes distortion rendering parameters for ovrHmd_ConfigureRenderAPI or for
-// ovrHmd_GenerateDistortionMesh.
+    // These bits can be modified by ovrHmd_SetEnabledCaps.
+    ovrHmdCap_Writable_Mask     = 0x1380
+} ovrHmdCaps;
+
+
+// Sensor capability bits reported by device.
+// Used with ovrHmd_StartSensor.
+typedef enum
+{
+    ovrSensorCap_Orientation    = 0x0010,   //  Supports orientation tracking (IMU).
+    ovrSensorCap_YawCorrection  = 0x0020,   //  Supports yaw correction through magnetometer or other means.
+    ovrSensorCap_Position       = 0x0040,   //  Supports positional tracking.
+
+} ovrSensorCaps;
+
+// Distortion capability bits reported by device.
+// Used with ovrHmd_ConfigureRendering and ovrHmd_CreateDistortionMesh.
 typedef enum
 {        
-    ovrDistortion_Chromatic = 0x01,
-    ovrDistortion_TimeWarp	= 0x02,
-    ovrDistortion_Vignette  = 0x08
+    ovrDistortionCap_Chromatic	= 0x01,		//	Supports chromatic aberration correction.
+    ovrDistortionCap_TimeWarp	= 0x02,		//	Supports timewarp.
+    ovrDistortionCap_Vignette	= 0x08		//	Supports vignetting around the edges of the view.
 } ovrDistortionCaps;
 
 
@@ -171,8 +195,11 @@ typedef struct ovrHmdDesc_
     const char* ProductName;    
     const char* Manufacturer;
 
-    // Capability bits described by ovrHmdCapBits.
-    unsigned int Caps;
+    // Capability bits described by ovrHmdCaps.
+    unsigned int HmdCaps;
+	// Capability bits described by ovrSensorCaps.
+    unsigned int SensorCaps;
+    // Capability bits described by ovrDistortionCaps.
     unsigned int DistortionCaps;
 
     // Resolution of the entire HMD screen (for both eyes) in pixels.
@@ -197,7 +224,7 @@ typedef struct ovrHmdDesc_
     // Windows: "\\\\.\\DISPLAY3", etc. Can be used in EnumDisplaySettings/CreateDC.    
     const char* DisplayDeviceName;
     // MacOS
-    long        DisplayId;
+    int        DisplayId;
 } ovrHmdDesc;
 
 // Describes the type of positional tracking being done.
@@ -221,7 +248,7 @@ typedef enum
 } ovrStatusBits;
 
 
-// State of the sensor at given a absolute time.
+// State of the sensor at a given absolute time.
 typedef struct ovrSensorState_
 {
     // Predicted pose configuration at requested absolute time.
@@ -283,27 +310,16 @@ typedef struct ovrFrameTiming_
 
 
 
-
-// Describes an eye for ovrHmd_Configure().
-// Configure will generate more complete ovrEyeRenderDesc based on this data.
-// Users must fill in both render target TextureSize and a RenderViewport within it
-// to specify the rectangle from which pre-distorted eye image will be taken.
-// A different RenderViewport may be used during rendering by specifying either
+// Rendering information for each eye, computed by either ovrHmd_ConfigureRendering().
+// or ovrHmd_GetRenderDesc() based on the specified Fov.
+// Note that the rendering viewport is not included here as it can be 
+// specified separately and modified per frame though:
 //    (a) calling ovrHmd_GetRenderScaleAndOffset with game-rendered api,
 // or (b) passing different values in ovrTexture in case of SDK-rendered distortion.
-typedef struct ovrEyeDesc_
-{    
-    ovrEyeType  Eye;
-    ovrSizei    TextureSize;     // Absolute size of render texture.
-    ovrRecti    RenderViewport;  // Viewport within texture where eye rendering takes place.
-                                 // If specified as (0,0,0,0), it will be initialized to TextureSize.
-    ovrFovPort  Fov;
-} ovrEyeDesc;
-
-// Rendering information for each eye, computed by ovrHmd_Configure().
 typedef struct ovrEyeRenderDesc_
 {    
-    ovrEyeDesc  Desc;        
+    ovrEyeType  Eye;
+    ovrFovPort  Fov;
 	ovrRecti	DistortedViewport; 	        // Distortion viewport 
     ovrVector2f PixelsPerTanAngleAtCenter;  // How many display pixels will fit in tan(angle) = 1.
     ovrVector3f ViewAdjust;  		        // Translation to be applied to view matrix.
@@ -353,7 +369,7 @@ typedef struct ovrRenderAPIConfig_
 //  - If RenderViewport is all zeros, will be used.
 typedef struct ovrTextureHeader_
 {
-    ovrRenderAPIType API;
+    ovrRenderAPIType API;    
     ovrSizei         TextureSize;
     ovrRecti         RenderViewport;  // Pixel viewport in texture that holds eye image.
 } ovrTextureHeader;
@@ -425,20 +441,32 @@ OVR_EXPORT const char* ovrHmd_GetLastError(ovrHmd hmd);
 
 
 //-------------------------------------------------------------------------------------
+
+// Returns capability bits that are enabled at this time; described by ovrHmdCaps.
+// Note that this value is different font ovrHmdDesc::HmdCaps, which describes what
+// capabilities are available.
+OVR_EXPORT unsigned int ovrHmd_GetEnabledCaps(ovrHmd hmd);
+
+// Modifies capability bits described by ovrHmdCaps that can be modified,
+// such as ovrHmd_LowPersistance.
+OVR_EXPORT void         ovrHmd_SetEnabledCaps(ovrHmd hmd, unsigned int hmdCaps);
+
+
+//-------------------------------------------------------------------------------------
 // ***** Sensor Interface
 
 // All sensor interface functions are thread-safe, allowing sensor state to be sampled
 // from different threads.
-
-// Starts sensor sampling, enabling specified capabilities, described by ovrHmdCapBits.
-//  - supportedCaps specifies support that is requested. The function will succeed even if,
-//    if these caps are not available (i.e. sensor or camera is unplugged). Support will
-//    automatically be enabled if such device is plugged in later. Software should check
-//    ovrSensorState.StatusFlags for real-time status.
-// - requiredCaps specify sensor capabilities required at the time of the call. If they
-//   are not available, the function will fail. Pass 0 if only specifying SupportedCaps.
-OVR_EXPORT ovrBool  ovrHmd_StartSensor(ovrHmd hmd, unsigned int supportedCaps,
-                                       unsigned int requiredCaps);
+// Starts sensor sampling, enabling specified capabilities, described by ovrSensorCaps.
+//  - supportedSensorCaps specifies support that is requested. The function will succeed 
+//	  even if these caps are not available (i.e. sensor or camera is unplugged). Support
+//    will automatically be enabled if such device is plugged in later. Software should
+//    check ovrSensorState.StatusFlags for real-time status.
+//  - requiredSensorCaps specify sensor capabilities required at the time of the call.
+//    If they are not available, the function will fail. Pass 0 if only specifying
+//    supportedSensorCaps.
+OVR_EXPORT ovrBool  ovrHmd_StartSensor(ovrHmd hmd,	unsigned int supportedSensorCaps,
+													unsigned int requiredSensorCaps);
 // Stops sensor sampling, shutting down internal resources.
 OVR_EXPORT void     ovrHmd_StopSensor(ovrHmd hmd);
 // Resets sensor orientation.
@@ -510,10 +538,9 @@ OVR_EXPORT ovrSizei ovrHmd_GetFovTextureSize(ovrHmd hmd, ovrEyeType eye, ovrFovP
 //  - distortionCaps describe distortion settings that will be applied.
 //
 OVR_EXPORT ovrBool ovrHmd_ConfigureRendering( ovrHmd hmd,
-                                              const ovrRenderAPIConfig* apiConfig,
-                                              unsigned int hmdCaps,
+                                              const ovrRenderAPIConfig* apiConfig,                                              
                                               unsigned int distortionCaps,
-                                              const ovrEyeDesc eyeDescIn[2],
+                                              const ovrFovPort eyeFovIn[2],
                                               ovrEyeRenderDesc eyeRenderDescOut[2] );
 
 
@@ -539,12 +566,12 @@ OVR_EXPORT void     ovrHmd_EndFrame(ovrHmd hmd);
 // HmdDesc.EyeRenderOrder[0] first.
 OVR_EXPORT ovrPosef ovrHmd_BeginEyeRender(ovrHmd hmd, ovrEyeType eye);
 
-// Marks the end of eye rendering and submits eye texture for display after it is ready.
+// Marks the end of eye rendering and submits the eye texture for display after it is ready.
 // Rendering viewport within the texture can change per frame if necessary.
-// Specified texture  may be presented immediately or wait till ovrHmd_EndFrame based
-// on implementation. The API may performs distortion and scaling internally.
+// Specified texture may be presented immediately or wait until ovrHmd_EndFrame based
+// on the implementation. The API performs distortion and scaling internally.
 // 'renderPose' will typically be the value returned from ovrHmd_BeginEyeRender, but can
-// be different if different pose was used for rendering.
+// be different if a different pose was used for rendering.
 OVR_EXPORT void     ovrHmd_EndEyeRender(ovrHmd hmd, ovrEyeType eye,
                                         ovrPosef renderPose, ovrTexture* eyeTexture);
 
@@ -572,7 +599,8 @@ OVR_EXPORT void     ovrHmd_EndEyeRender(ovrHmd hmd, ovrEyeType eye,
 // Computes distortion viewport, view adjust and other rendering for the specified
 // eye. This can be used instead of ovrHmd_ConfigureRendering to help setup rendering on
 // the game side.
-OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd, ovrEyeDesc eyeDesc);
+OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmd,
+                                                 ovrEyeType eyeType, ovrFovPort fov);
 
 
 // Describes a vertex used for distortion; this is intended to be converted into
@@ -604,12 +632,12 @@ typedef struct ovrDistortionMesh_
 // appropriate shaders based on their settings.
 // Distortion mesh data will be allocated and stored into the ovrDistortionMesh data structure,
 // which should be explicitly freed with ovrHmd_DestroyDistortionMesh.
-// uvScaleOffsetOut[] are filled in based on render target settings of eyeDesc.
+// Users should call ovrHmd_GetRenderScaleAndOffset to get uvScale and Offset values for rendering.
 // The function shouldn't fail unless theres is a configuration or memory error, in which case
 // ovrDistortionMesh values will be set to null.
-OVR_EXPORT ovrBool  ovrHmd_CreateDistortionMesh( ovrHmd hmd, ovrEyeDesc eyeDesc,
+OVR_EXPORT ovrBool  ovrHmd_CreateDistortionMesh( ovrHmd hmd,
+                                                 ovrEyeType eyeType, ovrFovPort fov,
                                                  unsigned int distortionCaps,
-                                                 ovrVector2f uvScaleOffsetOut[2], 
                                                  ovrDistortionMesh *meshData );
 
 // Frees distortion mesh allocated by ovrHmd_GenerateDistortionMesh. meshData elements
@@ -618,8 +646,8 @@ OVR_EXPORT void     ovrHmd_DestroyDistortionMesh( ovrDistortionMesh* meshData );
 
 // Computes updated 'uvScaleOffsetOut' to be used with a distortion if render target size or
 // viewport changes after the fact. This can be used to adjust render size every frame, if desired.
-OVR_EXPORT void     ovrHmd_GetRenderScaleAndOffset( ovrHmd hmd, ovrEyeDesc eyeDesc,
-                                                    unsigned int distortionCaps,
+OVR_EXPORT void     ovrHmd_GetRenderScaleAndOffset( ovrFovPort fov,
+                                                    ovrSizei textureSize, ovrRecti renderViewport,
                                                     ovrVector2f uvScaleOffsetOut[2] );
 
 
@@ -640,7 +668,7 @@ OVR_EXPORT void     ovrHmd_EndFrameTiming(ovrHmd hmd);
 // Initializes and resets frame time tracking. This is typically not necessary, but
 // is helpful if game changes vsync state or video mode. vsync is assumed to be on if this
 // isn't called. Resets internal frame index to the specified number.
-OVR_EXPORT void     ovrHmd_ResetFrameTiming(ovrHmd hmd, unsigned int frameIndex, bool vsync);
+OVR_EXPORT void     ovrHmd_ResetFrameTiming(ovrHmd hmd, unsigned int frameIndex);
 
 
 // Predicts and returns Pose that should be used rendering the specified eye.

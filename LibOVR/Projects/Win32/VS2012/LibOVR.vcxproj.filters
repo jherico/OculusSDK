@@ -129,6 +129,7 @@
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp">
       <Filter>CAPI\GL</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Src\OVR_Recording.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Src\OVR_Device.h" />
@@ -282,6 +283,8 @@
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.h">
       <Filter>CAPI\GL</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Src\OVR_Recording.h" />
+    <ClInclude Include="..\..\..\Src\OVR_RecordingDefs.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Util">
@@ -300,7 +303,7 @@
       <UniqueIdentifier>{191043aa-7805-44f0-a0a4-02799289365c}</UniqueIdentifier>
     </Filter>
     <Filter Include="CAPI\GL">
-      <UniqueIdentifier>{c86c7070-6bf4-4ae4-b9bf-4c21d2ba9516}</UniqueIdentifier>
+      <UniqueIdentifier>{0e2e7bad-69a3-464a-9256-12114645638c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -474,6 +474,7 @@ public:
     void        operator =  (const char* str);
     void        operator =  (const wchar_t* str);
     void        operator =  (const String& src);
+    void        operator =  (const StringBuffer& src);
 
     // Addition
     void        operator += (const String& src)      { AppendString(src.ToCStr(),src.GetSize()); }

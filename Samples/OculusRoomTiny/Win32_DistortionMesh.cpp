@@ -61,16 +61,22 @@ static D3D11_INPUT_ELEMENT_DESC DistortionMeshVertexDesc[] =
 
 
 void DistortionMeshInit(unsigned distortionCaps, ovrHmd HMD,
-                        ovrEyeRenderDesc eyeRenderDesc[2], RenderDevice* pRender)
+                        ovrEyeRenderDesc eyeRenderDesc[2],
+                        ovrSizei textureSize, ovrRecti viewports[2],
+                        RenderDevice* pRender)
 {
     //Generate distortion mesh for each eye
     for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
     {
         // Allocate & generate distortion mesh vertices.
         ovrDistortionMesh meshData;
-        ovrHmd_CreateDistortionMesh(HMD, eyeRenderDesc[eyeNum].Desc, distortionCaps,
-                                    (ovrVector2f* ) DistortionData.UVScaleOffset[eyeNum],
-                                    &meshData);
+        ovrHmd_CreateDistortionMesh(HMD,
+                                    eyeRenderDesc[eyeNum].Eye, eyeRenderDesc[eyeNum].Fov,
+                                    distortionCaps, &meshData);
+
+        ovrHmd_GetRenderScaleAndOffset(eyeRenderDesc[eyeNum].Fov,
+                                       textureSize, viewports[eyeNum],
+                                       (ovrVector2f*) DistortionData.UVScaleOffset[eyeNum]);
 
         // Now parse the vertex data and create a render ready vertex buffer from it
         DistortionVertex * pVBVerts = (DistortionVertex*)OVR_ALLOC( 
@@ -119,7 +125,7 @@ void DistortionMeshInit(unsigned distortionCaps, ovrHmd HMD,
 
 
     // Choose the vertex shader, according to if you have timewarp enabled
-	if (distortionCaps & ovrDistortion_TimeWarp)
+	if (distortionCaps & ovrDistortionCap_TimeWarp)
 	{   // TIMEWARP
 		//--------------------------------------------------------------------------------------------
 		const char* vertexShader = 
@@ -188,14 +194,14 @@ void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
                           double timwarpTimePoint, ovrPosef eyeRenderPoses[2],
                           RenderDevice* pRender, Texture* pRendertargetTexture)
 {
- 	if (distortionCaps & ovrDistortion_TimeWarp)
+ 	if (distortionCaps & ovrDistortionCap_TimeWarp)
 	{   // TIMEWARP
         // Wait till time-warp to reduce latency.
 	    ovr_WaitTillTime(timwarpTimePoint);
 	}
 
 	// Clear screen
-    pRender->SetRenderTarget(NULL);
+    pRender->SetDefaultRenderTarget();
     pRender->SetFullViewport();
     pRender->Clear(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -212,10 +218,11 @@ void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
         DistortionData.Shaders->SetUniform2f("EyeToSourceUVOffset",
             DistortionData.UVScaleOffset[eyeNum][1].x, DistortionData.UVScaleOffset[eyeNum][1].y);
 
- 		if (distortionCaps & ovrDistortion_TimeWarp)
+ 		if (distortionCaps & ovrDistortionCap_TimeWarp)
 		{   // TIMEWARP - Additional shader constants required
 			ovrMatrix4f timeWarpMatrices[2];
 			ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum, eyeRenderPoses[eyeNum], timeWarpMatrices);
+			//WARNING!!! These matrices are transposed in SetUniform4x4f, before being used by the shader.
 			DistortionData.Shaders->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
 			DistortionData.Shaders->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
 		}
@@ -224,7 +231,7 @@ void DistortionMeshRender(unsigned distortionCaps, ovrHmd HMD,
                         DistortionData.MeshVBs[eyeNum], DistortionData.MeshIBs[eyeNum]);
     }
 
-    pRender->SetRenderTarget(NULL);
+    pRender->SetDefaultRenderTarget();
 }
 
 

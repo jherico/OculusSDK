@@ -94,7 +94,7 @@ public:
         {
             // pFunctionName may be not null here if function is called internally on the same thread.
             OVR_ASSERT_LOG((FirstThread == GetCurrentThreadId()),
-                ("%s (threadId=%d) called at the same times as %s (threadId=%d)\n",
+                ("%s (threadId=%p) called at the same times as %s (threadId=%p)\n",
                 functionName, GetCurrentThreadId(), pFunctionName, FirstThread) );
         }        
     }
@@ -146,6 +146,12 @@ public:
     ovrSensorState  PredictedSensorState(double absTime);
     bool            GetSensorDesc(ovrSensorDesc* descOut);
 
+    // Changes HMD Caps.
+    // Capability bits that are not directly or logically tied to one system (such as sensor)
+    // are grouped here. ovrHmdCap_VSync, for example, affects rendering and timing.
+    void            SetEnabledHmdCaps(unsigned caps);
+
+
     bool            ProcessLatencyTest(unsigned char rgbColorOut[3]);
     void            ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTime);
     
@@ -153,9 +159,8 @@ public:
     // *** Rendering Setup
 
     bool       ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
-                                  const ovrEyeDesc eyeDescIn[2],
-                                  const ovrRenderAPIConfig* apiConfig,
-                                  unsigned hmdCaps,
+                                  const ovrFovPort eyeFovIn[2],
+                                  const ovrRenderAPIConfig* apiConfig,                                  
                                   unsigned distortionCaps);  
     
     ovrPosef    BeginEyeRender(ovrEyeType eye);
@@ -191,23 +196,23 @@ public:
     {
         OVR_UNUSED1(functionName); // for Release build.
         OVR_ASSERT_LOG(BeginFrameCalled == true,
-                       ("%s called outside ovrHmd_BeginFrame."));
+                       ("%s called outside ovrHmd_BeginFrame.", functionName));
         OVR_ASSERT_LOG(BeginFrameThreadId == OVR::GetCurrentThreadId(),
-                       ("%s called on a different thread then ovrHmd_BeginFrame."));
+                       ("%s called on a different thread then ovrHmd_BeginFrame.", functionName));
     }
 
     void checkRenderingConfigured(const char* functionName)
     {
         OVR_UNUSED1(functionName); // for Release build.
         OVR_ASSERT_LOG(RenderingConfigured == true,
-                       ("%s called without ovrHmd_ConfigureRendering."));
+                       ("%s called without ovrHmd_ConfigureRendering.", functionName));
     }
 
     void checkBeginFrameTimingScope(const char* functionName)
     {
         OVR_UNUSED1(functionName); // for Release build.
         OVR_ASSERT_LOG(BeginFrameTimingCalled == true,
-                       ("%s called outside ovrHmd_BeginFrameTiming."));
+                       ("%s called outside ovrHmd_BeginFrameTiming.", functionName));
     }
 
 
@@ -215,6 +220,8 @@ public:
 
     void updateLowPersistenceMode(bool lowPersistence) const;
 	void updateLatencyTestForHmd(bool latencyTesting);
+
+    void updateDK2FeaturesTiedToSensor(bool sensorCreatedJustNow);
     
 	// Get properties by name.
 	float    getFloatValue(const char* propertyName, float defaultVal);
@@ -250,6 +257,12 @@ public:
     const OVR::HMDInfo&     HMDInfo;
 
     const char*             pLastError;
+
+    // Caps enabled for the HMD.
+    unsigned                EnabledHmdCaps;
+    // These are the flags actually applied to the Sensor device,
+    // used to track whether SetDisplayReport calls are necessary.
+    unsigned                HmdCapsAppliedToSensor;
 
     
     // *** Sensor

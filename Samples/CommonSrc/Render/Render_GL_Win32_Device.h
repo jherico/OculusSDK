@@ -42,13 +42,12 @@ class RenderDevice : public GL::RenderDevice
 
     HWND Window;
     HGLRC WglContext;
-    HDC GdiDc;
     Recti PreFullscreen;
     Recti FSDesktop;
     HMONITOR HMonitor;
 
 public:
-    RenderDevice(const Render::RendererParams& p, HWND win, HDC dc, HGLRC gl);
+    RenderDevice(const Render::RendererParams& p, HWND win, HGLRC gl);
     virtual ~RenderDevice() { Shutdown(); }
 
     // Implement static initializer function to create this class.

@@ -32,7 +32,6 @@ limitations under the License.
 namespace OVR { namespace CAPI { namespace D3D9 {
 
 
-
 #define PRECOMPILE_FLAG 0 
 #if !PRECOMPILE_FLAG
 //To make these, you need to run it with PRECOMPILE_FLAG, which also uses them, so good for debugging.
@@ -182,21 +181,25 @@ void DistortionRenderer::Create_Distortion_Models(void)
 {
 	//Make the distortion models
 	for (int eye=0;eye<2;eye++)
-	{
-		ovrVector2f dummy_UVScaleOffset[2];  //because it needs to be updated by a later call
+	{		
 		FOR_EACH_EYE * e = &eachEye[eye];
 		ovrDistortionMesh meshData;
-		ovrHmd_CreateDistortionMesh(HMD, RState.EyeRenderDesc[eye].Desc, distortionCaps,
-                                    dummy_UVScaleOffset, &meshData);
+		ovrHmd_CreateDistortionMesh(HMD,
+            RState.EyeRenderDesc[eye].Eye,
+            RState.EyeRenderDesc[eye].Fov,
+                                    distortionCaps,
+                                    &meshData);
 
 		e->numVerts = meshData.VertexCount;
 		e->numIndices = meshData.IndexCount;
 
-		device->CreateVertexBuffer( (e->numVerts)*sizeof(ovrDistortionVertex),0, 0,D3DPOOL_MANAGED, &e->dxVerts, NULL );
+		device->CreateVertexBuffer( (e->numVerts)*sizeof(ovrDistortionVertex),0, 0,
+                                    D3DPOOL_MANAGED, &e->dxVerts, NULL );
 		ovrDistortionVertex * dxv; 	e->dxVerts->Lock( 0, 0, (void**)&dxv, 0 );
 		for (int v=0;v<e->numVerts;v++) dxv[v] = meshData.pVertexData[v];
 
-		device->CreateIndexBuffer( (e->numIndices)*sizeof(u_short),0, D3DFMT_INDEX16,D3DPOOL_MANAGED, &e->dxIndices, NULL );
+		device->CreateIndexBuffer( (e->numIndices)*sizeof(u_short),0, D3DFMT_INDEX16,
+                                   D3DPOOL_MANAGED, &e->dxIndices, NULL );
 		unsigned short* dxi; e->dxIndices->Lock( 0, 0, (void**)&dxi, 0 );
 		for (int i=0;i<e->numIndices;i++) dxi[i] = meshData.pIndexData[i];
 
@@ -207,30 +210,6 @@ void DistortionRenderer::Create_Distortion_Models(void)
 /**********************************************************/
 void DistortionRenderer::RenderBothDistortionMeshes(void)
 {
-	//Record and set render state
-	numSavedStates=0;
-    RecordAndSetState(0, D3DSAMP_MINFILTER,          D3DTEXF_LINEAR );
-    RecordAndSetState(0, D3DSAMP_MAGFILTER,          D3DTEXF_LINEAR );
-    RecordAndSetState(0, D3DSAMP_MIPFILTER,          D3DTEXF_LINEAR );
-    RecordAndSetState(0, D3DSAMP_BORDERCOLOR,        0x000000 );
-    RecordAndSetState(0, D3DSAMP_ADDRESSU,           D3DTADDRESS_BORDER );
-    RecordAndSetState(0, D3DSAMP_ADDRESSV,           D3DTADDRESS_BORDER ); 
-	RecordAndSetState(1, D3DRS_MULTISAMPLEANTIALIAS, FALSE );
-	RecordAndSetState(1, D3DRS_DITHERENABLE,         FALSE );
-	RecordAndSetState(1, D3DRS_ZENABLE,              FALSE );
-    RecordAndSetState(1, D3DRS_ZWRITEENABLE,         TRUE   );
-    RecordAndSetState(1, D3DRS_ZFUNC,                D3DCMP_LESSEQUAL   );
-    RecordAndSetState(1, D3DRS_CULLMODE ,            D3DCULL_CCW  );
-   	RecordAndSetState(1, D3DRS_ALPHABLENDENABLE ,    FALSE );
-   	RecordAndSetState(1, D3DRS_DEPTHBIAS ,           0 );
-    RecordAndSetState(1, D3DRS_SRCBLEND ,            D3DBLEND_SRCALPHA );
-    RecordAndSetState(1, D3DRS_DESTBLEND ,           D3DBLEND_INVSRCALPHA   );
-   	RecordAndSetState(1, D3DRS_FILLMODE,             D3DFILL_SOLID );
-    RecordAndSetState(1, D3DRS_ALPHATESTENABLE,      FALSE);
- 	RecordAndSetState(1, D3DRS_DEPTHBIAS ,           0 );
-    RecordAndSetState(1, D3DRS_LIGHTING,             FALSE );
-   	RecordAndSetState(1, D3DRS_FOGENABLE,            FALSE );
-
 	for (int eye=0; eye<2; eye++)
 	{
 		FOR_EACH_EYE * e = &eachEye[eye];
@@ -243,13 +222,17 @@ void DistortionRenderer::RenderBothDistortionMeshes(void)
 		device->SetTexture( 0, e->texture);
 
 		//Choose which vertex shader, with associated additional inputs
-		if (distortionCaps & ovrDistortion_TimeWarp)
+		if (distortionCaps & ovrDistortionCap_TimeWarp)
 		{          
 			device->SetVertexShader( vertexShaderTimewarp );  
 
             ovrMatrix4f timeWarpMatrices[2];            
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eye,
                                           RState.EyeRenderPoses[eye], timeWarpMatrices);
+
+			//Need to transpose the matrices
+			timeWarpMatrices[0] = Matrix4f(timeWarpMatrices[0]).Transposed();
+			timeWarpMatrices[1] = Matrix4f(timeWarpMatrices[1]).Transposed();
 
             // Feed identity like matrices in until we get proper timewarp calculation going on
 			device->SetVertexShaderConstantF(4, (float *) &timeWarpMatrices[0],4);
@@ -260,58 +243,12 @@ void DistortionRenderer::RenderBothDistortionMeshes(void)
 			device->SetVertexShader( vertexShader );  
 		}
 
-
 		//Set up vertex shader constants
 		device->SetVertexShaderConstantF( 0, ( FLOAT* )&(e->UVScaleOffset[0]), 1 );
 		device->SetVertexShaderConstantF( 2, ( FLOAT* )&(e->UVScaleOffset[1]), 1 );
 
 		device->DrawIndexedPrimitive( D3DPT_TRIANGLELIST,0,0,e->numVerts,0,e->numIndices/3);
 	}
-
-	//Revert render state
-	RevertAllStates();
-
 }
-
-/*********************************************************************************/
-void DistortionRenderer::RecordAndSetState(int which, int type, DWORD newValue)
-{
-	SavedStateType * sst = &savedState[numSavedStates++];
-	sst->which = which;
-	sst->type = type;
-	if (which==0)
-	{
-		device->GetSamplerState( 0, (D3DSAMPLERSTATETYPE)type, &sst->valueToRevertTo);
-		device->SetSamplerState( 0, (D3DSAMPLERSTATETYPE)type, newValue);
-	}
-	else
-	{
-		device->GetRenderState( (D3DRENDERSTATETYPE)type, &sst->valueToRevertTo);
-		device->SetRenderState( (D3DRENDERSTATETYPE)type, newValue);
-	}
-}
-/*********************************************************************************/
-void DistortionRenderer::RevertAllStates(void)
-{
-	for (int i=0;i<numSavedStates;i++)
-	{
-		SavedStateType * sst = &savedState[i];
-		if (sst->which==0)
-		{
-			device->SetSamplerState( 0, (D3DSAMPLERSTATETYPE)sst->type, sst->valueToRevertTo);
-		}
-		else
-		{
-			device->SetRenderState( (D3DRENDERSTATETYPE)sst->type, sst->valueToRevertTo);
-		}
-	}
-}
-
-
-
-
-
-
-
 
 }}}

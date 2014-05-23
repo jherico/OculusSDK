@@ -118,7 +118,7 @@ struct FrameTimeRecordSet
     // Advances I to  absolute color index
     bool FindReadbackIndex(int* i, int readbackIndex) const
     {
-        for (; *i < RecordCount; *i++)
+        for (; *i < RecordCount; (*i)++)
         {
             if ((*this)[*i].ReadbackIndex == readbackIndex)
                 return true;

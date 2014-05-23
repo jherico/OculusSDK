@@ -413,9 +413,9 @@ DeviceManager* DeviceManager::Create()
     {
         if (manager->Initialize(0))
         {            
-            manager->AddFactory(&SensorDeviceFactory::Instance);
-            manager->AddFactory(&LatencyTestDeviceFactory::Instance);
-            manager->AddFactory(&Win32::HMDDeviceFactory::Instance);
+            manager->AddFactory(&SensorDeviceFactory::GetInstance());
+			manager->AddFactory(&LatencyTestDeviceFactory::GetInstance());
+			manager->AddFactory(&Win32::HMDDeviceFactory::GetInstance());
 			
             manager->AddRef();
         }

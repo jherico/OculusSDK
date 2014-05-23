@@ -5,7 +5,7 @@ Content     :   An output object for windows that can display raw images for tes
 Created     :   March 13, 2014
 Authors     :   Dean Beeler
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus, Inc. All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
@@ -27,9 +27,12 @@ limitations under the License.
 #ifndef UTIL_IMAGEWINDOW_H
 #define UTIL_IMAGEWINDOW_H
 
+#if defined(OVR_OS_WIN32)
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
 #include <d2d1.h>
+#include <dwrite.h>
+#endif
 
 #include "../../Include/OVR.h"
 #include "../Kernel/OVR_Hash.h"
@@ -41,8 +44,6 @@ limitations under the License.
 
 namespace OVR { namespace Util {
 
-class ImageWindow
-{
 	typedef struct 
 	{
 		float x;
@@ -61,44 +62,77 @@ class ImageWindow
 		float r;
 		float g;
 		float b;
-		WCHAR* text;
+	OVR::String text;
 	} TextPlot;
 
-	typedef struct
+class Frame : virtual public RefCountBaseV<Frame>
 	{
+public:
+
+	Frame( int frame ) :
+		frameNumber( frame ),
+		imageData( NULL ),
+		colorImageData( NULL ),
+		plots(),
+		textLines(),
+		width( 0 ),
+		height( 0 ),
+		colorPitch( 0 ),
+		ready( false )
+	{
+
+	}
+
+	~Frame()
+	{
+		if( imageData )
+			free( imageData );
+		if( colorImageData )
+			free( colorImageData );
+
+		plots.ClearAndRelease();
+		textLines.ClearAndRelease();
+	}
+
+	int						frameNumber;
+
 		Array<CirclePlot> plots;
+	Array<TextPlot>			textLines;
 		void*			  imageData;
 		void*			  colorImageData;
 		int				  width;
 		int				  height;
 		int				  colorPitch;
 		bool			  ready;
-	} Frame;
+};
 
-	static ID2D1Factory* pD2DFactory;
-
+#if defined(OVR_OS_WIN32)
+class ImageWindow
+{
 	HWND hWindow;
 	ID2D1RenderTarget* pRT;
 	D2D1_SIZE_U resolution;
 
 	Mutex*						frontBufferMutex;
 
-	InPlaceMutableDeque<Frame>	frames;
+	InPlaceMutableDeque< Ptr<Frame> >	frames;
 
 	ID2D1Bitmap*				greyBitmap;
 	ID2D1Bitmap*				colorBitmap;
-
+    
 public:
 	// constructors
 	ImageWindow();
-	ImageWindow( UINT width, UINT height );
+	ImageWindow( uint32_t width, uint32_t height );
 	virtual ~ImageWindow();
+
+	void GetResolution( size_t& width, size_t& height ) { width = resolution.width; height = resolution.height; }
 
 	void OnPaint(); // Called by Windows when it receives a WM_PAINT message
 
-	void UpdateImage( const UINT8* imageData, UINT width, UINT height ) { UpdateImageBW( imageData, width, height ); }
-	void UpdateImageBW( const UINT8* imageData, UINT width, UINT height );
-	void UpdateImageRGBA( const UINT8* imageData, UINT width, UINT height, UINT pitch );
+	void UpdateImage( const uint8_t* imageData, uint32_t width, uint32_t height ) { UpdateImageBW( imageData, width, height ); }
+	void UpdateImageBW( const uint8_t* imageData, uint32_t width, uint32_t height );
+	void UpdateImageRGBA( const uint8_t* imageData, uint32_t width, uint32_t height, uint32_t pitch );
 	void Complete(); // Called by drawing thread to submit a frame
 
 	void Process(); // Called by rendering thread to do window processing
@@ -106,17 +140,61 @@ public:
 	void AssociateSurface( void* surface );
 
 	void addCircle( float x , float y, float radius, float r, float g, float b, bool fill );
+	void addText( float x, float y, float r, float g, float b, OVR::String text );
 
-	static ImageWindow*			GlobalWindow() { return globalWindow; }
+	static ImageWindow*			GlobalWindow( int window ) { return globalWindow[window]; }
+	static int					WindowCount() { return windowCount; }
 
 private:
 
+	Ptr<Frame>					lastUnreadyFrame();
 
-	static ImageWindow*			globalWindow;
-
-	static bool running;
+	static const int			MaxWindows = 4;
+	static ImageWindow*			globalWindow[MaxWindows];
+	static int					windowCount;
+	static ID2D1Factory*		pD2DFactory;
+	static IDWriteFactory*		pDWriteFactory;
 };
 
+#else
+
+class ImageWindow
+{
+public:
+	// constructors
+	ImageWindow() {}
+	ImageWindow( uint32_t width, uint32_t height ) { OVR_UNUSED( width ); OVR_UNUSED( height ); }
+	virtual ~ImageWindow() { }
+
+	void GetResolution( size_t& width, size_t& height ) { width = 0; height = 0; }
+
+	void OnPaint() { }
+
+	void UpdateImage( const uint8_t* imageData, uint32_t width, uint32_t height ) { UpdateImageBW( imageData, width, height ); }
+	void UpdateImageBW( const uint8_t* imageData, uint32_t width, uint32_t height ) { }
+	void UpdateImageRGBA( const uint8_t* imageData, uint32_t width, uint32_t height, uint32_t pitch ) { }
+	void Complete() { }
+
+	void Process() { }
+
+	void AssociateSurface( void* surface ) { }
+
+	void addCircle( float x , float y, float radius, float r, float g, float b, bool fill ) { }
+	void addText( float x, float y, float r, float g, float b, OVR::String text ) { }
+
+	static ImageWindow*			GlobalWindow( int window ) { return globalWindow[window]; }
+	static int					WindowCount() { return windowCount; }
+
+private:
+
+	static const int			MaxWindows = 4;
+	static ImageWindow*			globalWindow[4];
+	static int					windowCount;
+};
+
+#endif
+
 }} // namespace OVR::Util
+
 
 #endif

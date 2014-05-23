@@ -44,7 +44,7 @@ class HMDDevice;
 class HMDDeviceFactory : public DeviceFactory
 {
 public:
-    static HMDDeviceFactory Instance;
+	static HMDDeviceFactory &GetInstance();
 
     // Enumerates devices, creating and destroying relevant objects in manager.
     virtual void EnumerateDevices(EnumerateVisitor& visitor);

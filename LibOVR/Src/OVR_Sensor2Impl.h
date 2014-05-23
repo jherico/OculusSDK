@@ -71,7 +71,6 @@ public:
 	virtual bool		GetMagCalibrationReport(MagCalibrationReport* data);
 
     virtual bool		SetPositionCalibrationReport(const PositionCalibrationReport& data);
-	        bool        GetPositionCalibrationReport(PositionCalibrationReport* data);
 	virtual bool        GetAllPositionCalibrationReports(Array<PositionCalibrationReport>* data);
 
     virtual bool		SetCustomPatternReport(const CustomPatternReport& data);
@@ -87,7 +86,6 @@ public:
     virtual bool		GetUUIDReport(UUIDReport* data);
 
     virtual bool		SetTemperatureReport(const TemperatureReport& data);
-            bool        GetTemperatureReport(TemperatureReport* data);
     virtual bool        GetAllTemperatureReports(Array<Array<TemperatureReport> >*);
 
     virtual bool        GetGyroOffsetReport(GyroOffsetReport* data);
@@ -111,6 +109,7 @@ protected:
 
     bool	            setPositionCalibrationReport(const PositionCalibrationReport& data);
     bool                getPositionCalibrationReport(PositionCalibrationReport* data);
+    bool                getAllPositionCalibrationReports(Array<PositionCalibrationReport>* data);
 
     bool	            setCustomPatternReport(const CustomPatternReport& data);
     bool                getCustomPatternReport(CustomPatternReport* data);
@@ -126,6 +125,7 @@ protected:
 
     bool		        setTemperatureReport(const TemperatureReport& data);
     bool		        getTemperatureReport(TemperatureReport* data);
+    bool                getAllTemperatureReports(Array<Array<TemperatureReport> >*);
 
     bool                getGyroOffsetReport(GyroOffsetReport* data);
 
@@ -146,10 +146,6 @@ protected:
     UInt32                  LastFrameTimestamp;
 
     SensorCalibration       *pCalibration;
-
-    // This lock is used to protect operations with auto-incrementing indices 
-    // (see TemperatureReport and PositionCalibrationReport)
-    Lock                    IndexedReportLock;
 };
 
 } // namespace OVR

@@ -24,12 +24,16 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include "../../Kernel/OVR_Types.h"
+
 #undef new
 
+#if defined (OVR_OS_WIN32)
 #if _MSC_VER < 1700
 #include <d3dx9.h>
 #else
 #include <d3d9.h>
+#endif
 #endif
 
 #if defined(OVR_DEFINE_NEW)
@@ -57,7 +61,7 @@ public:
 	
     // ***** Public DistortionRenderer interface
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
-                            unsigned hmdCaps, unsigned distortionCaps);
+                            unsigned distortionCaps);
 
     virtual void SubmitEye(int eyeId, ovrTexture* eyeTexture);
 
@@ -69,6 +73,32 @@ public:
 	// Similar to ovr_WaitTillTime but it also flushes GPU.
 	// Note, it exits when time expires, even if GPU is not in idle state yet.
 	double       WaitTillTimeAndFlushGpu(double absTime);
+
+protected:
+	
+	class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
+	{
+	public:
+		GraphicsState(IDirect3DDevice9* d);
+		virtual void Save();
+		virtual void Restore();
+
+	protected:
+		void RecordAndSetState(int which, int type, DWORD newValue);
+
+		//Structure to store our state changes
+		static const int MAX_SAVED_STATES=100;
+		struct SavedStateType
+		{
+			int which;  //0 for samplerstate, 1 for renderstate
+			int type;
+			DWORD valueToRevertTo;
+		} savedState[MAX_SAVED_STATES];
+
+		//Keep track of how many we've done, for reverting
+		int numSavedStates;
+		IDirect3DDevice9* device;
+	};
 
 private:
 
@@ -83,6 +113,7 @@ private:
 	
 	//Data, structures and pointers
 	IDirect3DDevice9            * device;
+	IDirect3DSwapChain9         * swapChain;
 	IDirect3DVertexDeclaration9 * vertexDecl;
 	IDirect3DPixelShader9       * pixelShader;
 	IDirect3DVertexShader9      * vertexShader;
@@ -92,29 +123,17 @@ private:
 
 	struct FOR_EACH_EYE
 	{
+        FOR_EACH_EYE() : TextureSize(0), RenderViewport(Sizei(0)) { }
+
 		IDirect3DVertexBuffer9  * dxVerts;
 		IDirect3DIndexBuffer9   * dxIndices;
 		int                       numVerts;
 		int                       numIndices;
 		IDirect3DTexture9       * texture;
 		ovrVector2f			 	  UVScaleOffset[2]; 
+        Sizei                     TextureSize;
+        Recti                     RenderViewport;
 	} eachEye[2];
-
-
-	//Structure to store our state changes
-	#define MAX_SAVED_STATES 100
-	struct SavedStateType
-	{
-		int which;  //0 for samplerstate, 1 for renderstate
-		int type;
-		DWORD valueToRevertTo;
-	} savedState[MAX_SAVED_STATES];
-
-	//Keep track of how many we've done, for reverting
-	int numSavedStates;
-
-
-
 };
 
 }}} // OVR::CAPI::D3D9

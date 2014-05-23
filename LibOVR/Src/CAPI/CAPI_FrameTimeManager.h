@@ -179,7 +179,7 @@ public:
 
     // Called with each new ConfigureRendering.
     void    ResetFrameTiming(unsigned frameIndex,
-                             bool vsyncEnabled, bool dynamicPrediction, bool sdkRender);
+                             bool dynamicPrediction, bool sdkRender);
 
     void    SetVsync(bool enabled) { VsyncEnabled = enabled; }
 
@@ -192,7 +192,7 @@ public:
     Timing  GetFrameTiming(unsigned frameIndex);
  
     double  GetEyePredictionTime(ovrEyeType eye);
-    Posef   GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
+    Transformf GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
 
     void    GetTimewarpPredictions(ovrEyeType eye, double timewarpStartEnd[2]); 
     void    GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2]);

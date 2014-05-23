@@ -21,8 +21,18 @@ otherwise accompanies this software in either electronic or hard copy form.
 // ***** GL Specific
 
 #if defined(OVR_OS_WIN32)
-#include <GL/gl.h>
-#include <GL/wglext.h>
+    #include <Windows.h>
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/wglext.h>
+#elif defined(OVR_OS_MAC)
+    #include <OpenGL/gl3.h>
+    #include <OpenGL/gl3ext.h>
+    #include <OpenGL/OpenGL.h>
+#else
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/glx.h>
 #endif
 
 
@@ -31,9 +41,13 @@ typedef struct ovrGLConfigData_s
 {
     // General device settings.
     ovrRenderAPIConfigHeader Header;
+
+#if defined(OVR_OS_WIN32)
     HWND   Window;
-    HGLRC  WglContext;
-    HDC    GdiDc;
+#elif defined(OVR_OS_LINUX)
+    Display* Disp;
+    Window  Win;
+#endif
 } ovrGLConfigData;
 
 union ovrGLConfig

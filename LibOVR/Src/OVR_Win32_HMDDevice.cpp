@@ -227,7 +227,11 @@ BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 //-------------------------------------------------------------------------------------
 // ***** HMDDeviceFactory
 
-HMDDeviceFactory HMDDeviceFactory::Instance;
+HMDDeviceFactory &HMDDeviceFactory::GetInstance()
+{
+	static HMDDeviceFactory instance;
+	return instance;
+}
 
 void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 {

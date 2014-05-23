@@ -68,6 +68,8 @@
     <ClInclude Include="..\..\..\Src\OVR_JSON.h" />
     <ClInclude Include="..\..\..\Src\OVR_LatencyTestImpl.h" />
     <ClInclude Include="..\..\..\Src\OVR_Profile.h" />
+    <ClInclude Include="..\..\..\Src\OVR_Recording.h" />
+    <ClInclude Include="..\..\..\Src\OVR_RecordingDefs.h" />
     <ClInclude Include="..\..\..\Src\OVR_Sensor2Impl.h" />
     <ClInclude Include="..\..\..\Src\OVR_Sensor2ImplUtil.h" />
     <ClInclude Include="..\..\..\Src\OVR_SensorCalibration.h" />
@@ -137,6 +139,7 @@
     <ClCompile Include="..\..\..\Src\OVR_JSON.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_LatencyTestImpl.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_Profile.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Recording.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_Sensor2Impl.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_SensorCalibration.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_SensorFilter.cpp" />
@@ -250,7 +253,7 @@
     </CustomBuild>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{720F6C5E-6DCF-495A-B25E-10540EA081A2}</ProjectGuid>
+    <ProjectGuid>{934B40C7-F40A-4E4C-97A7-B9659BE0A441}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>LibOVR</RootNamespace>
     <ProjectName>LibOVR</ProjectName>
@@ -342,7 +345,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../../../../3rdParty/glext/;$(DXSDK_DIR)/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DXSDK_DIR)/Include;../../../../3rdParty/glext/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -364,7 +367,7 @@
       <MinimalRebuild>false</MinimalRebuild>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../../../../3rdParty/glext/;$(DXSDK_DIR)/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DXSDK_DIR)/Include;../../../../3rdParty/glext/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OmitFramePointers>false</OmitFramePointers>
     </ClCompile>
     <Link>
@@ -388,7 +391,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
-      <AdditionalIncludeDirectories>../../../../3rdParty/glext/;$(DXSDK_DIR)/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DXSDK_DIR)/Include;../../../../3rdParty/glext/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
@@ -414,7 +417,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <OmitDefaultLibName>true</OmitDefaultLibName>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
-      <AdditionalIncludeDirectories>../../../../3rdParty/glext/;$(DXSDK_DIR)/Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(DXSDK_DIR)/Include;../../../../3rdParty/glext/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>

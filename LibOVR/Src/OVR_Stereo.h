@@ -75,8 +75,8 @@ struct FovPort
         UpTan(u), DownTan(d), LeftTan(l), RightTan(r) { }
 
     // C-interop support: FovPort <-> ovrFovPort (implementation in OVR_CAPI.cpp).
-    FovPort (const ovrFovPort &src);
-    operator const ovrFovPort () const;
+    FovPort(const ovrFovPort& src);
+    operator ovrFovPort () const;
 
 
     static FovPort CreateFromRadians(float horizontalFov, float verticalFov)

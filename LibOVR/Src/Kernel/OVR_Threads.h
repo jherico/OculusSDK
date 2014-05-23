@@ -392,7 +392,7 @@ protected:
     void                Init(const CreateParams& params);
 
     // Protected copy constructor
-    Thread(const Thread &source) { OVR_UNUSED(source); }
+    Thread(const Thread &source) : RefCountBase<Thread>() { OVR_UNUSED(source); }
 
 };
 

@@ -87,8 +87,8 @@ struct SensorConfigImpl
 
     UInt16  CommandId;
     UByte   Flags;
-    UInt16  PacketInterval;
-    UInt16  KeepAliveIntervalMs;
+    UInt16  PacketInterval;		// LDC - This should be a UByte. Fix when you have time to test it.
+    UInt16  SampleRate;
 
     SensorConfigImpl();
 

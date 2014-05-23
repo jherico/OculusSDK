@@ -125,7 +125,7 @@ template<class T> class Vector2;
 template<class T> class Vector3;
 template<class T> class Matrix3;
 template<class T> class Matrix4;
-template<class T> class Pose;
+template<class T> class Transform;
 template<class T> class PoseState;
 
 // CompatibleTypes::Type is used to lookup a compatible C-version of a C++ class.
@@ -140,7 +140,7 @@ struct CompatibleTypes
 // Specializations providing CompatibleTypes::Type value.
 template<> struct CompatibleTypes<Quat<float> >     { typedef ovrQuatf Type; };
 template<> struct CompatibleTypes<Quat<double> >    { typedef ovrQuatd Type; };
-template<> struct CompatibleTypes<Matrix3<double> >  { typedef ovrMatrix3d Type; };
+template<> struct CompatibleTypes<Matrix3<double> > { typedef ovrMatrix3d Type; };
 template<> struct CompatibleTypes<Matrix4<float> >  { typedef ovrMatrix4f Type; };
 template<> struct CompatibleTypes<Size<int> >       { typedef ovrSizei Type; };
 template<> struct CompatibleTypes<Size<float> >     { typedef ovrSizef Type; };
@@ -150,11 +150,11 @@ template<> struct CompatibleTypes<Vector2<float> >  { typedef ovrVector2f Type; 
 template<> struct CompatibleTypes<Vector3<float> >  { typedef ovrVector3f Type; };
 template<> struct CompatibleTypes<Vector3<double> > { typedef ovrVector3d Type; };
 
-template<> struct CompatibleTypes<Pose<float> >     { typedef ovrPosef Type; };
-template<> struct CompatibleTypes<PoseState<float> >{ typedef ovrPoseStatef Type; };
+template<> struct CompatibleTypes<Transform<float> > { typedef ovrPosef Type; };
+template<> struct CompatibleTypes<PoseState<float> > { typedef ovrPoseStatef Type; };
 
-template<> struct CompatibleTypes<Pose<double> >     { typedef ovrPosed Type; };
-template<> struct CompatibleTypes<PoseState<double> >{ typedef ovrPoseStated Type; };
+template<> struct CompatibleTypes<Transform<double> > { typedef ovrPosed Type; };
+template<> struct CompatibleTypes<PoseState<double> > { typedef ovrPoseStated Type; };
 
 //------------------------------------------------------------------------------------//
 // ***** Math
@@ -509,7 +509,7 @@ public:
     T       Length() const                       { return sqrt(LengthSq()); }
 
     // Returns squared distance between two points represented by vectors.
-    T       DistanceSq(Vector3& b) const         { return (*this - b).LengthSq(); }
+    T       DistanceSq(Vector3 const& b) const         { return (*this - b).LengthSq(); }
 
     // Returns distance between two points represented by vectors.
     T       Distance(Vector3 const& b) const     { return (*this - b).Length(); }
@@ -705,7 +705,7 @@ public:
     // C-interop support.
     Quat(const typename CompatibleTypes<Quat<T> >::Type& s) : x(s.x), y(s.y), z(s.z), w(s.w) { }
 
-    operator const typename CompatibleTypes<Quat<T> >::Type () const
+    operator typename CompatibleTypes<Quat<T> >::Type () const
     {
         typename CompatibleTypes<Quat<T> >::Type result;
         result.x = x;
@@ -1091,36 +1091,73 @@ typedef Quat<double> Quatd;
 // Position and orientation combined.
 
 template<class T>
-class Pose
+class Transform
 {
 public:
 
-    typedef typename CompatibleTypes<Pose<T> >::Type CompatibleType;
+    typedef typename CompatibleTypes<Transform<T> >::Type CompatibleType;
 
-    Pose() { }
-    Pose(const Quat<T>& orientation, const Vector3<T>& pos)
-        : Orientation(orientation), Position(pos) {  }
-    Pose(const Pose& s)
-        : Orientation(s.Orientation), Position(s.Position) {  }
-    Pose(const CompatibleType& s)
-        : Orientation(s.Orientation), Position(s.Position) {  }
-    explicit Pose(const Pose<typename Math<T>::OtherFloatType> &s)
-        : Orientation(s.Orientation), Position(s.Position) {  }
+    Transform() { }
+    Transform(const Quat<T>& orientation, const Vector3<T>& pos)
+        : Rotation(orientation), Translation(pos) {  }
+    Transform(const Transform& s)
+        : Rotation(s.Rotation), Translation(s.Translation) {  }
+    Transform(const CompatibleType& s)
+        : Rotation(s.Orientation), Translation(s.Position) {  }
+    explicit Transform(const Transform<typename Math<T>::OtherFloatType> &s)
+        : Rotation(s.Rotation), Translation(s.Translation) {  }
 
-    operator const typename CompatibleTypes<Pose<T> >::Type () const
+    operator typename CompatibleTypes<Transform<T> >::Type () const
     {
-        typename CompatibleTypes<Pose<T> >::Type result;
-        result.Orientation = Orientation;
-        result.Position = Position;
+        typename CompatibleTypes<Transform<T> >::Type result;
+        result.Orientation = Rotation;
+        result.Position = Translation;
         return result;
     }
 
-    Quat<T>    Orientation;
-    Vector3<T> Position;
+    Quat<T>    Rotation;
+    Vector3<T> Translation;
+
+    Vector3<T> Rotate(const Vector3<T>& v) const
+    {
+        return Rotation.Rotate(v);
+    }
+
+    Vector3<T> Translate(const Vector3<T>& v) const
+    {
+        return v + Translation;
+    }
+
+    Vector3<T> Apply(const Vector3<T>& v) const
+    {
+        return Translate(Rotate(v));
+    }
+
+    Transform operator*(const Transform& other) const   
+    {
+        return Transform(Rotation * other.Rotation, Apply(other.Translation));
+    }
+
+    PoseState<T> operator*(const PoseState<T>& poseState) const   
+    {
+        PoseState<T> result;
+        result.Pose                = (*this) * poseState.Pose;
+        result.LinearVelocity      = this->Rotate(poseState.LinearVelocity);
+        result.LinearAcceleration  = this->Rotate(poseState.LinearAcceleration);
+        result.AngularVelocity     = this->Rotate(poseState.AngularVelocity);
+        result.AngularAcceleration = this->Rotate(poseState.AngularAcceleration);
+        return result;
+    }
+
+    Transform Inverted() const   
+    {
+        Quat<T> inv = Rotation.Inverted();
+        return Transform(inv, inv.Rotate(-Translation));
+    }
 };
 
-typedef Pose<float>  Posef;
-typedef Pose<double> Posed;
+typedef Transform<float>  Transformf;
+typedef Transform<double> Transformd;
 
 
 //-------------------------------------------------------------------------------------
@@ -1204,10 +1241,10 @@ public:
         M[3][0] = 0;                       M[3][1] = 0;                       M[3][2] = 0;                       M[3][3] = 1;
     }
 
-    explicit Matrix4(const Pose<T>& p)
+    explicit Matrix4(const Transform<T>& p)
     {
-        Matrix4 result(p.Orientation);
-        result.SetTranslation(p.Position);
+        Matrix4 result(p.Rotation);
+        result.SetTranslation(p.Translation);
         *this = result;
     }
 
@@ -1226,7 +1263,7 @@ public:
         memcpy(M, s.M, sizeof(M));
     }
 
-    operator const typename CompatibleTypes<Matrix4<T> >::Type () const
+    operator typename CompatibleTypes<Matrix4<T> >::Type () const
     {
         typename CompatibleTypes<Matrix4<T> >::Type result;
         OVR_COMPILER_ASSERT(sizeof(result) == sizeof(Matrix4));
@@ -1879,10 +1916,10 @@ public:
         M[0][1] = M[0][2] = M[1][0] = M[1][2] = M[2][0] = M[2][1] = 0;
     }
 
-	explicit Matrix3(const Pose<T>& p)
+	explicit Matrix3(const Transform<T>& p)
 	{
-		Matrix3 result(p.Orientation);
-		result.SetTranslation(p.Position);
+		Matrix3 result(p.Rotation);
+		result.SetTranslation(p.Translation);
 		*this = result;
 	}
 
@@ -1901,7 +1938,7 @@ public:
 		memcpy(M, s.M, sizeof(M));
 	}
 
-	operator const typename CompatibleTypes<Matrix3<T> >::Type () const
+	operator typename CompatibleTypes<Matrix3<T> >::Type () const
 	{
 		typename CompatibleTypes<Matrix3<T> >::Type result;
 		OVR_COMPILER_ASSERT(sizeof(result) == sizeof(Matrix3));

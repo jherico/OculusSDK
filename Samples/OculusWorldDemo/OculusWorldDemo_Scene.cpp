@@ -332,7 +332,7 @@ void OculusWorldDemoApp::RenderGrid(ovrEyeType eye)
     case Grid_Lens:
         {                           
             lineStep = 48;
-            Vector2f rendertargetNDC = FovPort(EyeRenderDesc[eye].Desc.Fov).TanAngleToRendertargetNDC(Vector2f(0.0f));
+            Vector2f rendertargetNDC = FovPort(EyeRenderDesc[eye].Fov).TanAngleToRendertargetNDC(Vector2f(0.0f));
             midX    = (int)( ( rendertargetNDC.x * 0.5f + 0.5f ) * (float)renderViewport.w + 0.5f );
             midY    = (int)( ( rendertargetNDC.y * 0.5f + 0.5f ) * (float)renderViewport.h + 0.5f );
             limitX  = Alg::Max ( renderViewport.w - midX, midX );

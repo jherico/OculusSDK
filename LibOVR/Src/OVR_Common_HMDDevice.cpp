@@ -143,6 +143,7 @@ bool HMDDeviceCreateDesc::GetDeviceInfo(DeviceInfo* info) const
         case HmdType_DKHDProto566Mi:   deviceName = "Oculus Rift DKHD 566 Mi";  break;
         case HmdType_CrystalCoveProto: deviceName = "Oculus Rift Crystal Cove"; break;
         case HmdType_DK2:              deviceName = "Oculus Rift DK2";          break;
+        default:                       deviceName = "Oculus HMD";               break;
     }
    
     info->ProductName = deviceName;

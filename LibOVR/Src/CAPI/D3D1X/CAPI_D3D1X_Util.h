@@ -41,6 +41,7 @@ limitations under the License.
 #include "../../Kernel/OVR_Array.h"
 #include "../../Kernel/OVR_Math.h"
 
+#if defined(OVR_OS_WIN32)
 #include <Windows.h>
 #include <comdef.h> // for _COM_SMARTPTR_TYPEDEF()
 
@@ -77,6 +78,7 @@ limitations under the License.
     #define IID_ID3D1xShaderReflection  IID_ID3D11ShaderReflection
     #include <d3d11.h>
     #include <D3D11Shader.h>
+#endif
 #endif
 
 

@@ -619,10 +619,8 @@ HIDDeviceManager* HIDDeviceManager::CreateInternal(Win32::DeviceManager* devMana
 // ***** Creation
 
 // Creates a new HIDDeviceManager and initializes OVR.
-HIDDeviceManager* HIDDeviceManager::Create()
+HIDDeviceManager* HIDDeviceManager::Create(Ptr<OVR::DeviceManager>& deviceManager)
 {
-    OVR_ASSERT_LOG(false, ("Standalone mode not implemented yet."));
-
     if (!System::IsInitialized())
     {
         // Use custom message, since Log is not yet installed.
@@ -631,21 +629,21 @@ HIDDeviceManager* HIDDeviceManager::Create()
         return 0;
     }
 
-    Ptr<Win32::HIDDeviceManager> manager = *new Win32::HIDDeviceManager(NULL);
+    Ptr<Win32::DeviceManager> deviceManagerWin32 = *new Win32::DeviceManager;
 
-    if (manager)
+    if (!deviceManagerWin32)
     {
-        if (manager->Initialize())
-        {
-            manager->AddRef();
-        }
-        else
-        {
-            manager.Clear();
-        }
+		return NULL;
+	}
+
+	if (!deviceManagerWin32->Initialize(0))
+    {         
+		return NULL;
     }
 
-    return manager.GetPtr();
+	deviceManager = deviceManagerWin32;
+
+	return deviceManagerWin32->GetHIDDeviceManager();
 }
 
 } // namespace OVR

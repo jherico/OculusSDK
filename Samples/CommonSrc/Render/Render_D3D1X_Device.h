@@ -265,6 +265,7 @@ public:
     Ptr<ID3D1xDepthStencilState> CurDepthState;
     Ptr<ID3D1xInputLayout>      ModelVertexIL;
     Ptr<ID3D1xInputLayout>      DistortionVertexIL;
+    Ptr<ID3D1xInputLayout>      HeightmapVertexIL;
 
     Ptr<ID3D1xSamplerState>     SamplerStates[Sample_Count];
 
@@ -351,7 +352,7 @@ public:
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false);
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(   const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                     const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
 

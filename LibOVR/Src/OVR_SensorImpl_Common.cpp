@@ -124,7 +124,7 @@ void SensorRangeImpl::Unpack()
 }
 
 SensorConfigImpl::SensorConfigImpl() 
-    :   CommandId(0), Flags(0), PacketInterval(0), KeepAliveIntervalMs(0)
+    :   CommandId(0), Flags(0), PacketInterval(0), SampleRate(0)
 {
     memset(Buffer, 0, PacketSize);
     Buffer[0] = 2;
@@ -147,16 +147,16 @@ void SensorConfigImpl::Pack()
     Buffer[2] = UByte(CommandId >> 8);
     Buffer[3] = Flags;
     Buffer[4] = UByte(PacketInterval);
-    Buffer[5] = UByte(KeepAliveIntervalMs & 0xFF);
-    Buffer[6] = UByte(KeepAliveIntervalMs >> 8);
+    Buffer[5] = UByte(SampleRate & 0xFF);
+    Buffer[6] = UByte(SampleRate >> 8);
 }
 
 void SensorConfigImpl::Unpack()
 {
-    CommandId          = Buffer[1] | (UInt16(Buffer[2]) << 8);
-    Flags              = Buffer[3];
-    PacketInterval     = Buffer[4];
-    KeepAliveIntervalMs= Buffer[5] | (UInt16(Buffer[6]) << 8);
+    CommandId		= Buffer[1] | (UInt16(Buffer[2]) << 8);
+    Flags			= Buffer[3];
+    PacketInterval	= Buffer[4];
+    SampleRate		= Buffer[5] | (UInt16(Buffer[6]) << 8);
 }
 
 SensorFactoryCalibrationImpl::SensorFactoryCalibrationImpl() 

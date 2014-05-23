@@ -29,6 +29,7 @@ limitations under the License.
 
 #include "OVR_HIDDeviceImpl.h"
 #include "OVR_SensorTimeFilter.h"
+#include "OVR_Device.h"
 
 #ifdef OVR_OS_ANDROID
 #include "OVR_PhoneSensors.h"
@@ -44,7 +45,7 @@ class ExternalVisitor;
 class SensorDeviceFactory : public DeviceFactory
 {
 public:
-    static SensorDeviceFactory Instance;
+	static SensorDeviceFactory &GetInstance();
 
     // Enumerates devices, creating and destroying relevant objects in manager.
     virtual void EnumerateDevices(EnumerateVisitor& visitor);
@@ -213,6 +214,7 @@ public:
                                        Matrix4f* AccelMatrix, Matrix4f* GyroMatrix, 
                                        float* Temperature);
     virtual void SetOnboardCalibrationEnabled(bool enabled);
+    virtual bool IsMagCalibrated();
 
     // Sets report rate (in Hz) of MessageBodyFrame messages (delivered through MessageHandler::OnMessage call). 
     // Currently supported maximum rate is 1000Hz. If the rate is set to 500 or 333 Hz then OnMessage will be 
@@ -225,6 +227,9 @@ public:
     // Note, this value may be different from the one provided for SetReportRate. The return
     // value will contain the actual rate.
     virtual unsigned    GetReportRate() const;
+
+	bool				SetSerialReport(const SerialReport& data);
+    bool				GetSerialReport(SerialReport* data);
 
     // Hack to create HMD device from sensor display info.
     static void         EnumerateHMDFromSensorDisplayInfo(const SensorDisplayInfoImpl& displayInfo, 
@@ -245,6 +250,9 @@ protected:
     Void            setReportRate(unsigned rateHz);
 
     Void            setOnboardCalibrationEnabled(bool enabled);
+
+	bool	        setSerialReport(const SerialReport& data);
+    bool            getSerialReport(SerialReport* data);
 
     // Called for decoded messages
     void			onTrackerMessage(TrackerMessage* message);
@@ -295,7 +303,6 @@ protected:
 
 #ifdef OVR_OS_ANDROID
     void 	        replaceWithPhoneMag(Vector3f* val);
-
     PhoneSensors* 	pPhoneSensors;
 #endif
 

@@ -57,11 +57,8 @@ DistortionRenderer::~DistortionRenderer()
 
 /******************************************************************************/
 bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
-                                    unsigned hmdCaps, unsigned arg_distortionCaps)
+                                    unsigned arg_distortionCaps)
 {
-	// TBD: Decide if hmdCaps are needed here or are a part of RenderState
-    OVR_UNUSED(hmdCaps);
-
 	///QUESTION - what is returned bool for???  Are we happy with this true, if not config.
     const ovrD3D9Config * config = (const ovrD3D9Config*)apiConfig;
     if (!config)                return true; 
@@ -69,14 +66,17 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 
 	//Glean all the required variables from the input structures
 	device         = config->D3D9.pDevice;
+    swapChain      = config->D3D9.pSwapChain;
 	screenSize     = config->D3D9.Header.RTSize;
 	distortionCaps = arg_distortionCaps;
+
+	GfxState = *new GraphicsState(device);
 
 	CreateVertexDeclaration();
 	CreateDistortionShaders();
 	Create_Distortion_Models();
 
-    return (true);
+    return true;
 }
 
 
@@ -89,23 +89,22 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
 	//Write in values
     eachEye[eyeId].texture = tex->D3D9.pTexture;
 
-	//Its only at this point we discover what the viewport of the texture is.
-	//because presumably we allow users to realtime adjust the resolution.
-	//Which begs the question - why did we ask them what viewport they were
-	//using before, which gave them a set of UV offsets.   In fact, our 
-	//asking for eye mesh must be entirely independed of these viewports,
-	//presumably only to get the parameters.
+	// Its only at this point we discover what the viewport of the texture is.
+	// because presumably we allow users to realtime adjust the resolution.
+    eachEye[eyeId].TextureSize    = tex->D3D9.Header.TextureSize;
+    eachEye[eyeId].RenderViewport = tex->D3D9.Header.RenderViewport;
 
-    ovrEyeDesc     ed = RState.EyeRenderDesc[eyeId].Desc;
-    ed.TextureSize    = tex->D3D9.Header.TextureSize;
-    ed.RenderViewport = tex->D3D9.Header.RenderViewport;
-
-     ovrHmd_GetRenderScaleAndOffset(HMD, ed, distortionCaps, eachEye[eyeId].UVScaleOffset);
+    const ovrEyeRenderDesc& erd = RState.EyeRenderDesc[eyeId];
+    
+    ovrHmd_GetRenderScaleAndOffset( erd.Fov,
+                                    eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
+                                    eachEye[eyeId].UVScaleOffset );
 }
 
 
 /******************************************************************/
-void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
+void DistortionRenderer::EndFrame(bool swapBuffers,
+                                  unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
 {
 	OVR_UNUSED(swapBuffers);
 	OVR_UNUSED(latencyTesterDrawColor);
@@ -115,7 +114,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
 
 	if (!TimeManager.NeedDistortionTimeMeasurement())
     {
-		if (RState.DistortionCaps & ovrDistortion_TimeWarp)
+		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
 		{
 			// Wait for timewarp distortion if it is time and Gpu idle
 			WaitTillTimeAndFlushGpu(TimeManager.GetFrameTiming().TimewarpPointTime);
@@ -149,101 +148,130 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
 
     if (swapBuffers)
     {
-		device->Present( NULL, NULL, NULL, NULL );
-
-    ///    if (RParams.pSwapChain)
+        if (swapChain)
         {
-     ///       UINT swapInterval = (RState.HMDCaps & ovrHmdCap_NoVSync) ? 0 : 1;
-     ///       RParams.pSwapChain->Present(swapInterval, 0);
-
-            // Force GPU to flush the scene, resulting in the lowest possible latency.
-            // It's critical that this flush is *after* present.
-     ///       WaitUntilGpuIdle();
+            swapChain->Present(NULL, NULL, NULL, NULL, 0);
         }
-    ///    else
+        else
         {
-            // TBD: Generate error - swapbuffer option used with null swapchain.
+		    device->Present( NULL, NULL, NULL, NULL );
         }
+
+        // Force GPU to flush the scene, resulting in the lowest possible latency.
+        // It's critical that this flush is *after* present.
+        WaitUntilGpuIdle();
     }
 }
 
 
 void DistortionRenderer::WaitUntilGpuIdle()
 {
-#if 0
-    // Flush and Stall CPU while waiting for GPU to complete rendering all of the queued draw calls
-    D3D1x_QUERY_DESC queryDesc = { D3D1X_(QUERY_EVENT), 0 };
-    Ptr<ID3D1xQuery> query;
-    BOOL             done = FALSE;
-
-    if (RParams.pDevice->CreateQuery(&queryDesc, &query.GetRawRef()) == S_OK)
+	if(device)
     {
-        D3DSELECT_10_11(query->End(),
-                        RParams.pContext->End(query));
+         IDirect3DQuery9* pEventQuery=NULL ;
+         device->CreateQuery(D3DQUERYTYPE_EVENT, &pEventQuery) ;
 
-        // GetData will returns S_OK for both done == TRUE or FALSE.
-        // Exit on failure to avoid infinite loop.
-        do { }
-        while(!done &&
-              !FAILED(D3DSELECT_10_11(query->GetData(&done, sizeof(BOOL), 0),
-                                      RParams.pContext->GetData(query, &done, sizeof(BOOL), 0)))
-             );
-    }
-#endif
+         if(pEventQuery!=NULL)
+         {
+            pEventQuery->Issue(D3DISSUE_END) ;
+            while(S_FALSE == pEventQuery->GetData(NULL, 0, D3DGETDATA_FLUSH)) ;
+         }
+     }
 }
 
 double DistortionRenderer::WaitTillTimeAndFlushGpu(double absTime)
 {
-
-OVR_UNUSED(absTime);
-#if 0
 	double       initialTime = ovr_GetTimeInSeconds();
 	if (initialTime >= absTime)
 		return 0.0;
 
-	// Flush and Stall CPU while waiting for GPU to complete rendering all of the queued draw calls
-    D3D1x_QUERY_DESC queryDesc = { D3D1X_(QUERY_EVENT), 0 };
-    Ptr<ID3D1xQuery> query;
-    BOOL             done = FALSE;
-	bool             callGetData = false;
-
-    if (RParams.pDevice->CreateQuery(&queryDesc, &query.GetRawRef()) == S_OK)
-    {
-        D3DSELECT_10_11(query->End(),
-                        RParams.pContext->End(query));
-		callGetData = true;
-	}
+	WaitUntilGpuIdle();
 
 	double newTime   = initialTime;
 	volatile int i;
 
 	while (newTime < absTime)
 	{
-		if (callGetData)
-		{
-			// GetData will returns S_OK for both done == TRUE or FALSE.
-			// Stop calling GetData on failure.
-			callGetData = !FAILED(D3DSELECT_10_11(query->GetData(&done, sizeof(BOOL), 0),
-					                              RParams.pContext->GetData(query, &done, sizeof(BOOL), 0))) && !done;
-		}
-		else
-		{
-			for (int j = 0; j < 50; j++)
-				i = 0;
-		}
+		for (int j = 0; j < 50; j++)
+			i = 0;
 		newTime = ovr_GetTimeInSeconds();
 	}
 
 	// How long we waited
 	return newTime - initialTime;
-#endif
-	return 0; //dummy
 }
 
 
 
+DistortionRenderer::GraphicsState::GraphicsState(IDirect3DDevice9* d)
+: device(d)
+, numSavedStates(0)
+{
+}
+
+void DistortionRenderer::GraphicsState::RecordAndSetState(int which, int type, DWORD newValue)
+{
+	SavedStateType * sst = &savedState[numSavedStates++];
+	sst->which = which;
+	sst->type = type;
+	if (which == 0)
+	{
+		device->GetSamplerState(0, (D3DSAMPLERSTATETYPE)type, &sst->valueToRevertTo);
+		device->SetSamplerState(0, (D3DSAMPLERSTATETYPE)type, newValue);
+	}
+	else
+	{
+		device->GetRenderState((D3DRENDERSTATETYPE)type, &sst->valueToRevertTo);
+		device->SetRenderState((D3DRENDERSTATETYPE)type, newValue);
+	}
+}
+
+void DistortionRenderer::GraphicsState::Save()
+{
+	//Record and set rasterizer and sampler states.
+
+	numSavedStates=0;
+
+    RecordAndSetState(0, D3DSAMP_MINFILTER,          D3DTEXF_LINEAR );
+    RecordAndSetState(0, D3DSAMP_MAGFILTER,          D3DTEXF_LINEAR );
+    RecordAndSetState(0, D3DSAMP_MIPFILTER,          D3DTEXF_LINEAR );
+    RecordAndSetState(0, D3DSAMP_BORDERCOLOR,        0x000000 );
+    RecordAndSetState(0, D3DSAMP_ADDRESSU,           D3DTADDRESS_BORDER );
+    RecordAndSetState(0, D3DSAMP_ADDRESSV,           D3DTADDRESS_BORDER );
+
+	RecordAndSetState(1, D3DRS_MULTISAMPLEANTIALIAS, FALSE );
+	RecordAndSetState(1, D3DRS_DITHERENABLE,         FALSE );
+	RecordAndSetState(1, D3DRS_ZENABLE,              FALSE );
+    RecordAndSetState(1, D3DRS_ZWRITEENABLE,         TRUE   );
+    RecordAndSetState(1, D3DRS_ZFUNC,                D3DCMP_LESSEQUAL   );
+    RecordAndSetState(1, D3DRS_CULLMODE ,            D3DCULL_CCW  );
+   	RecordAndSetState(1, D3DRS_ALPHABLENDENABLE ,    FALSE );
+   	RecordAndSetState(1, D3DRS_DEPTHBIAS ,           0 );
+    RecordAndSetState(1, D3DRS_SRCBLEND ,            D3DBLEND_SRCALPHA );
+    RecordAndSetState(1, D3DRS_DESTBLEND ,           D3DBLEND_INVSRCALPHA   );
+   	RecordAndSetState(1, D3DRS_FILLMODE,             D3DFILL_SOLID );
+    RecordAndSetState(1, D3DRS_ALPHATESTENABLE,      FALSE);
+ 	RecordAndSetState(1, D3DRS_DEPTHBIAS ,           0 );
+    RecordAndSetState(1, D3DRS_LIGHTING,             FALSE );
+   	RecordAndSetState(1, D3DRS_FOGENABLE,            FALSE );
+}
 
 
+void DistortionRenderer::GraphicsState::Restore()
+{
+	for (int i = 0; i<numSavedStates; i++)
+	{
+		SavedStateType * sst = &savedState[i];
+		if (sst->which == 0)
+		{
+			device->SetSamplerState(0, (D3DSAMPLERSTATETYPE)sst->type, sst->valueToRevertTo);
+		}
+		else
+		{
+			device->SetRenderState((D3DRENDERSTATETYPE)sst->type, sst->valueToRevertTo);
+		}
+	}
+}
 
 
 }}} // OVR::CAPI::D3D1X

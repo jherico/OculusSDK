@@ -26,9 +26,9 @@ limitations under the License.
 
 #include "OVR.h"
 
-#include "../CommonSrc/Platform/Platform_Default.h"
-#include "../CommonSrc/Render/Render_Device.h"
-#include "../CommonSrc/Platform/Gamepad.h"
+#include "../Platform/Platform_Default.h"
+#include "../Render/Render_Device.h"
+#include "../Platform/Gamepad.h"
 
 #include "Util/Util_Render_Stereo.h"
 using namespace OVR::Util::Render;
@@ -37,7 +37,6 @@ using namespace OVR::Util::Render;
 #include <Kernel/OVR_Log.h>
 #include <Kernel/OVR_Timer.h>
 
-#include "Player.h"
 #include "OVR_DeviceConstants.h"
 
 
@@ -97,10 +96,10 @@ struct ShortcutKey
         Shift_RequireOff
     };
 
-    ShortcutKey(KeyCode key = Key_None, ShiftUsageType shiftUsage = Shift_RequireOff)
+    ShortcutKey(OVR::KeyCode key = Key_None, ShiftUsageType shiftUsage = Shift_RequireOff)
         : Key(key), ShiftUsage(shiftUsage) { }
 
-    KeyCode        Key;
+    OVR::KeyCode        Key;
     ShiftUsageType ShiftUsage;
 };
 
@@ -119,7 +118,7 @@ struct OptionShortcut
     void AddShortcut(ShortcutKey key) { Keys.PushBack(key); }
     void AddShortcut(UInt32 gamepadButton) { GamepadButtons.PushBack(gamepadButton); }
 
-    bool MatchKey(KeyCode key, bool shift) const;
+    bool MatchKey(OVR::KeyCode key, bool shift) const;
     bool MatchGamepadButton(UInt32 gamepadButtonMask) const;
 };
 
@@ -142,8 +141,10 @@ public:
     virtual String  GetValue() { return ""; }
 
     // Returns empty string if shortcut not handled
-    virtual String  ProcessShortcutKey(KeyCode key, bool shift) = 0;
+    virtual String  ProcessShortcutKey(OVR::KeyCode key, bool shift) = 0;
     virtual String  ProcessShortcutButton(UInt32 buttonMask) = 0;
+
+    virtual bool    IsMenu() const { return false; }
 
 protected:
     String          Label;
@@ -208,7 +209,7 @@ public:
     // Executes shortcut message and returns notification string.
     // Returns empty string for no action.
     String         HandleShortcutUpdate();
-    virtual String ProcessShortcutKey(KeyCode key, bool shift);
+    virtual String ProcessShortcutKey(OVR::KeyCode key, bool shift);
     virtual String ProcessShortcutButton(UInt32 buttonMask);
 
     OptionVar& AddEnumValue(const char* displayName, SInt32 value);
@@ -227,7 +228,7 @@ public:
 
     OptionVar& AddShortcutUpKey(const ShortcutKey& shortcut)
     { ShortcutUp.AddShortcut(shortcut); return *this; }
-    OptionVar& AddShortcutUpKey(KeyCode key,
+    OptionVar& AddShortcutUpKey(OVR::KeyCode key,
                                 ShortcutKey::ShiftUsageType shiftUsage = ShortcutKey::Shift_Modify)
     { ShortcutUp.AddShortcut(ShortcutKey(key, shiftUsage)); return *this; }
     OptionVar& AddShortcutUpButton(UInt32 gamepadButton)
@@ -235,7 +236,7 @@ public:
 
     OptionVar& AddShortcutDownKey(const ShortcutKey& shortcut)
     { ShortcutDown.AddShortcut(shortcut); return *this; }
-    OptionVar& AddShortcutDownKey(KeyCode key,
+    OptionVar& AddShortcutDownKey(OVR::KeyCode key,
                                   ShortcutKey::ShiftUsageType shiftUsage = ShortcutKey::Shift_Modify)
     { ShortcutDown.AddShortcut(ShortcutKey(key, shiftUsage)); return *this; }
     OptionVar& AddShortcutDownButton(UInt32 gamepadButton)
@@ -243,7 +244,7 @@ public:
     
     OptionVar& AddShortcutKey(const ShortcutKey& shortcut)
     { return AddShortcutUpKey(shortcut); }
-    OptionVar& AddShortcutKey(KeyCode key,
+    OptionVar& AddShortcutKey(OVR::KeyCode key,
                                ShortcutKey::ShiftUsageType shiftUsage = ShortcutKey::Shift_RequireOff)
     { return AddShortcutUpKey(key, shiftUsage); }
     OptionVar& AddShortcutButton(UInt32 gamepadButton)
@@ -356,7 +357,7 @@ public:
     virtual void    Select();
     virtual String  GetLabel() { return Label + " >"; }
 
-    virtual String  ProcessShortcutKey(KeyCode key, bool shift);
+    virtual String  ProcessShortcutKey(OVR::KeyCode key, bool shift);
     virtual String  ProcessShortcutButton(UInt32 buttonMask);
     
     // Sets a message to display with a time-out. Default time-out is 4 seconds.
@@ -365,6 +366,8 @@ public:
     // Overrides current timeout, in seconds (not the future default value);
     // intended to be called right after SetPopupMessage.
     void            SetPopupTimeout(double timeoutSeconds, bool border = false);
+
+    virtual bool    IsMenu() const { return true; }
 
 protected:
 

@@ -33,9 +33,6 @@ limitations under the License.
 
 namespace OVR { namespace Util {
 
-//static const float      BIG_FLOAT = 1000000.0f;
-//static const float      SMALL_FLOAT = -1000000.0f;
-
 //-------------------------------------------------------------------------------------
 // ***** LatencyTest2
 

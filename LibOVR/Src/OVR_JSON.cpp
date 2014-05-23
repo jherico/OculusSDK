@@ -432,6 +432,23 @@ JSON* JSON::Parse(const char* buff, const char** perror)
 }
 
 //-----------------------------------------------------------------------------
+// This version works for buffers that are not null terminated strings.
+JSON* JSON::ParseBuffer(const char *buff, int len, const char** perror)
+{
+	// Our JSON parser does not support length-based parsing,
+	// so ensure it is null-terminated.
+	char *termStr = new char[len + 1];
+	memcpy(termStr, buff, len);
+	termStr[len] = '\0';
+
+	JSON *objJson = Parse(termStr, perror);
+
+	delete[]termStr;
+
+	return objJson;
+}
+
+//-----------------------------------------------------------------------------
 // Parser core - when encountering text, process appropriately.
 const char* JSON::parseValue(const char* buff, const char** perror)
 {
@@ -973,6 +990,51 @@ JSON* JSON::createHelper(JSONItemType itemType, double dval, const char* strVal)
     return item;
 }
 
+//-----------------------------------------------------------------------------
+// Get elements by name
+double JSON::GetNumberByName(const char *name, double defValue)
+{
+	JSON* item = GetItemByName(name);
+	if (!item || item->Type != JSON_Number) {
+		return defValue;
+	}
+	else {
+		return item->dValue;
+	}
+}
+
+int JSON::GetIntByName(const char *name, int defValue)
+{
+	JSON* item = GetItemByName(name);
+	if (!item || item->Type != JSON_Number) {
+		return defValue;
+	}
+	else {
+		return (int)item->dValue;
+	}
+}
+
+bool JSON::GetBoolByName(const char *name, bool defValue)
+{
+	JSON* item = GetItemByName(name);
+	if (!item || item->Type != JSON_Bool) {
+		return defValue;
+	}
+	else {
+		return (int)item->dValue != 0;
+	}
+}
+
+String JSON::GetStringByName(const char *name, const String &defValue)
+{
+	JSON* item = GetItemByName(name);
+	if (!item || item->Type != JSON_String) {
+		return defValue;
+	}
+	else {
+		return item->Value;
+	}
+}
 
 //-----------------------------------------------------------------------------
 // Adds an element to an array object type
@@ -1077,7 +1139,7 @@ JSON* JSON::Load(const char* path, const char** perror)
     }
 
     int    len   = f.GetLength();
-    UByte* buff  = (UByte*)OVR_ALLOC(len);
+    UByte* buff  = (UByte*)OVR_ALLOC(len + 1);
     int    bytes = f.Read(buff, len);
     f.Close();
 
@@ -1086,6 +1148,9 @@ JSON* JSON::Load(const char* path, const char** perror)
         OVR_FREE(buff);
         return NULL;
     }
+
+	// Ensure the result is null-terminated since Parse() expects null-terminated input.
+	buff[len] = '\0';
 
     JSON* json = JSON::Parse((char*)buff, perror);
     OVR_FREE(buff);

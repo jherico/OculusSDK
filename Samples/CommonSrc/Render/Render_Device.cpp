@@ -206,35 +206,35 @@ namespace OVR { namespace Render {
 		// Cube vertices and their normals.
 		Vector3f CubeVertices[][3] =
 		{
-			Vector3f(x1, y2, z1), Vector3f(z1, x1), Vector3f(0.0f, 1.0f, 0.0f),
-			Vector3f(x2, y2, z1), Vector3f(z1, x2), Vector3f(0.0f, 1.0f, 0.0f),
-			Vector3f(x2, y2, z2), Vector3f(z2, x2), Vector3f(0.0f, 1.0f, 0.0f),
-			Vector3f(x1, y2, z2), Vector3f(z2, x1), Vector3f(0.0f, 1.0f, 0.0f),
+            { Vector3f(x1, y2, z1), Vector3f(z1, x1), Vector3f(0.0f, 1.0f, 0.0f) },
+            { Vector3f(x2, y2, z1), Vector3f(z1, x2), Vector3f(0.0f, 1.0f, 0.0f) },
+            { Vector3f(x2, y2, z2), Vector3f(z2, x2), Vector3f(0.0f, 1.0f, 0.0f) },
+            { Vector3f(x1, y2, z2), Vector3f(z2, x1), Vector3f(0.0f, 1.0f, 0.0f) },
 
-			Vector3f(x1, y1, z1), Vector3f(z1, x1), Vector3f(0.0f, -1.0f, 0.0f),
-			Vector3f(x2, y1, z1), Vector3f(z1, x2), Vector3f(0.0f, -1.0f, 0.0f),
-			Vector3f(x2, y1, z2), Vector3f(z2, x2), Vector3f(0.0f, -1.0f, 0.0f),
-			Vector3f(x1, y1, z2), Vector3f(z2, x1), Vector3f(0.0f, -1.0f, 0.0f),
+            { Vector3f(x1, y1, z1), Vector3f(z1, x1), Vector3f(0.0f, -1.0f, 0.0f) },
+            { Vector3f(x2, y1, z1), Vector3f(z1, x2), Vector3f(0.0f, -1.0f, 0.0f) },
+            { Vector3f(x2, y1, z2), Vector3f(z2, x2), Vector3f(0.0f, -1.0f, 0.0f) },
+            { Vector3f(x1, y1, z2), Vector3f(z2, x1), Vector3f(0.0f, -1.0f, 0.0f) },
 
-			Vector3f(x1, y1, z2), Vector3f(z2, y1), Vector3f(-1.0f, 0.0f, 0.0f),
-			Vector3f(x1, y1, z1), Vector3f(z1, y1), Vector3f(-1.0f, 0.0f, 0.0f),
-			Vector3f(x1, y2, z1), Vector3f(z1, y2), Vector3f(-1.0f, 0.0f, 0.0f),
-			Vector3f(x1, y2, z2), Vector3f(z2, y2), Vector3f(-1.0f, 0.0f, 0.0f),
+            { Vector3f(x1, y1, z2), Vector3f(z2, y1), Vector3f(-1.0f, 0.0f, 0.0f) },
+            { Vector3f(x1, y1, z1), Vector3f(z1, y1), Vector3f(-1.0f, 0.0f, 0.0f) },
+            { Vector3f(x1, y2, z1), Vector3f(z1, y2), Vector3f(-1.0f, 0.0f, 0.0f) },
+            { Vector3f(x1, y2, z2), Vector3f(z2, y2), Vector3f(-1.0f, 0.0f, 0.0f) },
 
-			Vector3f(x2, y1, z2), Vector3f(z2, y1), Vector3f(1.0f, 0.0f, 0.0f),
-			Vector3f(x2, y1, z1), Vector3f(z1, y1), Vector3f(1.0f, 0.0f, 0.0f),
-			Vector3f(x2, y2, z1), Vector3f(z1, y2), Vector3f(1.0f, 0.0f, 0.0f),
-			Vector3f(x2, y2, z2), Vector3f(z2, y2), Vector3f(1.0f, 0.0f, 0.0f),
+            { Vector3f(x2, y1, z2), Vector3f(z2, y1), Vector3f(1.0f, 0.0f, 0.0f) },
+            { Vector3f(x2, y1, z1), Vector3f(z1, y1), Vector3f(1.0f, 0.0f, 0.0f) },
+            { Vector3f(x2, y2, z1), Vector3f(z1, y2), Vector3f(1.0f, 0.0f, 0.0f) },
+            { Vector3f(x2, y2, z2), Vector3f(z2, y2), Vector3f(1.0f, 0.0f, 0.0f) },
 
-			Vector3f(x1, y1, z1), Vector3f(x1, y1), Vector3f(0.0f, 0.0f, -1.0f),
-			Vector3f(x2, y1, z1), Vector3f(x2, y1), Vector3f(0.0f, 0.0f, -1.0f),
-			Vector3f(x2, y2, z1), Vector3f(x2, y2), Vector3f(0.0f, 0.0f, -1.0f),
-			Vector3f(x1, y2, z1), Vector3f(x1, y2), Vector3f(0.0f, 0.0f, -1.0f),
+            { Vector3f(x1, y1, z1), Vector3f(x1, y1), Vector3f(0.0f, 0.0f, -1.0f) },
+            { Vector3f(x2, y1, z1), Vector3f(x2, y1), Vector3f(0.0f, 0.0f, -1.0f) },
+            { Vector3f(x2, y2, z1), Vector3f(x2, y2), Vector3f(0.0f, 0.0f, -1.0f) },
+            { Vector3f(x1, y2, z1), Vector3f(x1, y2), Vector3f(0.0f, 0.0f, -1.0f) },
 
-			Vector3f(x1, y1, z2), Vector3f(x1, y1), Vector3f(0.0f, 0.0f, 1.0f),
-			Vector3f(x2, y1, z2), Vector3f(x2, y1), Vector3f(0.0f, 0.0f, 1.0f),
-			Vector3f(x2, y2, z2), Vector3f(x2, y2), Vector3f(0.0f, 0.0f, 1.0f),
-			Vector3f(x1, y2, z2), Vector3f(x1, y2), Vector3f(0.0f, 0.0f, 1.0f)
+            { Vector3f(x1, y1, z2), Vector3f(x1, y1), Vector3f(0.0f, 0.0f, 1.0f) },
+            { Vector3f(x2, y1, z2), Vector3f(x2, y1), Vector3f(0.0f, 0.0f, 1.0f) },
+            { Vector3f(x2, y2, z2), Vector3f(x2, y2), Vector3f(0.0f, 0.0f, 1.0f) },
+            { Vector3f(x1, y2, z2), Vector3f(x1, y2), Vector3f(0.0f, 0.0f, 1.0f) }
 		};
 
 
@@ -899,7 +899,8 @@ namespace OVR { namespace Render {
 				ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessWithChromAb);
 				vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcess);
 			}
-			else if (PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAb)
+			else if (PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAb ||
+                     PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAbHeightmapTimewarp)
 			{
 				ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessMeshWithChromAb);
 				vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessMesh);
@@ -909,11 +910,11 @@ namespace OVR { namespace Render {
 				ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessMeshWithChromAbTimewarp);
 				vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessMeshTimewarp);
 			}
-			else if (PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAbPositionalTimewarp)
-			{
-				ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessMeshWithChromAbPositionalTimewarp);
-				vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessMeshPositionalTimewarp);
-			}
+            else if (PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAbPositionalTimewarp)
+            {
+                ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessMeshWithChromAbPositionalTimewarp);
+                vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessMeshPositionalTimewarp);
+            }
 			else
 			{
 				OVR_ASSERT(false);
@@ -926,6 +927,23 @@ namespace OVR { namespace Render {
 			pPostProcessShader->SetShader(ppfs);
 		}
 
+        // Heightmap method does the timewarp on the first pass
+        if (!pPostProcessHeightmapShader &&
+            PostProcessShaderActive == PostProcessShader_MeshDistortionAndChromAbHeightmapTimewarp)
+        {
+            Shader *vs = NULL;
+            Shader *ppfs = NULL;
+
+            ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessHeightmapTimewarp);
+            vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessHeightmapTimewarp);
+
+            OVR_ASSERT(ppfs); // Means the shader failed to compile - look in the debug spew.
+            OVR_ASSERT(vs);
+
+            pPostProcessHeightmapShader = *CreateShaderSet();
+            pPostProcessHeightmapShader->SetShader(vs);
+            pPostProcessHeightmapShader->SetShader(ppfs);
+        }
 
 		if(!pFullScreenVertexBuffer)
 		{
@@ -937,7 +955,7 @@ namespace OVR { namespace Render {
 				Vertex(Vector3f(0, 0, 0), Color(1, 1, 1, 1), 0, 1),
 				Vertex(Vector3f(1, 0, 0), Color(1, 1, 1, 1), 1, 1)
 			};
-			pFullScreenVertexBuffer->Data(Buffer_Vertex, QuadVertices, sizeof(QuadVertices));
+			pFullScreenVertexBuffer->Data(Buffer_Vertex | Buffer_ReadOnly, QuadVertices, sizeof(QuadVertices));
 		}
 		return true;
 	}
@@ -960,7 +978,7 @@ namespace OVR { namespace Render {
 	void RenderDevice::FinishScene()
 	{
 		SetExtraShaders(0);
-		SetRenderTarget(0);
+		SetDefaultRenderTarget();
 	}
 
 
@@ -971,9 +989,10 @@ namespace OVR { namespace Render {
 	{
 		PostProcessingType          = pptype;
 
-		if ( ( pptype == PostProcess_MeshDistortion ) ||
+		if (( pptype == PostProcess_MeshDistortion ) ||
 			( pptype == PostProcess_MeshDistortionTimewarp ) ||
-			( pptype == PostProcess_MeshDistortionPositionalTimewarp ) )
+			( pptype == PostProcess_MeshDistortionPositionalTimewarp ) ||
+            ( pptype == PostProcess_MeshDistortionHeightmapTimewarp))
 		{
 			for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
 			{
@@ -1009,13 +1028,55 @@ namespace OVR { namespace Render {
 
 				DistortionMeshNumTris[eyeNum] = numTris;
 				pDistortionMeshVertexBuffer[eyeNum] = *CreateBuffer();
-				pDistortionMeshVertexBuffer[eyeNum]->Data ( Buffer_Vertex, pVerts, sizeof(DistortionVertex) * numVerts );
+				pDistortionMeshVertexBuffer[eyeNum]->Data ( Buffer_Vertex | Buffer_ReadOnly, pVerts, sizeof(DistortionVertex) * numVerts );
 				pDistortionMeshIndexBuffer[eyeNum] = *CreateBuffer();
-				pDistortionMeshIndexBuffer[eyeNum]->Data ( Buffer_Index, pIndices, ( sizeof(UInt16) * numIndices ) );
+				pDistortionMeshIndexBuffer[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, pIndices, ( sizeof(UInt16) * numIndices ) );
 
 				DistortionMeshDestroy ( pRawVerts, pIndices );
 				OVR_FREE ( pVerts );
 			}
+
+            if(pptype == PostProcess_MeshDistortionHeightmapTimewarp)
+            {
+                // Create the positional timewarp rectangular heightmap mesh
+                for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+                {
+                    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft : stereoParamsRight;
+
+                    // Get the mesh data.
+                    int numVerts = 0;
+                    int numTris = 0;
+                    HeightmapMeshVertexData *pRawVerts = NULL;
+                    UInt16 *pIndices = NULL;
+                    HeightmapMeshCreate ( &pRawVerts, &pIndices, &numVerts, &numTris, stereoParams, hmdRenderInfo );
+                    int numIndices = numTris * 3;
+
+                    // Convert to final vertex data.
+                    HeightmapVertex *pVerts = (HeightmapVertex*)OVR_ALLOC ( sizeof(HeightmapVertex) * numVerts );
+                    HeightmapVertex *pCurVert = pVerts;
+                    HeightmapMeshVertexData *pCurRawVert = pRawVerts;
+                    for ( int vertNum = 0; vertNum < numVerts; vertNum++ )
+                    {
+                        pCurVert->Pos.x = pCurRawVert->ScreenPosNDC.x;
+                        pCurVert->Pos.y = pCurRawVert->ScreenPosNDC.y;
+                        Vector2f texCoord = pCurRawVert->TanEyeAngles;
+                        pCurVert->Tex.x = texCoord.x;
+                        pCurVert->Tex.y = texCoord.y;
+                        pCurVert->Tex.z = (OVR::UByte)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
+                        pCurRawVert++;
+                        pCurVert++;
+                    }
+
+                    HeightmapMeshNumTris[eyeNum] = numTris;
+                    pHeightmapMeshVertexBuffer[eyeNum] = *CreateBuffer();
+                    pHeightmapMeshVertexBuffer[eyeNum]->Data ( Buffer_Vertex, pVerts, sizeof(HeightmapVertex) * numVerts );
+                    pHeightmapMeshIndexBuffer[eyeNum] = *CreateBuffer();
+                    pHeightmapMeshIndexBuffer[eyeNum]->Data ( Buffer_Index, pIndices, ( sizeof(UInt16) * numIndices ) );
+
+                    HeightmapMeshDestroy ( pRawVerts, pIndices );
+                    OVR_FREE ( pVerts );
+                }
+            }
 		}
 		else
 		{
@@ -1025,117 +1086,265 @@ namespace OVR { namespace Render {
 
 
 	void RenderDevice::ApplyPostProcess(Matrix4f const &matNowFromWorldStart,   Matrix4f const &matNowFromWorldEnd,
-		Matrix4f const &matRenderFromWorldLeft, Matrix4f const &matRenderFromWorldRight,
-		StereoEyeParams const &stereoParamsLeft, StereoEyeParams const &stereoParamsRight,
-		Ptr<Texture> pSourceTextureLeftOrOnly,
-		Ptr<Texture> pSourceTextureRight,
-		Ptr<Texture> pSourceTextureLeftOrOnlyDepth,
-		Ptr<Texture> pSourceTextureRightDepth)
+		                                Matrix4f const &matRenderFromWorldLeft, Matrix4f const &matRenderFromWorldRight,
+		                                StereoEyeParams const &stereoParamsLeft, StereoEyeParams const &stereoParamsRight,
+                                        RenderTarget* pHmdSpaceLayerRenderTargetLeftOrBothEyes,
+                                        RenderTarget* pHmdSpaceLayerRenderTargetRight,
+                                        RenderTarget* pOverlayLayerRenderTargetLeftOrBothEyes,
+                                        RenderTarget* pOverlayLayerRenderTargetRight)
 	{
 		SetExtraShaders(0);
 
-		if ( PostProcessingType == PostProcess_MeshDistortion )
-		{
-			Recti vp ( 0, 0, WindowWidth, WindowHeight );
-			SetViewport(vp);
-			float r, g, b, a;
-			DistortionClearColor.GetRGBA(&r, &g, &b, &a);
-			Clear(r, g, b, a);
+        bool usingOverlay = pOverlayLayerRenderTargetLeftOrBothEyes != NULL;
 
-			Matrix4f dummy;
-			ShaderFill fill(pPostProcessShader);
+		switch( PostProcessingType )
+        {
+        case PostProcess_MeshDistortion:
+            {
+                Recti vp ( 0, 0, WindowWidth, WindowHeight );
+                SetViewport(vp);
+                float r, g, b, a;
+                DistortionClearColor.GetRGBA(&r, &g, &b, &a);
+                Clear(r, g, b, a);
 
-			fill.SetTexture ( 0, pSourceTextureLeftOrOnly );
-			pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParamsLeft.EyeToSourceUV.Scale.x,  stereoParamsLeft.EyeToSourceUV.Scale.y );
-			pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParamsLeft.EyeToSourceUV.Offset.x, stereoParamsLeft.EyeToSourceUV.Offset.y );
-			Render(&fill, pDistortionMeshVertexBuffer[0], pDistortionMeshIndexBuffer[0], dummy, 0, DistortionMeshNumTris[0] * 3, Prim_Triangles, true);
+                Matrix4f dummy;
+                ShaderFill fill(pPostProcessShader);
 
-			if ( pSourceTextureRight != NULL )
-			{
-				fill.SetTexture ( 0, pSourceTextureRight );
-			}
-			pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParamsRight.EyeToSourceUV.Scale.x,  stereoParamsRight.EyeToSourceUV.Scale.y );
-			pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParamsRight.EyeToSourceUV.Offset.x, stereoParamsRight.EyeToSourceUV.Offset.y );
-			Render(&fill, pDistortionMeshVertexBuffer[1], pDistortionMeshIndexBuffer[1], dummy, 0, DistortionMeshNumTris[1] * 3, Prim_Triangles, true);
-		}
-		else if ( PostProcessingType == PostProcess_MeshDistortionTimewarp )
-		{
-			Recti vp ( 0, 0, WindowWidth, WindowHeight );
-			SetViewport(vp);
-			float r, g, b, a;
-			DistortionClearColor.GetRGBA(&r, &g, &b, &a);
-			Clear(r, g, b, a);
+                fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex );
+                fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetLeftOrBothEyes->pColorTex : NULL));
+                pPostProcessShader->SetUniform1f("UseOverlay", usingOverlay ? 1.0f : 0.0f);
+                pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParamsLeft.EyeToSourceUV.Scale.x,  stereoParamsLeft.EyeToSourceUV.Scale.y );
+                pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParamsLeft.EyeToSourceUV.Offset.x, stereoParamsLeft.EyeToSourceUV.Offset.y );
+                Render(&fill, pDistortionMeshVertexBuffer[0], pDistortionMeshIndexBuffer[0], dummy, 0, DistortionMeshNumTris[0] * 3, Prim_Triangles, Mesh_Distortion);
 
-			ShaderFill fill(pPostProcessShader);
-			fill.SetTexture ( 0, pSourceTextureLeftOrOnly );
+                if ( pHmdSpaceLayerRenderTargetRight != NULL )
+                {
+                    fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex );
+                    fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetRight->pColorTex : NULL));
+                }
+                pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParamsRight.EyeToSourceUV.Scale.x,  stereoParamsRight.EyeToSourceUV.Scale.y );
+                pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParamsRight.EyeToSourceUV.Offset.x, stereoParamsRight.EyeToSourceUV.Offset.y );
+                Render(&fill, pDistortionMeshVertexBuffer[1], pDistortionMeshIndexBuffer[1], dummy, 0, DistortionMeshNumTris[1] * 3, Prim_Triangles, Mesh_Distortion);
+            }
+            break;
 
-			for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
-			{
-				Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
-				const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
+        case PostProcess_MeshDistortionTimewarp:
+		    {
+			    Recti vp ( 0, 0, WindowWidth, WindowHeight );
+			    SetViewport(vp);
+			    float r, g, b, a;
+			    DistortionClearColor.GetRGBA(&r, &g, &b, &a);
+			    Clear(r, g, b, a);
 
-				Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart );
-				Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd   );
+			    ShaderFill fill(pPostProcessShader);
+			    fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex );
+                fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetLeftOrBothEyes->pColorTex : NULL));
+                pPostProcessShader->SetUniform1f("UseOverlay", usingOverlay ? 1.0f : 0.0f);
 
-				pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
-				pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
-				pPostProcessShader->SetUniform3x3f("EyeRotationStart", matRenderFromNowStart);
-				pPostProcessShader->SetUniform3x3f("EyeRotationEnd",   matRenderFromNowEnd);
+			    for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+			    {
+				    Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
+				    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
 
-				Matrix4f dummy;
-				if ( ( pSourceTextureRight != NULL ) && ( eyeNum == 1 ) )
-				{
-					fill.SetTexture ( 0, pSourceTextureRight );
-				}
-				Render(&fill, pDistortionMeshVertexBuffer[eyeNum], pDistortionMeshIndexBuffer[eyeNum], dummy, 0, DistortionMeshNumTris[eyeNum] * 3, Prim_Triangles, true);
-			}
-		}
-		else if ( PostProcessingType == PostProcess_MeshDistortionPositionalTimewarp )
-		{
-			Recti vp( 0, 0, WindowWidth, WindowHeight );
-			SetViewport(vp);
-			float r, g, b, a;
-			DistortionClearColor.GetRGBA(&r, &g, &b, &a);
-			Clear(r, g, b, a);
+				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
+				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
 
-			ShaderFill fill(pPostProcessShader);
-			fill.SetTexture ( 0, pSourceTextureLeftOrOnly );
-			fill.SetTexture ( 0, pSourceTextureLeftOrOnlyDepth, Shader_Vertex );
+				    pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
+				    pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+				    pPostProcessShader->SetUniform3x3f("EyeRotationStart", matRenderFromNowStart);
+				    pPostProcessShader->SetUniform3x3f("EyeRotationEnd",   matRenderFromNowEnd);
 
-			for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
-			{
-				Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
-				const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
+				    Matrix4f dummy;
+				    if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) && ( eyeNum == 1 ) )
+				    {
+					    fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex );
+                        fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetRight->pColorTex : NULL));
+				    }
+				    Render(&fill, pDistortionMeshVertexBuffer[eyeNum], pDistortionMeshIndexBuffer[eyeNum], dummy, 0, DistortionMeshNumTris[eyeNum] * 3, Prim_Triangles, Mesh_Distortion);
+			    }
+		    }
+            break;
 
-				Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart );
-				Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd   );
+        case PostProcess_MeshDistortionPositionalTimewarp:
+            {
+                Recti vp( 0, 0, WindowWidth, WindowHeight );
+                SetViewport(vp);
+                float r, g, b, a;
+                DistortionClearColor.GetRGBA(&r, &g, &b, &a);
+                Clear(r, g, b, a);
 
-				pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
-				pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+                ShaderFill fill(pPostProcessShader);
+                fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex );
+                fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pDepthTex, Shader_Vertex );
+                fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetLeftOrBothEyes->pColorTex : NULL));
+                pPostProcessShader->SetUniform1f("UseOverlay", usingOverlay ? 1.0f : 0.0f);
 
-				// DepthProjector values can also be calculated as:
-				// float DepthProjectorX = FarClip / (FarClip - NearClip);
-				// float DepthProjectorY = (-FarClip * NearClip) / (FarClip - NearClip);
-				pPostProcessShader->SetUniform2f("DepthProjector",	  -stereoParams.RenderedProjection.M[2][2], stereoParams.RenderedProjection.M[2][3]);
-				pPostProcessShader->SetUniform2f("DepthDimSize",      (float)pSourceTextureLeftOrOnlyDepth->GetWidth(), (float)pSourceTextureLeftOrOnlyDepth->GetHeight());
-				pPostProcessShader->SetUniform4x4f("EyeRotationStart", matRenderFromNowStart);
-				pPostProcessShader->SetUniform4x4f("EyeRotationEnd",   matRenderFromNowEnd);
+                for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+                {
+                    Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
+                    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
+
+                    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
+                    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+
+                    pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
+                    pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+
+                    // DepthProjector values can also be calculated as:
+                    // float DepthProjectorX = FarClip / (FarClip - NearClip);
+                    // float DepthProjectorY = (-FarClip * NearClip) / (FarClip - NearClip);
+                    pPostProcessShader->SetUniform2f("DepthProjector",	  -stereoParams.RenderedProjection.M[2][2], stereoParams.RenderedProjection.M[2][3]);
+                    pPostProcessShader->SetUniform2f("DepthDimSize",      (float)pHmdSpaceLayerRenderTargetLeftOrBothEyes->Size.w, (float)pHmdSpaceLayerRenderTargetLeftOrBothEyes->Size.h);
+                    pPostProcessShader->SetUniform4x4f("EyeRotationStart", matRenderFromNowStart);
+                    pPostProcessShader->SetUniform4x4f("EyeRotationEnd",   matRenderFromNowEnd);
 
 
-				Matrix4f dummy;
-				if ( ( pSourceTextureRight != NULL ) && ( eyeNum == 1 ) )
-				{
-					OVR_ASSERT(pSourceTextureRightDepth != NULL);
-					fill.SetTexture ( 0, pSourceTextureRight );
-					fill.SetTexture ( 0, pSourceTextureRightDepth, Shader_Vertex );
-				}
+                    Matrix4f dummy;
+                    if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) && ( eyeNum == 1 ) )
+                    {
+                        OVR_ASSERT(pHmdSpaceLayerRenderTargetRight->pDepthTex != NULL);
+                        fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex );
+                        fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pDepthTex, Shader_Vertex );
+                        fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetRight->pColorTex : NULL));
+                    }
 
-				Render(&fill, pDistortionMeshVertexBuffer[eyeNum], pDistortionMeshIndexBuffer[eyeNum], dummy, 0, DistortionMeshNumTris[eyeNum] * 3, Prim_Triangles, true);
-			}
-		}
-		else
-		{
-			if ( PostProcessingType == PostProcess_PixelDistortion )
+                    Render(&fill, pDistortionMeshVertexBuffer[eyeNum], pDistortionMeshIndexBuffer[eyeNum], dummy, 0, DistortionMeshNumTris[eyeNum] * 3, Prim_Triangles, Mesh_Distortion);
+                }
+            }
+            break;
+
+        case PostProcess_MeshDistortionHeightmapTimewarp:
+		    {
+                // Create pass1 textures if not already done
+                for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+                {
+                    Texture* templateTexture = NULL;
+                    switch(eyeNum)
+                    {
+                    case 0: templateTexture = pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex;  break;
+                    case 1: templateTexture = pHmdSpaceLayerRenderTargetRight->pColorTex;           break;
+                    default: OVR_ASSERT(false);
+                    }
+
+                    if( templateTexture == NULL)
+                    {
+                        if(HeightmapTimewarpRTs[eyeNum].pColorTex != NULL)
+                        {
+                            HeightmapTimewarpRTs[eyeNum].pColorTex = NULL;
+                            HeightmapTimewarpRTs[eyeNum].pDepthTex = NULL;
+                        }
+                    }
+                    else if( HeightmapTimewarpRTs[eyeNum].pColorTex == NULL ||
+                             HeightmapTimewarpRTs[eyeNum].Size.w != templateTexture->GetWidth() || 
+                             HeightmapTimewarpRTs[eyeNum].Size.h != templateTexture->GetHeight())
+                    {
+                        HeightmapTimewarpRTs[eyeNum].Size.w = templateTexture->GetWidth();
+                        HeightmapTimewarpRTs[eyeNum].Size.h = templateTexture->GetHeight();
+
+                        HeightmapTimewarpRTs[eyeNum].pColorTex = *CreateTexture(Texture_RGBA | Texture_RenderTarget | templateTexture->GetSamples(),
+                            HeightmapTimewarpRTs[eyeNum].Size.w, HeightmapTimewarpRTs[eyeNum].Size.h, NULL);
+
+                        HeightmapTimewarpRTs[eyeNum].pColorTex->SetSampleMode ( Sample_ClampBorder | Sample_Linear);
+
+                        HeightmapTimewarpRTs[eyeNum].pDepthTex = *CreateTexture(Texture_Depth | Texture_RenderTarget | Texture_SampleDepth | templateTexture->GetSamples(),
+                            HeightmapTimewarpRTs[eyeNum].Size.w, HeightmapTimewarpRTs[eyeNum].Size.h, NULL);
+                    }
+                }
+
+                Matrix4f identity;
+            
+                // Pass 1 - do heightmap-based positional time warp
+                {
+                    SetDepthMode(true, true);
+
+			        ShaderFill heightmapFill(pPostProcessHeightmapShader);
+
+                    for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+                    {
+                        const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
+
+                        switch(eyeNum)
+                        {
+                        case 0:
+                            {
+                                heightmapFill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex );
+                                heightmapFill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pDepthTex, Shader_Vertex );
+                                SetRenderTarget(HeightmapTimewarpRTs[eyeNum]);  // output to temp buffers
+                            }
+                            break;
+                        case 1:
+                            if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) )
+                            {
+                                heightmapFill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex );
+                                heightmapFill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pDepthTex, Shader_Vertex );
+                                SetRenderTarget(HeightmapTimewarpRTs[eyeNum]);  // output to temp buffers
+                            }
+                            break;
+                        default: OVR_ASSERT(false);
+                        }
+
+                        SetViewport(stereoParams.RenderedViewport);
+                        Clear();
+
+                        Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
+
+                        Matrix4f matRenderFromNowStart = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
+                        Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+
+                        pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
+                        pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+
+                        pPostProcessHeightmapShader->SetUniform2f("DepthDimSize",      (float)pHmdSpaceLayerRenderTargetLeftOrBothEyes->Size.w, (float)pHmdSpaceLayerRenderTargetLeftOrBothEyes->Size.h);
+
+                        // TODO: Combining "proj * xform * invProj" leads to artifacts due to precision loss with the inversion
+                        pPostProcessHeightmapShader->SetUniform4x4f("EyeXformStart", stereoParams.RenderedProjection * matRenderFromNowStart);
+                        pPostProcessHeightmapShader->SetUniform4x4f("EyeXformEnd",   stereoParams.RenderedProjection * matRenderFromNowEnd);
+                        //pPostProcessHeightmapShader->SetUniform4x4f("EyeXformStart", stereoParams.RenderedProjection * matRenderFromNowStart * stereoParams.RenderedProjection.Inverted());
+                        //pPostProcessHeightmapShader->SetUniform4x4f("EyeXformEnd",   stereoParams.RenderedProjection * matRenderFromNowEnd * stereoParams.RenderedProjection.Inverted());
+                        //pPostProcessHeightmapShader->SetUniform4x4f("Projection",       stereoParams.RenderedProjection);
+                        pPostProcessHeightmapShader->SetUniform4x4f("InvProjection",    stereoParams.RenderedProjection.Inverted());
+
+                        Render(&heightmapFill, pHeightmapMeshVertexBuffer[eyeNum], pHeightmapMeshIndexBuffer[eyeNum], identity, 0, HeightmapMeshNumTris[eyeNum] * 3, Prim_Triangles, Mesh_Heightmap);
+                    }
+                }
+
+                // Pass 2 - do distortion
+                {
+                    SetDefaultRenderTarget();
+                    SetDepthMode(false, false);
+
+                    Recti vp( 0, 0, WindowWidth, WindowHeight );
+                    SetViewport(vp);
+                    float r, g, b, a;
+                    DistortionClearColor.GetRGBA(&r, &g, &b, &a);
+                    Clear(r, g, b, a);
+
+                    ShaderFill fill(pPostProcessShader);
+                    fill.SetTexture ( 0, HeightmapTimewarpRTs[0].pColorTex );
+                    fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetLeftOrBothEyes->pColorTex : NULL));
+                    pPostProcessShader->SetUniform1f("UseOverlay", usingOverlay ? 1.0f : 0.0f);
+
+			        for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+			        {
+				        const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft : stereoParamsRight;
+
+                        // TODO: Could avoid the need for these vars since the mesh doesn't actually to time warping
+				        pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
+				        pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+
+				        if ( ( HeightmapTimewarpRTs[1].pColorTex != NULL ) && ( eyeNum == 1 ) )
+				        {
+					        fill.SetTexture ( 0, HeightmapTimewarpRTs[1].pColorTex );
+                            fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetRight->pColorTex : NULL));
+				        }
+
+				        Render(&fill, pDistortionMeshVertexBuffer[eyeNum], pDistortionMeshIndexBuffer[eyeNum], identity, 0, DistortionMeshNumTris[eyeNum] * 3, Prim_Triangles, Mesh_Distortion);
+			        }
+                }
+		    }
+            break;
+
+        case PostProcess_PixelDistortion:
 			{
 				float r, g, b, a;
 				DistortionClearColor.GetRGBA(&r, &g, &b, &a);
@@ -1201,18 +1410,20 @@ namespace OVR { namespace Render {
 						0, 0, 0,  1);
 					ShaderFill fill(pPostProcessShader);
 
-					if ( ( pSourceTextureRight != NULL ) && ( eyeNum == 1 ) )
+					if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) && ( eyeNum == 1 ) )
 					{
-						fill.SetTexture ( 0, pSourceTextureRight );
+						fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex );
 					}
 					else
 					{
-						fill.SetTexture ( 0, pSourceTextureLeftOrOnly );
+						fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex );
 					}
 					Render(&fill, pFullScreenVertexBuffer, NULL, view, 0, 4, Prim_TriangleStrip);
 				}
 			}
-			else if ( PostProcessingType == PostProcess_NoDistortion )
+            break;
+
+        case PostProcess_NoDistortion:
 			{
 				// Just splat the thing on the framebuffer with no distortion.
 				Clear ( 0.0f, 0.4f, 0.0f, 1.0f, 1.0f );
@@ -1225,8 +1436,8 @@ namespace OVR { namespace Render {
 				ortho.M[1][3] = 0.0f;
 				ortho.M[2][2] = 0;
 				SetProjection(ortho);
-				int rtWidth  = pSourceTextureLeftOrOnly->GetWidth();
-				int rtHeight = pSourceTextureLeftOrOnly->GetHeight();
+				int rtWidth  = pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex->GetWidth();
+				int rtHeight = pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex->GetHeight();
 
 				for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
 				{
@@ -1234,13 +1445,13 @@ namespace OVR { namespace Render {
 					SetViewport ( stereoParams.DistortionViewport );
 
 					Ptr<Texture> pTex;
-					if ( ( pSourceTextureRight != NULL ) && ( eyeNum == 1 ) )
+					if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) && ( eyeNum == 1 ) )
 					{
-						pTex = pSourceTextureRight;
+						pTex = pHmdSpaceLayerRenderTargetRight->pColorTex;
 					}
 					else
 					{
-						pTex = pSourceTextureLeftOrOnly;
+						pTex = pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex;
 					}
 
 					float ul = (float)( stereoParams.RenderedViewport.x                                   ) / (float)rtWidth;
@@ -1253,10 +1464,10 @@ namespace OVR { namespace Render {
 						Color(255,255,255,255), pTex );
 				}
 			}
-			else
-			{
-				OVR_ASSERT ( !"Unknown distortion type" );
-			}
+            break;
+
+        default:
+            OVR_ASSERT ( !"Unknown distortion type" );
 		}
 	}
 

@@ -251,7 +251,7 @@ struct PositionCalibrationImpl
 		EncodeSInt16(Buffer+18, (SInt16) normal.y);
 		EncodeSInt16(Buffer+20, (SInt16) normal.z);
 
-        double rotation = Settings.Rotation * 1e4;
+        double rotation = Settings.Angle * 1e4;
 		EncodeSInt16(Buffer+22, (SInt16) rotation);
 
 		EncodeUInt16(Buffer+24, Settings.PositionIndex);
@@ -272,7 +272,7 @@ struct PositionCalibrationImpl
 		Settings.Normal.y = DecodeSInt16(Buffer + 18) * 1e-6;
 		Settings.Normal.z = DecodeSInt16(Buffer + 20) * 1e-6;
 
-		Settings.Rotation = DecodeSInt16(Buffer + 22) * 1e-4;
+		Settings.Angle = DecodeSInt16(Buffer + 22) * 1e-4;
 
 		Settings.PositionIndex = DecodeUInt16(Buffer + 24);
 		Settings.NumPositions  = DecodeUInt16(Buffer + 26);

@@ -57,7 +57,7 @@ public:
     // ***** Public DistortionRenderer interface
 
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
-                            unsigned hmdCaps, unsigned distortionCaps);
+                            unsigned distortionCaps);
 
     virtual void SubmitEye(int eyeId, ovrTexture* eyeTexture);
 
@@ -69,6 +69,21 @@ public:
 	// Similar to ovr_WaitTillTime but it also flushes GPU.
 	// Note, it exits when time expires, even if GPU is not in idle state yet.
 	double       FlushGpuAndWaitTillTime(double absTime);
+
+protected:
+
+	class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
+	{
+	public:
+		GraphicsState(ID3D1xDeviceContext* context);
+		virtual void Save();
+		virtual void Restore();
+
+	protected:
+		ID3D1xRasterizerState* rasterizerState;
+		ID3D1xSamplerState* samplerStates[8];
+		ID3D1xDeviceContext* context;
+	};
 
 private:
     // Helpers
@@ -102,6 +117,8 @@ private:
 	
     // U,V scale and offset needed for timewarp.
     ovrVector2f         UVScaleOffset[2][2];
+    ovrSizei            EyeTextureSize[2];
+    ovrRecti            EyeRenderViewport[2];
 
     //Ptr<Buffer>         mpFullScreenVertexBuffer;
 

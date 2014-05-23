@@ -61,7 +61,12 @@ public:
     bool      SetupWindow(int w, int h);
     void      DestroyWindow();
     void      ShowWindow(bool visible);
-    void      Exit(int exitcode) { Quit = 1; ExitCode = exitcode; }
+    void      Exit(int exitcode)
+	{
+		for (MSG msg; PeekMessage(&msg, NULL, 0, 0, PM_REMOVE); )
+			;
+		Quit = 1; ExitCode = exitcode;
+	}
 
     RenderDevice* SetupGraphics(const SetupGraphicsDeviceSet& setupGraphicsDesc,
                                 const char* type,

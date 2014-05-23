@@ -3,7 +3,7 @@
 Filename    :   Render_GL_Device.h
 Content     :   RenderDevice implementation header for OpenGL
 Created     :   September 10, 2012
-Authors     :   Andrew Reisse
+Authors     :   Andrew Reisse, David Borel
 
 Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
@@ -27,37 +27,45 @@ limitations under the License.
 #include "../Render/Render_Device.h"
 
 #if defined(OVR_OS_WIN32)
-#include <Windows.h>
+    #include <Windows.h>
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/wglext.h>
+#elif defined(OVR_OS_MAC)
+    #include <OpenGL/gl3.h>
+    #include <OpenGL/gl3ext.h>
+#else
+    #include <GL/gl.h>
+    #include <GL/glext.h>
+    #include <GL/glx.h>
 #endif
 
-#if defined(OVR_OS_MAC)
-#include <OpenGL/gl.h>
-#include <OpenGL/glext.h>
-#else
-#ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-#endif
-#include <GL/gl.h>
-#include <GL/glext.h>
-#if defined(OVR_OS_WIN32)
-#include <GL/wglext.h>
-#endif
-#endif
 
 namespace OVR { namespace Render { namespace GL {
+    
+#if !defined(OVR_OS_MAC)
 
 // GL extension Hooks for PC.
 #if defined(OVR_OS_WIN32)
-    
+
 extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
 extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
-extern PFNGLGENFRAMEBUFFERSEXTPROC              glGenFramebuffersEXT;
-extern PFNGLDELETEFRAMEBUFFERSEXTPROC           glDeleteFramebuffersEXT;
+extern PFNWGLCHOOSEPIXELFORMATARBPROC           wglChoosePixelFormatARB;
+extern PFNWGLCREATECONTEXTATTRIBSARBPROC        wglCreateContextAttribsARB;
+
+#elif defined(OVR_OS_LINUX)
+
+extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
+
+#endif
+
+extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
+extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 extern PFNGLDELETESHADERPROC                    glDeleteShader;
-extern PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC       glCheckFramebufferStatusEXT;
-extern PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC      glFramebufferRenderbufferEXT;
-extern PFNGLFRAMEBUFFERTEXTURE2DEXTPROC         glFramebufferTexture2DEXT;
-extern PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebufferEXT;
+extern PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
+extern PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
+extern PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
+extern PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebuffer;
 extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
 extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
 extern PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
@@ -91,18 +99,17 @@ extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
 extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
 extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
 extern PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
-extern PFNGLRENDERBUFFERSTORAGEEXTPROC          glRenderbufferStorageEXT;
-extern PFNGLBINDRENDERBUFFEREXTPROC             glBindRenderbufferEXT;
-extern PFNGLGENRENDERBUFFERSEXTPROC             glGenRenderbuffersEXT;
-extern PFNGLDELETERENDERBUFFERSEXTPROC          glDeleteRenderbuffersEXT;
-
-// For testing
+extern PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
+extern PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
+extern PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
+extern PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
 extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
+extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
+extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
 
 extern void InitGLExtensions();
 
 #endif
-
 
 class RenderDevice;
 
@@ -227,12 +234,15 @@ class RenderDevice : public Render::RenderDevice
 
     Matrix4f    Proj;
 
+	GLuint Vao;
+
 protected:
     Ptr<Texture>             CurRenderTarget;
     Array<Ptr<Texture> >     DepthBuffers;
     GLuint                   CurrentFbo;
 
     const LightingParams*    Lighting;
+    bool SupportsVao;
     
 public:
     RenderDevice(const RendererParams& p);
@@ -243,8 +253,6 @@ public:
     virtual void FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex);
 
     virtual void SetViewport(const Recti& vp);
-
-    //virtual void SetScissor(int x, int y, int w, int h);
 		
     virtual void WaitUntilGpuIdle();
 
@@ -266,7 +274,7 @@ public:
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool useDistortionVertex = false);
+                        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                  const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
 

@@ -386,9 +386,7 @@ bool Sensor2DeviceImpl::getMagCalibrationReport(MagCalibrationReport* data)
 
 bool Sensor2DeviceImpl::SetPositionCalibrationReport(const PositionCalibrationReport& data)
 { 
-    Lock::Locker lock(&IndexedReportLock);
-
-	bool result;
+    bool result;
 	if (!GetManagerImpl()->GetThreadQueue()->
             PushCallAndWaitResult(this, &Sensor2DeviceImpl::setPositionCalibrationReport, &result, data))
 	{
@@ -409,20 +407,6 @@ bool Sensor2DeviceImpl::setPositionCalibrationReport(const PositionCalibrationRe
 	
 	PositionCalibrationImpl pci(data);
     return GetInternalDevice()->SetFeatureReport(pci.Buffer, PositionCalibrationImpl::PacketSize);
-}
-
-bool Sensor2DeviceImpl::GetPositionCalibrationReport(PositionCalibrationReport* data)
-{
-    Lock::Locker lock(&IndexedReportLock);
-
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
-            PushCallAndWaitResult(this, &Sensor2DeviceImpl::getPositionCalibrationReport, &result, data))
-	{
-		return false;
-	}
-
-	return result;
 }
 
 bool Sensor2DeviceImpl::getPositionCalibrationReport(PositionCalibrationReport* data)
@@ -454,10 +438,20 @@ bool Sensor2DeviceImpl::getPositionCalibrationReport(PositionCalibrationReport* 
 
 bool Sensor2DeviceImpl::GetAllPositionCalibrationReports(Array<PositionCalibrationReport>* data)
 {
-    Lock::Locker lock(&IndexedReportLock);
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
+        PushCallAndWaitResult(this, &Sensor2DeviceImpl::getAllPositionCalibrationReports, &result, data))
+    {
+        return false;
+    }
 
+    return result;
+}
+
+bool Sensor2DeviceImpl::getAllPositionCalibrationReports(Array<PositionCalibrationReport>* data)
+{
     PositionCalibrationReport pc;
-    bool result = GetPositionCalibrationReport(&pc);
+    bool result = getPositionCalibrationReport(&pc);
     if (!result)
         return false;
 
@@ -467,7 +461,7 @@ bool Sensor2DeviceImpl::GetAllPositionCalibrationReports(Array<PositionCalibrati
 
     for (int i = 0; i < positions; i++)
     {
-        result = GetPositionCalibrationReport(&pc);
+        result = getPositionCalibrationReport(&pc);
         if (!result)
             return false;
         OVR_ASSERT(pc.NumPositions == positions);
@@ -697,8 +691,6 @@ bool Sensor2DeviceImpl::getKeepAliveMuxReport(KeepAliveMuxReport* data)
 
 bool Sensor2DeviceImpl::SetTemperatureReport(const TemperatureReport& data)
 {
-    Lock::Locker lock(&IndexedReportLock);
-
     // direct call if we are already on the device manager thread
     if (GetCurrentThreadId() == GetManagerImpl()->GetThreadId())
     {
@@ -721,32 +713,41 @@ bool Sensor2DeviceImpl::setTemperatureReport(const TemperatureReport& data)
     return GetInternalDevice()->SetFeatureReport(ti.Buffer, TemperatureImpl::PacketSize);
 }
 
-bool Sensor2DeviceImpl::GetTemperatureReport(TemperatureReport* data)
+bool Sensor2DeviceImpl::getTemperatureReport(TemperatureReport* data)
 {
-    Lock::Locker lock(&IndexedReportLock);
-
-    // direct call if we are already on the device manager thread
-    if (GetCurrentThreadId() == GetManagerImpl()->GetThreadId())
+    TemperatureImpl ti;
+    if (GetInternalDevice()->GetFeatureReport(ti.Buffer, TemperatureImpl::PacketSize))
     {
-        return getTemperatureReport(data);
+        ti.Unpack();
+        *data = ti.Settings;
+        return true;
     }
 
-	bool result;
-	if (!GetManagerImpl()->GetThreadQueue()->
-            PushCallAndWaitResult(this, &Sensor2DeviceImpl::getTemperatureReport, &result, data))
-	{
-		return false;
-	}
-
-	return result;
+    return false;
 }
 
 bool Sensor2DeviceImpl::GetAllTemperatureReports(Array<Array<TemperatureReport> >* data)
 {
-    Lock::Locker lock(&IndexedReportLock);
+    // direct call if we are already on the device manager thread
+    if (GetCurrentThreadId() == GetManagerImpl()->GetThreadId())
+    {
+        return getAllTemperatureReports(data);
+    }
 
+    bool result;
+    if (!GetManagerImpl()->GetThreadQueue()->
+        PushCallAndWaitResult(this, &Sensor2DeviceImpl::getAllTemperatureReports, &result, data))
+    {
+        return false;
+    }
+
+    return result;
+}
+
+bool Sensor2DeviceImpl::getAllTemperatureReports(Array<Array<TemperatureReport> >* data)
+{
     TemperatureReport t;
-    bool result = GetTemperatureReport(&t);
+    bool result = getTemperatureReport(&t);
     if (!result)
         return false;
 
@@ -759,7 +760,7 @@ bool Sensor2DeviceImpl::GetAllTemperatureReports(Array<Array<TemperatureReport> 
     for (int i = 0; i < bins; i++)
         for (int j = 0; j < samples; j++)
         {
-            result = GetTemperatureReport(&t);
+            result = getTemperatureReport(&t);
             if (!result)
                 return false;
             OVR_ASSERT(t.NumBins == bins && t.NumSamples == samples);
@@ -767,19 +768,6 @@ bool Sensor2DeviceImpl::GetAllTemperatureReports(Array<Array<TemperatureReport> 
             (*data)[t.Bin][t.Sample] = t;
         }
     return true;
-}
-
-bool Sensor2DeviceImpl::getTemperatureReport(TemperatureReport* data)
-{
-    TemperatureImpl ti;
-    if (GetInternalDevice()->GetFeatureReport(ti.Buffer, TemperatureImpl::PacketSize))
-    {
-        ti.Unpack();
-        *data = ti.Settings;
-        return true;
-    }
-
-    return false;
 }
 
 bool Sensor2DeviceImpl::GetGyroOffsetReport(GyroOffsetReport* data)
@@ -1124,5 +1112,13 @@ double Sensor2DeviceImpl::OnTicks(double tickSeconds)
     }
     return NextKeepAliveTickSeconds - tickSeconds;
 }
+
+/*
+// TBD: don't report calibration for now, until we figure out the logic between camera and mag yaw correction
+bool Sensor2DeviceImpl::IsMagCalibrated()
+{
+    return pCalibration->IsMagCalibrated();
+}
+*/
 
 } // namespace OVR

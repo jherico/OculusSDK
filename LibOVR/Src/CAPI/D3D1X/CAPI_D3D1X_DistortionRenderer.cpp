@@ -88,8 +88,8 @@ static PrecompiledShader DistortionPixelShaderLookup[DistortionPixelShaderCount]
 
 void DistortionShaderBitIndexCheck()
 {
-    OVR_COMPILER_ASSERT(ovrDistortion_Chromatic == 1);
-    OVR_COMPILER_ASSERT(ovrDistortion_TimeWarp  == 2);
+    OVR_COMPILER_ASSERT(ovrDistortionCap_Chromatic == 1);
+    OVR_COMPILER_ASSERT(ovrDistortionCap_TimeWarp  == 2);
 }
 
 
@@ -135,6 +135,10 @@ DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager
                                        const HMDRenderState& renderState)
     : CAPI::DistortionRenderer(ovrRenderAPI_D3D11, hmd, timeManager, renderState)
 {
+    EyeTextureSize[0]    = Sizei(0);
+    EyeRenderViewport[0] = Recti();
+    EyeTextureSize[1]    = Sizei(0);
+    EyeRenderViewport[1] = Recti();
 }
 
 DistortionRenderer::~DistortionRenderer()
@@ -152,11 +156,8 @@ CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
 
 
 bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
-                                    unsigned hmdCaps, unsigned distortionCaps)
+                                    unsigned distortionCaps)
 {
-    // TBD: Decide if hmdCaps are needed here or are a part of RenderState
-    OVR_UNUSED(hmdCaps);
-
     const ovrD3D1X(Config)* config = (const ovrD3D1X(Config)*)apiConfig;
 
     if (!config)
@@ -177,6 +178,8 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
     RParams.pSwapChain     = config->D3D_NS.pSwapChain;
     RParams.RTSize         = config->D3D_NS.Header.RTSize;
     RParams.Multisample    = config->D3D_NS.Header.Multisample;
+
+	GfxState = *new GraphicsState(RParams.pContext);
 
     DistortionCaps = distortionCaps;
 
@@ -217,11 +220,14 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
     {
         // Use tex->D3D_NS.Header.RenderViewport to update UVs for rendering in case they changed.
         // TBD: This may be optimized through some caching. 
-        ovrEyeDesc     ed = RState.EyeRenderDesc[eyeId].Desc;
-        ed.TextureSize    = tex->D3D_NS.Header.TextureSize;
-        ed.RenderViewport = tex->D3D_NS.Header.RenderViewport;
+        EyeTextureSize[eyeId]    = tex->D3D_NS.Header.TextureSize;
+        EyeRenderViewport[eyeId] = tex->D3D_NS.Header.RenderViewport;
 
-        ovrHmd_GetRenderScaleAndOffset(HMD, ed, DistortionCaps, UVScaleOffset[eyeId]);
+        const ovrEyeRenderDesc& erd = RState.EyeRenderDesc[eyeId];
+
+        ovrHmd_GetRenderScaleAndOffset(erd.Fov,
+                                       EyeTextureSize[eyeId], EyeRenderViewport[eyeId],
+                                       UVScaleOffset[eyeId]);
 
         pEyeTextures[eyeId]->UpdatePlaceholderTexture(tex->D3D_NS.pTexture, tex->D3D_NS.pSRView,
                                                       tex->D3D_NS.Header.TextureSize);
@@ -231,32 +237,9 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
 void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor,
                                                     unsigned char* latencyTester2DrawColor)
 {
-
-#if 0
-
-    // MA:  This causes orientation and positional stutter!! NOT USABLE.
-    if (!TimeManager.NeedDistortionTimeMeasurement() &&
-        (RState.DistortionCaps & ovrDistortion_TimeWarp))
-    {
-        // Wait for timewarp distortion if it is time
-        FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
-    }
-
-    // Always measure distortion time so that TimeManager can better
-    // estimate latency-reducing time-warp wait timing.
-    {
-        GpuProfiler.BeginQuery();
-
-        renderDistortion(pEyeTextures[0], pEyeTextures[1]);
-
-        GpuProfiler.EndQuery();
-        TimeManager.AddDistortionTimeMeasurement(GpuProfiler.GetTiming(false));
-    }
-#else
-
     if (!TimeManager.NeedDistortionTimeMeasurement())
     {
-		if (RState.DistortionCaps & ovrDistortion_TimeWarp)
+		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
 		{
 			// Wait for timewarp distortion if it is time and Gpu idle
 			FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
@@ -276,7 +259,6 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
         WaitUntilGpuIdle();
         TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
     }
-#endif
 
     if(latencyTesterDrawColor)
     {
@@ -291,7 +273,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
     {
         if (RParams.pSwapChain)
         {
-            UINT swapInterval = (RState.HMDCaps & ovrHmdCap_NoVSync) ? 0 : 1;
+            UINT swapInterval = (RState.EnabledHmdCaps & ovrHmdCap_NoVSync) ? 0 : 1;
             RParams.pSwapChain->Present(swapInterval, 0);
             
             // Force GPU to flush the scene, resulting in the lowest possible latency.
@@ -380,9 +362,11 @@ void DistortionRenderer::initBuffersAndShaders()
 
 //        double startT = ovr_GetTimeInSeconds();
 
-        if (!ovrHmd_CreateDistortionMesh( HMD, RState.EyeRenderDesc[eyeNum].Desc,
+        if (!ovrHmd_CreateDistortionMesh( HMD,
+                                          RState.EyeRenderDesc[eyeNum].Eye,
+                                          RState.EyeRenderDesc[eyeNum].Fov,
                                           RState.DistortionCaps,
-                                          UVScaleOffset[eyeNum], &meshData) )
+                                          &meshData) )
         {
             OVR_ASSERT(false);
             continue;
@@ -413,9 +397,9 @@ void DistortionRenderer::initBuffersAndShaders()
         }
 
         DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
+		DistortionMeshVBs[eyeNum]->Data(Buffer_Vertex | Buffer_ReadOnly, pVBVerts, sizeof(DistortionVertex)* meshData.VertexCount);
         DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index, meshData.pIndexData, ( sizeof(INT16) * meshData.IndexCount ) );
+		DistortionMeshIBs[eyeNum]->Data(Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, (sizeof(INT16)* meshData.IndexCount));
 
         OVR_FREE ( pVBVerts );
         ovrHmd_DestroyDistortionMesh( &meshData );
@@ -451,7 +435,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         DistortionShader->SetUniform2f("EyeToSourceUVScale",  UVScaleOffset[eyeNum][0].x, UVScaleOffset[eyeNum][0].y);
         DistortionShader->SetUniform2f("EyeToSourceUVOffset", UVScaleOffset[eyeNum][1].x, UVScaleOffset[eyeNum][1].y);
         
-		if (DistortionCaps & ovrDistortion_TimeWarp)
+		if (DistortionCaps & ovrDistortionCap_TimeWarp)
 		{                       
             ovrMatrix4f timeWarpMatrices[2];            
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
@@ -768,6 +752,53 @@ void DistortionRenderer::destroy()
     }
 
     LatencyTesterQuadVB.Clear();
+}
+
+
+DistortionRenderer::GraphicsState::GraphicsState(ID3D1xDeviceContext* c)
+: context(c)
+, rasterizerState(NULL)
+{
+	for (int i = 0; i < 8; ++i)
+		samplerStates[i] = NULL;
+}
+
+
+void DistortionRenderer::GraphicsState::Save()
+{
+	if (rasterizerState != NULL)
+		rasterizerState->Release();
+
+	context->RSGetState(&rasterizerState);
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (samplerStates[i] != NULL)
+			samplerStates[i]->Release();
+	}
+
+	context->PSGetSamplers(0, 8, samplerStates);
+}
+
+
+void DistortionRenderer::GraphicsState::Restore()
+{
+	if (rasterizerState != NULL)
+	{
+		context->RSSetState(rasterizerState);
+		rasterizerState->Release();
+		rasterizerState = NULL;
+	}
+
+	for (int i = 0; i < 8; ++i)
+	{
+		if (samplerStates[i] == NULL)
+			continue;
+
+		context->PSSetSamplers(0, 1, &samplerStates[i]);
+		samplerStates[i]->Release();
+		samplerStates[i] = NULL;
+	}
 }
 
 }}} // OVR::CAPI::D3D1X

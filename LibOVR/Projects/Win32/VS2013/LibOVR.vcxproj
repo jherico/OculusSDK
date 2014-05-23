@@ -68,6 +68,8 @@
     <ClInclude Include="..\..\..\Src\OVR_JSON.h" />
     <ClInclude Include="..\..\..\Src\OVR_LatencyTestImpl.h" />
     <ClInclude Include="..\..\..\Src\OVR_Profile.h" />
+    <ClInclude Include="..\..\..\Src\OVR_Recording.h" />
+    <ClInclude Include="..\..\..\Src\OVR_RecordingDefs.h" />
     <ClInclude Include="..\..\..\Src\OVR_Sensor2Impl.h" />
     <ClInclude Include="..\..\..\Src\OVR_Sensor2ImplUtil.h" />
     <ClInclude Include="..\..\..\Src\OVR_SensorCalibration.h" />
@@ -137,6 +139,7 @@
     <ClCompile Include="..\..\..\Src\OVR_JSON.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_LatencyTestImpl.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_Profile.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Recording.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_Sensor2Impl.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_SensorCalibration.cpp" />
     <ClCompile Include="..\..\..\Src\OVR_SensorFilter.cpp" />

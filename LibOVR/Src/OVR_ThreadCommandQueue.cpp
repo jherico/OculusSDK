@@ -179,8 +179,7 @@ class ThreadCommandQueueImpl : public NewOverrideBase
 public:
 
     ThreadCommandQueueImpl(ThreadCommandQueue* queue)
-        : pQueue(queue), CommandBuffer(2048),
-          ExitEnqueued(false), ExitProcessed(false)
+        : pQueue(queue), ExitEnqueued(false), ExitProcessed(false), CommandBuffer(2048)
     {
     }
     ~ThreadCommandQueueImpl();

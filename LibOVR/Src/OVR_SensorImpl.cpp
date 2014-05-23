@@ -166,7 +166,11 @@ void SensorDisplayInfoImpl::Unpack()
 //-------------------------------------------------------------------------------------
 // ***** SensorDeviceFactory
 
-SensorDeviceFactory SensorDeviceFactory::Instance;
+SensorDeviceFactory &SensorDeviceFactory::GetInstance()
+{
+		static SensorDeviceFactory instance;
+		return instance;
+}
 
 void SensorDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 {
@@ -572,6 +576,11 @@ void SensorDeviceImpl::GetFactoryCalibration(Vector3f* AccelOffset, Vector3f* Gy
     *Temperature = CalibrationTemperature;
 }
 
+bool SensorDeviceImpl::IsMagCalibrated()
+{
+    return magCalibrated;
+}
+
 void SensorDeviceImpl::SetOnboardCalibrationEnabled(bool enabled)
 {
     // Push call with wait.
@@ -731,7 +740,6 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
                 sensors.RotationRate        = LastRotationRate;
                 sensors.MagneticField       = LastMagneticField;
                 sensors.Temperature         = LastTemperature;
-                sensors.MagCalibrated       = magCalibrated;
 
                 HandlerRef.Call(sensors);
             }
@@ -769,7 +777,6 @@ void SensorDeviceImpl::onTrackerMessage(TrackerMessage* message)
     if (HandlerRef.HasHandlers())
     {
         MessageBodyFrame sensors(this);
-        sensors.MagCalibrated = magCalibrated;
         UByte            iterations = s.SampleCount;
 
         if (s.SampleCount > 3)
@@ -1058,7 +1065,7 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
                                 time(&now);
 
                                 // parse the calibration time
-                                time_t calibration_time = now;
+                                //time_t calibration_time = now;
                                 JSON* caltime = calibration->GetItemByName("Time");
                                 if (caltime)
                                 {
@@ -1083,7 +1090,7 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
 #endif
                                     ct.tm_year -= 1900;
                                     ct.tm_mon--;
-                                    calibration_time = mktime(&ct);
+                                    //calibration_time = mktime(&ct);
                                 }
                                                         
                                 // parse the calibration matrix
@@ -1111,6 +1118,48 @@ bool SensorDeviceImpl::GetMagCalibrationReport(MagCalibrationReport* data)
     return true;
 }
 
+
+bool SensorDeviceImpl::SetSerialReport(const SerialReport& data)
+{ 
+	bool result;
+	if (!GetManagerImpl()->GetThreadQueue()->
+            PushCallAndWaitResult(this, &Sensor2DeviceImpl::setSerialReport, &result, data))
+	{
+		return false;
+	}
+
+	return result;
+}
+
+bool SensorDeviceImpl::setSerialReport(const SerialReport& data)
+{
+    SerialImpl di(data);
+    return GetInternalDevice()->SetFeatureReport(di.Buffer, SerialImpl::PacketSize);
+}
+
+bool SensorDeviceImpl::GetSerialReport(SerialReport* data)
+{
+	bool result;
+	if (!GetManagerImpl()->GetThreadQueue()->
+            PushCallAndWaitResult(this, &Sensor2DeviceImpl::getSerialReport, &result, data))
+	{
+		return false;
+	}
+
+	return result;
+}
+
+bool SensorDeviceImpl::getSerialReport(SerialReport* data)
+{
+    SerialImpl di;
+    if (GetInternalDevice()->GetFeatureReport(di.Buffer, SerialImpl::PacketSize))
+    {
+        di.Unpack();
+        *data = di.Settings;
+        return true;
+    }
+
+    return false;
+}
+
 } // namespace OVR
-
-

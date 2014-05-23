@@ -59,7 +59,7 @@ OculusWorldDemoApp::OculusWorldDemoApp()
       CenterPupilDepthMeters(0.05f),
       ForceZeroHeadMovement(false),
       VsyncEnabled(true),
-      MultisampleEnabled(true),
+      MultisampleEnabled(false),
       IsLowPersistence(true),
       DynamicPrediction(true),
       PositionTrackingEnabled(true),
@@ -77,6 +77,8 @@ OculusWorldDemoApp::OculusWorldDemoApp()
     SecondsPerFrame = 0.0f;
     FrameCounter    = 0;
     LastFpsUpdate   = 0;
+
+    EyeRenderSize[0] = EyeRenderSize[1] = Sizei(0);
 
     DistortionClearBlue = false;
 }
@@ -138,7 +140,7 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
     FovSideTanLimit = FovPort::Max(HmdDesc.MaxEyeFov[0], HmdDesc.MaxEyeFov[1]).GetMaxSideTan();
     FovSideTanMax   = FovPort::Max(HmdDesc.DefaultEyeFov[0], HmdDesc.DefaultEyeFov[1]).GetMaxSideTan();
 
-    PositionTrackingEnabled = (HmdDesc.Caps & ovrHmdCap_Position) ? true : false;
+    PositionTrackingEnabled = (HmdDesc.SensorCaps & ovrSensorCap_Position) ? true : false;
 
 
     // *** Configure HMD Stereo settings.
@@ -189,7 +191,11 @@ bool OculusWorldDemoApp::SetupWindowAndRendering(int argc, const char** argv)
 
     // *** Initialize Rendering
 
+#if defined(OVR_OS_WIN32)
     const char* graphics = "d3d11";
+#else
+    const char* graphics = "GL";
+#endif
 
     // Select renderer based on command line arguments.
     for(int i = 1; i < argc; i++)
@@ -322,11 +328,11 @@ void OculusWorldDemoApp::PopulateOptionMenu()
     Menu.AddBool("MultiSample 'F4'",    &MultisampleEnabled)    .AddShortcutKey(Key_F4).SetNotify(this, &OWD::MultisampleChange);
     
     // Add DK2 options to menu only for that headset.
-    if (HmdDesc.Caps & ovrHmdCap_Position)
+    if (HmdDesc.SensorCaps & ovrSensorCap_Position)
     {
-        Menu.AddBool("Low Persistence 'P'",      &IsLowPersistence).     
+        Menu.AddBool("Low Persistence 'P'",      &IsLowPersistence).
                                                   AddShortcutKey(Key_P).SetNotify(this, &OWD::HmdSettingChange);
-        Menu.AddBool("Dynamic Prediction",      &DynamicPrediction).     
+        Menu.AddBool("Dynamic Prediction",      &DynamicPrediction).
                                                   SetNotify(this, &OWD::HmdSettingChange);
         Menu.AddBool("Positional Tracking 'X'",  &PositionTrackingEnabled).
                                                   AddShortcutKey(Key_X).SetNotify(this, &OWD::HmdSettingChange);
@@ -338,16 +344,14 @@ void OculusWorldDemoApp::CalculateHmdValues()
 {
     // Initialize eye rendering information for ovrHmd_Configure.
     // The viewport sizes are re-computed in case RenderTargetSize changed due to HW limitations.
-    ovrEyeDesc eyes[2];
-    eyes[0].Eye = ovrEye_Left;
-    eyes[1].Eye = ovrEye_Right;
-    eyes[0].Fov = HmdDesc.DefaultEyeFov[0];
-    eyes[1].Fov = HmdDesc.DefaultEyeFov[1];
+    ovrFovPort eyeFov[2];
+    eyeFov[0] = HmdDesc.DefaultEyeFov[0];
+    eyeFov[1] = HmdDesc.DefaultEyeFov[1];
 
     // Clamp Fov based on our dynamically adjustable FovSideTanMax.
     // Most apps should use the default, but reducing Fov does reduce rendering cost.
-    eyes[0].Fov = FovPort::Min(eyes[0].Fov, FovPort(FovSideTanMax));
-    eyes[1].Fov = FovPort::Min(eyes[1].Fov, FovPort(FovSideTanMax));
+    eyeFov[0] = FovPort::Min(eyeFov[0], FovPort(FovSideTanMax));
+    eyeFov[1] = FovPort::Min(eyeFov[1], FovPort(FovSideTanMax));
 
 
     if (ForceZeroIpd)
@@ -357,28 +361,30 @@ void OculusWorldDemoApp::CalculateHmdValues()
         //  2) Sets eye ViewAdjust values to 0.0 (effective IPD == 0)
         //  3) Uses only the Left texture for rendering.
         
-        eyes[0].Fov = FovPort::Max(eyes[0].Fov, eyes[1].Fov);
-        eyes[1].Fov = eyes[0].Fov;
+        eyeFov[0] = FovPort::Max(eyeFov[0], eyeFov[1]);
+        eyeFov[1] = eyeFov[0];
 
         Sizei recommenedTexSize = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Left,
-                                                           eyes[0].Fov, DesiredPixelDensity);
+                                                           eyeFov[0], DesiredPixelDensity);
 
-        eyes[0].TextureSize         = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTexSize);
-        eyes[1].TextureSize         = eyes[0].TextureSize;
-        eyes[0].RenderViewport.Pos  = Vector2i(0,0);
-        eyes[0].RenderViewport.Size = Sizei::Min(eyes[0].TextureSize, recommenedTexSize);
-        eyes[1].RenderViewport      = eyes[0].RenderViewport;
+        Sizei textureSize = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTexSize);
+
+        EyeRenderSize[0] = Sizei::Min(textureSize, recommenedTexSize);
+        EyeRenderSize[1] = EyeRenderSize[0];
 
         // Store texture pointers that will be passed for rendering.
-        EyeTexture[0] = RenderTargets[Rendertarget_Left].Tex;
-        EyeTexture[1] = RenderTargets[Rendertarget_Left].Tex;
+        EyeTexture[0]                       = RenderTargets[Rendertarget_Left].Tex;
+        EyeTexture[0].Header.TextureSize    = textureSize;
+        EyeTexture[0].Header.RenderViewport = Recti(EyeRenderSize[0]);
+        // Right eye is the same.
+        EyeTexture[1] = EyeTexture[0];
     }
 
     else
     {
         // Configure Stereo settings. Default pixel density is 1.0f.
-        Sizei recommenedTex0Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Left,  eyes[0].Fov, DesiredPixelDensity);
-        Sizei recommenedTex1Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Right, eyes[1].Fov, DesiredPixelDensity);
+        Sizei recommenedTex0Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Left,  eyeFov[0], DesiredPixelDensity);
+        Sizei recommenedTex1Size = ovrHmd_GetFovTextureSize(Hmd, ovrEye_Right, eyeFov[1], DesiredPixelDensity);
 
         if (RendertargetIsSharedByBothEyes)
         {
@@ -390,46 +396,55 @@ void OculusWorldDemoApp::CalculateHmdValues()
 
             // Don't draw more then recommended size; this also ensures that resolution reported
             // in the overlay HUD size is updated correctly for FOV/pixel density change.            
-            Sizei leftSize  = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex0Size);
-            Sizei rightSize = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex1Size);
-
-            eyes[0].TextureSize     = rtSize;
-            eyes[1].TextureSize     = rtSize;
-            eyes[0].RenderViewport  = Recti(Vector2i(0), leftSize);            
-            eyes[1].RenderViewport  = Recti(Vector2i((rtSize.w+1)/2, 0), rightSize);
+            EyeRenderSize[0] = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex0Size);
+            EyeRenderSize[1] = Sizei::Min(Sizei(rtSize.w/2, rtSize.h), recommenedTex1Size);
 
             // Store texture pointers that will be passed for rendering.
             // Same texture is used, but with different viewports.
-            EyeTexture[0] = RenderTargets[Rendertarget_BothEyes].Tex;
-            EyeTexture[1] = RenderTargets[Rendertarget_BothEyes].Tex;
-            EyeTexture[0].Header.RenderViewport = eyes[0].RenderViewport;
-            EyeTexture[1].Header.RenderViewport = eyes[1].RenderViewport;
+            EyeTexture[0]                       = RenderTargets[Rendertarget_BothEyes].Tex;
+            EyeTexture[0].Header.TextureSize    = rtSize;
+            EyeTexture[0].Header.RenderViewport = Recti(Vector2i(0), EyeRenderSize[0]);
+            EyeTexture[1]                       = RenderTargets[Rendertarget_BothEyes].Tex;
+            EyeTexture[1].Header.TextureSize    = rtSize;
+            EyeTexture[1].Header.RenderViewport = Recti(Vector2i((rtSize.w+1)/2, 0), EyeRenderSize[1]);
         }
 
         else
         {
-            eyes[0].TextureSize     = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTex0Size);
-            eyes[1].TextureSize     = EnsureRendertargetAtLeastThisBig(Rendertarget_Right, recommenedTex1Size);
-            eyes[0].RenderViewport  = Recti(Sizei::Min(eyes[0].TextureSize, recommenedTex0Size));
-            eyes[1].RenderViewport  = Recti(Sizei::Min(eyes[1].TextureSize, recommenedTex1Size));
+            Sizei tex0Size = EnsureRendertargetAtLeastThisBig(Rendertarget_Left,  recommenedTex0Size);
+            Sizei tex1Size = EnsureRendertargetAtLeastThisBig(Rendertarget_Right, recommenedTex1Size);
 
-            // Store texture pointers that will be passed for rendering.
-            EyeTexture[0] = RenderTargets[Rendertarget_Left].Tex;
-            EyeTexture[1] = RenderTargets[Rendertarget_Right].Tex;
+            EyeRenderSize[0] = Sizei::Min(tex0Size, recommenedTex0Size);
+            EyeRenderSize[1] = Sizei::Min(tex1Size, recommenedTex1Size);
+
+            // Store texture pointers and viewports that will be passed for rendering.
+            EyeTexture[0]                       = RenderTargets[Rendertarget_Left].Tex;
+            EyeTexture[0].Header.TextureSize    = tex0Size;
+            EyeTexture[0].Header.RenderViewport = Recti(EyeRenderSize[0]);
+            EyeTexture[1]                       = RenderTargets[Rendertarget_Right].Tex;
+            EyeTexture[1].Header.TextureSize    = tex1Size;
+            EyeTexture[1].Header.RenderViewport = Recti(EyeRenderSize[1]);
         }
     }
 
+    // Hmd caps.
+    unsigned hmdCaps = (VsyncEnabled ? 0 : ovrHmdCap_NoVSync) |
+                       ovrHmdCap_LatencyTest;
+    if (IsLowPersistence)
+        hmdCaps |= ovrHmdCap_LowPersistence;
+    if (DynamicPrediction)
+        hmdCaps |= ovrHmdCap_DynamicPrediction;
 
-    unsigned hmdCaps = ovrHmdCap_Orientation | (VsyncEnabled ? 0 : ovrHmdCap_NoVSync); 
-    unsigned distortionCaps = ovrDistortion_Chromatic;
+    ovrHmd_SetEnabledCaps(Hmd, hmdCaps);
 
-	ovrRenderAPIConfig config = pRender->Get_ovrRenderAPIConfig();
 
+	ovrRenderAPIConfig config         = pRender->Get_ovrRenderAPIConfig();
+    unsigned           distortionCaps = ovrDistortionCap_Chromatic;
     if (TimewarpEnabled)
-        distortionCaps |= ovrDistortion_TimeWarp;
+        distortionCaps |= ovrDistortionCap_TimeWarp;
 
-    if (!ovrHmd_ConfigureRendering( Hmd, &config, hmdCaps, distortionCaps,
-                                    eyes, EyeRenderDesc ))
+    if (!ovrHmd_ConfigureRendering( Hmd, &config, distortionCaps,
+                                    eyeFov, EyeRenderDesc ))
     {
         // Fail exit? TBD
         return;
@@ -443,14 +458,10 @@ void OculusWorldDemoApp::CalculateHmdValues()
     }
 
     // ovrHmdCap_LatencyTest - enables internal latency feedback
-    unsigned sensorCaps =  ovrHmdCap_Orientation|ovrHmdCap_YawCorrection|ovrHmdCap_LatencyTest;
+    unsigned sensorCaps = ovrSensorCap_Orientation|ovrSensorCap_YawCorrection;
     if (PositionTrackingEnabled)
-        sensorCaps |= ovrHmdCap_Position;
-    if (IsLowPersistence)
-        sensorCaps |= ovrHmdCap_LowPersistence;
-    if (DynamicPrediction)
-        sensorCaps |= ovrHmdCap_DynamicPrediction;
-    
+        sensorCaps |= ovrSensorCap_Position;
+      
     if (StartSensorCaps != sensorCaps)
     {
         ovrHmd_StartSensor(Hmd, sensorCaps, 0);
@@ -458,8 +469,8 @@ void OculusWorldDemoApp::CalculateHmdValues()
     }    
 
     // Calculate projections
-    Projection[0] = ovrMatrix4f_Projection(EyeRenderDesc[0].Desc.Fov,  0.01f, 10000.0f, true);
-    Projection[1] = ovrMatrix4f_Projection(EyeRenderDesc[1].Desc.Fov,  0.01f, 10000.0f, true);
+    Projection[0] = ovrMatrix4f_Projection(EyeRenderDesc[0].Fov,  0.01f, 10000.0f, true);
+    Projection[1] = ovrMatrix4f_Projection(EyeRenderDesc[1].Fov,  0.01f, 10000.0f, true);
 
     float    orthoDistance = 0.8f; // 2D is 0.8 meter from camera
     Vector2f orthoScale0   = Vector2f(1.0f) / Vector2f(EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
@@ -530,7 +541,7 @@ Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requ
 void OculusWorldDemoApp::OnResize(int width, int height)
 {
     WindowSize = Sizei(width, height);
-    // Re-calculate?
+    HmdSettingsChanged = true;
 }
 
 void OculusWorldDemoApp::OnMouseMove(int x, int y, int modifiers)
@@ -570,13 +581,9 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
         break;
 
     case Key_F9:
-#ifndef OVR_OS_LINUX
         // Cycle through displays, going fullscreen on each one.
         if (!down) ChangeDisplay ( false, true, false );
         break;
-#else
-        // On Linux, fallthrough to F10/F11
-#endif
         
 #ifdef OVR_OS_MAC
      // F11 is reserved on Mac, F10 doesn't work on Windows
@@ -652,13 +659,13 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
 //-----------------------------------------------------------------------------
 
 
-Matrix4f OculusWorldDemoApp::CalculateViewFromPose(const Posef& pose)
+Matrix4f OculusWorldDemoApp::CalculateViewFromPose(const Transformf& pose)
 {
-    Posef worldPose = ThePlayer.VirtualWorldPoseFromRealPose(pose);
+    Transformf worldPose = ThePlayer.VirtualWorldTransformfromRealPose(pose);
 
     // Rotate and position View Camera
-    Vector3f up      = worldPose.Orientation.Rotate(UpVector);
-    Vector3f forward = worldPose.Orientation.Rotate(ForwardVector);
+    Vector3f up      = worldPose.Rotation.Rotate(UpVector);
+    Vector3f forward = worldPose.Rotation.Rotate(ForwardVector);
 
     // Transform the position of the center eye in the real world (i.e. sitting in your chair)
     // into the frame of the player's virtual body.
@@ -667,7 +674,7 @@ Matrix4f OculusWorldDemoApp::CalculateViewFromPose(const Posef& pose)
     // If you shrink one, you should also shrink the other.
     // So with zero IPD (i.e. everything at infinity),
     // head movement should also be zero.
-    Vector3f viewPos = ForceZeroHeadMovement ? ThePlayer.BodyPos : worldPose.Position;
+    Vector3f viewPos = ForceZeroHeadMovement ? ThePlayer.BodyPos : worldPose.Translation;
 
     Matrix4f view = Matrix4f::LookAtRH(viewPos, viewPos + forward, up);
     return view;
@@ -726,14 +733,14 @@ void OculusWorldDemoApp::OnIdle()
 
     
     // Update pose based on frame!
-    ThePlayer.HeadPose = ss.Predicted.Transform;
+    ThePlayer.HeadPose = ss.Predicted.Pose;
     // Movement/rotation with the gamepad.
     ThePlayer.BodyYaw -= ThePlayer.GamepadRotate.x * dt;
     ThePlayer.HandleMovement(dt, &CollisionModels, &GroundCollisionModels, ShiftDown);
 
 
     // Record after processing time.
-    Profiler.RecordSample(RenderProfiler::Sample_AfterGameProcessing);
+    Profiler.RecordSample(RenderProfiler::Sample_AfterGameProcessing);    
 
 
     // Determine if we are rendering this frame. Frame rendering may be
@@ -774,7 +781,7 @@ void OculusWorldDemoApp::OnIdle()
             for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
             {      
                 ovrEyeType eye = HmdDesc.EyeRenderOrder[eyeIndex];
-                ovrPosef   eyeRenderPose = ovrHmd_BeginEyeRender(Hmd, eye);
+                ovrPosef eyeRenderPose = ovrHmd_BeginEyeRender(Hmd, eye);
 
                 View = CalculateViewFromPose(eyeRenderPose);
                 RenderEyeView(eye); 
@@ -800,9 +807,16 @@ void OculusWorldDemoApp::OnIdle()
             }
         }   
 
-        pRender->SetRenderTarget(0);
+        pRender->SetDefaultRenderTarget();
         pRender->FinishScene();        
     }
+        
+    /*
+    double t= ovr_GetTimeInSeconds();
+    while (ovr_GetTimeInSeconds() < (t + 0.017))
+    {
+
+    } */
 
     Profiler.RecordSample(RenderProfiler::Sample_AfterEyeRender);
 
@@ -864,8 +878,8 @@ void OculusWorldDemoApp::ApplyDynamicResolutionScaling()
     if (!DynamicRezScalingEnabled)
     {
         // Restore viewport rectangle in case dynamic res scaling was enabled before.
-        EyeTexture[0].Header.RenderViewport = EyeRenderDesc[0].Desc.RenderViewport;
-        EyeTexture[1].Header.RenderViewport = EyeRenderDesc[1].Desc.RenderViewport;
+        EyeTexture[0].Header.RenderViewport.Size = EyeRenderSize[0];
+        EyeTexture[1].Header.RenderViewport.Size = EyeRenderSize[1];
         return;
     }
    
@@ -901,14 +915,14 @@ void OculusWorldDemoApp::ApplyDynamicResolutionScaling()
         dynamicRezScale = dynamicRezScale * 0.5f + 0.5f;
     }
 
-    Sizei sizeLeft  = EyeRenderDesc[0].Desc.RenderViewport.Size;
-    Sizei sizeRight = EyeRenderDesc[1].Desc.RenderViewport.Size;
+    Sizei sizeLeft  = EyeRenderSize[0];
+    Sizei sizeRight = EyeRenderSize[1];
     
     // This viewport is used for rendering and passed into ovrHmd_EndEyeRender.
     EyeTexture[0].Header.RenderViewport.Size = Sizei(int(sizeLeft.w  * dynamicRezScale),
-                                                             int(sizeLeft.h  * dynamicRezScale));
+                                                     int(sizeLeft.h  * dynamicRezScale));
     EyeTexture[1].Header.RenderViewport.Size = Sizei(int(sizeRight.w * dynamicRezScale),
-                                                             int(sizeRight.h * dynamicRezScale));
+                                                     int(sizeRight.h * dynamicRezScale));
 }
 
 
@@ -1042,13 +1056,13 @@ void OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
         char buf[512], gpustat[256];
 
         // Average FOVs.
-        FovPort leftFov  = EyeRenderDesc[0].Desc.Fov;
-        FovPort rightFov = EyeRenderDesc[1].Desc.Fov;
+        FovPort leftFov  = EyeRenderDesc[0].Fov;
+        FovPort rightFov = EyeRenderDesc[1].Fov;
         
         // Rendered size changes based on selected options & dynamic rendering.
         int pixelSizeWidth = EyeTexture[0].Header.RenderViewport.Size.w +
                              ((!ForceZeroIpd) ?
-                                        EyeTexture[1].Header.RenderViewport.Size.w : 0);
+                               EyeTexture[1].Header.RenderViewport.Size.w : 0);
         int pixelSizeHeight = ( EyeTexture[0].Header.RenderViewport.Size.h +
                                 EyeTexture[1].Header.RenderViewport.Size.h ) / 2;
 
@@ -1074,7 +1088,7 @@ void OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
             }
         }
 
-        ThePlayer.HeadPose.Orientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&hmdYaw, &hmdPitch, &hmdRoll);
+        ThePlayer.HeadPose.Rotation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&hmdYaw, &hmdPitch, &hmdRoll);
         OVR_sprintf(buf, sizeof(buf),
                     " HMD YPR:%4.0f %4.0f %4.0f   Player Yaw: %4.0f\n"
                     " FPS: %.1f  ms/frame: %.1f Frame: %d\n"
