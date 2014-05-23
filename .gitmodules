@@ -7,3 +7,6 @@
 [submodule "Bindings/Java"]
 	path = Bindings/Java
 	url = https://github.com/jherico/jocular.git
+[submodule "Bindings/Java-Platform"]
+	path = Bindings/Java-Platform
+	url = https://github.com/jherico/jocular-platform.git
