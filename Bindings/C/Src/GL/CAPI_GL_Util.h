@@ -146,6 +146,8 @@ public:
     RenderParams* pParams;
     GLuint        TexId;
     int           Width, Height;
+    bool          Multisample;
+    GLenum        TextureType;
 
     Texture(RenderParams* rp, int w, int h);
     ~Texture();

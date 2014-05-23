@@ -256,39 +256,41 @@ const OVR::CAPI::GL::ShaderBase::Uniform DistortionChroma_vs_refl[] =
 };
 
 static const char DistortionChroma_fs[] =
-    "uniform sampler2D Texture0;\n"
-
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "#version 330\n" 
+    "uniform sampler2DMS Texture0;\n"
+    "in vec4 oColor;\n"
+    "in vec2 oTexCoord[3];\n"
+    "out vec4 fragColor;\n"
 
     "void main()\n"
     "{\n"
-    "   float ResultR = texture2D(Texture0, oTexCoord0).r;\n"
-    "   float ResultG = texture2D(Texture0, oTexCoord1).g;\n"
-    "   float ResultB = texture2D(Texture0, oTexCoord2).b;\n"
-
-    "   gl_FragColor = vec4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "     for (int i = 0; i < 3; ++i) {"
+    "       float accum = 0;\n"
+    "       ivec2 Texcoord = ivec2(textureSize(Texture0) * oTexCoord[i]);"
+    "       for (int j = 0; j < 4; ++j) {"
+    "         accum += texelFetch(Texture0, Texcoord, 0)[i];\n"
+    "       }\n"
+    "       fragColor[i] = (accum / 4.0) * oColor[i];\n"
+    "     }\n"
+    "   fragColor.a = 1.0;"
     "}\n";
 
 
 static const char DistortionTimewarpChroma_vs[] =
+    "#version 330\n"
     "uniform vec2 EyeToSourceUVScale;\n"
     "uniform vec2 EyeToSourceUVOffset;\n"
     "uniform mat4 EyeRotationStart;\n"
     "uniform mat4 EyeRotationEnd;\n"
 
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
+    "in vec2 Position;\n"
+    "in vec4 Color;\n"
+    "in vec2 TexCoord0;\n"
+    "in vec2 TexCoord1;\n"
+    "in vec2 TexCoord2;\n"
 
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "out vec4 oColor;\n"
+    "out vec2 oTexCoord[3];\n"
 
     "void main()\n"
     "{\n"
@@ -299,6 +301,7 @@ static const char DistortionTimewarpChroma_vs[] =
 
     // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
     // These are now "real world" vectors in direction (x,y,1) relative to the eye of the HMD.
+
     "   vec3 TanEyeAngleR = vec3 ( TexCoord0.x, TexCoord0.y, 1.0 );\n"
     "   vec3 TanEyeAngleG = vec3 ( TexCoord1.x, TexCoord1.y, 1.0 );\n"
     "   vec3 TanEyeAngleB = vec3 ( TexCoord2.x, TexCoord2.y, 1.0 );\n"
@@ -338,12 +341,12 @@ static const char DistortionTimewarpChroma_vs[] =
     "   vec2 SrcCoordG = FlattenedG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
     "   vec2 SrcCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
 
-    "   oTexCoord0 = SrcCoordR;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
-    "   oTexCoord1 = SrcCoordG;\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
-    "   oTexCoord2 = SrcCoordB;\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
+    "   oTexCoord[0] = SrcCoordR;\n"
+    "   oTexCoord[0].y = 1.0-oTexCoord[0].y;\n"
+    "   oTexCoord[1] = SrcCoordG;\n"
+    "   oTexCoord[1].y = 1.0-oTexCoord[1].y;\n"
+    "   oTexCoord[2] = SrcCoordB;\n"
+    "   oTexCoord[2].y = 1.0-oTexCoord[2].y;\n"
 
     "   oColor = vec4(Color.r);\n"              // Used for vignette fade.
     "}\n";

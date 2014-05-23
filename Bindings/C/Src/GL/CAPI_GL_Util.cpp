@@ -314,6 +314,7 @@ void ShaderBase::UpdateBuffer(Buffer* buf)
 
 Texture::Texture(RenderParams* rp, int w, int h) : IsUserAllocated(true), pParams(rp), TexId(0), Width(w), Height(h)
 {
+    TextureType = rp->Multisample == 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
     if (w && h)
         glGenTextures(1, &TexId);
 }
@@ -327,52 +328,52 @@ Texture::~Texture()
 void Texture::Set(int slot, ShaderStage) const
 {
     glActiveTexture(GL_TEXTURE0 + slot);
-    glBindTexture(GL_TEXTURE_2D, TexId);
+    glBindTexture(TextureType, TexId);
     glActiveTexture(GL_TEXTURE0);
 }
 
 void Texture::SetSampleMode(int sm)
 {
-    glBindTexture(GL_TEXTURE_2D, TexId);
+  glBindTexture(TextureType, TexId);
     switch (sm & Sample_FilterMask)
     {
     case Sample_Linear:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
+      glTexParameteri(TextureType, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(TextureType, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(TextureType, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
 
     case Sample_Anisotropic:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
+      glTexParameteri(TextureType, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(TextureType, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(TextureType, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8);
         break;
 
     case Sample_Nearest:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
+      glTexParameteri(TextureType, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(TextureType, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(TextureType, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
     }
 
     switch (sm & Sample_AddressMask)
     {
     case Sample_Repeat:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_T, GL_REPEAT);
         break;
 
     case Sample_Clamp:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         break;
 
     case Sample_ClampBorder:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+      glTexParameteri(TextureType, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         break;
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(TextureType, 0);
 }
 
 void Texture::UpdatePlaceholderTexture(GLuint texId, const Sizei& textureSize)
