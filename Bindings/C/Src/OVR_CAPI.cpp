@@ -482,7 +482,7 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmd)
     if (hmds->pRenderer)
 	{
 		hmds->pRenderer->SaveGraphicsState();
-        hmds->pRenderer->EndFrame(true,
+        hmds->pRenderer->EndFrame(false,
                                   hmds->LatencyTestActive ? hmds->LatencyTestDrawColor : NULL,
                             
                                   // MA: Use this color since we are running DK2 test all the time.
