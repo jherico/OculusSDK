@@ -10,6 +10,10 @@ include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
 include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
 
 file(GLOB SOURCE_FILES Src/*.cpp Src/*.h Src/GL/*.cpp Src/GL/*.h Include/*.h)
+if (WIN32)
+file(GLOB WIN32_SOURCE_FILES Src/D3D1X/*.cpp Src/D3D1X/*.h)
+list(APPEND SOURCE_FILES ${WIN32_SOURCE_FILES})
+endif()
 add_library(OVR_C SHARED ${SOURCE_FILES})
 
 set(EXTRA_LIBS OculusVR)
