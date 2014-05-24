@@ -1,12 +1,6 @@
 [submodule "3rdParty/glfw"]
 	path = 3rdParty/glfw
 	url = https://github.com/jherico/glfw.git
-[submodule "3rdParty/jsoncpp"]
-	path = 3rdParty/jsoncpp
-	url = https://github.com/jherico/jsoncpp.git
 [submodule "Bindings/Java"]
 	path = Bindings/Java
 	url = https://github.com/jherico/jocular.git
-[submodule "Bindings/Java-Platform"]
-	path = Bindings/Java-Platform
-	url = https://github.com/jherico/jocular-platform.git
