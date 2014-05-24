@@ -26,6 +26,7 @@ namespace OVR { namespace CAPI { namespace GL {
     "#version 110\n"
     "#extension GL_ARB_shader_texture_lod : enable\n"
     "#define _FRAGCOLOR_DECLARATION\n"
+    "#define _SAMPLE\n"
     "#define _VS_IN attribute\n"
     "#define _VS_OUT varying\n"
     "#define _FS_IN varying\n"
@@ -35,6 +36,17 @@ namespace OVR { namespace CAPI { namespace GL {
     static const char glsl3Prefix[] =
     "#version 150\n"
     "#define _FRAGCOLOR_DECLARATION out vec4 FragColor;\n"
+    "#define _SAMPLE\n"
+    "#define _VS_IN in\n"
+    "#define _VS_OUT out\n"
+    "#define _FS_IN in\n"
+    "#define _TEXTURELOD textureLod\n"
+    "#define _FRAGCOLOR FragColor\n";
+
+    static const char glsl4Prefix[] =
+    "#version 440\n"
+    "#define _FRAGCOLOR_DECLARATION out vec4 FragColor;\n"
+    "#define _SAMPLE sample\n"
     "#define _VS_IN in\n"
     "#define _VS_OUT out\n"
     "#define _FS_IN in\n"
@@ -106,9 +118,8 @@ namespace OVR { namespace CAPI { namespace GL {
     
     static const char Distortion_fs[] =
     "uniform sampler2D Texture0;\n"
-    
     "_FS_IN vec4 oColor;\n"
-    "_FS_IN vec2 oTexCoord0;\n"
+    "_SAMPLE _FS_IN vec2 oTexCoord0;\n"
     
     "_FRAGCOLOR_DECLARATION\n"
     
@@ -218,9 +229,9 @@ namespace OVR { namespace CAPI { namespace GL {
     "uniform sampler2D Texture0;\n"
     
     "_FS_IN vec4 oColor;\n"
-    "_FS_IN vec2 oTexCoord0;\n"
-    "_FS_IN vec2 oTexCoord1;\n"
-    "_FS_IN vec2 oTexCoord2;\n"
+    "_SAMPLE _FS_IN vec2 oTexCoord0;\n"
+    "_SAMPLE _FS_IN vec2 oTexCoord1;\n"
+    "_SAMPLE _FS_IN vec2 oTexCoord2;\n"
     
     "_FRAGCOLOR_DECLARATION\n"
     

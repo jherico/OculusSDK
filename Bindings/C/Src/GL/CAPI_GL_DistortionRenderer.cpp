@@ -684,9 +684,14 @@ void DistortionRenderer::initShaders()
 {
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
 
-    const char* shaderPrefix =
-        (glState->GlMajorVersion < 3 || (glState->GlMajorVersion == 3 && glState->GlMinorVersion < 2)) ?
-            glsl2Prefix : glsl3Prefix;
+    const char* shaderPrefix;
+    if (glState->GlMajorVersion < 3 || (glState->GlMajorVersion == 3 && glState->GlMinorVersion < 2)) {
+      shaderPrefix = glsl2Prefix;
+    } else if (glState->GlMajorVersion < 4 || (glState->GlMajorVersion == 4 && glState->GlMinorVersion < 4)) {
+      shaderPrefix = glsl3Prefix;
+    } else {
+      shaderPrefix = glsl4Prefix;
+    }
 
     {
 		ShaderInfo vsInfo = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & DistortionCaps];
