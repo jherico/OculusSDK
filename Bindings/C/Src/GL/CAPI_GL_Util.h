@@ -41,6 +41,9 @@ limitations under the License.
 #include <GL/glxew.h>
 #endif
 
+#if defined(OVR_OS_MAC)
+#include <OpenGL/OpenGL.h>
+#endif
 
 namespace OVR { namespace CAPI { namespace GL {
 
