@@ -129,8 +129,8 @@ namespace OVR { namespace CAPI { namespace GL {
     "_VS_IN vec4 Color;\n"
     "_VS_IN vec2 TexCoord0;\n"
     
-    "_FS_IN vec4 oColor;\n"
-    "_FS_IN vec2 oTexCoord0;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
     
     "void main()\n"
     "{\n"
