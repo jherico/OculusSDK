@@ -37,6 +37,10 @@ limitations under the License.
 #endif
 
 #include <GL/glew.h>
+#if defined(OVR_OS_LINUX)
+#include <GL/glxew.h>
+#endif
+
 
 namespace OVR { namespace CAPI { namespace GL {
 

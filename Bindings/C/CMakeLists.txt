@@ -9,7 +9,7 @@ include_directories(${OculusVR_SOURCE_DIR}/Src)
 include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
 include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
 
-file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h Include/*.h)
+file(GLOB SOURCE_FILES Src/*.cpp Src/*.h Src/GL/*.cpp Src/GL/*.h Include/*.h)
 add_library(OVR_C SHARED ${SOURCE_FILES})
 
 set(EXTRA_LIBS OculusVR)
