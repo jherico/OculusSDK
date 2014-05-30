@@ -34,10 +34,15 @@ void InitGl()
     called = true;
     glewExperimental = true;
     glewInit();
+    // Sometimes the GLEW initialization generates an
+    // error if glewExperimental is on.
+    // We explicitly clear the error here so that we
+    // won't confuse it with a legitimate GL error
+    // later on
+    glGetError();
   }
 }
 
-    
 Buffer::Buffer(RenderParams* rp) : pParams(rp), Size(0), Use(0), GLBuffer(0)
 {
 }
