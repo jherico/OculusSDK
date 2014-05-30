@@ -143,7 +143,7 @@ void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor, unsigne
         // TODO:
     }
 
-    if (0 == RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers)
+    if (0 == (RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers))
     {
         if (swapChain)
         {

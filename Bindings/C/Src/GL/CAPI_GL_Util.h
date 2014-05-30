@@ -37,6 +37,11 @@ limitations under the License.
 #endif
 
 #include <GL/glew.h>
+
+#if defined(OVR_OS_WIN32)
+#include <GL/wglew.h>
+#endif
+
 #if defined(OVR_OS_LINUX)
 #include <GL/glxew.h>
 #endif

@@ -218,13 +218,14 @@ void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor, unsigne
         renderLatencyPixel(latencyTester2DrawColor);
     }
 
-    if (0 == RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers)
+    int flag = RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers;
+    if (0 == (RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers))
     {
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
 		int swapInterval = (useVsync) ? 1 : 0;
 #if defined(OVR_OS_WIN32)
-//		if (glfwGetSwapInterval() != swapInterval)
-//            glfwSwapInterval(swapInterval);
+     if (wglGetSwapIntervalEXT() != swapInterval)
+       wglSwapIntervalEXT(swapInterval);
 
         HDC dc = GetDC(RParams.Window);
 		BOOL success = SwapBuffers(dc);
