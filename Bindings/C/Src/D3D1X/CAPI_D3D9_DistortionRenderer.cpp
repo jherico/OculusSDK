@@ -102,10 +102,8 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
 
 
 /******************************************************************/
-void DistortionRenderer::EndFrame(bool swapBuffers,
-                                  unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
+void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
 {
-	OVR_UNUSED(swapBuffers);
 	OVR_UNUSED(latencyTesterDrawColor);
 
 	///QUESTION : Should I be clearing the screen? 
@@ -145,7 +143,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers,
         // TODO:
     }
 
-    if (swapBuffers)
+    if (0 == RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers)
     {
         if (swapChain)
         {

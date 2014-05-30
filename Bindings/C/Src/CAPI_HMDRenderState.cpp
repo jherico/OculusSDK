@@ -68,7 +68,7 @@ ovrHmdDesc HMDRenderState::GetDesc()
 
     d.HmdCaps           = ovrHmdCap_Present | ovrHmdCap_NoVSync;
     d.SensorCaps        = ovrSensorCap_YawCorrection | ovrSensorCap_Orientation;
-    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
+    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette | ovrDistortionCap_NoSwapBuffers;
 
     if (strstr(HMDInfo.ProductName, "DK1"))
     {

@@ -235,7 +235,7 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
     }
 }
 
-void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor,
+void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor,
                                                     unsigned char* latencyTester2DrawColor)
 {
     if (!TimeManager.NeedDistortionTimeMeasurement())
@@ -270,7 +270,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers, unsigned char* latencyTester
         renderLatencyPixel(latencyTester2DrawColor);
     }
 
-    if (swapBuffers)
+    if (0 == RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers)
     {
         if (RParams.pSwapChain)
         {

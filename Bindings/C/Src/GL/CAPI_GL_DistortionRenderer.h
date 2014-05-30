@@ -49,7 +49,7 @@ public:
 
     virtual void SubmitEye(int eyeId, ovrTexture* eyeTexture);
 
-    virtual void EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor);
+    virtual void EndFrame(unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor);
 
     void         WaitUntilGpuIdle();
 

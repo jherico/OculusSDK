@@ -69,7 +69,7 @@ public:
 
     // Finish the frame, optionally swapping buffers.
     // Many implementations may actually apply the distortion here.
-    virtual void EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor,
+    virtual void EndFrame(unsigned char* latencyTesterDrawColor,
                                             unsigned char* latencyTester2DrawColor) = 0;
     
 	// Stores the current graphics pipeline state so it can be restored later.

@@ -190,6 +190,7 @@ typedef enum
 {        
     ovrDistortionCap_Chromatic	= 0x01,		//	Supports chromatic aberration correction.
     ovrDistortionCap_TimeWarp	= 0x02,		//	Supports timewarp.
+    ovrDistortionCap_NoSwapBuffers = 0x04,
     ovrDistortionCap_Vignette	= 0x08		//	Supports vignetting around the edges of the view.
 } ovrDistortionCaps;
 
