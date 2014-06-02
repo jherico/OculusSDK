@@ -17,6 +17,9 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 #include "OVR_CAPI.h"
 
+#if defined(OVR_OS_LINUX)
+#include <X11/Xlib.h>
+#endif
 #ifndef GL_TRUE
 #error "You must include an OpenGL header before including OVR_CAPI_GL.h"
 #endif
@@ -46,7 +49,7 @@ typedef struct ovrGLTextureData_s
 {
     // General device settings.
     ovrTextureHeader          Header;
-    GLuint           TexId;       
+    GLuint           TexId;
 } ovrGLTextureData;
 
 typedef union ovrGLTexture_s
