@@ -218,7 +218,6 @@ void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor, unsigne
         renderLatencyPixel(latencyTester2DrawColor);
     }
 
-    int flag = RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers;
     if (0 == (RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers))
     {
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
