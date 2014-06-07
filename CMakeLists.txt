@@ -42,6 +42,7 @@ else()
 endif()
 
 # The primary SDK artifact, a static library for Oculus access 
+include_directories(Bindings/C/Include)
 add_subdirectory(LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
@@ -60,8 +61,6 @@ set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
 #
 
 option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
-
-if(WIN32)
 if(OCULUS_BUILD_SAMPLES)
     # Make sure to set up the OVR include paths
     include_directories(3rdParty/glew/include)
@@ -70,6 +69,7 @@ if(OCULUS_BUILD_SAMPLES)
     include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
     include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
     include_directories(Bindings/C/Include)
+
     # Cross platform window creation
  #   add_subdirectory(3rdParty/glfw)
  #   include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
@@ -87,5 +87,4 @@ if(OCULUS_BUILD_SAMPLES)
 
     add_subdirectory (Samples/OculusWorldDemo )
     set_target_properties(OculusWorldDemo PROPERTIES FOLDER "Samples")
-endif()
 endif()

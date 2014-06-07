@@ -21,13 +21,14 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include "Linux_Gamepad.h"
+#ifdef OVR_OS_LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <glob.h>
 #include <linux/joystick.h>
-#include "Linux_Gamepad.h"
 
 
 namespace OVR { namespace Platform { namespace Linux {
@@ -450,4 +451,4 @@ void Gamepad::SetStateButton(GamepadState *pState, UInt32 button, SInt32 value)
 }
 
 }}} // OVR::Platform::Linux
-
+#endif

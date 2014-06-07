@@ -25,6 +25,7 @@ limitations under the License.
 #define OVR_Linux_Gamepad_h
 
 #include "Gamepad.h"
+#ifdef OVR_OS_LINUX
 
 namespace OVR { namespace Platform { namespace Linux {
 
@@ -80,4 +81,5 @@ private:
 
 }}}
 
+#endif
 #endif // OVR_Linux_Gamepad_h

@@ -24,10 +24,11 @@ limitations under the License.
 #ifndef OVR_OSX_Gamepad_h
 #define OVR_OSX_Gamepad_h
 
+#include "Gamepad.h"
+#ifdef OVR_OS_MAC
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDManager.h>
 
-#include "Gamepad.h"
 
 namespace OVR { namespace Platform { namespace OSX {
 
@@ -63,4 +64,5 @@ private:
 
 }}}
 
+#endif
 #endif // OVR_OSX_Gamepad_h

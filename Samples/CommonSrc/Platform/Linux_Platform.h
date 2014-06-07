@@ -23,10 +23,12 @@ limitations under the License.
 
 #ifndef OVR_Platform_Linux_h
 #define OVR_Platform_Linux_h
-
+#include "Gamepad.h"
+#include "../Render/Render_Device.h"
 #include "Platform.h"
-#include "../Render/Render_GL_Device.h"
 
+#ifdef OVR_OS_LINUX
+#include "../Render/Render_GL_Device.h"
 #include <GL/glx.h>
 #include <X11/extensions/xf86vmode.h>
 #include <X11/Xlib.h>
@@ -144,4 +146,5 @@ public:
 
 #define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())
 
+#endif
 #endif

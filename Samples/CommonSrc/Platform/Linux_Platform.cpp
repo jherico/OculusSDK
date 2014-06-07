@@ -21,13 +21,14 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include "Linux_Platform.h"
+#ifdef OVR_OS_LINUX
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_Timer.h"
 #include "OVR_CAPI_GL.h"
 
-#include "Linux_Platform.h"
 #include "Linux_Gamepad.h"
 
 // Renderers
@@ -782,3 +783,4 @@ int main(int argc, const char* argv[])
 
     return exitCode;
 }
+#endif

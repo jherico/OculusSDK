@@ -25,10 +25,7 @@ limitations under the License.
 // This file can be included twice, once with OVR_D3D_VERSION=10 and
 // once with OVR_D3D_VERSION=11.
 
-
-#ifndef OVR_D3D_VERSION
-#error define OVR_D3D_VERSION to 10 or 11
-#endif
+#ifdef OVR_D3D_VERSION
 
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_Array.h"
@@ -375,4 +372,5 @@ public:
 
 }}}
 
+#endif
 #endif

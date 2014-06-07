@@ -26,18 +26,13 @@ limitations under the License.
 
 #include "../Render/Render_Device.h"
 
+#include <GL/glew.h>
 #if defined(OVR_OS_WIN32)
     #include <Windows.h>
-    #include <GL/gl.h>
-    #include <GL/glext.h>
-    #include <GL/wglext.h>
+    #include <GL/wglew.h>
 #elif defined(OVR_OS_MAC)
-    #include <OpenGL/gl3.h>
-    #include <OpenGL/gl3ext.h>
 #else
-    #include <GL/gl.h>
-    #include <GL/glext.h>
-    #include <GL/glx.h>
+    #include <GL/glxew.h>
 #endif
 
 

@@ -39,58 +39,6 @@ limitations under the License.
 using namespace OVR;
 using namespace OVR::Util::Render;
 
-//-------------------------------------------------------------------------------------
-// Math
-namespace OVR {
-
-
-// ***** FovPort
-
-// C-interop support: FovPort <-> ovrFovPort
-FovPort::FovPort(const ovrFovPort &src)
-    : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
-{ }    
-
-FovPort::operator ovrFovPort () const
-{
-    ovrFovPort result;
-    result.LeftTan  = LeftTan;
-    result.RightTan = RightTan;
-    result.UpTan    = UpTan;
-    result.DownTan  = DownTan;
-    return result;
-}
-
-// Converts Fov Tan angle units to [-1,1] render target NDC space
-Vector2f FovPort::TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle)
-{  
-    ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(*this);
-    return tanEyeAngle * eyeToSourceNDC.Scale + eyeToSourceNDC.Offset;
-}
-
-
-// ***** SensorState
-
-SensorState::SensorState(const ovrSensorState& s)
-{
-    Predicted       = s.Predicted;
-    Recorded        = s.Recorded;
-    Temperature     = s.Temperature;
-    StatusFlags     = s.StatusFlags;
-}
-
-SensorState::operator ovrSensorState() const
-{
-    ovrSensorState result;
-    result.Predicted    = Predicted;
-    result.Recorded     = Recorded;
-    result.Temperature  = Temperature;
-    result.StatusFlags  = StatusFlags;
-    return result;
-}
-
-
-} // namespace OVR
 
 //-------------------------------------------------------------------------------------
 

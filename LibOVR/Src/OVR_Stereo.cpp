@@ -28,13 +28,40 @@ limitations under the License.
 #include "OVR_Profile.h"
 #include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_Alg.h"
-
+#include <OVR_CAPI.h>
 //To allow custom distortion to be introduced to CatMulSpline.
 float (*CustomDistortion)(float) = NULL;
 float (*CustomDistortionInv)(float) = NULL;
 
 
 namespace OVR {
+
+
+
+// ***** FovPort
+
+// C-interop support: FovPort <-> ovrFovPort
+FovPort::FovPort(const ovrFovPort &src)
+    : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
+{ }
+
+FovPort::operator ovrFovPort () const
+{
+    ovrFovPort result;
+    result.LeftTan  = LeftTan;
+    result.RightTan = RightTan;
+    result.UpTan    = UpTan;
+    result.DownTan  = DownTan;
+    return result;
+}
+
+// Converts Fov Tan angle units to [-1,1] render target NDC space
+Vector2f FovPort::TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle)
+{
+    ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(*this);
+    return tanEyeAngle * eyeToSourceNDC.Scale + eyeToSourceNDC.Offset;
+}
+
 
 
 using namespace Alg;

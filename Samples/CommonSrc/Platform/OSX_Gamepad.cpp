@@ -22,7 +22,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OSX_Gamepad.h"
-
+#ifdef OVR_OS_MAC
 
 static const UInt32 Logitech_F710_VendorID = 0x046D;
 //static const UInt32 Logitech_F710_ProductID = 0xC219;
@@ -428,3 +428,4 @@ void GamepadManager::manipulateBitField(unsigned int& bitfield, unsigned int mas
 }
 
 }}} // OVR::Platform::OSX
+#endif

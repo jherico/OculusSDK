@@ -113,7 +113,6 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 		endif ()
 	endif ()
 
-
 	find_path (DirectX_D3D9_INCLUDE_DIR d3d9.h
 		PATHS ${DirectX_INC_SEARCH_PATH}
 		DOC "The directory where d3d9.h resides")

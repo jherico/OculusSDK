@@ -24,6 +24,8 @@ limitations under the License.
 #ifndef OVR_WavPlayer_h
 #define OVR_WavPlayer_h
 
+#include "OVR.h"
+#ifdef OVR_OS_MAC
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -69,4 +71,5 @@ private:
 
 }}}
 
+#endif
 #endif

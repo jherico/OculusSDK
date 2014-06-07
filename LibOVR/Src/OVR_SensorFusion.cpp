@@ -31,7 +31,7 @@ limitations under the License.
 #include "OVR_Profile.h"
 #include "OVR_Stereo.h"
 #include "OVR_Recording.h"
-
+#include <OVR_CAPI.h>
 // Temporary for debugging
 bool Global_Flag_1 = true;
 
@@ -44,6 +44,26 @@ bool   TPH_IsPositionTracked = false;
 
 namespace OVR {
 
+
+// ***** SensorState
+
+SensorState::SensorState(const ovrSensorState& s)
+{
+    Predicted       = s.Predicted;
+    Recorded        = s.Recorded;
+    Temperature     = s.Temperature;
+    StatusFlags     = s.StatusFlags;
+}
+
+SensorState::operator ovrSensorState() const
+{
+    ovrSensorState result;
+    result.Predicted    = Predicted;
+    result.Recorded     = Recorded;
+    result.Temperature  = Temperature;
+    result.StatusFlags  = StatusFlags;
+    return result;
+}
 const Transformd DefaultWorldFromCamera(Quatd(), Vector3d(0, 0, -1));
 
 //-------------------------------------------------------------------------------------
