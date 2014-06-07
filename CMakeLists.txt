@@ -42,7 +42,6 @@ else()
 endif()
 
 # The primary SDK artifact, a static library for Oculus access 
-include_directories(Bindings/C/Include)
 add_subdirectory(LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
