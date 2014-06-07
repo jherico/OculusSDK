@@ -137,7 +137,7 @@ void SensorFusion::Reset()
     ExposureRecordHistory.Clear();
     NextExposureRecord                  = ExposureRecord();
     LastMessageExposureFrame            = MessageExposureFrame(NULL);
-    LastVisionAbsoluteTime              = 0;
+    LastVisionAbsoluteTime              = 1e9;
     Stage                               = 0;
     
     MagRefs.Clear();
