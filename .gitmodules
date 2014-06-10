@@ -4,3 +4,6 @@
 [submodule "Bindings/Java"]
 	path = Bindings/Java
 	url = https://github.com/jherico/jocular.git
+[submodule "Bindings/Python"]
+	path = Bindings/Python
+	url = https://github.com/jherico/python-ovrsdk.git
