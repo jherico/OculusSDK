@@ -473,7 +473,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture);
 
 		DistortionShader->SetUniform2f("EyeToSourceUVScale",  eachEye[eyeNum].UVScaleOffset[0].x, eachEye[eyeNum].UVScaleOffset[0].y);
-		DistortionShader->SetUniform2f("EyeToSourceUVOffset", eachEye[eyeNum].UVScaleOffset[1].x, eachEye[eyeNum].UVScaleOffset[1].y);
+		DistortionShader->SetUniform2f("EyeToSourceUVOffset", eachEye[eyeNum].UVScaleOffset[1].x, 1 - eachEye[eyeNum].UVScaleOffset[1].y);
         
 		if (DistortionCaps & ovrDistortionCap_TimeWarp)
 		{                       
