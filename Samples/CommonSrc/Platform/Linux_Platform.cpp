@@ -35,7 +35,6 @@ limitations under the License.
 #include "../Render/Render_GL_Device.h"
 
 #include "../../3rdParty/EDID/edid.h"
-#include <X11/extensions/Xinerama.h>
 #include <X11/extensions/Xrandr.h>
 
 
@@ -44,7 +43,7 @@ namespace OVR { namespace Platform { namespace Linux {
 static const char *AtomNames[] = {"WM_PROTOCOLS", "WM_DELETE_WINDOW"};
 
 PlatformCore::PlatformCore(Application* app)
-    : Platform::PlatformCore(app), Disp(NULL), Win(0), Vis(NULL), Quit(0), MMode(Mouse_Normal)    
+    : Platform::PlatformCore(app), Disp(NULL), Win(0), Vis(NULL), Quit(0), MMode(Mouse_Normal)
     , StartVP(0, 0, 0, 0)
 {
     pGamepadManager = *new Linux::GamepadManager();
@@ -169,7 +168,7 @@ void PlatformCore::SetWindowTitle(const char* title)
 {
     XStoreName(Disp, Win, title);
 }
-    
+
 void PlatformCore::ShowWindow(bool show)
 {
     if (show)
@@ -240,12 +239,12 @@ static KeyCode MapXKToKeyCode(unsigned vk)
     {
         key = vk - XK_F1 + Key_F1;
     }
-    else 
+    else
     {
         for (unsigned i = 0; i< (sizeof(KeyMap) / sizeof(KeyMap[1])); i++)
         {
             if (vk == KeyMap[i][0])
-            {                
+            {
                 key = KeyMap[i][1];
                 break;
             }
@@ -324,7 +323,7 @@ void PlatformCore::processEvent(XEvent& event)
 
     case MapNotify:
         if (MMode == Mouse_Relative)
-        {            
+        {
             XWarpPointer(Disp, Win, Win, 0,0,Width,Height, Width/2, Height/2);
             showCursor(false);
         }
@@ -336,7 +335,7 @@ void PlatformCore::processEvent(XEvent& event)
             //grab
 
             if (MMode == Mouse_RelativeEscaped)
-            {            
+            {
                 XWarpPointer(Disp, Win, Win, 0,0,Width,Height, Width/2, Height/2);
                 showCursor(false);
                 MMode = Mouse_Relative;
@@ -346,7 +345,7 @@ void PlatformCore::processEvent(XEvent& event)
 
     case FocusOut:
         if (MMode == Mouse_Relative)
-        {            
+        {
             MMode = Mouse_RelativeEscaped;
             showCursor(true);
         }
@@ -383,8 +382,33 @@ int PlatformCore::Run()
 
 bool PlatformCore::determineScreenOffset(int screenId, int* screenOffsetX, int* screenOffsetY)
 {
-    Display* display = XOpenDisplay(NULL);
+  XRRScreenResources* sr = XRRGetScreenResources(Disp, DefaultRootWindow(Disp));
+  XRRCrtcInfo* ci = XRRGetCrtcInfo(_glfw.x11.display, sr, monitor->x11.crtc);
 
+      sr
+      ci
+
+      if (xpos)
+          *xpos = ci->x;
+      if (ypos)
+          *ypos = ci->y;
+
+      XRRFreeCrtcInfo(ci);
+      XRRFreeScreenResources(sr);
+  }
+  else
+  {
+      if (xpos)
+          *xpos = 0;
+      if (ypos)
+          *ypos = 0;
+  }
+    Display* display = XOpenDisplay(NULL);
+    screenOffsetX = 0;
+    screenOffsetY = 0;
+    return true;
+
+/*
     bool foundScreen = false;
 
     if (display)
@@ -405,6 +429,7 @@ bool PlatformCore::determineScreenOffset(int screenId, int* screenOffsetX, int* 
     }
 
     return foundScreen;
+    */
 }
 
 void PlatformCore::showWindowDecorations(bool show)
@@ -626,8 +651,32 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
 int PlatformCore::GetDisplayCount()
 {
     int numberOfScreens = 0;
-    XineramaScreenInfo* screens = XineramaQueryScreens(Disp, &numberOfScreens);
-    XFree(screens);
+    XRRScreenResources* sr = XRRGetScreenResources(Disp, DefaultRootWindow(Disp));
+    RROutput primary = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
+    for (int i = 0;  i < sr->ncrtc;  i++) {
+      XRRCrtcInfo* ci = XRRGetCrtcInfo(Disp, sr, sr->crtcs[i]);
+      if (ci->noutput == 0) {
+        XRRFreeCrtcInfo(ci);
+        continue;
+      }
+
+      RROutput output = ci->outputs[0];
+
+      for (int j = 0;  j < ci->noutput;  j++) {
+        if (ci->outputs[j] == primary) {
+          output = primary;
+          break;
+        }
+      }
+
+      XRROutputInfo* oi = XRRGetOutputInfo(Disp, sr, output);
+      if (oi->connection == RR_Connected) {
+        numberOfScreens++;
+      }
+      XRRFreeOutputInfo(oi);
+      XRRFreeCrtcInfo(ci);
+    }
+    XRRFreeScreenResources(sr);
     return numberOfScreens;
 }
 
@@ -672,11 +721,11 @@ RenderDevice* PlatformCore::SetupGraphics(const SetupGraphicsDeviceSet& setupGra
 {
     const SetupGraphicsDeviceSet* setupDesc = setupGraphicsDesc.PickSetupDevice(type);
     OVR_ASSERT(setupDesc);
-        
+
     pRender = *setupDesc->pCreateDevice(rp, this);
     if (pRender)
         pRender->SetWindowSize(Width, Height);
-        
+
     return pRender.GetPtr();
 }
 
