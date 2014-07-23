@@ -220,6 +220,12 @@ void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor, unsigne
 
     if (0 == (RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers))
     {
+      if (RState.SwapBufferCallback) 
+      {
+        RState.SwapBufferCallback(RState.SwapBufferUserData);
+        return;
+      } 
+
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
 		int swapInterval = (useVsync) ? 1 : 0;
 #if defined(OVR_OS_WIN32)

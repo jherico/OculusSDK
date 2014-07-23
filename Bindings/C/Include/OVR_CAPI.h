@@ -32,10 +32,15 @@ typedef char ovrBool;
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_EXPORT definition
+#if defined(WIN32)
+  #define OVR_APIENTRY APIENTRY
+#else
+  #define OVR_APIENTRY
+#endif
 
 #if !defined(OVR_EXPORT)
     #if defined(WIN32)    
-        #define OVR_EXPORT __declspec(dllexport)        
+        #define OVR_EXPORT __declspec(dllexport)
     #else
         #define OVR_EXPORT
     #endif
@@ -566,6 +571,13 @@ OVR_EXPORT ovrBool ovrHmd_ConfigureRendering( ovrHmd hmd,
                                               unsigned int distortionCaps,
                                               const ovrFovPort eyeFovIn[2],
                                               ovrEyeRenderDesc eyeRenderDescOut[2] );
+
+
+typedef void (*ovrSwapBufferCallback)(void * userData);
+
+OVR_EXPORT void ovrHmd_SetSwapBuffersCallback(ovrHmd hmd,
+                                              ovrSwapBufferCallback callback,
+                                              void * userData);
 
 
 // Begins a frame, returning timing and orientation information useful for simulation.

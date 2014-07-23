@@ -800,5 +800,11 @@ void HMDState::EndEyeRender(ovrEyeType eye, ovrPosef renderPose, ovrTexture* eye
     EyeRenderActive[eye] = false;
 }
 
+void HMDState::SetSwapBufferCallback(ovrSwapBufferCallback callback, void * userData) {
+  RenderState.SwapBufferCallback = callback;
+  RenderState.SwapBufferUserData = userData;
+}
+
+
 }} // namespace OVR::CAPI
 

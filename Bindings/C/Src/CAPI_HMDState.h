@@ -161,8 +161,10 @@ public:
     bool       ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
                                   const ovrFovPort eyeFovIn[2],
                                   const ovrRenderAPIConfig* apiConfig,                                  
-                                  unsigned distortionCaps);  
-    
+                                  unsigned distortionCaps);
+
+    void        SetSwapBufferCallback(ovrSwapBufferCallback callback, void * userData);
+
     ovrPosef    BeginEyeRender(ovrEyeType eye);
     void        EndEyeRender(ovrEyeType eye, ovrPosef renderPose, ovrTexture* eyeTexture);
 

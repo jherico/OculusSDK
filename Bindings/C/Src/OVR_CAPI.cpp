@@ -375,6 +375,13 @@ ovrBool ovrHmd_ConfigureRendering( ovrHmd hmd,
 }
 
 
+OVR_EXPORT void ovrHmd_SetSwapBuffersCallback(ovrHmd hmd,
+                                              ovrSwapBufferCallback callback,
+                                              void * userData) 
+{
+  if (!hmd) return;
+  ((HMDState*)hmd)->SetSwapBufferCallback(callback, userData);
+}
 
 // TBD: MA - Deprecated, need alternative
 void ovrHmd_SetVsync(ovrHmd hmd, ovrBool vsync)

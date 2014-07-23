@@ -272,7 +272,15 @@ void DistortionRenderer::EndFrame(unsigned char* latencyTesterDrawColor,
 
     if (0 == (RState.DistortionCaps & ovrDistortionCap_NoSwapBuffers))
     {
-        if (RParams.pSwapChain)
+        if (RState.SwapBufferCallback)
+        {
+            RState.SwapBufferCallback(RState.SwapBufferUserData);
+
+            // Force GPU to flush the scene, resulting in the lowest possible latency.
+            // It's critical that this flush is *after* present.
+            WaitUntilGpuIdle();
+        }
+        else if (RParams.pSwapChain)
         {
             UINT swapInterval = (RState.EnabledHmdCaps & ovrHmdCap_NoVSync) ? 0 : 1;
             RParams.pSwapChain->Present(swapInterval, 0);

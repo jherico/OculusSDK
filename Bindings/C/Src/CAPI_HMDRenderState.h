@@ -78,6 +78,8 @@ public:
 
     // Pose at which last time the eye was rendered, as submitted by EndEyeRender.
     ovrPosef                 EyeRenderPoses[2];
+    ovrSwapBufferCallback    SwapBufferCallback;
+    void *                   SwapBufferUserData;
 
     // Capabilities passed to Configure.
     unsigned                 EnabledHmdCaps;
