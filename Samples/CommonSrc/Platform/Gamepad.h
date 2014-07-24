@@ -24,9 +24,9 @@ limitations under the License.
 #ifndef OVR_Gamepad_h
 #define OVR_Gamepad_h
 
-#include <OVR.h>
+#include <OVR_Kernel.h>
 
-namespace OVR { namespace Platform {
+namespace OVR { namespace OvrPlatform {
 
 // Buttons on a typical gamepad controller.
 enum GamepadButtons
@@ -57,7 +57,7 @@ enum GamepadButtons
 // Describes the state of the controller buttons and analog inputs.
 struct GamepadState
 {
-    UInt32  Buttons;            // Bitfield representing button state.
+    uint32_t  Buttons;            // Bitfield representing button state.
     float   LX;                 // Left stick X axis [-1,1]
     float   LY;                 // Left stick Y axis [-1,1]
     float   RX;                 // Right stick X axis [-1,1]
@@ -91,12 +91,12 @@ class GamepadManager : public RefCountBase<GamepadManager>
 public:
 
     // Get the number of connected gamepads.
-    virtual UInt32  GetGamepadCount() = 0;
+    virtual uint32_t GetGamepadCount() = 0;
 
     // Get the state of the gamepad with a given index.
-    virtual bool    GetGamepadState(UInt32 index, GamepadState* pState) = 0;
+    virtual bool    GetGamepadState(uint32_t index, GamepadState* pState) = 0;
 };
 
-}} // OVR::Platform
+}} // OVR::OvrPlatform
 
 #endif // OVR_Gamepad_h

@@ -89,7 +89,7 @@ void PopulateCubeFieldScene(Scene* scene, Fill* fill,
     }
 }
 
-Fill* CreateTexureFill(RenderDevice* prender, const String& filename)
+Fill* CreateTextureFill(RenderDevice* prender, const String& filename)
 {
     Ptr<File>    imageFile = *new SysFile(filename);
     Ptr<Texture> imageTex;
@@ -132,15 +132,15 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
 
 
     // 10x10x10 cubes.
-    Ptr<Fill> fillR = *CreateTexureFill(pRender, mainFilePathNoExtension + "_redCube.tga");
+    Ptr<Fill> fillR = *CreateTextureFill(pRender, mainFilePathNoExtension + "_redCube.tga");
     PopulateCubeFieldScene(&RedCubesScene, fillR.GetPtr(), 10, 10, 10, Vector3f(0.0f, 0.0f, 0.0f), 0.4f);
 
     // 10x10x10 cubes.
-    Ptr<Fill> fillB = *CreateTexureFill(pRender, mainFilePathNoExtension + "_blueCube.tga");
+    Ptr<Fill> fillB = *CreateTextureFill(pRender, mainFilePathNoExtension + "_blueCube.tga");
     PopulateCubeFieldScene(&BlueCubesScene, fillB.GetPtr(), 10, 10, 10, Vector3f(0.0f, 0.0f, 0.0f), 0.4f);
 
 	// Anna: OculusWorldDemo/Assets/Tuscany/Tuscany_OculusCube.tga file needs to be added    
-    Ptr<Fill> imageFill = *CreateTexureFill(pRender, mainFilePathNoExtension + "_OculusCube.tga");
+    Ptr<Fill> imageFill = *CreateTextureFill(pRender, mainFilePathNoExtension + "_OculusCube.tga");
     PopulateCubeFieldScene(&OculusCubesScene, imageFill.GetPtr(), 11, 4, 35, Vector3f(0.0f, 0.0f, -6.0f), 0.5f);
 
 	
@@ -219,7 +219,7 @@ void OculusWorldDemoApp::RenderAnimatedBlocks(ovrEyeType eye, double appTime)
         {
             for ( int i = 0; i < numBlocks; i++ )
             {
-                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( Math<float>::Pi * 2.0f );
+                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( MATH_FLOAT_PI * 2.0f );
                 Vector3f pos;
                 pos.x = BlocksCenter.x + radius * cosf ( angle );
                 pos.y = BlocksCenter.y;
@@ -247,7 +247,7 @@ void OculusWorldDemoApp::RenderAnimatedBlocks(ovrEyeType eye, double appTime)
         {
             for ( int i = 0; i < numBlocks; i++ )
             {
-                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( Math<float>::Pi * 2.0f );
+                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( MATH_FLOAT_PI * 2.0f );
                 Vector3f pos;
                 pos.x = BlocksCenter.x;
                 pos.y = BlocksCenter.y + radius * cosf ( angle );

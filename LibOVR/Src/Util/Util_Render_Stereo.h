@@ -1,6 +1,5 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
 Filename    :   Util_Render_Stereo.h
 Content     :   Sample stereo rendering configuration classes.
 Created     :   October 22, 2012
@@ -29,13 +28,9 @@ limitations under the License.
 #define OVR_Util_Render_Stereo_h
 
 #include "../OVR_Stereo.h"
+#include "../Tracking/Tracking_SensorStateReader.h"
 
-
-namespace OVR {
-
-class SensorFusion;
-
-namespace Util { namespace Render {
+namespace OVR { namespace Util { namespace Render {
 
 
 
@@ -334,19 +329,19 @@ struct DistortionMeshVertexData
 };
 
 
-void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                             int *pNumVertices, int *pNumTriangles,
                             const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo );
 
 // Generate distortion mesh for a eye. This version requires less data then stereoParms, supporting
 // dynamic change in render target viewport.
-void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
                            const HmdRenderInfo &hmdRenderInfo, 
                            const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC );
 
-void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices );
+void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, uint16_t *pTriangleMeshIndices );
 
 
 //-----------------------------------------------------------------------------------
@@ -368,17 +363,17 @@ struct HeightmapMeshVertexData
 };
 
 
-void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
     int *pNumVertices, int *pNumTriangles,
     const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo );
 
 // Generate heightmap mesh for a eye. This version requires less data then stereoParms, supporting
 // dynamic change in render target viewport.
-void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
     int *pNumVertices, int *pNumTriangles, bool rightEye,
     const HmdRenderInfo &hmdRenderInfo, const ScaleAndOffset2D &eyeToSourceNDC );
 
-void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices );
+void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, uint16_t *pTriangleMeshIndices );
 
 
 
@@ -434,7 +429,7 @@ public:
     // and the predicted pose of the HMD at that time.
     // You usually only need to call one of these functions.
     double      GetViewRenderPredictionTime();
-    Transformf  GetViewRenderPredictionPose(SensorFusion &sfusion);
+    bool        GetViewRenderPredictionPose(Tracking::SensorStateReader* reader, Posef& transform);
 
 
     // Timewarp prediction functions. You usually only need to call one of these three sets of functions.
@@ -443,14 +438,13 @@ public:
     double      GetVisiblePixelTimeStart();
     double      GetVisiblePixelTimeEnd();
     // Predicted poses of the HMD at those first and last pixels.
-    Transformf  GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion);
-    Transformf  GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion);
+	bool        GetPredictedVisiblePixelPoseStart(Tracking::SensorStateReader* reader, Posef& transform);
+	bool        GetPredictedVisiblePixelPoseEnd(Tracking::SensorStateReader* reader, Posef& transform);
     // The delta matrices to feed to the timewarp distortion code,
     // given the pose that was used for rendering.
     // (usually the one returned by GetViewRenderPredictionPose() earlier)
-    Matrix4f    GetTimewarpDeltaStart(SensorFusion &sfusion, Transformf const &renderedPose);
-    Matrix4f    GetTimewarpDeltaEnd  (SensorFusion &sfusion, Transformf const &renderedPose);
-
+	bool        GetTimewarpDeltaStart(Tracking::SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
+	bool        GetTimewarpDeltaEnd(Tracking::SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
 
     // Just-In-Time distortion aims to delay the second sensor reading & distortion
     // until the very last moment to improve prediction. However, it is a little scary,
@@ -466,9 +460,7 @@ public:
     void        JustInTime_BeforeDistortionTimeMeasurement(double timeNow);
     void        JustInTime_AfterDistortionTimeMeasurement(double timeNow);
 
-
 private:
-
     bool                VsyncEnabled;
     HmdRenderInfo       RenderInfo;
     PredictionValues    CurrentPredictionValues;
@@ -480,11 +472,11 @@ private:
     float               DistortionTimeAverage;
 
     // Pose at which last time the eye was rendered.
-    Transformf               EyeRenderPoses[2];
+    Posef               EyeRenderPoses[2];
 
     // Absolute time of the last present+flush
     double              LastFramePresentFlushTime;
-    // Seconds between presentflushes
+    // Seconds between present+flushes
     float               PresentFlushToPresentFlushSeconds;
     // Predicted absolute time of the next present+flush
     double              NextFramePresentFlushTime;

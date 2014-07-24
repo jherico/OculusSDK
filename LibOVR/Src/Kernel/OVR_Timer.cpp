@@ -27,8 +27,10 @@ limitations under the License.
 #include "OVR_Timer.h"
 #include "OVR_Log.h"
 
-#if defined (OVR_OS_WIN32)
+#if defined (OVR_OS_WIN32) 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <MMSystem.h>
 #elif defined(OVR_OS_ANDROID)
 #include <time.h>
 #include <android/log.h>
@@ -57,7 +59,7 @@ double Timer::GetSeconds()
 }
 
 
-#ifndef OVR_OS_WIN32
+#if !defined(OVR_OS_WIN32)
 
 // Unused on OSs other then Win32.
 void Timer::initializeTimerSystem()
@@ -76,10 +78,10 @@ void Timer::shutdownTimerSystem()
 
 #if defined(OVR_OS_ANDROID)
 
-UInt64 Timer::GetTicksNanos()
+uint64_t Timer::GetTicksNanos()
 {
     if (useFakeSeconds)
-        return (UInt64) (FakeSeconds * NanosPerSecond);
+        return (uint64_t) (FakeSeconds * NanosPerSecond);
 
     // Choreographer vsync timestamp is based on.
     struct timespec tp;
@@ -89,7 +91,7 @@ UInt64 Timer::GetTicksNanos()
     {
         OVR_DEBUG_LOG(("clock_gettime status=%i", status ));
     }
-    const UInt64 result = (UInt64)tp.tv_sec * (UInt64)(1000 * 1000 * 1000) + UInt64(tp.tv_nsec);
+    const uint64_t result = (uint64_t)tp.tv_sec * (uint64_t)(1000 * 1000 * 1000) + uint64_t(tp.tv_nsec);
     return result;
 }
 
@@ -97,7 +99,7 @@ UInt64 Timer::GetTicksNanos()
 //------------------------------------------------------------------------
 // *** Win32 Specific Timer
 
-#elif defined (OVR_OS_WIN32)
+#elif defined (OVR_OS_WIN32) 
 
 
 // This helper class implements high-resolution wrapper that combines timeGetTime() output
@@ -117,7 +119,7 @@ struct PerformanceTimer
     void    Initialize();
     void    Shutdown();
 
-    UInt64  GetTimeNanos();
+    uint64_t  GetTimeNanos();
 
 
     UINT64 getFrequency()
@@ -131,19 +133,20 @@ struct PerformanceTimer
         return PrefFrequency;
     }
     
+	bool            UsingVista;
 
     CRITICAL_SECTION TimeCS;
     // timeGetTime() support with wrap.
-    UInt32          OldMMTimeMs;
-    UInt32          MMTimeWrapCounter;
+    uint32_t        OldMMTimeMs;
+    uint32_t        MMTimeWrapCounter;
     // Cached performance frequency result.
-    UInt64          PrefFrequency;
+    uint64_t        PrefFrequency;
     
     // Computed as (perfCounterNanos - ticksCounterNanos) initially,
     // and used to adjust timing.
-    UInt64          PerfMinusTicksDeltaNanos;
+    uint64_t        PerfMinusTicksDeltaNanos;
     // Last returned value in nanoseconds, to ensure we don't back-step in time.
-    UInt64          LastResultNanos;
+    uint64_t        LastResultNanos;
 };
 
 PerformanceTimer Win32_PerfTimer;
@@ -151,23 +154,55 @@ PerformanceTimer Win32_PerfTimer;
 
 void PerformanceTimer::Initialize()
 {
-    timeBeginPeriod(1);
+
+    MMRESULT mmr = timeBeginPeriod(1);
+    OVR_ASSERT(TIMERR_NOERROR == mmr);
+    OVR_UNUSED(mmr);
+
     InitializeCriticalSection(&TimeCS);
     MMTimeWrapCounter = 0;
     getFrequency();
+
+	// Set Vista flag.  On Vista, we can just use QPC() without all the extra work
+	UsingVista = false;
+	OSVERSIONINFOA vi;
+	vi.dwOSVersionInfoSize = sizeof(vi);
+	if (GetVersionExA(&vi))
+	{
+		UsingVista = vi.dwMajorVersion >= 6;
+	}
+
+	OVR_DEBUG_LOG(("Performance timer Vista flag = %d", (int)UsingVista));
 }
 
 void PerformanceTimer::Shutdown()
 {
     DeleteCriticalSection(&TimeCS);
-    timeEndPeriod(1);
+
+    MMRESULT mmr = timeEndPeriod(1);
+    OVR_ASSERT(TIMERR_NOERROR == mmr);
+    OVR_UNUSED(mmr);
 }
 
-UInt64 PerformanceTimer::GetTimeNanos()
+uint64_t PerformanceTimer::GetTimeNanos()
 {
-    UInt64          resultNanos;
+    uint64_t        resultNanos;
     LARGE_INTEGER   li;
-    DWORD           mmTimeMs;
+
+	// If on Vista,
+	if (UsingVista)
+	{
+		// Then we can use QPC() directly without all that extra work
+		QueryPerformanceCounter(&li);
+
+		uint64_t  frequency = getFrequency();
+		uint64_t  perfCounterSeconds = (uint64_t)li.QuadPart / frequency;
+		uint64_t  perfRemainderNanos = (((uint64_t)li.QuadPart - perfCounterSeconds * frequency) *
+									  Timer::NanosPerSecond) / frequency;
+		resultNanos = perfCounterSeconds * Timer::NanosPerSecond + perfRemainderNanos;
+	}
+	else
+	{
 
     // On Win32 QueryPerformanceFrequency is unreliable due to SMP and
     // performance levels, so use this logic to detect wrapping and track
@@ -175,25 +210,23 @@ UInt64 PerformanceTimer::GetTimeNanos()
     ::EnterCriticalSection(&TimeCS);
 
     // Get raw value and perf counter "At the same time".
-    mmTimeMs = timeGetTime();
     QueryPerformanceCounter(&li);
-
+    DWORD mmTimeMs = timeGetTime();
     if (OldMMTimeMs > mmTimeMs)
         MMTimeWrapCounter++;
     OldMMTimeMs = mmTimeMs;
 
     // Normalize to nanoseconds.
-    UInt64  mmCounterNanos     = ((UInt64(MMTimeWrapCounter) << 32) | mmTimeMs) * 1000000;
-    UInt64  frequency          = getFrequency();
-    UInt64  perfCounterSeconds = UInt64(li.QuadPart) / frequency;
-    UInt64  perfRemainderNanos = ( (UInt64(li.QuadPart) - perfCounterSeconds * frequency) *
+    uint64_t  frequency          = getFrequency();
+    uint64_t  perfCounterSeconds = uint64_t(li.QuadPart) / frequency;
+    uint64_t  perfRemainderNanos = ( (uint64_t(li.QuadPart) - perfCounterSeconds * frequency) *
                                    Timer::NanosPerSecond ) / frequency;
-    UInt64  perfCounterNanos   = perfCounterSeconds * Timer::NanosPerSecond + perfRemainderNanos;
+    uint64_t  perfCounterNanos   = perfCounterSeconds * Timer::NanosPerSecond + perfRemainderNanos;
 
+    uint64_t  mmCounterNanos     = ((uint64_t(MMTimeWrapCounter) << 32) | mmTimeMs) * 1000000;
     if (PerfMinusTicksDeltaNanos == 0)
         PerfMinusTicksDeltaNanos = perfCounterNanos - mmCounterNanos;
  
-
     // Compute result before snapping. 
     //
     // On first call, this evaluates to:
@@ -225,22 +258,23 @@ UInt64 PerformanceTimer::GetTimeNanos()
 
     LastResultNanos = resultNanos;
     ::LeaveCriticalSection(&TimeCS);
+	}
 
 	//Tom's addition, to keep precision
-	static UInt64      initial_time = 0;
-	if (!initial_time) initial_time = resultNanos;
-	resultNanos -= initial_time;
-
+	//static uint64_t    initial_time = 0;
+	//if (!initial_time) initial_time = resultNanos;
+	//resultNanos -= initial_time;
+	// FIXME: This cannot be used for cross-process timestamps
 
     return resultNanos;
 }
 
 
 // Delegate to PerformanceTimer.
-UInt64 Timer::GetTicksNanos()
+uint64_t Timer::GetTicksNanos()
 {
     if (useFakeSeconds)
-        return (UInt64) (FakeSeconds * NanosPerSecond);
+        return (uint64_t) (FakeSeconds * NanosPerSecond);
 
     return Win32_PerfTimer.GetTimeNanos();
 }
@@ -260,20 +294,20 @@ void Timer::shutdownTimerSystem()
 //------------------------------------------------------------------------
 // *** Standard OS Timer     
 
-UInt64 Timer::GetTicksNanos()
+uint64_t Timer::GetTicksNanos()
 {
     if (useFakeSeconds)
-        return (UInt64) (FakeSeconds * NanosPerSecond);
+        return (uint64_t) (FakeSeconds * NanosPerSecond);
 
     // TODO: prefer rdtsc when available?
-	UInt64 result;
+	uint64_t result;
 
     // Return microseconds.
     struct timeval tv;
 
     gettimeofday(&tv, 0);
 
-    result = (UInt64)tv.tv_sec * 1000000;
+    result = (uint64_t)tv.tv_sec * 1000000;
     result += tv.tv_usec;
 
     return result * 1000;

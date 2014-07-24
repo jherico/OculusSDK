@@ -18,8 +18,10 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include "CAPI_GL_DistortionShaders.h"
 
 #include "../../OVR_CAPI_GL.h"
+#include "../../Kernel/OVR_Color.h"
 
 namespace OVR { namespace CAPI { namespace GL {
+
 
 // Distortion pixel shader lookup.
 //  Bit 0: Chroma Correction
@@ -69,10 +71,10 @@ void DistortionShaderBitIndexCheck()
 
 struct DistortionVertex
 {
-    Vector2f Pos;
-    Vector2f TexR;
-    Vector2f TexG;
-    Vector2f TexB;
+    Vector2f ScreenPosNDC;
+    Vector2f TanEyeAnglesR;
+    Vector2f TanEyeAnglesG;
+    Vector2f TanEyeAnglesB;
     Color    Col;
 };
 
@@ -120,6 +122,8 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 {
 	GfxState = *new GraphicsState();
 
+	SaveGraphicsState();
+
     const ovrGLConfig* config = (const ovrGLConfig*)apiConfig;
 
     if (!config)
@@ -135,18 +139,39 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 	RParams.RTSize      = config->OGL.Header.RTSize;
 #if defined(OVR_OS_WIN32)
 	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
+    RParams.DC          = config->OGL.DC;
 #elif defined(OVR_OS_LINUX)
-    RParams.Disp        = (config->OGL.Disp) ? config->OGL.Disp : XOpenDisplay(NULL);
-    RParams.Win         = config->OGL.Win;
+    if (config->OGL.Disp)
+        RParams.Disp = config->OGL.Disp;
+    if (!RParams.Disp)
+        RParams.Disp = XOpenDisplay(NULL);
+    if (!RParams.Disp)
+    {
+        OVR_DEBUG_LOG(("XOpenDisplay failed."));
+        return false;
+    }
+
+    if (config->OGL.Win)
+        RParams.Win         = config->OGL.Win;
     if (!RParams.Win)
     {
         int unused;
-        XGetInputFocus(RParams.Disp, &RParams.Win, &unused);
+        RParams.Win = glXGetCurrentDrawable();
+    }
+    if (!RParams.Win)
+    {
+        OVR_DEBUG_LOG(("XGetInputFocus failed."));
+        return false;
     }
 #endif
 	
     DistortionCaps = distortionCaps;
 	
+    DistortionMeshVAOs[0] = 0;
+    DistortionMeshVAOs[1] = 0;
+
+    LatencyVAO = 0;
+
     //DistortionWarper.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
 
     pEyeTextures[0] = *new Texture(&RParams, 0, 0);
@@ -154,13 +179,15 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 
     initBuffersAndShaders();
 
+	RestoreGraphicsState();
+
     return true;
 }
 
 
-void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
+void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
 {
-	// Doesn't do a lot in here??
+    // Doesn't do a lot in here??
 	const ovrGLTexture* tex = (const ovrGLTexture*)eyeTexture;
 
 	// Write in values
@@ -179,44 +206,65 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
                                         eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
                                         eachEye[eyeId].UVScaleOffset );
 
+		if (!(RState.DistortionCaps & ovrDistortionCap_FlipInput))
+		{
+			eachEye[eyeId].UVScaleOffset[0].y = -eachEye[eyeId].UVScaleOffset[0].y;
+			eachEye[eyeId].UVScaleOffset[1].y = 1.0f - eachEye[eyeId].UVScaleOffset[1].y;
+		}
+
         pEyeTextures[eyeId]->UpdatePlaceholderTexture(tex->OGL.TexId,
                                                       tex->OGL.Header.TextureSize);
 	}
 }
 
-void DistortionRenderer::EndFrame(bool swapBuffers,
-                                  unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
+void DistortionRenderer::renderEndFrame()
 {
-    if (!TimeManager.NeedDistortionTimeMeasurement())
-    {
-		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
-		{
-			// Wait for timewarp distortion if it is time and Gpu idle
-			FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
-		}
+    renderDistortion(pEyeTextures[0], pEyeTextures[1]);
 
-        renderDistortion(pEyeTextures[0], pEyeTextures[1]);
+    // TODO: Add rendering context to callback.
+    if(RegisteredPostDistortionCallback)
+       RegisteredPostDistortionCallback(NULL);
+
+    if(LatencyTest2Active)
+    {
+        renderLatencyPixel(LatencyTest2DrawColor);
+    }
+}
+
+void DistortionRenderer::EndFrame(bool swapBuffers)
+{
+    // Don't spin if we are explicitly asked not to
+    if (RState.DistortionCaps & ovrDistortionCap_TimeWarp &&
+        !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+    {
+        if (!TimeManager.NeedDistortionTimeMeasurement())
+        {
+            // Wait for timewarp distortion if it is time and Gpu idle
+            FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
+
+            renderEndFrame();
+        }
+        else
+        {
+            // If needed, measure distortion time so that TimeManager can better estimate
+            // latency-reducing time-warp wait timing.
+            WaitUntilGpuIdle();
+            double  distortionStartTime = ovr_GetTimeInSeconds();
+
+            renderEndFrame();
+
+            WaitUntilGpuIdle();
+            TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+        }
     }
     else
     {
-        // If needed, measure distortion time so that TimeManager can better estimate
-        // latency-reducing time-warp wait timing.
-        WaitUntilGpuIdle();
-        double  distortionStartTime = ovr_GetTimeInSeconds();
-
-        renderDistortion(pEyeTextures[0], pEyeTextures[1]);
-
-        WaitUntilGpuIdle();
-        TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+        renderEndFrame();
     }
 
-    if(latencyTesterDrawColor)
+    if(LatencyTestActive)
     {
-        renderLatencyQuad(latencyTesterDrawColor);
-    }
-    else if(latencyTester2DrawColor)
-    {
-        renderLatencyPixel(latencyTester2DrawColor);
+        renderLatencyQuad(LatencyTestDrawColor);
     }
 
     if (swapBuffers)
@@ -227,11 +275,13 @@ void DistortionRenderer::EndFrame(bool swapBuffers,
 		if (wglGetSwapIntervalEXT() != swapInterval)
             wglSwapIntervalEXT(swapInterval);
 
-        HDC dc = GetDC(RParams.Window);
+        HDC dc = (RParams.DC != NULL) ? RParams.DC : GetDC(RParams.Window);
 		BOOL success = SwapBuffers(dc);
-        ReleaseDC(RParams.Window, dc);
-		OVR_ASSERT(success);
+        OVR_ASSERT(success);
         OVR_UNUSED(success);
+
+        if (RParams.DC == NULL)
+            ReleaseDC(RParams.Window, dc);
 #elif defined(OVR_OS_MAC)
         CGLContextObj context = CGLGetCurrentContext();
         GLint currentSwapInterval = 0;
@@ -253,58 +303,58 @@ void DistortionRenderer::EndFrame(bool swapBuffers,
 
         glXSwapBuffers(RParams.Disp, RParams.Win);
 #endif
+        // Force GPU to flush the scene, resulting in the lowest possible latency.
+        // It's critical that this flush is *after* present.
+        // With the display driver this flush is obsolete and theoretically should
+        // be a no-op.
+        // Doesn't need to be done if running through the Oculus driver.
+        if (RState.OurHMDInfo.InCompatibilityMode &&
+            !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+            WaitUntilGpuIdle();
     }
 }
 
 void DistortionRenderer::WaitUntilGpuIdle()
 {
-	glFlush();
 	glFinish();
 }
 
 double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
 {
-	double       initialTime = ovr_GetTimeInSeconds();
-	if (initialTime >= absTime)
-		return 0.0;
-	
-	glFlush();
-	glFinish();
+    // because glFlush() is not strict enough certain GL drivers
+    // we do a glFinish(), but before doing so, we make sure we're not
+    // running late
+    double initialTime = ovr_GetTimeInSeconds();
+    if (initialTime >= absTime)
+        return 0.0;
 
-	double newTime   = initialTime;
-	volatile int i;
+    glFinish();
 
-	while (newTime < absTime)
-	{
-		for (int j = 0; j < 50; j++)
-			i = 0;
-
-		newTime = ovr_GetTimeInSeconds();
-	}
-
-	// How long we waited
-	return newTime - initialTime;
+    return WaitTillTime(absTime);
 }
     
     
 DistortionRenderer::GraphicsState::GraphicsState()
 {
-    const char* glVersionString = (const char*)glGetString(GL_VERSION);
-    OVR_DEBUG_LOG(("GL_VERSION STRING: %s", (const char*)glVersionString));
-    char prefix[64];
     bool foundVersion = false;
-    
-    for (int i = 10; i < 30; ++i)
+    const char* glVersionString = (const char*)glGetString(GL_VERSION);
+    if (glVersionString)
     {
-        int major = i / 10;
-        int minor = i % 10;
-        OVR_sprintf(prefix, 64, "%d.%d", major, minor);
-        if (strstr(glVersionString, prefix) == glVersionString)
+        OVR_DEBUG_LOG(("GL_VERSION STRING: %s", (const char*)glVersionString));
+        char prefix[64];
+
+        for (int i = 10; i < 30; ++i)
         {
-            GlMajorVersion = major;
-            GlMinorVersion = minor;
-            foundVersion = true;
-            break;
+            int major = i / 10;
+            int minor = i % 10;
+            OVR_sprintf(prefix, 64, "%d.%d", major, minor);
+            if (strstr(glVersionString, prefix) == glVersionString)
+            {
+                GlMajorVersion = major;
+                GlMinorVersion = minor;
+                foundVersion = true;
+                break;
+            }
         }
     }
     
@@ -319,21 +369,34 @@ DistortionRenderer::GraphicsState::GraphicsState()
     if (GlMajorVersion >= 3)
     {
         SupportsVao = true;
+        SupportsDrawBuffers = true;
     }
     else
     {
         const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-        SupportsVao = (strstr("GL_ARB_vertex_array_object", extensions) != NULL);
+        SupportsVao = (strstr(extensions, "GL_ARB_vertex_array_object") != NULL
+                       || strstr(extensions, "GL_APPLE_vertex_array_object") != NULL);
+        SupportsDrawBuffers = (strstr(extensions, "GL_EXT_draw_buffers2") != NULL);
     }
 }
     
     
-void DistortionRenderer::GraphicsState::ApplyBool(GLenum Name, GLint Value)
+void DistortionRenderer::GraphicsState::ApplyBool(GLenum Name, GLint Value, GLint index)
 {
-    if (Value != 0)
-        glEnable(Name);
-    else
-        glDisable(Name);
+	if (SupportsDrawBuffers && index != -1)
+	{
+		if (Value != 0)
+			glEnablei(Name, index);
+		else
+			glDisablei(Name, index);
+	}
+	else
+	{
+		if (Value != 0)
+			glEnable(Name);
+		else
+			glDisable(Name);
+	}
 }
     
     
@@ -343,18 +406,34 @@ void DistortionRenderer::GraphicsState::Save()
     glGetFloatv(GL_COLOR_CLEAR_VALUE, ClearColor);
     glGetIntegerv(GL_DEPTH_TEST, &DepthTest);
     glGetIntegerv(GL_CULL_FACE, &CullFace);
+	glGetIntegerv(GL_FRAMEBUFFER_SRGB, &SRGB);
     glGetIntegerv(GL_CURRENT_PROGRAM, &Program);
     glGetIntegerv(GL_ACTIVE_TEXTURE, &ActiveTexture);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &TextureBinding);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArray);
+    if (SupportsVao)
+    {
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArrayBinding);
+    }
+    else
+    {
+        glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ElementArrayBufferBinding);
+        glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &ArrayBufferBinding);
+    }
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FrameBufferBinding);
-    glGetIntegerv(GL_BLEND, &Blend);
-    glGetIntegerv(GL_COLOR_WRITEMASK, ColorWritemask);
+    if (SupportsDrawBuffers)
+    {
+        glGetIntegeri_v(GL_BLEND, 0, &Blend);
+        glGetIntegeri_v(GL_COLOR_WRITEMASK, 0, ColorWritemask);
+    }
+    else
+    {
+        glGetIntegerv(GL_BLEND, &Blend);
+        glGetIntegerv(GL_COLOR_WRITEMASK, ColorWritemask);
+    }
     glGetIntegerv(GL_DITHER, &Dither);
     glGetIntegerv(GL_RASTERIZER_DISCARD, &RasterizerDiscard);
-    if (GlMajorVersion >= 3 && GlMajorVersion >= 2)
+    if ((GlMajorVersion == 3 && GlMinorVersion >= 2) || GlMajorVersion >= 4)
         glGetIntegerv(GL_SAMPLE_MASK, &SampleMask);
-	glGetIntegerv(GL_SCISSOR_TEST, &ScissorTest);
 
 	IsValid = true;
 }
@@ -371,22 +450,37 @@ void DistortionRenderer::GraphicsState::Restore()
     
     ApplyBool(GL_DEPTH_TEST, DepthTest);
     ApplyBool(GL_CULL_FACE, CullFace);
+    ApplyBool(GL_FRAMEBUFFER_SRGB, SRGB);	
     
     glUseProgram(Program);
     glActiveTexture(ActiveTexture);
     glBindTexture(GL_TEXTURE_2D, TextureBinding);
     if (SupportsVao)
-        glBindVertexArray(VertexArray);
+    {
+#ifdef OVR_OS_MAC
+		glBindVertexArrayAPPLE(VertexArrayBinding);
+#else
+		glBindVertexArray(VertexArrayBinding);
+#endif
+    }
+    else
+    {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ElementArrayBufferBinding);
+        glBindBuffer(GL_ARRAY_BUFFER, ArrayBufferBinding);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferBinding);
     
-    ApplyBool(GL_BLEND, Blend);
+	ApplyBool(GL_BLEND, Blend, 0);
     
-	glColorMask((GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    if (SupportsDrawBuffers)
+        glColorMaski(0, (GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    else
+        glColorMask((GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    
     ApplyBool(GL_DITHER, Dither);
     ApplyBool(GL_RASTERIZER_DISCARD, RasterizerDiscard);
-    if (GlMajorVersion >= 3 && GlMajorVersion >= 2)
+	if ((GlMajorVersion == 3 && GlMinorVersion >= 2) || GlMajorVersion >= 4)
         ApplyBool(GL_SAMPLE_MASK, SampleMask);
-    ApplyBool(GL_SCISSOR_TEST, ScissorTest);
 }
 
 
@@ -416,16 +510,21 @@ void DistortionRenderer::initBuffersAndShaders()
 
         for ( unsigned vertNum = 0; vertNum < meshData.VertexCount; vertNum++ )
         {
-            pCurVBVert->Pos.x = pCurOvrVert->Pos.x;
-            pCurVBVert->Pos.y = pCurOvrVert->Pos.y;
-            pCurVBVert->TexR  = (*(Vector2f*)&pCurOvrVert->TexR);
-            pCurVBVert->TexG  = (*(Vector2f*)&pCurOvrVert->TexG);
-            pCurVBVert->TexB  = (*(Vector2f*)&pCurOvrVert->TexB);
+            pCurVBVert->ScreenPosNDC.x = pCurOvrVert->ScreenPosNDC.x;
+            pCurVBVert->ScreenPosNDC.y = pCurOvrVert->ScreenPosNDC.y;
+            pCurVBVert->TanEyeAnglesR  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR);
+            pCurVBVert->TanEyeAnglesG  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesG);
+            pCurVBVert->TanEyeAnglesB  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesB);
+
             // Convert [0.0f,1.0f] to [0,255]
-            pCurVBVert->Col.R = (OVR::UByte)( pCurOvrVert->VignetteFactor * 255.99f );
+			if (DistortionCaps & ovrDistortionCap_Vignette)
+				pCurVBVert->Col.R = (uint8_t)( pCurOvrVert->VignetteFactor * 255.99f );
+			else
+				pCurVBVert->Col.R = 255;
+
             pCurVBVert->Col.G = pCurVBVert->Col.R;
             pCurVBVert->Col.B = pCurVBVert->Col.R;
-            pCurVBVert->Col.A = (OVR::UByte)( pCurOvrVert->TimeWarpFactor * 255.99f );;
+            pCurVBVert->Col.A = (uint8_t)( pCurOvrVert->TimeWarpFactor * 255.99f );;
             pCurOvrVert++;
             pCurVBVert++;
         }
@@ -433,7 +532,7 @@ void DistortionRenderer::initBuffersAndShaders()
         DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
         DistortionMeshVBs[eyeNum]->Data ( Buffer_Vertex | Buffer_ReadOnly, pVBVerts, sizeof(DistortionVertex) * meshData.VertexCount );
         DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
-        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, ( sizeof(SInt16) * meshData.IndexCount ) );
+        DistortionMeshIBs[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, ( sizeof(int16_t) * meshData.IndexCount ) );
 
         OVR_FREE ( pVBVerts );
         ovrHmd_DestroyDistortionMesh( &meshData );
@@ -449,16 +548,29 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     setViewport( Recti(0,0, RParams.RTSize.w, RParams.RTSize.h) );
 
+	if (DistortionCaps & ovrDistortionCap_SRGB)
+		glEnable(GL_FRAMEBUFFER_SRGB);
+    else
+        glDisable(GL_FRAMEBUFFER_SRGB);
+
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
     
-    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+    if (glState->SupportsDrawBuffers)
+    {
+        glDisablei(GL_BLEND, 0);
+        glColorMaski(0, GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+    }
+    else
+    {
+        glDisable(GL_BLEND);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+    }
+    
     glDisable(GL_DITHER);
     glDisable(GL_RASTERIZER_DISCARD);
-    if (glState->GlMajorVersion >= 3 && glState->GlMajorVersion >= 2)
+    if ((glState->GlMajorVersion >= 3 && glState->GlMinorVersion >= 2) || glState->GlMajorVersion >= 4)
         glDisable(GL_SAMPLE_MASK);
-    glDisable(GL_SCISSOR_TEST);
         
 	glClearColor(
 		RState.ClearColor[0],
@@ -536,20 +648,21 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
         createDrawQuad();
     }
        
-    ShaderFill quadFill(SimpleQuadShader);
+    Ptr<ShaderSet> quadShader = (DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
+    ShaderFill quadFill(quadShader);
     //quadFill.SetInputLayout(SimpleQuadVertexIL);
 
     setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
 
-    SimpleQuadShader->SetUniform2f("Scale", 0.2f, 0.2f);
-    SimpleQuadShader->SetUniform4f("Color", (float)latencyTesterDrawColor[0] / 255.99f,
-                                            (float)latencyTesterDrawColor[0] / 255.99f,
-                                            (float)latencyTesterDrawColor[0] / 255.99f,
-                                            1.0f);
+    quadShader->SetUniform2f("Scale", 0.3f, 0.3f);
+    quadShader->SetUniform4f("Color", (float)latencyTesterDrawColor[0] / 255.99f,
+                                      (float)latencyTesterDrawColor[0] / 255.99f,
+                                      (float)latencyTesterDrawColor[0] / 255.99f,
+                                      1.0f);
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
-        SimpleQuadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.4f : 0.4f, 0.0f);    
+        quadShader->SetUniform2f("PositionOffset", eyeNum == 0 ? -0.5f : 0.5f, 0.0f);    
         renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
     }
 }
@@ -563,18 +676,28 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
         createDrawQuad();
     }
 
-    ShaderFill quadFill(SimpleQuadShader);
+    Ptr<ShaderSet> quadShader = (DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
+    ShaderFill quadFill(quadShader);
 
     setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
 
-    SimpleQuadShader->SetUniform4f("Color", (float)latencyTesterPixelColor[0] / 255.99f,
-                                            (float)latencyTesterPixelColor[0] / 255.99f,
-                                            (float)latencyTesterPixelColor[0] / 255.99f,
-                                            1.0f);
+#ifdef OVR_BUILD_DEBUG
+    quadShader->SetUniform4f("Color", (float)latencyTesterPixelColor[0] / 255.99f,
+                                      (float)latencyTesterPixelColor[1] / 255.99f,
+                                      (float)latencyTesterPixelColor[2] / 255.99f,
+                                      1.0f);
 
-    Vector2f scale(2.0f / RParams.RTSize.w, 2.0f / RParams.RTSize.h); 
-    SimpleQuadShader->SetUniform2f("Scale", scale.x, scale.y);
-    SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f, 1.0f);
+    Vector2f scale(20.0f / RParams.RTSize.w, 20.0f / RParams.RTSize.h); 
+#else
+    quadShader->SetUniform4f("Color", (float)latencyTesterPixelColor[0] / 255.99f,
+                                      (float)latencyTesterPixelColor[0] / 255.99f,
+                                      (float)latencyTesterPixelColor[0] / 255.99f,
+                                      1.0f);
+
+    Vector2f scale(1.0f / RParams.RTSize.w, 1.0f / RParams.RTSize.h); 
+#endif
+    quadShader->SetUniform2f("Scale", scale.x, scale.y);
+    quadShader->SetUniform2f("PositionOffset", 1.0f-scale.x, 1.0f-scale.y);
 	renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
 }
 
@@ -611,7 +734,11 @@ void DistortionRenderer::renderPrimitives(
 	{
 		if (*vao != 0)
 		{
+#ifdef OVR_OS_MAC
+        	glBindVertexArrayAPPLE(*vao);
+#else
 			glBindVertexArray(*vao);
+#endif
 
 			if (isDistortionMesh)
 				glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
@@ -622,8 +749,13 @@ void DistortionRenderer::renderPrimitives(
 		{
             if (glState->SupportsVao)
             {
+#ifdef OVR_OS_MAC
+                glGenVertexArraysAPPLE(1, vao);
+                glBindVertexArrayAPPLE(*vao);
+#else
                 glGenVertexArrays(1, vao);
                 glBindVertexArray(*vao);
+#endif
 			}
 
 			int attributeCount = (isDistortionMesh) ? 5 : 1;
@@ -641,11 +773,11 @@ void DistortionRenderer::renderPrimitives(
 				locs[3] = glGetAttribLocation(prog, "TexCoord1");
 				locs[4] = glGetAttribLocation(prog, "TexCoord2");
 
-				glVertexAttribPointer(locs[0], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, Pos));
+				glVertexAttribPointer(locs[0], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, ScreenPosNDC));
 				glVertexAttribPointer(locs[1], 4, GL_UNSIGNED_BYTE, true, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, Col));
-				glVertexAttribPointer(locs[2], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexR));
-				glVertexAttribPointer(locs[3], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexG));
-				glVertexAttribPointer(locs[4], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TexB));
+				glVertexAttribPointer(locs[2], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TanEyeAnglesR));
+				glVertexAttribPointer(locs[3], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TanEyeAnglesG));
+				glVertexAttribPointer(locs[4], 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset)+offsetof(DistortionVertex, TanEyeAnglesB));
 			}
 			else
 			{
@@ -751,12 +883,44 @@ void DistortionRenderer::initShaders()
 		SimpleQuadShader->SetShader(ps);
 
 		delete[](psSource);
-	}
+    }
+    {
+        size_t vsSize = strlen(shaderPrefix)+sizeof(SimpleQuad_vs);
+        char* vsSource = new char[vsSize];
+        OVR_strcpy(vsSource, vsSize, shaderPrefix);
+        OVR_strcat(vsSource, vsSize, SimpleQuad_vs);
+
+        Ptr<GL::VertexShader> vs = *new GL::VertexShader(
+            &RParams,
+            (void*)vsSource, vsSize,
+            SimpleQuad_vs_refl, sizeof(SimpleQuad_vs_refl) / sizeof(SimpleQuad_vs_refl[0]));
+
+        SimpleQuadGammaShader = *new ShaderSet;
+        SimpleQuadGammaShader->SetShader(vs);
+
+        delete[](vsSource);
+
+        size_t psSize = strlen(shaderPrefix)+sizeof(SimpleQuadGamma_fs);
+        char* psSource = new char[psSize];
+        OVR_strcpy(psSource, psSize, shaderPrefix);
+        OVR_strcat(psSource, psSize, SimpleQuadGamma_fs);
+
+        Ptr<GL::FragmentShader> ps  = *new GL::FragmentShader(
+            &RParams,
+            (void*)psSource, psSize,
+            SimpleQuadGamma_fs_refl, sizeof(SimpleQuadGamma_fs_refl) / sizeof(SimpleQuadGamma_fs_refl[0]));
+
+        SimpleQuadGammaShader->SetShader(ps);
+
+        delete[](psSource);
+    }
 }
 
 
 void DistortionRenderer::destroy()
 {
+	SaveGraphicsState();
+
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
 
 	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
@@ -778,7 +942,15 @@ void DistortionRenderer::destroy()
     }
 
     LatencyTesterQuadVB.Clear();
-	LatencyVAO = 0;
+
+    if(LatencyVAO != 0)
+    {
+        glDeleteVertexArrays(1, &LatencyVAO);
+	    LatencyVAO = 0;
+    }
+
+	RestoreGraphicsState();
 }
+
 
 }}} // OVR::CAPI::GL

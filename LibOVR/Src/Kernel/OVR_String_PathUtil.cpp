@@ -39,7 +39,7 @@ void ScanFilePath(const char* url, const char** pfilename, const char** pext)
     const char *filename = 0;
     const char *lastDot = 0;
 
-    UInt32 charVal = UTF8Util::DecodeNextChar(&url);
+    uint32_t charVal = UTF8Util::DecodeNextChar(&url);
 
     while (charVal != 0)
     {
@@ -76,8 +76,8 @@ void ScanFilePath(const char* url, const char** pfilename, const char** pext)
 //  - protocol: 'file://', 'http://'
 const char* ScanPathProtocol(const char* url)
 {    
-    UInt32 charVal = UTF8Util::DecodeNextChar(&url);
-    UInt32 charVal2;
+    uint32_t charVal = UTF8Util::DecodeNextChar(&url);
+    uint32_t charVal2;
    
     while (charVal != 0)
     {
@@ -118,7 +118,7 @@ bool String::HasAbsolutePath(const char* url)
     if (!url || !*url)
         return true; // Treat empty strings as absolute.    
 
-    UInt32 charVal = UTF8Util::DecodeNextChar(&url);
+    uint32_t charVal = UTF8Util::DecodeNextChar(&url);
 
     // Fist character of '/' or '\\' means absolute url.
     if ((charVal == '/') || (charVal == '\\'))

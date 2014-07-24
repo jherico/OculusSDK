@@ -31,7 +31,6 @@ limitations under the License.
 #include "../Kernel/OVR_Timer.h"
 #include "../Kernel/OVR_Math.h"
 #include "../Util/Util_Render_Stereo.h"
-#include "../Util/Util_LatencyTest2.h"
 
 namespace OVR { namespace CAPI {
 
@@ -41,7 +40,7 @@ namespace OVR { namespace CAPI {
 // how long to wait. 
 struct TimeDeltaCollector
 {
-    TimeDeltaCollector() : Count(0) { }
+    TimeDeltaCollector() : Count(0), ReCalcMedian(true), Median(-1.0) { }
 
     void    AddTimeDelta(double timeSeconds);    
     void    Clear() { Count = 0; }    
@@ -51,9 +50,11 @@ struct TimeDeltaCollector
     double  GetCount() const { return Count; }
 
     enum { Capacity = 12 };
-private:    
-    int     Count;
-    double  TimeBufferSeconds[Capacity];
+private:
+	double  TimeBufferSeconds[Capacity];
+	mutable double  Median;
+	int     Count;
+    mutable bool    ReCalcMedian;
 };
 
 
@@ -85,6 +86,7 @@ public:
 
     void MatchRecord(const Util::FrameTimeRecordSet &r);   
 
+    bool IsLatencyTimingAvailable();
     void GetLatencyTimings(float latencies[3]);
 
     void Reset();
@@ -192,7 +194,7 @@ public:
     Timing  GetFrameTiming(unsigned frameIndex);
  
     double  GetEyePredictionTime(ovrEyeType eye);
-    Transformf GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
+    Posef   GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
 
     void    GetTimewarpPredictions(ovrEyeType eye, double timewarpStartEnd[2]); 
     void    GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2]);
@@ -202,15 +204,19 @@ public:
     void    AddDistortionTimeMeasurement(double distortionTimeSeconds);
 
     
-    // DK2 Lateny test interface
-
-    // Get next draw color for DK2 latency tester
-    unsigned char GetFrameLatencyTestDrawColor()
-    { return ScreenLatencyTracker.GetNextDrawColor(); }
+    // DK2 Latency test interface
+    
+    // Get next draw color for DK2 latency tester (3-byte RGB)
+    void GetFrameLatencyTestDrawColor(unsigned char outColor[3])
+    {
+        outColor[0] = ScreenLatencyTracker.GetNextDrawColor();
+        outColor[1] = ScreenLatencyTracker.IsLatencyTimingAvailable() ? 255 : 0;
+        outColor[2] = ScreenLatencyTracker.IsLatencyTimingAvailable() ? 0 : 255;
+    }
 
     // Must be called after EndFrame() to update latency tester timings.
     // Must pass color reported by NextFrameColor for this frame.
-    void    UpdateFrameLatencyTrackingAfterEndFrame(unsigned char frameLatencyTestColor,
+    void    UpdateFrameLatencyTrackingAfterEndFrame(unsigned char frameLatencyTestColor[3],
                                                     const Util::FrameTimeRecordSet& rs);
 
     void    GetLatencyTimings(float latencies[3])
@@ -223,8 +229,58 @@ private:
 
     double  calcFrameDelta() const;
     double  calcScreenDelay() const;
-    double  calcTimewarpWaitDelta() const;    
+    double  calcTimewarpWaitDelta() const;
+
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    /*
+    void    updateTimewarpTiming();
+
+
     
+    // TimewarpDelayAdjuster implements a simple state machine that reduces the amount
+    // of time-warp waiting based on skipped frames. 
+    struct TimewarpDelayAdjuster
+    {
+        enum StateInLevel
+        {        
+            // We are ok at this level, and will be waiting for some time before trying to reduce.
+            State_WaitingToReduceLevel,  
+            // After decrementing a level, we are verifying that this won't cause skipped frames.
+            State_VerifyingAfterReduce
+       };
+    
+        enum {
+            MaxDelayLevel          = 5,
+            MaxInfiniteTimingLevel = 3,
+            MaxTimeIndex           = 6
+        };
+
+        StateInLevel State;   
+        // Current level. Higher levels means larger delay reduction (smaller overall time-warp delay).
+        int          DelayLevel;
+        // Index for the amount of time we'd wait in this level. If attempt to decrease level fails,
+        // with is incrementing causing the level to become "sticky". 
+        int          WaitTimeIndexForLevel[MaxTimeIndex + 1];
+        // We skip few frames after each escalation to avoid too rapid of a reduction.
+        int          InitialFrameCounter;
+        // What th currect "reduction" currently is.
+        double       TimewarpDelayReductionSeconds;
+        // When we should try changing the level again.
+        double       DelayLevelFinishTime;
+
+    public:
+        TimewarpDelayAdjuster() { Reset(); }
+
+        void    Reset();
+
+        void    UpdateTimewarpWaitIfSkippedFrames(FrameTimeManager* manager,
+                                                  double measuredFrameDelta,
+                                                  double nextFrameTime);
+
+        double  GetDelayReduction() const { return TimewarpDelayReductionSeconds; }
+    };
+    */
+
     
     HmdRenderInfo       RenderInfo;
     // Timings are collected through a median filter, to avoid outliers.
@@ -245,10 +301,13 @@ private:
     double              NoVSyncToScanoutDelay;
     double              ScreenSwitchingDelay;
 
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    //TimewarpDelayAdjuster  TimewarpAdjuster;
+
     // Current (or last) frame timing info. Used as a source for LocklessTiming.
     Timing                  FrameTiming;
     // TBD: Don't we need NextFrame here as well?
-    LocklessUpdater<Timing> LocklessTiming;
+    LocklessUpdater<Timing, Timing> LocklessTiming;
 
 
     // IMU Read timings

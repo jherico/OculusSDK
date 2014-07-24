@@ -1,6 +1,5 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
 Filename    :   OVR_Lockless.cpp
 Content     :   Test logic for lock-less classes
 Created     :   December 27, 2013
@@ -32,7 +31,6 @@ limitations under the License.
 #include "OVR_Threads.h"
 #include "OVR_Timer.h"
 #include "OVR_Log.h"
-
 
 namespace OVR { namespace LocklessTest {
 
@@ -108,7 +106,6 @@ class Consumer : public Thread
     {
         LogText("LocklessTest::Consumer::Run started.\n");
         
-
         while (!FirstItemWritten)
         {
             // spin until producer wrote first value...

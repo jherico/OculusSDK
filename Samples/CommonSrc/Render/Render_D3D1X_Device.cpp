@@ -26,6 +26,9 @@ limitations under the License.
 #include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_Std.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <comdef.h>
+
 #include "Render_D3D1X_Device.h"
 #include "Util/Util_ImageWindow.h"
 
@@ -159,7 +162,7 @@ static const char* MultiTexturePixelShaderSrc =
     "   if (color2.a <= 0.4)\n"
     "		discard;\n"
 	// go to back to gamma space space colors (assume gamma 2.0 for speed)
-	"	return float4(sqrt(color2.rgb), color2.a);\n"
+	"	return float4(sqrt(color2.rgb) / color2.a, 1);\n"
     "}\n";
 
 #define LIGHTING_COMMON                 \
@@ -225,6 +228,24 @@ static const char* AlphaTexturePixelShaderSrc =
 	"	finalColor.rgb *= finalColor.a;\n"
 	"	return finalColor;\n"
     "}\n";
+
+static const char* AlphaBlendedTexturePixelShaderSrc =
+	"Texture2D Texture : register(t0);\n"
+	"SamplerState Linear : register(s0);\n"
+	"struct Varyings\n"
+	"{\n"
+	"   float4 Position : SV_Position;\n"
+	"   float4 Color    : COLOR0;\n"
+	"   float2 TexCoord : TEXCOORD0;\n"
+	"};\n"
+	"float4 main(in Varyings ov) : SV_Target\n"
+	"{\n"
+	"	float4 finalColor = ov.Color;\n"
+	"	finalColor *= Texture.Sample(Linear, ov.TexCoord);\n"
+	// blend state expects premultiplied alpha
+	"	finalColor.rgb *= finalColor.a;\n"
+	"	return finalColor;\n"
+	"}\n";
 #pragma endregion
 
 #pragma region Distortion shaders
@@ -662,7 +683,8 @@ static const char* FShaderSrcs[FShader_Count] =
     SolidPixelShaderSrc,
     GouraudPixelShaderSrc,
     TexturePixelShaderSrc,
-    AlphaTexturePixelShaderSrc,
+	AlphaTexturePixelShaderSrc,
+	AlphaBlendedTexturePixelShaderSrc,
     PostProcessPixelShaderWithChromAbSrc,
     LitSolidPixelShaderSrc,
     LitTexturePixelShaderSrc,
@@ -673,32 +695,96 @@ static const char* FShaderSrcs[FShader_Count] =
     PostProcessHeightmapTimewarpPixelShaderSrc
 };
 
+#ifdef OVR_BUILD_DEBUG
+
+static void ReportCOMError(HRESULT hr, const char* file, int line)
+{
+    if (FAILED(hr))
+    {
+        _com_error err(hr);
+        LPCTSTR errMsg = err.ErrorMessage();
+
+        if (sizeof(TCHAR) == sizeof(char))
+        {
+            LogError("[D3D] Error in %s on line %d : %s", file, line, errMsg);
+        }
+        else
+        {
+            size_t len = wcslen(errMsg);
+            char* data = new char[len + 1];
+            size_t count = len;
+            wcstombs_s(&count, data, len + 1, errMsg, len);
+            if (count < len)
+            {
+                len = count;
+            }
+            data[len] = '\0';
+            LogError("[D3D] Error in %s on line %d : %s", file, line, data);
+            delete[] data;
+        }
+
+        OVR_ASSERT(false);
+    }
+}
+
+#define OVR_LOG_COM_ERROR(hr) \
+    ReportCOMError(hr, __FILE__, __LINE__);
+
+#else
+
+#define OVR_LOG_COM_ERROR(hr) ;
+
+#endif
+
 RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 {
-    RECT rc;
-    GetClientRect(window, &rc);
-    UINT width = rc.right - rc.left;
-    UINT height = rc.bottom - rc.top;
-	::OVR::Render::RenderDevice::SetWindowSize(width, height);
+    HRESULT hr;
 
+    RECT rc;
+    if (p.Resolution == Sizei(0))
+    {
+        GetClientRect(window, &rc);
+        UINT width = rc.right - rc.left;
+        UINT height = rc.bottom - rc.top;
+        ::OVR::Render::RenderDevice::SetWindowSize(width, height);
+    }
+    else
+    {
+        // TBD: This should be renamed to not be tied to window for App mode.
+        ::OVR::Render::RenderDevice::SetWindowSize(p.Resolution.w, p.Resolution.h);
+    }
+    
     Window = window;
 
     Params = p;
-    HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
-    if (FAILED(hr))    
+    DXGIFactory = NULL;
+    hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
         return;
+    }
 
     // Find the adapter & output (monitor) to use for fullscreen, based on the reported name of the HMD's monitor.
     if (Params.Display.MonitorName.GetLength() > 0)
     {
         for(UINT AdapterIndex = 0; ; AdapterIndex++)
         {
+			Adapter = NULL;
             HRESULT hr = DXGIFactory->EnumAdapters(AdapterIndex, &Adapter.GetRawRef());
             if (hr == DXGI_ERROR_NOT_FOUND)
                 break;
+            if (FAILED(hr))
+            {
+                OVR_LOG_COM_ERROR(hr);
+            }
 
             DXGI_ADAPTER_DESC Desc;
-            Adapter->GetDesc(&Desc);
+            hr = Adapter->GetDesc(&Desc);
+            if (FAILED(hr))
+            {
+                OVR_LOG_COM_ERROR(hr);
+            }
 
             UpdateMonitorOutputs();
 
@@ -712,25 +798,37 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     if (!Adapter)
     {
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        hr = DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
         UpdateMonitorOutputs();
     }
 
     int flags = D3D10_CREATE_DEVICE_BGRA_SUPPORT; //0;
 
 #if (OVR_D3D_VERSION == 10)
+    Device = NULL;
     hr = D3D10CreateDevice1(Adapter, D3D10_DRIVER_TYPE_HARDWARE, NULL, flags, D3D10_FEATURE_LEVEL_10_1, D3D10_1_SDK_VERSION,
                            &Device.GetRawRef());
     Context = Device;
     Context->AddRef();
 #else //11
+    Device = NULL;
+    Context = NULL;
     D3D_FEATURE_LEVEL featureLevel; // TODO: Limit certain features based on D3D feature level
     hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
                            NULL, flags, NULL, 0, D3D1x_(SDK_VERSION),
                            &Device.GetRawRef(), &featureLevel, &Context.GetRawRef());
 #endif
-    if (FAILED(hr))
-        return;
+	if (FAILED(hr))
+	{
+        OVR_LOG_COM_ERROR(hr);
+        LogError("[D3D1X] Unable to create device: %x", hr);
+        OVR_ASSERT(false);
+		return;
+	}
 
     if (!RecreateSwapChain())
         return;
@@ -769,28 +867,40 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
         }
     }
 
-    SPInt bufferSize = vsData->GetBufferSize();
+    intptr_t bufferSize = vsData->GetBufferSize();
     const void* buffer = vsData->GetBufferPointer();
+    ModelVertexIL = NULL;
     ID3D1xInputLayout** objRef = &ModelVertexIL.GetRawRef();
-    HRESULT validate = Device->CreateInputLayout(ModelVertexDesc, sizeof(ModelVertexDesc)/sizeof(ModelVertexDesc[0]), buffer, bufferSize, objRef);
-    OVR_UNUSED(validate);
+    hr = Device->CreateInputLayout(ModelVertexDesc, sizeof(ModelVertexDesc)/sizeof(ModelVertexDesc[0]), buffer, bufferSize, objRef);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
 
     {
         ID3D10Blob* vsData2 = CompileShader("vs_4_1", PostProcessMeshVertexShaderSrc);
-        SPInt bufferSize2 = vsData2->GetBufferSize();
+        intptr_t bufferSize2 = vsData2->GetBufferSize();
         const void* buffer2 = vsData2->GetBufferPointer();
+        DistortionVertexIL = NULL;
         ID3D1xInputLayout** objRef2 = &DistortionVertexIL.GetRawRef();
-        HRESULT validate2 = Device->CreateInputLayout(DistortionVertexDesc, sizeof(DistortionVertexDesc)/sizeof(DistortionVertexDesc[0]), buffer2, bufferSize2, objRef2);
-        OVR_UNUSED(validate2);
+        hr = Device->CreateInputLayout(DistortionVertexDesc, sizeof(DistortionVertexDesc)/sizeof(DistortionVertexDesc[0]), buffer2, bufferSize2, objRef2);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
     }
 
     {
         ID3D10Blob* vsData2 = CompileShader("vs_4_1", PostProcessHeightmapTimewarpVertexShaderSrc);
-        SPInt bufferSize2 = vsData2->GetBufferSize();
+        intptr_t bufferSize2 = vsData2->GetBufferSize();
         const void* buffer2 = vsData2->GetBufferPointer();
+        HeightmapVertexIL = NULL;
         ID3D1xInputLayout** objRef2 = &HeightmapVertexIL.GetRawRef();
-        HRESULT validate2 = Device->CreateInputLayout(HeightmapVertexDesc, sizeof(HeightmapVertexDesc)/sizeof(HeightmapVertexDesc[0]), buffer2, bufferSize2, objRef2);
-        OVR_UNUSED(validate2);
+        hr = Device->CreateInputLayout(HeightmapVertexDesc, sizeof(HeightmapVertexDesc)/sizeof(HeightmapVertexDesc[0]), buffer2, bufferSize2, objRef2);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
     }
 
     Ptr<ShaderSet> gouraudShaders = *new ShaderSet();
@@ -806,7 +916,8 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     bm.SrcBlend     = bm.SrcBlendAlpha  = D3D1x_(BLEND_ONE); //premultiplied alpha
     bm.DestBlend    = bm.DestBlendAlpha = D3D1x_(BLEND_INV_SRC_ALPHA);
     bm.RenderTargetWriteMask[0]         = D3D1x_(COLOR_WRITE_ENABLE_ALL);
-    Device->CreateBlendState(&bm, &BlendState.GetRawRef());
+    BlendState = NULL;
+    hr = Device->CreateBlendState(&bm, &BlendState.GetRawRef());
 #else
     D3D1x_(BLEND_DESC) bm;
     memset(&bm, 0, sizeof(bm));
@@ -815,8 +926,13 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     bm.RenderTarget[0].SrcBlend    = bm.RenderTarget[0].SrcBlendAlpha   = D3D1x_(BLEND_ONE); //premultiplied alpha
     bm.RenderTarget[0].DestBlend   = bm.RenderTarget[0].DestBlendAlpha  = D3D1x_(BLEND_INV_SRC_ALPHA);
     bm.RenderTarget[0].RenderTargetWriteMask = D3D1x_(COLOR_WRITE_ENABLE_ALL);
-    Device->CreateBlendState(&bm, &BlendState.GetRawRef());
+    BlendState = NULL;
+    hr = Device->CreateBlendState(&bm, &BlendState.GetRawRef());
 #endif
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
 
     D3D1x_(RASTERIZER_DESC) rs;
     memset(&rs, 0, sizeof(rs));
@@ -825,13 +941,21 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     // rs.CullMode = D3D1x_(CULL_NONE);
     rs.DepthClipEnable = true;
     rs.FillMode = D3D1x_(FILL_SOLID);
-    Device->CreateRasterizerState(&rs, &Rasterizer.GetRawRef());
+    Rasterizer = NULL;
+    hr = Device->CreateRasterizerState(&rs, &Rasterizer.GetRawRef());
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
 
     QuadVertexBuffer = *CreateBuffer();
     const Render::Vertex QuadVertices[] =
     { Vertex(Vector3f(0, 1, 0)), Vertex(Vector3f(1, 1, 0)),
       Vertex(Vector3f(0, 0, 0)), Vertex(Vector3f(1, 0, 0)) };
-    QuadVertexBuffer->Data(Buffer_Vertex | Buffer_ReadOnly, QuadVertices, sizeof(QuadVertices));
+    if (!QuadVertexBuffer->Data(Buffer_Vertex | Buffer_ReadOnly, QuadVertices, sizeof(QuadVertices)))
+    {
+        OVR_ASSERT(false);
+    }
 
     SetDepthMode(0, 0);
 }
@@ -840,7 +964,11 @@ RenderDevice::~RenderDevice()
 {
     if (SwapChain && Params.Fullscreen)
     {
-        SwapChain->SetFullscreenState(false, NULL);
+        HRESULT hr = SwapChain->SetFullscreenState(false, NULL);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
     }
 }
 
@@ -848,7 +976,25 @@ RenderDevice::~RenderDevice()
 // Implement static initializer function to create this class.
 Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
 {
-    return new RenderDevice(rp, (HWND)oswnd);
+#if (OVR_D3D_VERSION == 10)
+    Render::D3D10::RenderDevice* render = new RenderDevice(rp, (HWND)oswnd);
+#else
+    Render::D3D11::RenderDevice* render = new RenderDevice(rp, (HWND)oswnd);
+#endif
+    // Sanity check to make sure our resources were created.
+    // This should stop a lot of driver related crashes we have experienced
+    if ((render->DXGIFactory == NULL) || (render->Device == NULL) || (render->SwapChain == NULL))
+    {
+        OVR_ASSERT(false);
+        // TBD: Probabaly other things like shader creation should be verified as well
+        render->Shutdown();
+        render->Release();
+        return NULL;
+    }
+    else
+    {
+        return render;
+    }
 }
 
 
@@ -861,16 +1007,16 @@ BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 {
     RenderDevice* renderer = (RenderDevice*)dwData;
 
-    MONITORINFOEX monitor;
+    MONITORINFOEXA monitor;
     monitor.cbSize = sizeof(monitor);
 
-    if (::GetMonitorInfo(hMonitor, &monitor) && monitor.szDevice[0])
+    if (::GetMonitorInfoA(hMonitor, &monitor) && monitor.szDevice[0])
     {
-        DISPLAY_DEVICE dispDev;
+        DISPLAY_DEVICEA dispDev;
         memset(&dispDev, 0, sizeof(dispDev));
         dispDev.cb = sizeof(dispDev);
 
-        if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
+        if (::EnumDisplayDevicesA(monitor.szDevice, 0, &dispDev, 0))
         {
             if (strstr(String(dispDev.DeviceName).ToCStr(), renderer->GetParams().Display.MonitorName.ToCStr()))
             {
@@ -895,17 +1041,27 @@ void RenderDevice::UpdateMonitorOutputs(bool needRecreate)
         // to get latest info about monitors.
         if (SwapChain)
         {
-            SwapChain->SetFullscreenState(FALSE, NULL);
-            SwapChain->Release();
+            hr = SwapChain->SetFullscreenState(FALSE, NULL);
+            if (FAILED(hr))
+            {
+                OVR_LOG_COM_ERROR(hr);
+            }
             SwapChain = NULL;
         }
 
         DXGIFactory = NULL;
         Adapter = NULL;
         hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
-        if (FAILED(hr))    
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
             return;
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        }
+        hr = DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
     }
 
     bool deviceNameFound = false;
@@ -918,19 +1074,23 @@ void RenderDevice::UpdateMonitorOutputs(bool needRecreate)
         {
             break;
         }
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
 
         DXGI_OUTPUT_DESC OutDesc;
         Output->GetDesc(&OutDesc);
 
-        MONITORINFOEX monitor;
+        MONITORINFOEXA monitor;
         monitor.cbSize = sizeof(monitor);
-        if (::GetMonitorInfo(OutDesc.Monitor, &monitor) && monitor.szDevice[0])
+        if (::GetMonitorInfoA(OutDesc.Monitor, &monitor) && monitor.szDevice[0])
         {
-            DISPLAY_DEVICE dispDev;
+            DISPLAY_DEVICEA dispDev;
             memset(&dispDev, 0, sizeof(dispDev));
             dispDev.cb = sizeof(dispDev);
 
-            if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
+            if (::EnumDisplayDevicesA(monitor.szDevice, 0, &dispDev, 0))
             {
                 if (strstr(String(dispDev.DeviceName).ToCStr(), Params.Display.MonitorName.ToCStr()))
                 {
@@ -946,19 +1106,23 @@ void RenderDevice::UpdateMonitorOutputs(bool needRecreate)
 
     if (!deviceNameFound && !Params.Display.MonitorName.IsEmpty())
     {
-        EnumDisplayMonitors(0, 0, MonitorEnumFunc, (LPARAM)this);
+        if (!EnumDisplayMonitors(0, 0, MonitorEnumFunc, (LPARAM)this))
+        {
+            OVR_ASSERT(false);
+        }
     }
 }
 
 bool RenderDevice::RecreateSwapChain()
 {
+    HRESULT hr;
+
     DXGI_SWAP_CHAIN_DESC scDesc;
     memset(&scDesc, 0, sizeof(scDesc));
     scDesc.BufferCount = 1;
     scDesc.BufferDesc.Width  = WindowWidth;
     scDesc.BufferDesc.Height = WindowHeight;
     scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    //scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     // Use default refresh rate; switching rate on CC prototype can cause screen lockup.
     scDesc.BufferDesc.RefreshRate.Numerator = 0;
     scDesc.BufferDesc.RefreshRate.Denominator = 1;
@@ -971,29 +1135,42 @@ bool RenderDevice::RecreateSwapChain()
 
 	if (SwapChain)
 	{
-		SwapChain->SetFullscreenState(FALSE, NULL);
-		SwapChain->Release();
-		SwapChain = NULL;
+		hr = SwapChain->SetFullscreenState(FALSE, NULL);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
+        SwapChain = NULL;
 	}
 
     Ptr<IDXGISwapChain> newSC;
-    if (FAILED(DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef())))
-        return false;    
+    hr = DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef());
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+        return false;
+    }
     SwapChain = newSC;
 
     BackBuffer = NULL;
     BackBufferRT = NULL;
-    HRESULT hr = SwapChain->GetBuffer(0, __uuidof(ID3D1xTexture2D), (void**)&BackBuffer.GetRawRef());
+    hr = SwapChain->GetBuffer(0, __uuidof(ID3D1xTexture2D), (void**)&BackBuffer.GetRawRef());
     if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
         return false;
+    }
 
     hr = Device->CreateRenderTargetView(BackBuffer, NULL, &BackBufferRT.GetRawRef());
     if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
         return false;
+    }
 
     Texture* depthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, Params.Multisample);
     CurDepthBuffer = depthBuffer;
-    if (CurRenderTarget == NULL)
+	if (CurRenderTarget == NULL && depthBuffer != NULL)
     {
         Context->OMSetRenderTargets(1, &BackBufferRT.GetRawRef(), depthBuffer->TexDsv);
     }
@@ -1059,20 +1236,12 @@ ovrTexture Texture::Get_ovrTexture()
 
 void RenderDevice::SetWindowSize(int w, int h)
 {
-    if (w == WindowWidth && h == WindowHeight)
-        return;
-
-	::OVR::Render::RenderDevice::SetWindowSize(w, h);
-
-    Context->OMSetRenderTargets(0, NULL, NULL);
-    BackBuffer   = NULL;
-    BackBufferRT = NULL;
-    if (SwapChain)
-    {
-        SwapChain->ResizeBuffers(2, WindowWidth, WindowHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0);
-        SwapChain->GetBuffer(0, __uuidof(ID3D1xTexture2D), (void**)&BackBuffer.GetRawRef());
-    }
-    Device->CreateRenderTargetView(BackBuffer, NULL, &BackBufferRT.GetRawRef());
+	// This code is rendered a no-op
+	// It interferes with proper driver operation in
+	// application mode and doesn't add any value in
+	// compatibility mode
+	OVR_UNUSED(w);
+	OVR_UNUSED(h);
 }
 
 bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
@@ -1121,6 +1290,7 @@ bool RenderDevice::SetFullscreen(DisplayMode fullscreen)
         HRESULT hr = SwapChain->SetFullscreenState(fullscreen, fullscreen ? FullscreenOutput : NULL);
         if (FAILED(hr))
         {
+            OVR_LOG_COM_ERROR(hr);
             return false;
         }
     }
@@ -1180,7 +1350,11 @@ void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
         OVR_ASSERT(0);
     }
     dss.DepthWriteMask = write ? D3D1x_(DEPTH_WRITE_MASK_ALL) : D3D1x_(DEPTH_WRITE_MASK_ZERO);
-    Device->CreateDepthStencilState(&dss, &DepthStates[index].GetRawRef());
+    HRESULT hr = Device->CreateDepthStencilState(&dss, &DepthStates[index].GetRawRef());
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
     Context->OMSetDepthStencilState(DepthStates[index], 0);
     CurDepthState = DepthStates[index];
 }
@@ -1258,6 +1432,7 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
         }
         else
         {
+            OVR_ASSERT (!(use & Buffer_ReadOnly));
             Ren->Context->UpdateSubresource(D3DBuffer, 0, NULL, buffer, 0, 0);
             return true;
         }
@@ -1307,12 +1482,17 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
     sr.SysMemPitch = 0;
     sr.SysMemSlicePitch = 0;
 
+    D3DBuffer = NULL;
     HRESULT hr = Ren->Device->CreateBuffer(&desc, buffer ? &sr : NULL, &D3DBuffer.GetRawRef());
     if (SUCCEEDED(hr))
     {
         Use = use;
         Size = desc.ByteWidth;
         return 1;
+    }
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
     }
     return 0;
 }
@@ -1360,15 +1540,30 @@ bool   Buffer::Unmap(void *m)
 #if (OVR_D3D_VERSION == 10)
 template<> bool Shader<Render::Shader_Vertex, ID3D10VertexShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreateVertexShader(shader, size, &D3DShader));
+    HRESULT hr = Ren->Device->CreateVertexShader(shader, size, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 template<> bool Shader<Render::Shader_Pixel, ID3D10PixelShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreatePixelShader(shader, size, &D3DShader));
+    HRESULT hr = Ren->Device->CreatePixelShader(shader, size, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 template<> bool Shader<Render::Shader_Geometry, ID3D10GeometryShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreateGeometryShader(shader, size, &D3DShader));
+    HRESULT hr = Ren->Device->CreateGeometryShader(shader, size, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 
 template<> void Shader<Render::Shader_Vertex, ID3D10VertexShader>::Set(PrimitiveType) const
@@ -1387,15 +1582,30 @@ template<> void Shader<Render::Shader_Geometry, ID3D10GeometryShader>::Set(Primi
 #else // 11
 template<> bool Shader<Render::Shader_Vertex, ID3D11VertexShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreateVertexShader(shader, size, NULL, &D3DShader));
+    HRESULT hr = Ren->Device->CreateVertexShader(shader, size, NULL, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 template<> bool Shader<Render::Shader_Pixel, ID3D11PixelShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreatePixelShader(shader, size, NULL, &D3DShader));
+    HRESULT hr = Ren->Device->CreatePixelShader(shader, size, NULL, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 template<> bool Shader<Render::Shader_Geometry, ID3D11GeometryShader>::Load(void* shader, size_t size)
 {
-    return SUCCEEDED(Ren->Device->CreateGeometryShader(shader, size, NULL, &D3DShader));
+    HRESULT hr = Ren->Device->CreateGeometryShader(shader, size, NULL, &D3DShader);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return SUCCEEDED(hr);
 }
 
 template<> void Shader<Render::Shader_Vertex, ID3D11VertexShader>::Set(PrimitiveType) const
@@ -1436,6 +1646,7 @@ ID3D10Blob* RenderDevice::CompileShader(const char* profile, const char* src, co
         OVR_DEBUG_LOG(("Compiling D3D shader for %s failed\n%s\n\n%s",
                        profile, src, errors->GetBufferPointer()));
         OutputDebugStringA((char*)errors->GetBufferPointer());
+        OVR_LOG_COM_ERROR(hr);
         return NULL;
     }
     if (errors)
@@ -1472,11 +1683,17 @@ bool ShaderBase::SetUniform(const char* name, int n, const float* v)
 void ShaderBase::InitUniforms(ID3D10Blob* s)
 {
     ID3D10ShaderReflection* ref = NULL;
-    D3D10ReflectShader(s->GetBufferPointer(), s->GetBufferSize(), &ref);
+    HRESULT hr = D3D10ReflectShader(s->GetBufferPointer(), s->GetBufferSize(), &ref);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
     ID3D10ShaderReflectionConstantBuffer* buf = ref->GetConstantBufferByIndex(0);
     D3D10_SHADER_BUFFER_DESC bufd;
-    if (FAILED(buf->GetDesc(&bufd)))
+    hr = buf->GetDesc(&bufd);
+    if (FAILED(hr))
     {
+        //OVR_LOG_COM_ERROR(hr); - Seems to happen normally
         UniformsSize = 0;
         if (UniformData)
         {
@@ -1492,13 +1709,18 @@ void ShaderBase::InitUniforms(ID3D10Blob* s)
         if (var)
         {
             D3D10_SHADER_VARIABLE_DESC vd;
-            if (SUCCEEDED(var->GetDesc(&vd)))
+            hr = var->GetDesc(&vd);
+            if (SUCCEEDED(hr))
             {
                 Uniform u;
                 u.Name = vd.Name;
                 u.Offset = vd.StartOffset;
                 u.Size = vd.Size;
                 UniformInfo.PushBack(u);
+            }
+            if (FAILED(hr))
+            {
+                OVR_LOG_COM_ERROR(hr);
             }
         }
     }
@@ -1511,7 +1733,10 @@ void ShaderBase::UpdateBuffer(Buffer* buf)
 {
     if (UniformsSize)
     {
-        buf->Data(Buffer_Uniform, UniformData, UniformsSize);
+        if (!buf->Data(Buffer_Uniform, UniformData, UniformsSize))
+        {
+            OVR_ASSERT(false);
+        }
     }
 }
 
@@ -1650,7 +1875,11 @@ ID3D1xSamplerState* RenderDevice::GetSamplerState(int sm)
         ss.Filter = D3D1x_(FILTER_MIN_MAG_MIP_LINEAR);
     }
     ss.MaxLOD = 15;
-    Device->CreateSamplerState(&ss, &SamplerStates[sm].GetRawRef());
+    HRESULT hr = Device->CreateSamplerState(&ss, &SamplerStates[sm].GetRawRef());
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
     return SamplerStates[sm];
 }
 
@@ -1797,14 +2026,28 @@ void RenderDevice::GenerateSubresourceData(
 
 Texture* RenderDevice::CreateTexture(int format, int width, int height, const void* data, int mipcount)
 {
-    UPInt gpuMemorySize = 0;
+    OVR_ASSERT(Device != NULL);
+    
+    size_t gpuMemorySize = 0;
     {
         IDXGIDevice* pDXGIDevice;
-        Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
+        HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
         IDXGIAdapter * pDXGIAdapter;
-        pDXGIDevice->GetAdapter(&pDXGIAdapter);
+        hr = pDXGIDevice->GetAdapter(&pDXGIAdapter);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
         DXGI_ADAPTER_DESC adapterDesc;
-        pDXGIAdapter->GetDesc(&adapterDesc);
+        hr = pDXGIAdapter->GetDesc(&adapterDesc);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
         gpuMemorySize = adapterDesc.DedicatedVideoMemory;
         pDXGIAdapter->Release();
         pDXGIDevice->Release();
@@ -1858,14 +2101,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         {
             return NULL;
         }
-        int samples = (Texture_RGBA & Texture_SamplesMask);
-        if (samples < 1)
-        {
-            samples = 1;
-        }
 
         Texture* NewTex = new Texture(this, format, largestMipWidth, largestMipHeight);
-        NewTex->Samples = samples;
+        // BCn/DXTn - no AA.
+        NewTex->Samples = 1;
 
         D3D1x_(TEXTURE2D_DESC) desc;
         desc.Width      = largestMipWidth;
@@ -1873,16 +2112,21 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         desc.MipLevels  = effectiveMipCount;
         desc.ArraySize  = 1;
         desc.Format     = static_cast<DXGI_FORMAT>(convertedFormat);
-        desc.SampleDesc.Count = samples;
+        desc.SampleDesc.Count = 1;
         desc.SampleDesc.Quality = 0;
         desc.Usage      = D3D1x_(USAGE_DEFAULT);
         desc.BindFlags  = D3D1x_(BIND_SHADER_RESOURCE);
         desc.CPUAccessFlags = 0;
         desc.MiscFlags  = 0;
 
+        NewTex->Tex = NULL;
         HRESULT hr = Device->CreateTexture2D(&desc, static_cast<D3D1x_(SUBRESOURCE_DATA)*>(subresData),
                                              &NewTex->Tex.GetRawRef());
         OVR_FREE(subresData);
+        if (FAILED(hr))
+        {
+            OVR_LOG_COM_ERROR(hr);
+        }
 
         if (SUCCEEDED(hr) && NewTex != 0)
         {
@@ -1892,10 +2136,12 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             SRVDesc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
             SRVDesc.Texture2D.MipLevels = desc.MipLevels;
 
+            NewTex->TexSv = NULL;
             hr = Device->CreateShaderResourceView(NewTex->Tex, NULL, &NewTex->TexSv.GetRawRef());
 
             if (FAILED(hr))
             {
+                OVR_LOG_COM_ERROR(hr);
                 NewTex->Release();
                 return NULL;
             }
@@ -1920,11 +2166,11 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         {
 		case Texture_BGRA:
 			bpp = 4;
-			d3dformat = DXGI_FORMAT_B8G8R8A8_UNORM;
+			d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_B8G8R8A8_UNORM_SRGB : DXGI_FORMAT_B8G8R8A8_UNORM;
 			break;
         case Texture_RGBA:
             bpp = 4;
-            d3dformat = DXGI_FORMAT_R8G8B8A8_UNORM;
+			d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
             break;
         case Texture_R:
             bpp = 1;
@@ -1970,9 +2216,11 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             }
         }
 
+        NewTex->Tex = NULL;
         HRESULT hr = Device->CreateTexture2D(&dsDesc, NULL, &NewTex->Tex.GetRawRef());
         if (FAILED(hr))
         {
+            OVR_LOG_COM_ERROR(hr);
             OVR_DEBUG_LOG_TEXT(("Failed to create 2D D3D texture."));
             NewTex->Release();
             return NULL;
@@ -1986,11 +2234,21 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
 				depthSrv.ViewDimension = samples > 1 ? D3D1x_(SRV_DIMENSION_TEXTURE2DMS) : D3D1x_(SRV_DIMENSION_TEXTURE2D);
                 depthSrv.Texture2D.MostDetailedMip = 0;
                 depthSrv.Texture2D.MipLevels = dsDesc.MipLevels;
-                Device->CreateShaderResourceView(NewTex->Tex, &depthSrv, &NewTex->TexSv.GetRawRef());
+                NewTex->TexSv = NULL;
+                hr = Device->CreateShaderResourceView(NewTex->Tex, &depthSrv, &NewTex->TexSv.GetRawRef());
+                if (FAILED(hr))
+                {
+                    OVR_LOG_COM_ERROR(hr);
+                }
             }
             else
             {
-                Device->CreateShaderResourceView(NewTex->Tex, NULL, &NewTex->TexSv.GetRawRef());
+                NewTex->TexSv = NULL;
+                hr = Device->CreateShaderResourceView(NewTex->Tex, NULL, &NewTex->TexSv.GetRawRef());
+                if (FAILED(hr))
+                {
+                    OVR_LOG_COM_ERROR(hr);
+                }
             }
         }
 
@@ -2001,7 +2259,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             {
                 int srcw = width, srch = height;
                 int level = 0;
-                UByte* mipmaps = NULL;
+                uint8_t* mipmaps = NULL;
                 do
                 {
                     level++;
@@ -2017,9 +2275,9 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                     }
                     if (mipmaps == NULL)
                     {
-                        mipmaps = (UByte*)OVR_ALLOC(mipw * miph * 4);
+                        mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
                     }
-                    FilterRgba2x2(level == 1 ? (const UByte*)data : mipmaps, srcw, srch, mipmaps);
+                    FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
                     Context->UpdateSubresource(NewTex->Tex, level, NULL, mipmaps, mipw * bpp, miph * bpp);
                     srcw = mipw;
                     srch = miph;
@@ -2042,11 +2300,21 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                 depthDsv.Format = DXGI_FORMAT_D32_FLOAT;
                 depthDsv.ViewDimension = samples > 1 ? D3D1x_(DSV_DIMENSION_TEXTURE2DMS) : D3D1x_(DSV_DIMENSION_TEXTURE2D);
                 depthDsv.Texture2D.MipSlice = 0;
-                Device->CreateDepthStencilView(NewTex->Tex, createDepthSrv ? &depthDsv : NULL, &NewTex->TexDsv.GetRawRef());
+                NewTex->TexDsv = NULL;
+                hr = Device->CreateDepthStencilView(NewTex->Tex, createDepthSrv ? &depthDsv : NULL, &NewTex->TexDsv.GetRawRef());
+                if (FAILED(hr))
+                {
+                    OVR_LOG_COM_ERROR(hr);
+                }
             }
             else
             {
-                Device->CreateRenderTargetView(NewTex->Tex, NULL, &NewTex->TexRtv.GetRawRef());
+                NewTex->TexRtv = NULL;
+                hr = Device->CreateRenderTargetView(NewTex->Tex, NULL, &NewTex->TexRtv.GetRawRef());
+                if (FAILED(hr))
+                {
+                    OVR_LOG_COM_ERROR(hr);
+                }
             }
         }
 
@@ -2109,13 +2377,19 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
     if (!model->VertexBuffer)
     {
         Ptr<Buffer> vb = *CreateBuffer();
-        vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex));
+        if (!vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex)))
+        {
+            OVR_ASSERT(false);
+        }
         model->VertexBuffer = vb;
     }
     if (!model->IndexBuffer)
     {
         Ptr<Buffer> ib = *CreateBuffer();
-        ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.GetSize() * 2);
+        if (!ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.GetSize() * 2))
+        {
+            OVR_ASSERT(false);
+        }
         model->IndexBuffer = ib;
     }
 
@@ -2176,7 +2450,10 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
             stdUniforms->Proj = StdUniforms.Proj;
         }
 
-        UniformBuffers[Shader_Vertex]->Data(Buffer_Uniform, vertexData, vshader->UniformsSize);
+        if (!UniformBuffers[Shader_Vertex]->Data(Buffer_Uniform, vertexData, vshader->UniformsSize))
+        {
+            OVR_ASSERT(false);
+        }
         vshader->SetUniformBuffer(UniformBuffers[Shader_Vertex]);
     }
 
@@ -2223,15 +2500,27 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
     }
 }
 
-UPInt RenderDevice::QueryGPUMemorySize()
+size_t RenderDevice::QueryGPUMemorySize()
 {
 	IDXGIDevice* pDXGIDevice;
-	Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
+	HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
 	IDXGIAdapter * pDXGIAdapter;
-	pDXGIDevice->GetAdapter(&pDXGIAdapter);
-	DXGI_ADAPTER_DESC adapterDesc;
-	pDXGIAdapter->GetDesc(&adapterDesc);
-	return adapterDesc.DedicatedVideoMemory;
+	hr = pDXGIDevice->GetAdapter(&pDXGIAdapter);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    DXGI_ADAPTER_DESC adapterDesc;
+	hr = pDXGIAdapter->GetDesc(&adapterDesc);
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+    }
+    return adapterDesc.DedicatedVideoMemory;
 }
 
 
@@ -2245,20 +2534,25 @@ void RenderDevice::Present ( bool withVsync )
 		}
 	}
 
+    HRESULT hr;
     if ( withVsync )
     {
-        SwapChain->Present(1, 0);
+        hr = SwapChain->Present(1, 0);
     }
     else
     {
         // Immediate present
-        SwapChain->Present(0, 0);
+        hr = SwapChain->Present(0, 0);
+    }
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
     }
 }
 
 void RenderDevice::WaitUntilGpuIdle()
 {
-#if 0
+#if 1
 	// If enabling this option and using an NVIDIA GPU,
 	// then make sure your "max pre-rendered frames" is set to 1 under the NVIDIA GPU settings.
 
@@ -2289,35 +2583,35 @@ void RenderDevice::WaitUntilGpuIdle()
 #endif
 }
 
-void RenderDevice::FillRect(float left, float top, float right, float bottom, Color c)
+void RenderDevice::FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view)
 {
     Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
-    OVR::Render::RenderDevice::FillRect(left, top, right, bottom, c);
+    OVR::Render::RenderDevice::FillRect(left, top, right, bottom, c, view);
     Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
-void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm)
+void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view)
 {
     Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
-    OVR::Render::RenderDevice::FillGradientRect(left, top, right, bottom, col_top, col_btm);
+    OVR::Render::RenderDevice::FillGradientRect(left, top, right, bottom, col_top, col_btm, view);
     Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
-void RenderDevice::RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c)
+void RenderDevice::RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view)
 {
 	Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
-	OVR::Render::RenderDevice::RenderText(font, str, x, y, size, c);
+	OVR::Render::RenderDevice::RenderText(font, str, x, y, size, c, view);
 	Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
-void RenderDevice::RenderImage(float left, float top, float right, float bottom, ShaderFill* image)
+void RenderDevice::RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha, const Matrix4f* view)
 {
     Context->OMSetBlendState(BlendState, NULL, 0xffffffff);
-    OVR::Render::RenderDevice::RenderImage(left, top, right, bottom, image);
+    OVR::Render::RenderDevice::RenderImage(left, top, right, bottom, image, alpha, view);
     Context->OMSetBlendState(NULL, NULL, 0xffffffff);
 }
 
-void RenderDevice::BeginGpuEvent(const char* markerText, UInt32 markerColor)
+void RenderDevice::BeginGpuEvent(const char* markerText, uint32_t markerColor)
 {
 #if GPU_PROFILING
     WCHAR wStr[255];

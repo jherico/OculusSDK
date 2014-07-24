@@ -28,6 +28,7 @@ limitations under the License.
 #include "Kernel/OVR_RefCount.h"
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_File.h"
+#include "Kernel/OVR_Color.h"
 #include "OVR_CAPI.h"
 
 #include "OVR_Stereo.h"
@@ -36,6 +37,7 @@ namespace OVR { namespace Render {
 
 class RenderDevice;
 struct Font;
+
 
 //-----------------------------------------------------------------------------------
 
@@ -90,6 +92,7 @@ enum BuiltinShaders
     FShader_Gouraud                                 ,
     FShader_Texture                                 ,
     FShader_AlphaTexture                            ,
+	FShader_AlphaBlendedTexture                     ,
     FShader_PostProcessWithChromAb                  ,
     FShader_LitGouraud                              ,
     FShader_LitTexture                              ,
@@ -136,6 +139,7 @@ enum TextureFormat
 	Texture_RenderTarget    = 0x10000,
 	Texture_SampleDepth		= 0x20000,
     Texture_GenMipmaps      = 0x40000,
+    Texture_SRGB			= 0x80000,
 };
 
 enum SampleMode
@@ -502,7 +506,7 @@ class Model : public Node
 {
 public:
     Array<Vertex>     Vertices;
-    Array<UInt16>     Indices;
+    Array<uint16_t>     Indices;
     PrimitiveType     Type;
     Ptr<class Fill>   Fill;
     bool              Visible;
@@ -532,42 +536,42 @@ public:
     }
 
     // Returns the index next added vertex will have.
-    UInt16 GetNextVertexIndex() const
+    uint16_t GetNextVertexIndex() const
     {
-        return (UInt16)Vertices.GetSize();
+        return (uint16_t)Vertices.GetSize();
     }
 
-    UInt16 AddVertex(const Vertex& v)
+    uint16_t AddVertex(const Vertex& v)
     {
 		OVR_ASSERT(!VertexBuffer && !IndexBuffer);
-		UPInt size = Vertices.GetSize();
+		size_t size = Vertices.GetSize();
 		OVR_ASSERT(size <= USHRT_MAX);      // We only use a short to store vert indices.
-		UInt16 index = (UInt16) size;
+		uint16_t index = (uint16_t) size;
 		Vertices.PushBack(v);
 		return index;
     }
-    UInt16 AddVertex(const Vector3f& v, const Color& c, float u_ = 0, float v_ = 0)
+    uint16_t AddVertex(const Vector3f& v, const Color& c, float u_ = 0, float v_ = 0)
     {
         return AddVertex(Vertex(v,c,u_,v_));
     }
-    UInt16 AddVertex(float x, float y, float z, const Color& c, float u, float v)
+    uint16_t AddVertex(float x, float y, float z, const Color& c, float u, float v)
     {
         return AddVertex(Vertex(Vector3f(x,y,z),c, u,v));
     }
 
-    void AddLine(UInt16 a, UInt16 b)
+    void AddLine(uint16_t a, uint16_t b)
     {
         Indices.PushBack(a);
         Indices.PushBack(b);
     }
 
-    UInt16 AddVertex(float x, float y, float z, const Color& c,
+    uint16_t AddVertex(float x, float y, float z, const Color& c,
                      float u, float v, float nx, float ny, float nz)
     {
         return AddVertex(Vertex(Vector3f(x,y,z),c, u,v, Vector3f(nx,ny,nz)));
     }
 
-	UInt16 AddVertex(float x, float y, float z, const Color& c,
+	uint16_t AddVertex(float x, float y, float z, const Color& c,
                      float u1, float v1, float u2, float v2, float nx, float ny, float nz)
     {
         return AddVertex(Vertex(Vector3f(x,y,z), c, u1, v1, u2, v2, Vector3f(nx,ny,nz)));
@@ -578,7 +582,7 @@ public:
         AddLine(AddVertex(a), AddVertex(b));
     }
 
-    void AddTriangle(UInt16 a, UInt16 b, UInt16 c)
+    void AddTriangle(uint16_t a, uint16_t b, uint16_t c)
     {
         Indices.PushBack(a);
         Indices.PushBack(b);
@@ -625,7 +629,7 @@ public:
 
     void ClearRenderer()
     {
-        for (UPInt i=0; i< Nodes.GetSize(); i++)
+        for (size_t i=0; i< Nodes.GetSize(); i++)
             Nodes[i]->ClearRenderer();
     }
 
@@ -723,9 +727,9 @@ struct DisplayId
     // MacOS
     int   CgDisplayId; // CGDirectDisplayID
     
-    DisplayId() : CgDisplayId(0) {}
+    DisplayId() : CgDisplayId(-2) {}
     DisplayId(int id) : CgDisplayId(id) {}
-    DisplayId(String m, int id=0) : MonitorName(m), CgDisplayId(id) {}
+    DisplayId(String m, int id = -2) : MonitorName(m), CgDisplayId(id) {}
     
     operator bool () const
     {
@@ -734,19 +738,28 @@ struct DisplayId
     
     bool operator== (const DisplayId& b) const
     {
-        return CgDisplayId == b.CgDisplayId &&
-            (strstr(MonitorName.ToCStr(), b.MonitorName.ToCStr()) ||
-             strstr(b.MonitorName.ToCStr(), MonitorName.ToCStr()));
+        if (MonitorName.IsEmpty() || b.MonitorName.IsEmpty())
+        {
+            return CgDisplayId == b.CgDisplayId;
+        }
+        else
+        {
+            return  strstr(MonitorName.ToCStr(), b.MonitorName.ToCStr()) ||
+                    strstr(b.MonitorName.ToCStr(), MonitorName.ToCStr());
+        }
     }
 };
 
 struct RendererParams
 {
-    int  Multisample;
-    int  Fullscreen;
-    DisplayId Display;
+    int         Multisample;
+    int         Fullscreen;
+    DisplayId   Display;
+    // Resolution of the rendering buffer used during creation.
+    // Allows buffer of different size then the widow if not zero.
+    Sizei       Resolution;
 
-    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
+    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0), Resolution(0) {}
     
     bool IsDisplaySet() const
     {
@@ -777,7 +790,7 @@ protected:
     Ptr<ShaderSet>      pPostProcessHeightmapShader;
     Ptr<Buffer>         pFullScreenVertexBuffer;
     Color               DistortionClearColor;
-    UPInt		        TotalTextureMemoryUsage;
+    size_t		        TotalTextureMemoryUsage;
     float               FadeOutBorderFraction;
     
     int                 DistortionMeshNumTris[2];
@@ -893,7 +906,8 @@ public:
                                   RenderTarget* pHmdSpaceLayerRenderTargetLeftOrBothEyes,
                                   RenderTarget* pHmdSpaceLayerRenderTargetRight,
                                   RenderTarget* pStaticLayerRenderTargetLeftOrBothEyes,
-                                  RenderTarget* pStaticLayerRenderTargetRight);
+                                  RenderTarget* pStaticLayerRenderTargetRight,
+                                  RenderTarget* pOutputTarget);
 
     // Finish scene.
     virtual void FinishScene();
@@ -932,14 +946,14 @@ public:
     // Returns width of text in same units as drawing. If strsize is not null, stores width and height.
     // Can optionally return char-range selection rectangle.
     float        MeasureText(const Font* font, const char* str, float size, float strsize[2] = NULL,
-                             const UPInt charRange[2] = 0, Vector2f charRangeRect[2] = 0);
-    virtual void RenderText(const Font* font, const char* str, float x, float y, float size, Color c);
+                             const size_t charRange[2] = 0, Vector2f charRangeRect[2] = 0);
+    virtual void RenderText(const Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view = NULL);
 
-    virtual void FillRect(float left, float top, float right, float bottom, Color c);
+    virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view = NULL);
     virtual void RenderLines ( int NumLines, Color c, float *x, float *y, float *z = NULL );
     virtual void FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<Texture> tex);
-    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
-    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255, const Matrix4f* view = NULL);
 
     virtual Fill *CreateSimpleFill(int flags = Fill::F_Solid) = 0;
     Fill *        CreateTextureFill(Texture* tex, bool useAlpha = false);
@@ -963,7 +977,7 @@ public:
 		VP = Recti( 0, 0, WindowWidth, WindowHeight );
 	}
 
-    UPInt GetTotalTextureMemoryUsage() const
+    size_t GetTotalTextureMemoryUsage() const
     {
         return TotalTextureMemoryUsage;
     }
@@ -995,7 +1009,7 @@ public:
 
     // GPU Profiling
     // using (void) to avoid "unused param" warnings
-    virtual void BeginGpuEvent(const char* markerText, UInt32 markerColor) { (void)markerText; (void)markerColor; }
+    virtual void BeginGpuEvent(const char* markerText, uint32_t markerColor) { (void)markerText; (void)markerColor; }
     virtual void EndGpuEvent() { }
 
 protected:
@@ -1015,7 +1029,7 @@ private:
 class AutoGpuProf
 {
 public:
-    AutoGpuProf(RenderDevice* device, const char* markerText, UInt32 color)
+    AutoGpuProf(RenderDevice* device, const char* markerText, uint32_t color)
         : mDevice(device)
     { device->BeginGpuEvent(markerText, color); }
 
@@ -1023,7 +1037,7 @@ public:
     AutoGpuProf(RenderDevice* device, const char* markerText)
         : mDevice(device)
     { 
-        UInt32 color =  ((rand() & 0xFF) << 24) +
+        uint32_t color =  ((rand() & 0xFF) << 24) +
                         ((rand() & 0xFF) << 16) +
                         ((rand() & 0xFF) <<  8) +
                          (rand() & 0xFF);
@@ -1043,11 +1057,12 @@ int GetTextureSize(int format, int w, int h);
 
 // Filter an rgba image with a 2x2 box filter, for mipmaps.
 // Image size must be a power of 2.
-void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest);
+void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest);
 
 Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha = 255);
 Texture* LoadTextureDDS(RenderDevice* ren, File* f);
 
-}}
+
+}} // namespace OVR::Render
 
 #endif

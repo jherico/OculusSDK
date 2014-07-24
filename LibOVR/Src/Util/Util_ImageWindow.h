@@ -28,13 +28,14 @@ limitations under the License.
 #define UTIL_IMAGEWINDOW_H
 
 #if defined(OVR_OS_WIN32)
-#define WIN32_LEAN_AND_MEAN 1
-#include <windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
 #endif
 
-#include "../../Include/OVR.h"
 #include "../Kernel/OVR_Hash.h"
 #include "../Kernel/OVR_Array.h"
 #include "../Kernel/OVR_Threads.h"
@@ -171,16 +172,16 @@ public:
 	void OnPaint() { }
 
 	void UpdateImage( const uint8_t* imageData, uint32_t width, uint32_t height ) { UpdateImageBW( imageData, width, height ); }
-	void UpdateImageBW( const uint8_t* imageData, uint32_t width, uint32_t height ) { }
-	void UpdateImageRGBA( const uint8_t* imageData, uint32_t width, uint32_t height, uint32_t pitch ) { }
+	void UpdateImageBW( const uint8_t* imageData, uint32_t width, uint32_t height ) { OVR_UNUSED( imageData ); OVR_UNUSED( width ); OVR_UNUSED( height ); }
+	void UpdateImageRGBA( const uint8_t* imageData, uint32_t width, uint32_t height, uint32_t pitch ) { OVR_UNUSED( imageData ); OVR_UNUSED( width ); OVR_UNUSED( height ); OVR_UNUSED( pitch ); }
 	void Complete() { }
 
 	void Process() { }
 
-	void AssociateSurface( void* surface ) { }
+	void AssociateSurface( void* surface ) { OVR_UNUSED(surface); }
 
-	void addCircle( float x , float y, float radius, float r, float g, float b, bool fill ) { }
-	void addText( float x, float y, float r, float g, float b, OVR::String text ) { }
+	void addCircle( float x , float y, float radius, float r, float g, float b, bool fill ) { OVR_UNUSED( x ); OVR_UNUSED( y ); OVR_UNUSED( radius ); OVR_UNUSED( r ); OVR_UNUSED( g ); OVR_UNUSED( b ); OVR_UNUSED( fill ); }
+	void addText( float x, float y, float r, float g, float b, OVR::String text ) { OVR_UNUSED( x ); OVR_UNUSED( y ); OVR_UNUSED( r ); OVR_UNUSED( g ); OVR_UNUSED( b ); OVR_UNUSED( text ); }
 
 	static ImageWindow*			GlobalWindow( int window ) { return globalWindow[window]; }
 	static int					WindowCount() { return windowCount; }

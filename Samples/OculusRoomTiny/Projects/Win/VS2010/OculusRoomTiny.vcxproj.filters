@@ -10,11 +10,13 @@
     <ClCompile Include="../../../RenderTiny_D3D11_Device.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="../../../Win32_DistortionMesh.cpp" />
     <ClCompile Include="../../../Win32_OculusRoomTiny.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../../../RenderTiny_D3D11_Device.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\HSWDisplay_Util.h">
       <Filter>Util</Filter>
     </ClInclude>
   </ItemGroup>

@@ -413,6 +413,7 @@ public:
     template<class R>
     OVR_FORCE_INLINE const Ptr<C>& operator = (const Ptr<R> &src)
     {
+        // By design we don't check for src == pObject, as we don't expect that to be the case the large majority of the time.
         if (src) src->AddRef();
         if (pObject) pObject->Release();        
         pObject = src;

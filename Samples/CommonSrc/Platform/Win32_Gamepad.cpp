@@ -23,7 +23,7 @@ limitations under the License.
 
 #include "Win32_Gamepad.h"
 
-namespace OVR { namespace Platform { namespace Win32 {
+namespace OVR { namespace OvrPlatform { namespace Win32 {
 
 GamepadManager::GamepadManager()
 {
@@ -61,12 +61,12 @@ static inline float GamepadTrigger(BYTE in)
         return float(in-30) / 225;
 }
 
-UInt32 GamepadManager::GetGamepadCount()
+uint32_t GamepadManager::GetGamepadCount()
 {
     return 1;
 }
 
-bool GamepadManager::GetGamepadState(UInt32 index, GamepadState* pState)
+bool GamepadManager::GetGamepadState(uint32_t index, GamepadState* pState)
 {
     // For now we just support one gamepad.
     OVR_UNUSED(index);
@@ -98,4 +98,4 @@ bool GamepadManager::GetGamepadState(UInt32 index, GamepadState* pState)
     return false;
 }
 
-}}} // OVR::Platform::Win32
+}}} // OVR::OvrPlatform::Win32

@@ -1,6 +1,6 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Color.h
 Content     :   Contains color struct.
 Created     :   February 7, 2013
@@ -31,9 +31,10 @@ limitations under the License.
 
 namespace OVR {
 
+
 struct Color
 {
-    UByte R,G,B,A;
+    uint8_t R,G,B,A;
 
     Color() {}
 
@@ -61,6 +62,7 @@ struct Color
     }
 };
 
-}
+
+} // namespace OVR
 
 #endif

@@ -72,7 +72,70 @@ namespace OVR { namespace CAPI { namespace GL {
     {
         { "Color", OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 16 },
     };
+
+    static const char SimpleQuadGamma_fs[] =
+        "uniform vec4 Color;\n"
+
+        "_FRAGCOLOR_DECLARATION\n"
+
+        "void main()\n"
+        "{\n"
+        "    _FRAGCOLOR.rgb = pow(Color.rgb, vec3(2.2));\n"
+        "    _FRAGCOLOR.a = Color.a;\n"
+        "}\n";
+
+    const OVR::CAPI::GL::ShaderBase::Uniform SimpleQuadGamma_fs_refl[] =
+    {
+        { "Color", OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 16 },
+    };
+
+    // This must be prefixed with glsl2Prefix or glsl3Prefix before being compiled.
+    static const char SimpleTexturedQuad_vs[] =
+        "uniform vec2 PositionOffset;\n"
+        "uniform vec2 Scale;\n"
+
+        "_VS_IN vec3 Position;\n"
+        "_VS_IN vec4 Color;\n"
+        "_VS_IN vec2 TexCoord;\n"
+  
+        "_VS_OUT vec4 oColor;\n"
+        "_VS_OUT vec2 oTexCoord;\n"
     
+        "void main()\n"
+        "{\n"
+	    "	gl_Position = vec4(Position.xy * Scale + PositionOffset, 0.5, 1.0);\n"
+        "   oColor = Color;\n"
+        "   oTexCoord = TexCoord;\n"
+        "}\n";
+
+    // The following declaration is copied from the generated D3D SimpleTexturedQuad_vs_refl.h file, with D3D_NS renamed to GL.
+    const OVR::CAPI::GL::ShaderBase::Uniform SimpleTexturedQuad_vs_refl[] =
+    {
+	    { "PositionOffset", OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 8 },
+	    { "Scale",          OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 8, 8 },
+    };
+
+
+    // This must be prefixed with glsl2Prefix or glsl3Prefix before being compiled.
+    static const char SimpleTexturedQuad_ps[] =
+        "uniform sampler2D Texture0;\n"
+    
+        "_FS_IN vec4 oColor;\n"
+        "_FS_IN vec2 oTexCoord;\n"
+    
+        "void main()\n"
+        "{\n"
+        "   gl_FragColor = texture2D(Texture0, oTexCoord);\n"
+        "   if(oColor.a < 0.02)\n"
+        "       gl_FragColor.a = 0.0;\n"
+        "}\n";
+
+    // The following is copied from the generated D3D SimpleTexturedQuad_ps_refl.h file, with D3D_NS renamed to GL.
+    const OVR::CAPI::GL::ShaderBase::Uniform SimpleTexturedQuad_ps_refl[] =
+    {
+	    { "Color", 	OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 16 },
+    };
+
     
     static const char Distortion_vs[] =
     "uniform vec2 EyeToSourceUVScale;\n"
@@ -94,7 +157,6 @@ namespace OVR { namespace CAPI { namespace GL {
     // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
     // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
     "   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0.y = 1.0 - oTexCoord0.y;\n"
     "   oColor = Color;\n"              // Used for vignette fade.
     "}\n";
     
@@ -129,8 +191,8 @@ namespace OVR { namespace CAPI { namespace GL {
     "_VS_IN vec4 Color;\n"
     "_VS_IN vec2 TexCoord0;\n"
     
-    "_FS_IN vec4 oColor;\n"
-    "_FS_IN vec2 oTexCoord0;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
     
     "void main()\n"
     "{\n"
@@ -163,7 +225,6 @@ namespace OVR { namespace CAPI { namespace GL {
     // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
     "   vec2 SrcCoord = Flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
     "   oTexCoord0 = SrcCoord;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
     "   oColor = vec4(Color.r, Color.r, Color.r, Color.r);\n"              // Used for vignette fade.
     "}\n";
 
@@ -199,11 +260,8 @@ namespace OVR { namespace CAPI { namespace GL {
     // Vertex inputs are in TanEyeAngle space for the R,G,B channels (i.e. after chromatic aberration and distortion).
     // Scale them into the correct [0-1],[0-1] UV lookup space (depending on eye)
     "   oTexCoord0 = TexCoord0 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
     "   oTexCoord1 = TexCoord1 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
     "   oTexCoord2 = TexCoord2 * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
     
     "   oColor = Color;\n" // Used for vignette fade.
     "}\n";
@@ -303,11 +361,8 @@ namespace OVR { namespace CAPI { namespace GL {
     "   vec2 SrcCoordB = FlattenedB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
     
     "   oTexCoord0 = SrcCoordR;\n"
-    "   oTexCoord0.y = 1.0-oTexCoord0.y;\n"
     "   oTexCoord1 = SrcCoordG;\n"
-    "   oTexCoord1.y = 1.0-oTexCoord1.y;\n"
     "   oTexCoord2 = SrcCoordB;\n"
-    "   oTexCoord2.y = 1.0-oTexCoord2.y;\n"
     
     "   oColor = vec4(Color.r, Color.r, Color.r, Color.r);\n"              // Used for vignette fade.
     "}\n";

@@ -20,6 +20,7 @@ limitations under the License.
 *************************************************************************************/
 
 #include "RenderTiny_D3D11_Device.h"
+#include "OVR_CAPI.h"
 
 // Win32 System Variables
 HWND                hWnd = NULL;
@@ -28,7 +29,7 @@ POINT               WindowCenter;
 
 // User inputs
 bool                Quit = 0;
-UByte               MoveForward = 0,
+uint8_t             MoveForward = 0,
                     MoveBack = 0,
                     MoveLeft = 0,
                     MoveRight = 0;
@@ -44,21 +45,27 @@ float               AdditionalYawFromMouse = 0;
 // Movement speed, in m/s applied during keyboard motion.
 const float         MoveSpeed   = 3.0f;
 
-// Functions from Win32_OculusRoomTiny.cpp and DistortionMesh.cpp
+extern ovrHmd       HMD;
+
+// Functions from Win32_OculusRoomTiny.cpp
 int     Init();
 void    ProcessAndRender();
 void    Release();
-void    DistortionMeshRelease(void);
 
 
 //-------------------------------------------------------------------------------------
 
 void OnKey(unsigned vk, bool down)
 {
+    if (down && HMD)
+        ovrHmd_DismissHSWDisplay(HMD);
+
     switch (vk)
     {
     case 'Q':       if (down && ControlDown) Quit = true;                         break;
     case VK_ESCAPE: if (!down)               Quit = true;                         break;
+
+    case 'R':       if (down && HMD) ovrHmd_RecenterPose(HMD);                    break;
 
     case 'W':       MoveForward = down ? (MoveForward | 1) : (MoveForward & ~1);  break;
     case 'S':       MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1);  break;
@@ -73,6 +80,7 @@ void OnKey(unsigned vk, bool down)
     case VK_SHIFT:  ShiftDown = down;                                             break;
     case VK_CONTROL:ControlDown = down;                                           break;
     }
+
 }
 
 void OnMouseMove(int x)
@@ -81,8 +89,7 @@ void OnMouseMove(int x)
      AdditionalYawFromMouse -= (Sensitivity * x)/ 360.0f;
 }
 
-bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos,
-                            float deltaTime, Quatf PoseOrientation)
+bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos, Quatf PoseOrientation)
 {
 	#if 0//Optional debug output
 	char debugString[1000];
@@ -95,8 +102,8 @@ bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos,
 	AdditionalYawFromMouse = 0;
 
 	//Get HeadYaw
-	float HeadPitch, HeadRoll, HeadYaw;
-	PoseOrientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&HeadYaw,&HeadPitch, &HeadRoll);
+	float tempHeadPitch, tempHeadRoll, HeadYaw;
+	PoseOrientation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&HeadYaw,&tempHeadPitch, &tempHeadRoll);
 
 	//Move on Eye pos from controls
     Vector3f localMoveVector(0,0,0);
@@ -109,6 +116,7 @@ bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos,
 
 	Vector3f    orientationVector = yawRotate.Transform(localMoveVector);
 
+	const float deltaTime = 1.0f/60.0f;
     orientationVector *= MoveSpeed * deltaTime * (ShiftDown ? 3.0f : 1.0f);
 	EyePos += orientationVector;
 
@@ -172,8 +180,10 @@ LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 
-RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount)
+HWND Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount, bool UseAppWindowFrame, RenderDevice ** returnedDevice)
 {
+    RendererParams  renderParams;
+
 	// Window
     WNDCLASS wc;
     memset(&wc, 0, sizeof(wc));
@@ -182,25 +192,40 @@ RenderDevice* Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSamp
     wc.lpfnWndProc   = systemWindowProc;
     wc.cbWndExtra    = NULL;
     RegisterClass(&wc);
+
+    DWORD wsStyle = WS_POPUP;
+    DWORD sizeDivisor = 1;
    
-	RECT winSize = { 0, 0, vp.w, vp.h };
-    AdjustWindowRect(&winSize, WS_POPUP, false);
-    hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny", WS_POPUP |WS_VISIBLE,
+    if (UseAppWindowFrame)
+    {
+        // If using our driver, displaya window frame with a smaller window.
+        // Original HMD resolution is still passed into the renderer for proper swap chain.
+        wsStyle |= WS_OVERLAPPEDWINDOW;
+        renderParams.Resolution = vp.GetSize();
+        sizeDivisor = 2;
+    }
+
+	RECT winSize = { 0, 0, vp.w / sizeDivisor, vp.h / sizeDivisor};
+    AdjustWindowRect(&winSize, wsStyle, false);
+    hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny",
+                         wsStyle |WS_VISIBLE,
 		                 vp.x, vp.y,
                          winSize.right-winSize.left, winSize.bottom-winSize.top,
                          NULL, NULL, hInstance, NULL);
 
-    POINT center = { vp.w / 2, vp.h / 2 };
+    POINT center = { vp.w / 2 / sizeDivisor, vp.h / 2 / sizeDivisor};
     ::ClientToScreen(hWnd, &center);
     WindowCenter = center;
 
 	if (!hWnd) return(NULL);
 
 	// Graphics
-    RendererParams  renderParams;
 	renderParams.Multisample = multiSampleCount; 
     renderParams.Fullscreen  = fullscreen;
-    return (RenderDevice::CreateDevice(renderParams, (void*)hWnd));
+
+    *returnedDevice = RenderDevice::CreateDevice(renderParams, (void*)hWnd);
+
+    return(hWnd);
 }
 
 
@@ -208,8 +233,6 @@ void Util_ReleaseWindowAndGraphics(RenderDevice * prender)
 {    
 	if (prender)
 		prender->Release();
-
-	DistortionMeshRelease();
 
     if (hWnd)
     {
@@ -248,7 +271,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR , int)
 		}
     }
   	Release();
-    OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
+    OVR_ASSERT(!_CrtDumpMemoryLeaks());
     return (0);
 }
 

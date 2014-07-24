@@ -21,7 +21,11 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+//#include <playsoundapi.h>
 
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Array.h"
@@ -31,11 +35,11 @@ limitations under the License.
 #include "Win32_Gamepad.h"
 #include "../Render/Render_Device.h"
 
-namespace OVR { namespace Platform { namespace Win32 {
+namespace OVR { namespace OvrPlatform { namespace Win32 {
 
 
 PlatformCore::PlatformCore(Application* app, HINSTANCE hinst)
-  : Platform::PlatformCore(app), hWnd(NULL), hInstance(hinst), Quit(0), MMode(Mouse_Normal),
+  : OvrPlatform::PlatformCore(app), hWnd(NULL), hInstance(hinst), Quit(0), MMode(Mouse_Normal),
     Cursor(0), Modifiers(0), WindowTitle("App")
 {
     pGamepadManager = *new Win32::GamepadManager();
@@ -45,7 +49,7 @@ PlatformCore::~PlatformCore()
 {
 }
 
-bool PlatformCore::SetupWindow(int w, int h)
+void* PlatformCore::SetupWindow(int w, int h)
 {
     WNDCLASS wc;
     memset(&wc, 0, sizeof(wc));
@@ -53,6 +57,7 @@ bool PlatformCore::SetupWindow(int w, int h)
     wc.style         = CS_OWNDC;
     wc.lpfnWndProc   = systemWindowProc;
     wc.cbWndExtra    = sizeof(PlatformCore*);
+    wc.hbrBackground = (HBRUSH)::GetStockObject(BLACK_BRUSH);
 
     RegisterClass(&wc);
 
@@ -63,7 +68,8 @@ bool PlatformCore::SetupWindow(int w, int h)
     winSize.right = Width;
     winSize.bottom = Height;
     AdjustWindowRect(&winSize, WS_OVERLAPPEDWINDOW, false);
-    hWnd = CreateWindowA("OVRAppWindow", WindowTitle.ToCStr(), WS_OVERLAPPEDWINDOW,
+    // WS_CLIPCHILDREN is needed to support NotificationOverlay.
+    hWnd = CreateWindowA("OVRAppWindow", WindowTitle.ToCStr(), WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,
                           CW_USEDEFAULT, CW_USEDEFAULT,
                         //  1950, 10,
                           winSize.right-winSize.left, winSize.bottom-winSize.top,
@@ -84,7 +90,7 @@ bool PlatformCore::SetupWindow(int w, int h)
     }
     ::SetFocus(hWnd);
 
-    return (hWnd != NULL);
+    return (void*)hWnd;
 }
 
 void PlatformCore::DestroyWindow()
@@ -145,7 +151,7 @@ void PlatformCore::SetWindowTitle(const char* title)
     ::SetWindowTextA(hWnd, title);
 }
 
-static UByte KeyMap[][2] = 
+static uint8_t KeyMap[][2] = 
 {
     { VK_BACK,      Key_Backspace },
     { VK_TAB,       Key_Tab },
@@ -246,7 +252,7 @@ LRESULT CALLBACK PlatformCore::systemWindowProc(HWND hwnd, UINT msg, WPARAM wp, 
     }
     else
     {
-        self = (PlatformCore*)(UPInt)GetWindowLongPtr(hwnd, 0);
+        self = (PlatformCore*)(size_t)GetWindowLongPtr(hwnd, 0);
     }
         
     return self ? self->WindowProc(msg, wp, lp) :
@@ -262,7 +268,7 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
     {
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
+            PAINTSTRUCT ps;            
             BeginPaint(hWnd, &ps);
             EndPaint(hWnd, &ps);
         }
@@ -373,6 +379,13 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
         Height = HIWORD(lp);
         if (pRender)
             pRender->SetWindowSize(Width, Height);
+
+        for (int i = 0; i< NotificationOverlays.GetSizeI(); i++)
+        {
+            if (NotificationOverlays[i])
+                NotificationOverlays[i]->UpdateOnWindowSize();
+        }
+
         pApp->OnResize(Width,Height);
         }
         break;
@@ -542,16 +555,92 @@ Render::DisplayId PlatformCore::GetDisplay(int screen)
     return screen_name;
 }
 
+// Creates notification overlay text box over the top of OS window.
+void  PlatformCore::SetNotificationOverlay(int index, int fontHeightPixels,
+                                           int yoffset, const char* text)
+{
+    // Not intended for extensive text display.. or array management should be cleaned up.
+    OVR_ASSERT(index < 100);     
+    // Must call SetupWindow first for now.
+    OVR_ASSERT(hWnd);
+
+    // If null text, destroy overlay.
+    if (!text)
+    {
+        if (index < NotificationOverlays.GetSizeI())
+            NotificationOverlays[index].Clear();
+        return;
+    }
+
+    // Otherwise create new overlay in this slot.
+    if (index >= NotificationOverlays.GetSizeI())
+        NotificationOverlays.Resize(index+1);
+    NotificationOverlays[index] = *new NotificationOverlay(this, fontHeightPixels, yoffset, text);
+}
+
+
+// -----------------------------------------------------------------------------
+
+NotificationOverlay::NotificationOverlay(PlatformCore* core, int fontHeightPixels,
+                                         int yoffset, const char* text)
+{
+    Array<wchar_t> buffer;
+    intptr_t       textLength = UTF8Util::GetLength(text);
+    buffer.Resize(textLength+1);
+    UTF8Util::DecodeString(&buffer[0], text);
+
+    pCore        = core;
+    YOffest      = yoffset;
+
+    // Create a static, centered TextField of specified font size.
+
+    hFont= CreateFont(fontHeightPixels, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET,
+                      OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                      DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
+
+    HDC   dc = ::CreateCompatibleDC(0);
+    ::SelectObject(dc, hFont);
+    TextSize.cx = TextSize.cy = 0;
+    ::GetTextExtentPoint32(dc, &buffer[0], (int)textLength, &TextSize);
+    ::DeleteDC(dc);
+
+    int vpos = (YOffest > 0) ? YOffest : (pCore->Height + YOffest - (TextSize.cy + 7));
+
+    hWnd = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("STATIC"),
+                          &buffer[0], WS_CHILD|WS_VISIBLE|SS_CENTER|WS_CLIPSIBLINGS,
+                          (core->Width-TextSize.cx+20)/2, vpos,
+                          TextSize.cx+20, TextSize.cy + 7,
+                          core->hWnd, HMENU(NULL), core->hInstance, NULL);
+
+    SendMessage(hWnd, WM_SETFONT, WPARAM (hFont), TRUE);
+}
+
+NotificationOverlay::~NotificationOverlay()
+{
+    ::DestroyWindow(hWnd);
+    ::DeleteObject(hFont);
+}
+
+void NotificationOverlay::UpdateOnWindowSize()
+{
+    // Just reposition the window for proper centering and alignment.
+    int vpos = (YOffest > 0) ? YOffest : (pCore->Height + YOffest - (TextSize.cy + 7));
+
+    ::SetWindowPos(hWnd, 0,
+                   (pCore->Width-TextSize.cx+20)/2, vpos,
+                   TextSize.cx+20, TextSize.cy + 7, SWP_NOSIZE|SWP_NOZORDER);
+}
+
 
 }}}
 
-OVR::Platform::Application*     g_app;
+OVR::OvrPlatform::Application*     g_app;
 
 
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 {
     using namespace OVR;
-    using namespace OVR::Platform;
+    using namespace OVR::OvrPlatform;
 
     OVR_UNUSED2(prevInst, show);
     
@@ -587,7 +676,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
         }
         if (p != pstart)
             args.PushBack(String(pstart, p - pstart));
-        for (UPInt i = 0; i < args.GetSize(); i++)
+        for (size_t i = 0; i < args.GetSize(); i++)
             argv.PushBack(args[i].ToCStr());
 
         exitCode = g_app->OnStartup((int)argv.GetSize(), &argv[0]);
@@ -599,6 +688,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
     Application::DestroyApplication(g_app);
     g_app = 0;
 
-    OVR_DEBUG_STATEMENT(_CrtDumpMemoryLeaks());
+    // If this assert fires, then look at the debug output to see what memory is leaking
+    OVR_ASSERT(!_CrtDumpMemoryLeaks());
     return exitCode;
 }

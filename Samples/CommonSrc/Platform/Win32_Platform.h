@@ -25,17 +25,48 @@ limitations under the License.
 #define OVR_Win32_Platform_h
 
 #include "Platform.h"
-#include <windows.h>
 
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 namespace OVR { namespace Render {
     class RenderDevice;
     struct DisplayId;
 }}
 
-namespace OVR { namespace Platform { namespace Win32 {
+namespace OVR { namespace OvrPlatform { namespace Win32 {
 
-class PlatformCore : public Platform::PlatformCore
+class PlatformCore; 
+
+// -----------------------------------------------------------------------------
+// ***** NotificationOverlay
+
+// Describes a notification overlay window that contains a message string.
+// When used with Oculus Display Driver, allows the message to be shown
+// in the monitor window that is not visible on the Rift.
+class NotificationOverlay : public RefCountBase<NotificationOverlay>
+{
+public:
+    NotificationOverlay(PlatformCore* core,
+                        int fontHeightPixels, int yoffset, const char* text);
+    ~NotificationOverlay();
+
+    void UpdateOnWindowSize();
+
+private:
+    PlatformCore* pCore;
+    HWND          hWnd;
+    HFONT         hFont;
+    SIZE          TextSize;
+    int           YOffest; // Negative if counting from the bottom
+}; 
+
+
+// -----------------------------------------------------------------------------
+
+class PlatformCore : public OvrPlatform::PlatformCore
 {
     HWND        hWnd;
     HINSTANCE   hInstance;
@@ -49,22 +80,27 @@ class PlatformCore : public Platform::PlatformCore
     int         Modifiers;
     String      WindowTitle;
 
+    friend class NotificationOverlay;
+
     // Win32 static function that delegates to WindowProc member function.
     static LRESULT CALLBACK systemWindowProc(HWND window, UINT msg, WPARAM wp, LPARAM lp);
 
     LRESULT     WindowProc(UINT msg, WPARAM wp, LPARAM lp);
 
+    Array<Ptr<NotificationOverlay> > NotificationOverlays;
+
 public:
     PlatformCore(Application* app, HINSTANCE hinst);
     ~PlatformCore();
 
-    bool      SetupWindow(int w, int h);
+    void*	  SetupWindow(int w, int h);
     void      DestroyWindow();
     void      ShowWindow(bool visible);
     void      Exit(int exitcode)
 	{
-		for (MSG msg; PeekMessage(&msg, NULL, 0, 0, PM_REMOVE); )
-			;
+        // On some AMD cards, additional events may cause crashing after exit.
+		//for (MSG msg; PeekMessage(&msg, NULL, 0, 0, PM_REMOVE); )
+		//	;
 		Quit = 1; ExitCode = exitcode;
 	}
 
@@ -80,6 +116,10 @@ public:
     int       GetDisplayCount();
     Render::DisplayId    GetDisplay(int screen);
 
+    // Creates notification overlay text box over the top of OS window.
+    virtual void        SetNotificationOverlay(int index, int fontHeightPixels,
+                                               int yoffset, const char* text);
+
     int       Run();
 };
 
@@ -93,22 +133,22 @@ KeyCode MapVKToKeyCode(unsigned vk);
 // OVR_PLATFORM_APP_ARGS specifies the Application class to use for startup,
 // providing it with startup arguments.
 #define OVR_PLATFORM_APP_ARGS(AppClass, args)                                            \
-    OVR::Platform::Application* OVR::Platform::Application::CreateApplication()          \
+    OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
     { OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));                \
       return new AppClass args; }                                                        \
-    void OVR::Platform::Application::DestroyApplication(OVR::Platform::Application* app) \
-    { OVR::Platform::PlatformCore* platform = app->pPlatform;                            \
+    void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
+    { OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
       delete app; delete platform; OVR::System::Destroy(); };
 
 // OVR_PLATFORM_APP_ARGS specifies the Application startup class with no args.
 #define OVR_PLATFORM_APP(AppClass) OVR_PLATFORM_APP_ARGS(AppClass, ())
 
 #define OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass, LogClass, args)                         \
-	OVR::Platform::Application* OVR::Platform::Application::CreateApplication()          \
+	OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
 	{ static LogClass log; OVR::System::Init(&log);                                      \
 	   return new AppClass args; }                                                       \
-	void OVR::Platform::Application::DestroyApplication(OVR::Platform::Application* app) \
-	{ OVR::Platform::PlatformCore* platform = app->pPlatform;                            \
+	void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
+	{ OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
 	    delete app; delete platform; OVR::System::Destroy(); };
 
 #define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())

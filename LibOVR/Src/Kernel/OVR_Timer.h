@@ -56,13 +56,13 @@ public:
     static double  OVR_STDCALL GetSeconds();    
 
     // Returns time in Nanoseconds, using highest possible system resolution.
-    static UInt64  OVR_STDCALL GetTicksNanos();
+    static uint64_t  OVR_STDCALL GetTicksNanos();
 
     // Kept for compatibility.
     // Returns ticks in milliseconds, as a 32-bit number. May wrap around every 49.2 days.
     // Use either time difference of two values of GetTicks to avoid wrap-around.
-    static UInt32  OVR_STDCALL GetTicksMs()
-    { return  UInt32(GetTicksNanos() / 1000000); }
+    static uint32_t  OVR_STDCALL GetTicksMs()
+    { return  uint32_t(GetTicksNanos() / 1000000); }
 
     // for recorded data playback
     static void SetFakeSeconds(double fakeSeconds) 

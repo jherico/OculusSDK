@@ -30,64 +30,45 @@ limitations under the License.
 #include "../OVR_CAPI.h"
 #include "../Kernel/OVR_Math.h"
 #include "../Util/Util_Render_Stereo.h"
-
+#include "../Service/Service_NetSessionCommon.h"
 
 namespace OVR { namespace CAPI {
 
 using namespace OVR::Util::Render;
 
+
 //-------------------------------------------------------------------------------------
 // ***** HMDRenderState
 
 // Combines all of the rendering setup information about one HMD.
-
-class HMDRenderState : public NewOverrideBase 
+// This structure only ever exists inside HMDState, but this 
+// declaration is in a separate file to reduce #include dependencies.
+// All actual lifetime and update control is done by the surrounding HMDState.
+struct HMDRenderState
 {
-    // Quiet assignment compiler warning.
-    void operator = (const HMDRenderState&) { }
-public:   
+    // Utility query functions.
+    ovrHmdDesc          GetDesc() const;
+    ovrSizei            GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel) const;
+    ovrEyeRenderDesc    CalcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov) const;
 
-    HMDRenderState(ovrHmd hmd, Profile* userProfile, const OVR::HMDInfo& hmdInfo);
-    virtual ~HMDRenderState();
+    HMDInfo                 OurHMDInfo;
 
-
-    // *** Rendering Setup
-
-    // Delegated access APIs
-    ovrHmdDesc GetDesc();
-    ovrSizei   GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel);
-
-    ovrEyeRenderDesc calcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov);
-
-    void       setupRenderDesc(ovrEyeRenderDesc eyeRenderDescOut[2],
-                               const ovrFovPort eyeFovIn[2]);
-public:
-    
-    // HMDInfo shouldn't change, as its string pointers are passed out.    
-    ovrHmd                  HMD;
-    const OVR::HMDInfo&     HMDInfo;
-
-    //const char*             pLastError;
-
-    HmdRenderInfo            RenderInfo;    
-    DistortionRenderDesc     Distortion[2];
-    ovrEyeRenderDesc         EyeRenderDesc[2]; 
+    HmdRenderInfo           RenderInfo;
+    DistortionRenderDesc    Distortion[2];
+    ovrEyeRenderDesc        EyeRenderDesc[2]; 
 
     // Clear color used for distortion
-    float                    ClearColor[4];
+    float                   ClearColor[4];
 
     // Pose at which last time the eye was rendered, as submitted by EndEyeRender.
-    ovrPosef                 EyeRenderPoses[2];
+    ovrPosef                EyeRenderPoses[2];
 
     // Capabilities passed to Configure.
-    unsigned                 EnabledHmdCaps;
-    unsigned                 DistortionCaps;
+    unsigned                EnabledHmdCaps;
+    unsigned                DistortionCaps;
 };
 
 
 }} // namespace OVR::CAPI
 
-
 #endif // OVR_CAPI_HMDState_h
-
-

@@ -26,19 +26,22 @@ limitations under the License.
 
 #include "Gamepad.h"
 
-#include <windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <xinput.h>
 
-namespace OVR { namespace Platform { namespace Win32 {
+namespace OVR { namespace OvrPlatform { namespace Win32 {
 
-class GamepadManager : public Platform::GamepadManager
+class GamepadManager : public OvrPlatform::GamepadManager
 {
 public:
     GamepadManager();
     ~GamepadManager();
 
-    virtual UInt32  GetGamepadCount();
-    virtual bool    GetGamepadState(UInt32 index, GamepadState* pState);
+    virtual uint32_t  GetGamepadCount();
+    virtual bool    GetGamepadState(uint32_t index, GamepadState* pState);
 
 private:
     // Dynamically ink to XInput to simplify projects.
@@ -46,7 +49,7 @@ private:
     typedef DWORD (WINAPI *PFn_XInputGetState)(DWORD dwUserIndex, XINPUT_STATE* pState);
     PFn_XInputGetState  pXInputGetState;
 
-    UInt32              LastPadPacketNo;
+    uint32_t            LastPadPacketNo;
 };
 
 }}}

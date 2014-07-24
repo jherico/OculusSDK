@@ -25,9 +25,10 @@ limitations under the License.
 *************************************************************************************/
 
 #include "Util_Render_Stereo.h"
-#include "../OVR_SensorFusion.h"
 
 namespace OVR { namespace Util { namespace Render {
+
+using namespace OVR::Tracking;
 
 
 //-----------------------------------------------------------------------------------
@@ -442,7 +443,7 @@ const StereoEyeParamsWithOrtho& StereoConfig::GetEyeRenderParams(StereoEye eye)
         UpdateComputedState();
     }
 
-    static const UByte eyeParamIndices[3] = { 0, 0, 1 };
+    static const uint8_t eyeParamIndices[3] = { 0, 0, 1 };
 
     OVR_ASSERT(eye < sizeof(eyeParamIndices));
     return EyeRenderParams[eyeParamIndices[eye]];
@@ -787,13 +788,13 @@ static const int DMA_NumTrisPerEye  = (DMA_GridSize)*(DMA_GridSize)*2;
 
 
 
-void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices )
+void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, uint16_t *pTriangleMeshIndices )
 {
     OVR_FREE ( pVertices );
     OVR_FREE ( pTriangleMeshIndices );
 }
 
-void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                             int *pNumVertices, int *pNumTriangles,
                             const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo )
 {
@@ -811,7 +812,7 @@ void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, UInt16 **ppTr
 
 
 // Generate distortion mesh for a eye.
-void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
                            const HmdRenderInfo &hmdRenderInfo, 
@@ -822,7 +823,7 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
 
     *ppVertices = (DistortionMeshVertexData*)
                       OVR_ALLOC( sizeof(DistortionMeshVertexData) * (*pNumVertices) );
-    *ppTriangleListIndices  = (UInt16*) OVR_ALLOC( sizeof(UInt16) * (*pNumTriangles) * 3 );
+    *ppTriangleListIndices  = (uint16_t*) OVR_ALLOC( sizeof(uint16_t) * (*pNumTriangles) * 3 );
 
     if (!*ppVertices || !*ppTriangleListIndices)
     {
@@ -870,11 +871,16 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
             sourceCoordNDC.y = 2.0f * ( (float)y / (float)DMA_GridSize ) - 1.0f;
             Vector2f tanEyeAngle = TransformRendertargetNDCToTanFovSpace ( eyeToSourceNDC, sourceCoordNDC );
 
-            // This is the function that does the really heavy lifting.
+            // Find a corresponding screen position.
+            // Note - this function does not have to be precise - we're just trying to match the mesh tessellation
+            // with the shape of the distortion to minimise the number of trianlges needed.
             Vector2f screenNDC = TransformTanFovSpaceToScreenNDC ( distortion, tanEyeAngle, false );
+            // ...but don't let verts overlap to the other eye.
+            screenNDC.x = Alg::Max ( -1.0f, Alg::Min ( screenNDC.x, 1.0f ) );
+            screenNDC.y = Alg::Max ( -1.0f, Alg::Min ( screenNDC.y, 1.0f ) );
 
-            // We then need RGB UVs. Since chromatic aberration is generated from screen coords, not
-            // directly from texture NDCs, we can't just use tanEyeAngle, we need to go the long way round.
+            // From those screen positions, we then need (effectively) RGB UVs.
+            // This is the function that actually matters when doing the distortion calculation.
             Vector2f tanEyeAnglesR, tanEyeAnglesG, tanEyeAnglesB;
             TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
                                                     distortion, screenNDC );
@@ -883,7 +889,6 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
 			pcurVert->TanEyeAnglesG = tanEyeAnglesG;
 			pcurVert->TanEyeAnglesB = tanEyeAnglesB;
 			
-
             HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
             switch ( shutterType )
             {
@@ -914,16 +919,14 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
             }
 
             // Fade out at texture edges.
+            // The furthest out will be the blue channel, because of chromatic aberration (true of any standard lens)
+            Vector2f sourceTexCoordBlueNDC = TransformTanFovSpaceToRendertargetNDC ( eyeToSourceNDC, tanEyeAnglesB );
             float edgeFadeIn       = ( 1.0f / fadeOutBorderFraction ) *
-                                     ( 1.0f - Alg::Max ( Alg::Abs ( sourceCoordNDC.x ), Alg::Abs ( sourceCoordNDC.y ) ) );
+                                     ( 1.0f - Alg::Max ( Alg::Abs ( sourceTexCoordBlueNDC.x ), Alg::Abs ( sourceTexCoordBlueNDC.y ) ) );
             // Also fade out at screen edges.
             float edgeFadeInScreen = ( 2.0f / fadeOutBorderFraction ) *
                                      ( 1.0f - Alg::Max ( Alg::Abs ( screenNDC.x ), Alg::Abs ( screenNDC.y ) ) );
             edgeFadeIn = Alg::Min ( edgeFadeInScreen, edgeFadeIn );
-
-            // Don't let verts overlap to the other eye.
-            screenNDC.x = Alg::Max ( -1.0f, Alg::Min ( screenNDC.x, 1.0f ) );
-            screenNDC.y = Alg::Max ( -1.0f, Alg::Min ( screenNDC.y, 1.0f ) );
 
             pcurVert->Shade = Alg::Max ( 0.0f, Alg::Min ( edgeFadeIn, 1.0f ) );
             pcurVert->ScreenPosNDC.x = 0.5f * screenNDC.x - 0.5f + xOffset;
@@ -935,7 +938,7 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
 
 
     // Populate index buffer info  
-    UInt16 *pcurIndex = *ppTriangleListIndices;
+    uint16_t *pcurIndex = *ppTriangleListIndices;
 
     for ( int triNum = 0; triNum < DMA_GridSize * DMA_GridSize; triNum++ )
     {
@@ -982,23 +985,23 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, UInt16 **ppTri
         // so linear interpolation works better & we can use fewer tris.
         if ( ( x < DMA_GridSize/2 ) != ( y < DMA_GridSize/2 ) )       // != is logical XOR
         {
-            *pcurIndex++ = (UInt16)FirstVertex;
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1)+1;
 
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1)+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1);
-            *pcurIndex++ = (UInt16)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex;
         }
         else
         {
-            *pcurIndex++ = (UInt16)FirstVertex;
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1);
 
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1)+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(DMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(DMA_GridSize+1);
         }
     }
 }
@@ -1013,13 +1016,13 @@ static const int HMA_NumVertsPerEye = (HMA_GridSize+1)*(HMA_GridSize+1);
 static const int HMA_NumTrisPerEye  = (HMA_GridSize)*(HMA_GridSize)*2;
 
 
-void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, UInt16 *pTriangleMeshIndices )
+void HeightmapMeshDestroy ( HeightmapMeshVertexData *pVertices, uint16_t *pTriangleMeshIndices )
 {
     OVR_FREE ( pVertices );
     OVR_FREE ( pTriangleMeshIndices );
 }
 
-void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
     int *pNumVertices, int *pNumTriangles,
     const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo )
 {
@@ -1037,7 +1040,7 @@ void HeightmapMeshCreate ( HeightmapMeshVertexData **ppVertices, UInt16 **ppTria
 
 
 // Generate heightmap mesh for one eye.
-void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTriangleListIndices,
+void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
     int *pNumVertices, int *pNumTriangles, bool rightEye,
     const HmdRenderInfo &hmdRenderInfo,
     const ScaleAndOffset2D &eyeToSourceNDC )
@@ -1046,7 +1049,7 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTrian
     *pNumTriangles = HMA_NumTrisPerEye;
 
     *ppVertices = (HeightmapMeshVertexData*) OVR_ALLOC( sizeof(HeightmapMeshVertexData) * (*pNumVertices) );
-    *ppTriangleListIndices  = (UInt16*) OVR_ALLOC( sizeof(UInt16) * (*pNumTriangles) * 3 );
+    *ppTriangleListIndices  = (uint16_t*) OVR_ALLOC( sizeof(uint16_t) * (*pNumTriangles) * 3 );
 
     if (!*ppVertices || !*ppTriangleListIndices)
     {
@@ -1133,7 +1136,7 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTrian
 
 
     // Populate index buffer info  
-    UInt16 *pcurIndex = *ppTriangleListIndices;
+    uint16_t *pcurIndex = *ppTriangleListIndices;
 
     for ( int triNum = 0; triNum < HMA_GridSize * HMA_GridSize; triNum++ )
     {
@@ -1180,23 +1183,23 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, UInt16 **ppTrian
         // so linear interpolation works better & we can use fewer tris.
         if ( ( x < HMA_GridSize/2 ) != ( y < HMA_GridSize/2 ) )       // != is logical XOR
         {
-            *pcurIndex++ = (UInt16)FirstVertex;
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1)+1;
 
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
-            *pcurIndex++ = (UInt16)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex;
         }
         else
         {
-            *pcurIndex++ = (UInt16)FirstVertex;
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex;
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1);
 
-            *pcurIndex++ = (UInt16)FirstVertex+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1)+1;
-            *pcurIndex++ = (UInt16)FirstVertex+(HMA_GridSize+1);
+            *pcurIndex++ = (uint16_t)FirstVertex+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1)+1;
+            *pcurIndex++ = (uint16_t)FirstVertex+(HMA_GridSize+1);
         }
     }
 }
@@ -1318,7 +1321,7 @@ TimewarpMachine::TimewarpMachine()
 {    
     for ( int i = 0; i < 2; i++ )
     {
-        EyeRenderPoses[i] = Transformf();
+        EyeRenderPoses[i] = Posef();
     }
     DistortionTimeCount = 0;
     VsyncEnabled = false;
@@ -1349,10 +1352,9 @@ double TimewarpMachine::GetViewRenderPredictionTime()
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToRenderedScene;
 }
 
-Transformf TimewarpMachine::GetViewRenderPredictionPose(SensorFusion &sfusion)
+bool TimewarpMachine::GetViewRenderPredictionPose(SensorStateReader* reader, Posef& pose)
 {
-    double predictionTime = GetViewRenderPredictionTime();
-    return sfusion.GetPoseAtTime(predictionTime);
+	return reader->GetPoseAtTime(GetViewRenderPredictionTime(), pose);
 }
 
 double TimewarpMachine::GetVisiblePixelTimeStart()
@@ -1365,31 +1367,43 @@ double TimewarpMachine::GetVisiblePixelTimeEnd()
     // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToTimewarpEnd;
 }
-Transformf TimewarpMachine::GetPredictedVisiblePixelPoseStart(SensorFusion &sfusion)
+bool TimewarpMachine::GetPredictedVisiblePixelPoseStart(SensorStateReader* reader, Posef& pose)
 {
-    double predictionTime = GetVisiblePixelTimeStart();
-    return sfusion.GetPoseAtTime(predictionTime);
+	return reader->GetPoseAtTime(GetVisiblePixelTimeStart(), pose);
 }
-Transformf TimewarpMachine::GetPredictedVisiblePixelPoseEnd  (SensorFusion &sfusion)
+bool TimewarpMachine::GetPredictedVisiblePixelPoseEnd(SensorStateReader* reader, Posef& pose)
 {
-    double predictionTime = GetVisiblePixelTimeEnd();
-    return sfusion.GetPoseAtTime(predictionTime);
+	return reader->GetPoseAtTime(GetVisiblePixelTimeEnd(), pose);
 }
-Matrix4f TimewarpMachine::GetTimewarpDeltaStart(SensorFusion &sfusion, Transformf const &renderedPose)
+bool TimewarpMachine::GetTimewarpDeltaStart(SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
 {
-    Transformf visiblePose = GetPredictedVisiblePixelPoseStart ( sfusion );
+	Posef visiblePose;
+	if (!GetPredictedVisiblePixelPoseStart(reader, visiblePose))
+	{
+		return false;
+	}
+
     Matrix4f visibleMatrix(visiblePose);
     Matrix4f renderedMatrix(renderedPose);
     Matrix4f identity;  // doesn't matter for orientation-only timewarp
-    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
+    transform = TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
+
+	return true;
 }
-Matrix4f TimewarpMachine::GetTimewarpDeltaEnd  (SensorFusion &sfusion, Transformf const &renderedPose)
+bool TimewarpMachine::GetTimewarpDeltaEnd(SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
 {
-    Transformf visiblePose = GetPredictedVisiblePixelPoseEnd ( sfusion );
+	Posef visiblePose;
+	if (!GetPredictedVisiblePixelPoseEnd(reader, visiblePose))
+	{
+		return false;
+	}
+
     Matrix4f visibleMatrix(visiblePose);
     Matrix4f renderedMatrix(renderedPose);
     Matrix4f identity;  // doesn't matter for orientation-only timewarp
-    return TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
+    transform = TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
+
+	return true;
 }
 
 

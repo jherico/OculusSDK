@@ -25,430 +25,265 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_HMDState.h"
-#include "CAPI_GlobalState.h"
 #include "../OVR_Profile.h"
+#include "../Service/Service_NetClient.h"
+#ifdef OVR_OS_WIN32
+#include "../Displays/OVR_Win32_ShimFunctions.h"
+#endif
+
 
 namespace OVR { namespace CAPI {
+
 
 //-------------------------------------------------------------------------------------
 // ***** HMDState
 
-
-HMDState::HMDState(HMDDevice* device)
-    : pHMD(device), HMDInfoW(device), HMDInfo(HMDInfoW.h),    
-      EnabledHmdCaps(0), HmdCapsAppliedToSensor(0),
-      SensorStarted(0), SensorCreated(0), SensorCaps(0),
-      AddSensorCount(0), AddLatencyTestCount(0), AddLatencyTestDisplayCount(0),
-      RenderState(getThis(), pHMD->GetProfile(), HMDInfoW.h),
-      LastFrameTimeSeconds(0.0f), LastGetFrameTimeSeconds(0.0),
-      LatencyTestActive(false),
-      LatencyTest2Active(false)
+HMDState::HMDState(const OVR::Service::HMDNetworkInfo& netInfo,
+				   const OVR::HMDInfo& hmdInfo,
+				   Profile* profile,
+				   Service::NetClient* client) :
+    pClient(client),
+    pProfile(profile),
+    pHmdDesc(0),
+    pWindow(0),
+    NetInfo(netInfo),
+    NetId(netInfo.NetId),
+    OurHMDInfo(hmdInfo),
+    EnabledHmdCaps(0),
+    LastFrameTimeSeconds(0.f),
+    LastGetFrameTimeSeconds(0.),
+    LatencyTestActive(false),
+    LatencyTest2Active(false)
 {
+    sharedInit(profile);
+}
+
+HMDState::HMDState(const OVR::HMDInfo& hmdInfo, Profile* profile) :
+    pClient(0),
+    pHmdDesc(0),
+    NetId(InvalidVirtualHmdId),
+    pProfile(profile),
+    OurHMDInfo(hmdInfo),
+    EnabledHmdCaps(0),
+    LastFrameTimeSeconds(0.),
+    LastGetFrameTimeSeconds(0.)
+{
+    sharedInit(profile);
+}
+
+HMDState::~HMDState()
+{
+    if (pClient)
+    {
+		pClient->Hmd_Release(NetId);
+		pClient = 0;
+    }
+
+    ConfigureRendering(0,0,0,0);
+
+    if (pHmdDesc)
+        delete pHmdDesc;
+}
+
+void HMDState::sharedInit(Profile* profile)
+{
+    // TBD: We should probably be looking up the default profile for the given
+    // device type + user if profile == 0.    
     pLastError = 0;
-    GlobalState::pInstance->AddHMD(this);
-    
-    // Should be in renderer?
+
+    RenderState.OurHMDInfo = OurHMDInfo;
+
+    UpdateRenderProfile(profile);
+
+    OVR_ASSERT(!pHmdDesc);
+    pHmdDesc         = new ovrHmdDesc;
+    *pHmdDesc        = RenderState.GetDesc();
+    pHmdDesc->Handle = this;
+
+    RenderState.ClearColor[0] = 0.0f;
+    RenderState.ClearColor[1] = 0.0f;
+    RenderState.ClearColor[2] = 0.0f;
+    RenderState.ClearColor[3] = 0.0f;
+
+    RenderState.EnabledHmdCaps = 0;
+
     TimeManager.Init(RenderState.RenderInfo);
 
-    EyeRenderActive[0] = false;
-    EyeRenderActive[1] = false;
-
+    /*
     LatencyTestDrawColor[0] = 0;
     LatencyTestDrawColor[1] = 0;
     LatencyTestDrawColor[2] = 0;
-
-    OVR_CAPI_VISION_CODE( pPoseTracker = 0; )
-
-    RenderingConfigured = false;
-    BeginFrameCalled    = false;
-    BeginFrameThreadId  = 0;
-    BeginFrameTimingCalled = false;
-}
-
-HMDState::HMDState(ovrHmdType hmdType)
-  : pHMD(0), HMDInfoW(hmdType), HMDInfo(HMDInfoW.h),
-    EnabledHmdCaps(0),
-    SensorStarted(0), SensorCreated(0), SensorCaps(0),
-    AddSensorCount(0), AddLatencyTestCount(0), AddLatencyTestDisplayCount(0),
-    RenderState(getThis(), 0, HMDInfoW.h), // No profile. 
-    LastFrameTimeSeconds(0.0), LastGetFrameTimeSeconds(0.0)
-{
-    // TBD: We should probably be looking up the default profile for the given
-    // device type + user.
-
-    pLastError = 0;
-    GlobalState::pInstance->AddHMD(this);
-
-    // Should be in renderer?
-    TimeManager.Init(RenderState.RenderInfo);
-
-    EyeRenderActive[0] = false;
-    EyeRenderActive[1] = false;
-
-    OVR_CAPI_VISION_CODE( pPoseTracker = 0; )
+    */
 
     RenderingConfigured = false;
     BeginFrameCalled   = false;
     BeginFrameThreadId = 0;
     BeginFrameTimingCalled = false;
+
+    // Construct the HSWDisplay. We will later reconstruct it with a specific ovrRenderAPI type if the application starts using SDK-based rendering.
+    if(!pHSWDisplay)
+        pHSWDisplay = *OVR::CAPI::HSWDisplay::Factory(ovrRenderAPI_None, pHmdDesc, RenderState);
 }
 
-
-HMDState::~HMDState()
+static Vector3f GetNeckModelFromProfile(Profile* profile)
 {
-    OVR_ASSERT(GlobalState::pInstance);
-   
-    StopSensor();
-    ConfigureRendering(0,0,0,0);
+    OVR_ASSERT(profile);
 
-    OVR_CAPI_VISION_CODE( OVR_ASSERT(pPoseTracker == 0); )
+    float neckeye[2] = { OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL, OVR_DEFAULT_NECK_TO_EYE_VERTICAL };
+    profile->GetFloatValues(OVR_KEY_NECK_TO_EYE_DISTANCE, neckeye, 2);
 
-    GlobalState::pInstance->RemoveHMD(this);
+    // Make sure these are vaguely sensible values.
+    //OVR_ASSERT((neckeye[0] > 0.05f) && (neckeye[0] < 0.5f));
+    //OVR_ASSERT((neckeye[1] > 0.05f) && (neckeye[1] < 0.5f));
+
+    // Named for clarity
+    float NeckToEyeHorizontal = neckeye[0];
+    float NeckToEyeVertical = neckeye[1];
+
+    // Store the neck model
+    return Vector3f(0.0, NeckToEyeVertical, -NeckToEyeHorizontal);
 }
 
+static float GetCenterPupilDepthFromRenderInfo(HmdRenderInfo* hmdRenderInfo)
+{
+    OVR_ASSERT(hmdRenderInfo);
 
+    // Find the distance from the center of the screen to the "center eye"
+    // This center eye is used by systems like rendering & audio to represent the player,
+    // and they will handle the offsets needed from there to each actual eye.
+
+    // HACK HACK HACK
+    // We know for DK1 the screen->lens surface distance is roughly 0.049f, and that the faceplate->lens is 0.02357f.
+    // We're going to assume(!!!!) that all HMDs have the same screen->faceplate distance.
+    // Crystal Cove was measured to be roughly 0.025 screen->faceplate which agrees with this assumption.
+    // TODO: do this properly!  Update:  Measured this at 0.02733 with a CC prototype, CES era (PT7), on 2/19/14 -Steve
+    float screenCenterToMidplate = 0.02733f;
+    float centerEyeRelief = hmdRenderInfo->GetEyeCenter().ReliefInMeters;
+    float CenterPupilDepth = screenCenterToMidplate + hmdRenderInfo->LensSurfaceToMidplateInMeters + centerEyeRelief;
+
+    return CenterPupilDepth;
+}
+
+void HMDState::UpdateRenderProfile(Profile* profile)
+{
+    // Apply the given profile to generate a render context
+    RenderState.RenderInfo = GenerateHmdRenderInfoFromHmdInfo(RenderState.OurHMDInfo, profile);
+    RenderState.Distortion[0] = CalculateDistortionRenderDesc(StereoEye_Left, RenderState.RenderInfo, 0);
+    RenderState.Distortion[1] = CalculateDistortionRenderDesc(StereoEye_Right, RenderState.RenderInfo, 0);
+
+    if (pClient)
+    {
+        // Center pupil depth
+        float centerPupilDepth = GetCenterPupilDepthFromRenderInfo(&RenderState.RenderInfo);
+        pClient->SetNumberValue(GetNetId(), "CenterPupilDepth", centerPupilDepth);
+
+        // Neck model
+        Vector3f neckModel = GetNeckModelFromProfile(profile);
+        double neckModelArray[3] = {
+            neckModel.x,
+            neckModel.y,
+            neckModel.z
+        };
+        pClient->SetNumberValues(GetNetId(), "NeckModelVector3f", neckModelArray, 3);
+    }
+}
+
+HMDState* HMDState::CreateHMDState(NetClient* client, const HMDNetworkInfo& netInfo)
+{
+    // HMDState works through a handle to service HMD....
+    HMDInfo hinfo;
+    if (!client->Hmd_GetHmdInfo(netInfo.NetId, &hinfo))
+    {
+        OVR_DEBUG_LOG(("[HMDState] Unable to get HMD info"));
+        return NULL;
+    }
+
+#ifdef OVR_OS_WIN32
+    OVR_DEBUG_LOG(("Setting up display shim"));
+
+    // Initialize the display shim before reporting the display to the user code
+    // so that this will happen before the D3D display object is created.
+    Win32::DisplayShim::GetInstance().Update(&hinfo.ShimInfo);
+#endif
+
+    Ptr<Profile> pDefaultProfile = *ProfileManager::GetInstance()->GetDefaultUserProfile(&hinfo);
+    OVR_DEBUG_LOG(("Using profile %s", pDefaultProfile->GetValue(OVR_KEY_USER)));
+
+    HMDState* hmds = new HMDState(netInfo, hinfo, pDefaultProfile, client);
+
+    if (!hmds->SharedStateReader.Open(netInfo.SharedMemoryName.ToCStr()))
+    {
+        delete hmds;
+        return NULL;
+    }
+
+    hmds->TheSensorStateReader.SetUpdater(hmds->SharedStateReader.Get());
+    hmds->TheLatencyTestStateReader.SetUpdater(hmds->SharedStateReader.Get());
+
+    return hmds;
+}
+
+HMDState* HMDState::CreateHMDState(ovrHmdType hmdType)
+{
+    HmdTypeEnum t = HmdType_None;
+    if (hmdType == ovrHmd_DK1)
+        t = HmdType_DK1;    
+    else if (hmdType == ovrHmd_DK2)
+        t = HmdType_DK2;
+
+    // FIXME: This does not actually grab the right user..
+    Ptr<Profile> pDefaultProfile = *ProfileManager::GetInstance()->GetDefaultProfile(t);
+
+    return new HMDState(CreateDebugHMDInfo(t), pDefaultProfile);
+}
+    
 
 //-------------------------------------------------------------------------------------
 // *** Sensor 
 
-bool HMDState::StartSensor(unsigned supportedCaps, unsigned requiredCaps)
+bool HMDState::ConfigureTracking(unsigned supportedCaps, unsigned requiredCaps)
 {
-    Lock::Locker lockScope(&DevicesLock);
-
-    bool crystalCoveOrBetter = (HMDInfo.HmdType == HmdType_CrystalCoveProto) ||
-                               (HMDInfo.HmdType == HmdType_DK2);
-    bool sensorCreatedJustNow = false;
-
-    // TBD: In case of sensor not being immediately available, it would be good to check
-    //      yaw config availability to match it with ovrHmdCap_YawCorrection requirement.
-    // 
-
-    if (!crystalCoveOrBetter)
-    {
-        if (requiredCaps & ovrSensorCap_Position)
-        {
-            pLastError = "ovrSensorCap_Position not supported on this HMD.";
-            return false;            
-        }
-    }
-
-    supportedCaps |= requiredCaps;
-
-    if (pHMD && !pSensor)
-    {
-        // Zero AddSensorCount before creation, in case it fails (or succeeds but then
-        // immediately gets disconnected) followed by another Add notification.        
-        AddSensorCount      = 0;
-        pSensor             = *pHMD->GetSensor();
-        sensorCreatedJustNow= true;
-
-        if (pSensor)
-        {
-            pSensor->SetReportRate(500);
-            SFusion.AttachToSensor(pSensor);
-            applyProfileToSensorFusion();
-        }
-        else
-        {
-            if (requiredCaps & ovrSensorCap_Orientation)
-            {
-                pLastError = "Failed to create sensor.";
-                return false;
-            }
-        }
-    }
-
-
-    if ((requiredCaps & ovrSensorCap_YawCorrection) && !pSensor->IsMagCalibrated())
-    {
-        pLastError = "ovrHmdCap_YawCorrection not available.";
-        if (sensorCreatedJustNow)
-        {
-            SFusion.AttachToSensor(0);
-            SFusion.Reset();
-            pSensor.Clear();
-        }
-        return false;
-    }        
-
-    SFusion.SetYawCorrectionEnabled((supportedCaps & ovrSensorCap_YawCorrection) != 0);
-
-    if (pSensor && sensorCreatedJustNow)
-    {
-        LogText("Sensor created.\n");
-        SensorCreated = true;
-    }
-
-    updateDK2FeaturesTiedToSensor(sensorCreatedJustNow);    
-    
-
-#ifdef OVR_CAPI_VISIONSUPPORT
-
-    if (crystalCoveOrBetter && (supportedCaps & ovrSensorCap_Position))
-    {
-        if (!pPoseTracker)
-        {
-            pPoseTracker = new Vision::PoseTracker(SFusion);
-            if (pPoseTracker)
-            {
-                pPoseTracker->AssociateHMD(pSensor);
-                LogText("Sensor Pose tracker created.\n");
-            }
-        }
-
-        // TBD: How do we verify that position tracking is actually available
-        //      i.e. camera is plugged in?
-    }
-    else if (pPoseTracker)
-    {
-        // TBD: Internals not thread safe - must fix!!
-        delete pPoseTracker;
-        pPoseTracker = 0;
-        LogText("Sensor Pose tracker destroyed.\n");
-    }
-
-#endif // OVR_CAPI_VISIONSUPPORT
-
-    SensorCaps    = supportedCaps;
-    SensorStarted = true;
-
-    return true;
+	return pClient ? pClient->Hmd_ConfigureTracking(NetId, supportedCaps, requiredCaps) : true;
 }
 
-
-// Stops sensor sampling, shutting down internal resources.
-void HMDState::StopSensor()
+void HMDState::ResetTracking()
 {
-    Lock::Locker lockScope(&DevicesLock);
+	if (pClient) pClient->Hmd_ResetTracking(NetId);
+}        
 
-    if (SensorStarted)
-    {
-#ifdef OVR_CAPI_VISIONSUPPORT
-        if (pPoseTracker)
-        {
-            // TBD: Internals not thread safe - must fix!!
-            delete pPoseTracker;
-            pPoseTracker = 0;
-            LogText("Sensor Pose tracker destroyed.\n");
-        }        
-#endif // OVR_CAPI_VISION_CODE
-
-        SFusion.AttachToSensor(0);
-        SFusion.Reset();
-        pSensor.Clear();
-        HmdCapsAppliedToSensor = 0;
-        AddSensorCount = 0;
-        SensorCaps     = 0;
-        SensorCreated  = false;
-        SensorStarted  = false;
-
-        LogText("StopSensor succeeded.\n");
-    }
-}
-
-// Resets sensor orientation.
-void HMDState::ResetSensor()
+// Re-center the orientation.
+void HMDState::RecenterPose()
 {
-    SFusion.Reset();
+    TheSensorStateReader.RecenterPose();
 }
-
 
 // Returns prediction for time.
-ovrSensorState HMDState::PredictedSensorState(double absTime)
+ovrTrackingState HMDState::PredictedTrackingState(double absTime)
 {    
-    SensorState ss;
+	Tracking::TrackingState ss;
+    TheSensorStateReader.GetSensorStateAtTime(absTime, ss);
 
-    // We are trying to keep this path lockless unless we are notified of new device
-    // creation while not having a sensor yet. It's ok to check SensorCreated volatile
-    // flag here, since GetSensorStateAtTime() is internally lockless and safe.
-
-    if (SensorCreated || checkCreateSensor())
-    {   
-        ss = SFusion.GetSensorStateAtTime(absTime);
-
-        if (!(ss.StatusFlags & ovrStatus_OrientationTracked))
-        {
-            Lock::Locker lockScope(&DevicesLock);
-
-#ifdef OVR_CAPI_VISIONSUPPORT
-            if (pPoseTracker)
-            {
-                // TBD: Internals not thread safe - must fix!!
-                delete pPoseTracker;
-                pPoseTracker = 0;
-                LogText("Sensor Pose tracker destroyed.\n");
-            }        
-#endif // OVR_CAPI_VISION_CODE
-            // Not needed yet; SFusion.AttachToSensor(0);
-            // This seems to reset orientation anyway...
-            pSensor.Clear();
-            SensorCreated = false;         
-            HmdCapsAppliedToSensor = 0;
-        }
-    }
-    else
+    // Zero out the status flags
+    if (!pClient || !pClient->IsConnected())
     {
-        // SensorState() defaults to 0s.
-        // ss.Pose.Orientation       = Quatf();
-        // ..
-
-        // John:
-        // We still want valid times so frames will get a delta-time
-        // and allow operation with a joypad when the sensor isn't
-        // connected.
-        ss.Recorded.TimeInSeconds  = absTime;
-        ss.Predicted.TimeInSeconds = absTime;
+        ss.StatusFlags = 0;
     }
 
-    ss.StatusFlags |= ovrStatus_HmdConnected;
     return ss;
 }
 
-
-bool  HMDState::checkCreateSensor()
-{
-    if (!(SensorStarted && !SensorCreated && AddSensorCount))
-        return false;
-
-    Lock::Locker lockScope(&DevicesLock);
-
-    // Re-check condition once in the lock, in case the state changed.
-    if (SensorStarted && !SensorCreated && AddSensorCount)
-    {        
-        if (pHMD)
-        {
-            AddSensorCount = 0;
-            pSensor        = *pHMD->GetSensor();
-        }
-
-        if (pSensor)
-        {
-            pSensor->SetReportRate(500);
-            SFusion.AttachToSensor(pSensor);
-            SFusion.SetYawCorrectionEnabled((SensorCaps & ovrSensorCap_YawCorrection) != 0);
-            applyProfileToSensorFusion();
-
-#ifdef OVR_CAPI_VISIONSUPPORT
-            if (SensorCaps & ovrSensorCap_Position)
-            {
-                pPoseTracker = new Vision::PoseTracker(SFusion);
-                if (pPoseTracker)
-                {
-                    pPoseTracker->AssociateHMD(pSensor);
-                }
-                LogText("Sensor Pose tracker created.\n");
-            }
-#endif // OVR_CAPI_VISION_CODE
-
-            LogText("Sensor created.\n");
-
-            SensorCreated = true;
-            return true;
-        }
-    }
-
-    return SensorCreated;
-}
-
-bool HMDState::GetSensorDesc(ovrSensorDesc* descOut)
-{
-    Lock::Locker lockScope(&DevicesLock);
-
-    if (SensorCreated)
-    {
-        OVR_ASSERT(pSensor);
-        OVR::SensorInfo si;
-        pSensor->GetDeviceInfo(&si);
-        descOut->VendorId  = si.VendorId;
-        descOut->ProductId = si.ProductId;
-        OVR_ASSERT(si.SerialNumber.GetSize() <= sizeof(descOut->SerialNumber));
-        OVR_strcpy(descOut->SerialNumber, sizeof(descOut->SerialNumber), si.SerialNumber.ToCStr());
-        return true;
-    }
-    return false;
-}
-
-
-void HMDState::applyProfileToSensorFusion()
-{
-    if (!pHMD)
-        return;
-    Profile* profile = pHMD->GetProfile();
-    if (!profile)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-    SFusion.SetUserHeadDimensions ( *profile, RenderState.RenderInfo );
-}
-
-void HMDState::updateLowPersistenceMode(bool lowPersistence) const
-{
-	OVR_ASSERT(pSensor);
-	DisplayReport dr;
-    
-    if (pSensor.GetPtr())
-    {
-	    pSensor->GetDisplayReport(&dr);
-
-	    dr.Persistence = (UInt16) (dr.TotalRows * (lowPersistence ? 0.18f : 1.0f));
-	    dr.Brightness = lowPersistence ? 255 : 0;
-    
-	    pSensor->SetDisplayReport(dr);
-    }
-}
-
-void HMDState::updateLatencyTestForHmd(bool latencyTesting)
-{
-    if (pSensor.GetPtr())
-    {
-        DisplayReport dr;
-        pSensor->GetDisplayReport(&dr);
-
-        dr.ReadPixel = latencyTesting;
-
-        pSensor->SetDisplayReport(dr);
-    }
-
-    if (latencyTesting)
-    {
-        LatencyUtil2.SetSensorDevice(pSensor.GetPtr());
-    }
-    else
-    {
-        LatencyUtil2.SetSensorDevice(NULL);
-    }
-}
-
-
-void HMDState::updateDK2FeaturesTiedToSensor(bool sensorCreatedJustNow)
-{
-    Lock::Locker lockScope(&DevicesLock);
-
-    if (!SensorCreated || (HMDInfo.HmdType != HmdType_DK2))
-        return;
-
-    // Only send display reports if state changed or sensor initializing first time.
-    if (sensorCreatedJustNow ||
-         ((HmdCapsAppliedToSensor ^ EnabledHmdCaps) & ovrHmdCap_LowPersistence))
-    {
-        updateLowPersistenceMode((EnabledHmdCaps & ovrHmdCap_LowPersistence) ? true : false);         
-    }
-
-    if (sensorCreatedJustNow || ((HmdCapsAppliedToSensor ^ EnabledHmdCaps) & ovrHmdCap_LatencyTest))
-    {
-        updateLatencyTestForHmd((EnabledHmdCaps & ovrHmdCap_LatencyTest) != 0);
-    }
-
-    HmdCapsAppliedToSensor = EnabledHmdCaps & (ovrHmdCap_LowPersistence|ovrHmdCap_LatencyTest);
-}
-
-
-
 void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
 {
-    
-    if (HMDInfo.HmdType == HmdType_DK2)
+    if (OurHMDInfo.HmdType < HmdType_DK2)
+    {
+        // disable low persistence
+        hmdCaps &= ~ovrHmdCap_LowPersistence;
+
+        // disable dynamic prediction using the internal latency tester
+        hmdCaps &= ~ovrHmdCap_DynamicPrediction;
+    }
+
+    if (OurHMDInfo.HmdType >= HmdType_DK2)
     {
         if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_DynamicPrediction)
         {
@@ -464,55 +299,121 @@ void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
         TimeManager.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
     }
 
+    if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_NoMirrorToWindow)
+    {
+#ifdef OVR_OS_WIN32
+        Win32::DisplayShim::GetInstance().UseMirroring = (hmdCaps & ovrHmdCap_NoMirrorToWindow)  ?
+                                                         false : true;
+        if (pWindow)
+        {   // Force window repaint so that stale mirrored image doesn't persist.
+            ::InvalidateRect((HWND)pWindow, 0, true);
+        }
+#endif
+    }
 
+    // TBD: Should this include be only the rendering flags? Otherwise, bits that failed
+    //      modification in Hmd_SetEnabledCaps may mis-match...
     EnabledHmdCaps             = hmdCaps & ovrHmdCap_Writable_Mask;
     RenderState.EnabledHmdCaps = EnabledHmdCaps;
 
-    // Unfortunately, LowPersistance and other flags are tied to sensor.
-    // This flag will apply the state of sensor is created; otherwise this will be delayed
-    // till StartSensor.
-    // Such behavior is less then ideal, but should be resolved with the service model.
 
-    updateDK2FeaturesTiedToSensor(false);
+    // If any of the modifiable service caps changed, call on the service.
+    unsigned prevServiceCaps = EnabledServiceHmdCaps & ovrHmdCap_Writable_Mask;
+    unsigned newServiceCaps  = hmdCaps & ovrHmdCap_Writable_Mask & ovrHmdCap_Service_Mask;
+
+    if (prevServiceCaps ^ newServiceCaps)
+	{
+        EnabledServiceHmdCaps = pClient ? pClient->Hmd_SetEnabledCaps(NetId, newServiceCaps)
+                                : newServiceCaps;
+    }
+}
+
+
+unsigned HMDState::SetEnabledHmdCaps()
+{
+	unsigned serviceCaps = pClient ? pClient->Hmd_GetEnabledCaps(NetId) :
+                                      EnabledServiceHmdCaps;
+    
+    return serviceCaps & ((~ovrHmdCap_Service_Mask) | EnabledHmdCaps);    
 }
 
 
 //-------------------------------------------------------------------------------------
 // ***** Property Access
 
-// TBD: This all needs to be cleaned up and organized into namespaces.
+// FIXME: Remove the EGetBoolValue stuff and do it with a "Server:" prefix, so we do not
+// need to keep a white-list of keys.  This is also way cool because it allows us to add
+// new settings keys from outside CAPI that can modify internal server data.
+
+bool HMDState::getBoolValue(const char* propertyName, bool defaultVal)
+{
+    if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetBoolValue, propertyName))
+    {
+       return NetClient::GetInstance()->GetBoolValue(GetNetId(), propertyName, defaultVal);
+    }
+    else if (pProfile)
+    {
+        return pProfile->GetBoolValue(propertyName, defaultVal);
+    }
+    return defaultVal;
+}
+
+bool HMDState::setBoolValue(const char* propertyName, bool value)
+{
+    NetClient::GetInstance()->SetBoolValue(GetNetId(), propertyName, value);
+    return true;
+}
+
+int HMDState::getIntValue(const char* propertyName, int defaultVal)
+{
+    if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetIntValue, propertyName))
+    {
+        return NetClient::GetInstance()->GetIntValue(GetNetId(), propertyName, defaultVal);
+    }
+    else if (pProfile)
+    {
+        return pProfile->GetIntValue(propertyName, defaultVal);
+    }
+    return defaultVal;
+}
+
+bool HMDState::setIntValue(const char* propertyName, int value)
+{
+    NetClient::GetInstance()->SetIntValue(GetNetId(), propertyName, value);
+    return true;
+}
 
 float HMDState::getFloatValue(const char* propertyName, float defaultVal)
 {
-	if (OVR_strcmp(propertyName, "LensSeparation") == 0)
-	{
-		return HMDInfo.LensSeparationInMeters;
-	}
-    else if (OVR_strcmp(propertyName, "CenterPupilDepth") == 0)
-    {        
-        return SFusion.GetCenterPupilDepth();
+    if (OVR_strcmp(propertyName, "LensSeparation") == 0)
+    {
+        return OurHMDInfo.LensSeparationInMeters;
     }
-	else if (pHMD)
-	{
-		Profile* p = pHMD->GetProfile();
-		if (p)
-		{
-			return p->GetFloatValue(propertyName, defaultVal);
-		}
-	}
-	return defaultVal;
+    else if (OVR_strcmp(propertyName, "VsyncToNextVsync") == 0) 
+    {
+        return OurHMDInfo.Shutter.VsyncToNextVsync;
+    }
+    else if (OVR_strcmp(propertyName, "PixelPersistence") == 0) 
+    {
+        return OurHMDInfo.Shutter.PixelPersistence;
+    }
+    else if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetNumberValue, propertyName))
+    {
+       return (float)NetClient::GetInstance()->GetNumberValue(GetNetId(), propertyName, defaultVal);
+    }
+    else if (pProfile)
+    {
+        return pProfile->GetFloatValue(propertyName, defaultVal);
+    }
+
+    return defaultVal;
 }
 
 bool HMDState::setFloatValue(const char* propertyName, float value)
 {
-    if (OVR_strcmp(propertyName, "CenterPupilDepth") == 0)
-    {
-        SFusion.SetCenterPupilDepth(value);
-        return true;
-    }
-    return false;
+    NetClient::GetInstance()->SetNumberValue(GetNetId(), propertyName, value);
+    return true;
 }
-
 
 static unsigned CopyFloatArrayWithLimit(float dest[], unsigned destSize,
                                         float source[], unsigned sourceSize)
@@ -523,14 +424,13 @@ static unsigned CopyFloatArrayWithLimit(float dest[], unsigned destSize,
     return count;
 }
 
-
 unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsigned arraySize)
 {
 	if (arraySize)
 	{
 		if (OVR_strcmp(propertyName, "ScreenSize") == 0)
 		{
-            float data[2] = { HMDInfo.ScreenSizeInMeters.w, HMDInfo.ScreenSizeInMeters.h };
+			float data[2] = { OurHMDInfo.ScreenSizeInMeters.w, OurHMDInfo.ScreenSizeInMeters.h };
 
             return CopyFloatArrayWithLimit(values, arraySize, data, 2);
 		}
@@ -540,38 +440,44 @@ unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsig
         }
         else if (OVR_strcmp(propertyName, "DK2Latency") == 0)
         {
-            if (HMDInfo.HmdType != HmdType_DK2)
+            if (OurHMDInfo.HmdType != HmdType_DK2)
+            {
                 return 0;
+            }
 
             float data[3];            
             TimeManager.GetLatencyTimings(data);
             
             return CopyFloatArrayWithLimit(values, arraySize, data, 3);
         }
-
-        /*
-        else if (OVR_strcmp(propertyName, "CenterPupilDepth") == 0)
+        else if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetNumberValues, propertyName))
         {
-            if (arraySize >= 1)
+            // Convert floats to doubles
+            double* da = new double[arraySize];
+            for (int i = 0; i < (int)arraySize; ++i)
             {
-                values[0] = SFusion.GetCenterPupilDepth();
-                return 1;
+                da[i] = values[i];
             }
-            return 0;
-        } */
-		else if (pHMD)
-		{        
-			Profile* p = pHMD->GetProfile();
 
+            int count = NetClient::GetInstance()->GetNumberValues(GetNetId(), propertyName, da, (int)arraySize);
+
+            for (int i = 0; i < count; ++i)
+            {
+                values[i] = (float)da[i];
+            }
+
+            delete[] da;
+
+            return count;
+        }
+		else if (pProfile)
+		{        
 			// TBD: Not quite right. Should update profile interface, so that
 			//      we can return 0 in all conditions if property doesn't exist.
-			if (p)
-			{
-				unsigned count = p->GetFloatValues(propertyName, values, arraySize);
-				return count;
+		
+            return pProfile->GetFloatValues(propertyName, values, arraySize);
 			}
 		}
-	}
 
 	return 0;
 }
@@ -579,26 +485,40 @@ unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsig
 bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned arraySize)
 {
     if (!arraySize)
+    {
         return false;
+    }
     
     if (OVR_strcmp(propertyName, "DistortionClearColor") == 0)
     {
         CopyFloatArrayWithLimit(RenderState.ClearColor, 4, values, arraySize);
         return true;
     }
-    return false;
-}
 
+    double* da = new double[arraySize];
+    for (int i = 0; i < (int)arraySize; ++i)
+    {
+        da[i] = values[i];
+    }
+
+    NetClient::GetInstance()->SetNumberValues(GetNetId(), propertyName, da, arraySize);
+
+    delete[] da;
+
+    return true;
+}
 
 const char* HMDState::getString(const char* propertyName, const char* defaultVal)
 {
-	if (pHMD)
-	{
-		// For now, just access the profile.
-		Profile* p = pHMD->GetProfile();
+    if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetStringValue, propertyName))
+    {
+        return NetClient::GetInstance()->GetStringValue(GetNetId(), propertyName, defaultVal);
+    }
 
+	if (pProfile)
+	{
 		LastGetStringValue[0] = 0;
-		if (p && p->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
+		if (pProfile->GetValue(propertyName, LastGetStringValue, sizeof(LastGetStringValue)))
 		{
 			return LastGetStringValue;
 		}
@@ -607,13 +527,23 @@ const char* HMDState::getString(const char* propertyName, const char* defaultVal
 	return defaultVal;
 }
 
+bool HMDState::setString(const char* propertyName, const char* value)
+{
+    NetClient::GetInstance()->SetStringValue(GetNetId(), propertyName, value);
+    return true;
+}
+
+
 //-------------------------------------------------------------------------------------
 // *** Latency Test
 
 bool HMDState::ProcessLatencyTest(unsigned char rgbColorOut[3])
-{
+{    
     bool result = false;
 
+    result = NetClient::GetInstance()->LatencyUtil_ProcessInputs(Timer::GetSeconds(), rgbColorOut);
+
+#if 0 //def ENABLE_LATENCY_TESTER
     // Check create.
     if (pLatencyTester)
     {
@@ -640,20 +570,22 @@ bool HMDState::ProcessLatencyTest(unsigned char rgbColorOut[3])
         // This might have some unlikely race condition issue which could cause us to miss a device...
         AddLatencyTestCount = 0;
 
-        pLatencyTester = *GlobalState::pInstance->GetManager()->
-                            EnumerateDevices<LatencyTestDevice>().CreateDevice();
+        pLatencyTester = *GlobalState::pInstance->GetManager()->EnumerateDevices<LatencyTestDevice>().CreateDevice();
         if (pLatencyTester)
         {
             LatencyUtil.SetDevice(pLatencyTester);
             LogText("LATENCY TESTER connected\n");
         }        
     }
+#endif
     
     return result;
 }
 
 void HMDState::ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTime)
 {
+    OVR_UNUSED2(rgbColorOut, startTime);
+    /*
     // Check create.
     if (!(EnabledHmdCaps & ovrHmdCap_LatencyTest))
         return;
@@ -693,6 +625,7 @@ void HMDState::ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTim
     {
         LatencyTest2Active = false;
     }
+    */
 }
 
 //-------------------------------------------------------------------------------------
@@ -708,6 +641,12 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
     // null -> shut down.
     if (!apiConfig)
     {
+        if (pHSWDisplay)
+        {
+            pHSWDisplay->Shutdown();
+            pHSWDisplay.Clear();
+        }
+
         if (pRenderer)
             pRenderer.Clear();        
         RenderingConfigured = false; 
@@ -718,15 +657,25 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
         (apiConfig->Header.API != pRenderer->GetRenderAPI()))
     {
         // Shutdown old renderer.
+        if (pHSWDisplay)
+        {
+            pHSWDisplay->Shutdown();
+            pHSWDisplay.Clear();
+        }
+
         if (pRenderer)
             pRenderer.Clear();
     }
 
+	distortionCaps = distortionCaps & pHmdDesc->DistortionCaps;
 
     // Step 1: do basic setup configuration
-    RenderState.setupRenderDesc(eyeRenderDescOut, eyeFovIn);
     RenderState.EnabledHmdCaps = EnabledHmdCaps;     // This is a copy... Any cleaner way?
     RenderState.DistortionCaps = distortionCaps;
+    RenderState.EyeRenderDesc[0] = RenderState.CalcRenderDesc(ovrEye_Left,  eyeFovIn[0]);
+    RenderState.EyeRenderDesc[1] = RenderState.CalcRenderDesc(ovrEye_Right, eyeFovIn[1]);
+    eyeRenderDescOut[0] = RenderState.EyeRenderDesc[0];
+    eyeRenderDescOut[1] = RenderState.EyeRenderDesc[1];
 
     TimeManager.ResetFrameTiming(0,
                                  (EnabledHmdCaps & ovrHmdCap_DynamicPrediction) ? true : false,
@@ -740,7 +689,7 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
     if (!pRenderer)
     {
         pRenderer = *DistortionRenderer::APICreateRegistry
-                        [apiConfig->Header.API](this, TimeManager, RenderState);
+                        [apiConfig->Header.API](pHmdDesc, TimeManager, RenderState);
     }
 
     if (!pRenderer ||
@@ -750,55 +699,96 @@ bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
         return false;
     }    
 
+    // Setup the Health and Safety Warning display system.
+    if(pHSWDisplay && (pHSWDisplay->GetRenderAPIType() != apiConfig->Header.API)) // If we need to reconstruct the HSWDisplay for a different graphics API type, delete the existing display.
+    {
+        pHSWDisplay->Shutdown();
+        pHSWDisplay.Clear();
+    }
+
+    if(!pHSWDisplay) // Use * below because that for of operator= causes it to inherit the refcount the factory gave the object.
+        pHSWDisplay = *OVR::CAPI::HSWDisplay::Factory(apiConfig->Header.API, pHmdDesc, RenderState);
+
+    if (pHSWDisplay)
+        pHSWDisplay->Initialize(apiConfig); // This is potentially re-initializing it with a new config.
+
     return true;
 }
 
 
-
-ovrPosef HMDState::BeginEyeRender(ovrEyeType eye)
+void  HMDState::SubmitEyeTextures(const ovrPosef renderPose[2],
+                                  const ovrTexture eyeTexture[2])
 {
-    // Debug checks.
-    checkBeginFrameScope("ovrHmd_BeginEyeRender");
-    ThreadChecker::Scope checkScope(&RenderAPIThreadChecker, "ovrHmd_BeginEyeRender");
-
-    // Unknown eyeId provided in ovrHmd_BeginEyeRender
-    OVR_ASSERT_LOG(eye == ovrEye_Left || eye == ovrEye_Right,
-                   ("ovrHmd_BeginEyeRender eyeId out of range."));     
-    OVR_ASSERT_LOG(EyeRenderActive[eye] == false,
-                   ("Multiple calls to ovrHmd_BeginEyeRender for the same eye."));
-
-    EyeRenderActive[eye] = true;
-    
-    // Only process latency tester for drawing the left eye (assumes left eye is drawn first)
-    if (pRenderer && eye == 0)
-    {
-        LatencyTestActive = ProcessLatencyTest(LatencyTestDrawColor);
-    }
-
-    return ovrHmd_GetEyePose(this, eye);
-}
-
-
-void HMDState::EndEyeRender(ovrEyeType eye, ovrPosef renderPose, ovrTexture* eyeTexture)
-{
-    // Debug checks.
-    checkBeginFrameScope("ovrHmd_EndEyeRender");
-    ThreadChecker::Scope checkScope(&RenderAPIThreadChecker, "ovrHmd_EndEyeRender");
-
-    if (!EyeRenderActive[eye])
-    {
-        OVR_ASSERT_LOG(false,
-                       ("ovrHmd_EndEyeRender called without ovrHmd_BeginEyeRender."));
-        return;
-    }
-
-    RenderState.EyeRenderPoses[eye] = renderPose;
+    RenderState.EyeRenderPoses[0] = renderPose[0];
+    RenderState.EyeRenderPoses[1] = renderPose[1];
 
     if (pRenderer)
-        pRenderer->SubmitEye(eye, eyeTexture);
-
-    EyeRenderActive[eye] = false;
+    {
+        pRenderer->SubmitEye(0, &eyeTexture[0]);
+        pRenderer->SubmitEye(1, &eyeTexture[1]);
+    }
 }
 
-}} // namespace OVR::CAPI
 
+// I appreciate this is not an idea place for this function, but it didn't seem to be
+// being linked properly when in OVR_CAPI.cpp. 
+// Please relocate if you know of a better place
+ovrBool ovrHmd_CreateDistortionMeshInternal( ovrHmdStruct *  hmd,
+                                             ovrEyeType eyeType, ovrFovPort fov,
+                                             unsigned int distortionCaps,
+                                             ovrDistortionMesh *meshData,
+											 float overrideEyeReliefIfNonZero )
+{
+    if (!meshData)
+        return 0;
+    HMDState* hmds = (HMDState*)hmd;
+
+    // Not used now, but Chromatic flag or others could possibly be checked for in the future.
+    OVR_UNUSED1(distortionCaps); 
+   
+#if defined (OVR_OS_WIN32)
+    OVR_COMPILER_ASSERT(sizeof(DistortionMeshVertexData) == sizeof(ovrDistortionVertex));
+#endif
+	
+    // *** Calculate a part of "StereoParams" needed for mesh generation
+
+    // Note that mesh distortion generation is invariant of RenderTarget UVs, allowing
+    // render target size and location to be changed after the fact dynamically. 
+    // eyeToSourceUV is computed here for convenience, so that users don't need
+    // to call ovrHmd_GetRenderScaleAndOffset unless changing RT dynamically.
+
+    const HmdRenderInfo&  hmdri          = hmds->RenderState.RenderInfo;    
+    StereoEye             stereoEye      = (eyeType == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
+
+    DistortionRenderDesc& distortion = hmds->RenderState.Distortion[eyeType];
+	if (overrideEyeReliefIfNonZero)
+	{
+		distortion.Lens = GenerateLensConfigFromEyeRelief(overrideEyeReliefIfNonZero,hmdri);
+	}
+
+    // Find the mapping from TanAngle space to target NDC space.
+    ScaleAndOffset2D      eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
+
+    int triangleCount = 0;
+    int vertexCount = 0;
+
+    DistortionMeshCreate((DistortionMeshVertexData**)&meshData->pVertexData,
+                         (uint16_t**)&meshData->pIndexData,
+                          &vertexCount, &triangleCount,
+                          (stereoEye == StereoEye_Right),
+                          hmdri, distortion, eyeToSourceNDC);
+
+    if (meshData->pVertexData)
+    {
+        // Convert to index
+        meshData->IndexCount = triangleCount * 3;
+        meshData->VertexCount = vertexCount;
+        return 1;
+    }
+
+    return 0;
+}
+
+
+
+}} // namespace OVR::CAPI

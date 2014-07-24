@@ -38,6 +38,9 @@ limitations under the License.
 
 #include "../Render/Render_Device.h"
 
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #if (OVR_D3D_VERSION == 10)
@@ -312,7 +315,7 @@ public:
     virtual void WaitUntilGpuIdle();
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
-	virtual UPInt QueryGPUMemorySize();
+	virtual size_t QueryGPUMemorySize();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1,
                        float depth = 1,
@@ -345,10 +348,10 @@ public:
     }
 
     // Overrident to apply proper blend state.
-    virtual void FillRect(float left, float top, float right, float bottom, Color c);
-    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
-	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
-    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image);
+    virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view=NULL);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view);
+	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view=NULL);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255, const Matrix4f* view=NULL);
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
@@ -369,7 +372,7 @@ public:
     void SetTexture(Render::ShaderStage stage, int slot, const Texture* t);
 
     // GPU Profiling
-    virtual void BeginGpuEvent(const char* markerText, UInt32 markerColor);
+    virtual void BeginGpuEvent(const char* markerText, uint32_t markerColor);
     virtual void EndGpuEvent();
 };
 

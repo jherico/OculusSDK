@@ -27,6 +27,9 @@ limitations under the License.
 #include "../Render/Render_Device.h"
 
 #if defined(OVR_OS_WIN32)
+    #include <WinSock2.h>
+    #include <WS2tcpip.h>
+    #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
     #include <GL/gl.h>
     #include <GL/glext.h>

@@ -48,9 +48,9 @@ class   SysFile;
 struct FileStat
 {
     // No change or create time because they are not available on most systems
-    SInt64  ModifyTime;
-    SInt64  AccessTime;
-    SInt64  FileSize;
+    int64_t ModifyTime;
+    int64_t AccessTime;
+    int64_t FileSize;
 
     bool operator== (const FileStat& stat) const
     {

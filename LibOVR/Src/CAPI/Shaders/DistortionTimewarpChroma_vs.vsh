@@ -13,28 +13,31 @@ float2 TimewarpTexCoordToWarpedPos(float2 inTexCoord, float4x4 rotMat)
 	float2 flattened = transformed.xy / transformed.z;
 	// Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
 	return flattened * EyeToSourceUVScale + EyeToSourceUVOffset;
-	
 }
 
-void main(in float2 Position    : POSITION,    in float4 Color       : COLOR0,    in float2 TexCoord0 : TEXCOORD0,
-          in float2 TexCoord1   : TEXCOORD1,   in float2 TexCoord2   : TEXCOORD2,
-          out float4 oPosition  : SV_Position, out float4 oColor     : COLOR,     out float3 oTexCoord0 : TEXCOORD0,
-          out float3 oTexCoord1 : TEXCOORD1,   out float3 oTexCoord2 : TEXCOORD2)
+void main(in float2 Position    : POSITION,
+          in float4 Color       : COLOR0,
+          in float2 TexCoord0   : TEXCOORD0,
+          in float2 TexCoord1   : TEXCOORD1,
+          in float2 TexCoord2   : TEXCOORD2,
+          out float4 oPosition  : SV_Position,
+          out float1 oColor     : COLOR,
+          out float2 oTexCoord0 : TEXCOORD0,
+          out float2 oTexCoord1 : TEXCOORD1,
+          out float2 oTexCoord2 : TEXCOORD2)
 {
+    oPosition.x = Position.x;
+    oPosition.y = Position.y;
+    oPosition.z = 0.5;
+    oPosition.w = 1.0;
+     	    
+    float timewarpLerpFactor = Color.a;
+    float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);
 
-   oPosition.x = Position.x;
-   oPosition.y = Position.y;
-   oPosition.z = 0.5;
-   oPosition.w = 1.0;
-    	    
-   float timewarpLerpFactor = Color.a;
-   float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);	
-	//"	float4x4 lerpedEyeRot = EyeRotationStart;
+    // warped positions are a bit more involved, hence a separate function
+	oTexCoord0 = TimewarpTexCoordToWarpedPos(TexCoord0, lerpedEyeRot);
+	oTexCoord1 = TimewarpTexCoordToWarpedPos(TexCoord1, lerpedEyeRot);
+	oTexCoord2 = TimewarpTexCoordToWarpedPos(TexCoord2, lerpedEyeRot);
 
-		// warped positions are a bit more involved, hence a separate function
-	oTexCoord0 = float3(TimewarpTexCoordToWarpedPos(TexCoord0, lerpedEyeRot), 1);
-	oTexCoord1 = float3(TimewarpTexCoordToWarpedPos(TexCoord1, lerpedEyeRot), 1);
-	oTexCoord2 = float3(TimewarpTexCoordToWarpedPos(TexCoord2, lerpedEyeRot), 1);
-
-   oColor = Color.r;              // Used for vignette fade.
+    oColor = Color.r;              // Used for vignette fade.
 }

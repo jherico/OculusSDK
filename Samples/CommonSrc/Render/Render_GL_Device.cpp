@@ -306,6 +306,23 @@ static const char* AlphaTextureFragShaderSrc =
     "   gl_FragColor = oColor * vec4(1,1,1,texture2D(Texture0, oTexCoord).r);\n"
     "}\n";
 
+static const char* AlphaBlendedTextureFragShaderSrc =
+	"#version 110\n"
+
+	"uniform sampler2D Texture0;\n"
+
+	"varying vec4 oColor;\n"
+	"varying vec2 oTexCoord;\n"
+
+	"void main()\n"
+	"{\n"
+    "   vec4 finalColor = oColor;\n"
+    "   finalColor *= texture2D(Texture0, oTexCoord);\n"
+    // Blend state expects premultiplied alpha
+    "   finalColor.rgb *= finalColor.a;\n"
+	"   gl_FragColor = finalColor;\n"
+	"}\n";
+
 static const char* MultiTextureFragShaderSrc =
     "#version 110\n"
     
@@ -685,6 +702,7 @@ static const char* FShaderSrcs[FShader_Count] =
     GouraudFragShaderSrc,
     TextureFragShaderSrc,
     AlphaTextureFragShaderSrc,
+	AlphaBlendedTextureFragShaderSrc,
     PostProcessFragShaderWithChromAbSrc,
     LitSolidFragShaderSrc,
     LitTextureFragShaderSrc,
@@ -700,40 +718,44 @@ RenderDevice::RenderDevice(const RendererParams&)
 {
     int GlMajorVersion = 0;
     int GlMinorVersion = 0;
+    bool isES = false;
     
     const char* glVersionString = (const char*)glGetString(GL_VERSION);
-    char prefix[64];
-    bool foundVersion = false;
-    
-    for (int i = 10; i < 30; ++i)
+
+#ifdef OVR_CC_MSVC
+    // Hack: This is using sscanf_s on MSVC to kill the security warning.
+    // Normally the two functions are not interchangeable because the string format
+    // is different for %s types, however we only use %d so it's fine.
+#define _OVR_SSCANF sscanf_s
+#else
+#define _OVR_SSCANF sscanf
+#endif
+
+    isES = strstr( glVersionString, "OpenGL ES-CM" ) != NULL;
+    if( isES )
     {
-        int major = i / 10;
-        int minor = i % 10;
-        OVR_sprintf(prefix, 64, "%d.%d", major, minor);
-        if (strstr(glVersionString, prefix) == glVersionString)
-        {
-            GlMajorVersion = major;
-            GlMinorVersion = minor;
-            foundVersion = true;
-            break;
-        }
-    }
-    
-    if (!foundVersion)
-    {
-        glGetIntegerv(GL_MAJOR_VERSION, &GlMajorVersion);
-        glGetIntegerv(GL_MAJOR_VERSION, &GlMinorVersion);
-    }
-    
-    if (GlMajorVersion >= 3)
-    {
-        SupportsVao = true;
+        _OVR_SSCANF(glVersionString, "OpenGL ES-CM %d.%d", &GlMajorVersion, &GlMinorVersion);
     }
     else
     {
-        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-        SupportsVao = (strstr("GL_ARB_vertex_array_object", extensions) != NULL);
+        isES = strstr( glVersionString, "OpenGL ES " ) != NULL;
+        if ( isES )
+        {
+            _OVR_SSCANF(glVersionString, "OpenGL ES %d.%d", &GlMajorVersion, &GlMinorVersion);
+        }
+        else
+        {
+            _OVR_SSCANF(glVersionString, "%d.%d", &GlMajorVersion, &GlMinorVersion);
+        }
     }
+
+#undef _OVR_SSCANF
+
+    OVR_ASSERT( isES == false );
+	OVR_ASSERT(GlMajorVersion >= 2);
+
+    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+    SupportsVao         = (GlMajorVersion >= 3) || (strstr("GL_ARB_vertex_array_object", extensions) != NULL);
     
     for (int i = 0; i < VShader_Count; i++)
     {
@@ -806,7 +828,6 @@ Shader *RenderDevice::LoadBuiltinShader(ShaderStage stage, int shader)
 
 void RenderDevice::BeginRendering()
 {
-	//glEnable(GL_FRAMEBUFFER_SRGB);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CW);
@@ -1339,7 +1360,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     {
     case Texture_RGBA:  glformat = GL_RGBA; break;
     case Texture_R:     glformat = GL_RED; break;
-    case Texture_Depth: glformat = GL_DEPTH_COMPONENT32F; gltype = GL_FLOAT; break;
+	case Texture_Depth: glformat = GL_DEPTH_COMPONENT; gltype = GL_FLOAT; break;
     case Texture_DXT1:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
     case Texture_DXT3:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
     case Texture_DXT5:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
@@ -1348,7 +1369,14 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     }
     Texture* NewTex = new Texture(this, width, height);
     glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
-    OVR_ASSERT(!glGetError());
+	GLint err = glGetError();
+
+    OVR_ASSERT(!err);
+
+	if( err )
+	{
+		printf("%d\n", err);
+	}
     
     if (format & Texture_Compressed)
     {
@@ -1366,10 +1394,14 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             if (h < 1) h = 1;
         }
     }
-    else if (format & Texture_Depth)
-        glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, GL_DEPTH_COMPONENT, gltype, data);
-    else
-        glTexImage2D(GL_TEXTURE_2D, 0, glformat, width, height, 0, glformat, gltype, data);
+	else
+	{
+		bool isSRGB = ((format & Texture_TypeMask) == Texture_RGBA && (format & Texture_SRGB) != 0);
+		bool isDepth = ((format & Texture_Depth) != 0);
+		GLenum internalFormat = (isSRGB) ? GL_SRGB_ALPHA : (isDepth) ? GL_DEPTH_COMPONENT32F : glformat;
+
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, glformat, gltype, data);
+	}
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -1380,15 +1412,15 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     {
         int srcw = width, srch = height;
         int level = 0;
-        UByte* mipmaps = NULL;
+        uint8_t* mipmaps = NULL;
         do
         {
             level++;
             int mipw = srcw >> 1; if (mipw < 1) mipw = 1;
             int miph = srch >> 1; if (miph < 1) miph = 1;
             if (mipmaps == NULL)
-                mipmaps = (UByte*)OVR_ALLOC(mipw * miph * 4);
-            FilterRgba2x2(level == 1 ? (const UByte*)data : mipmaps, srcw, srch, mipmaps);
+                mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
+            FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
             glTexImage2D(GL_TEXTURE_2D, level, glformat, mipw, miph, 0, glformat, gltype, mipmaps);
             srcw = mipw;
             srch = miph;

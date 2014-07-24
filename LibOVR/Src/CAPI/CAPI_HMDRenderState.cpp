@@ -32,58 +32,55 @@ namespace OVR { namespace CAPI {
 //-------------------------------------------------------------------------------------
 // ***** HMDRenderState
 
-
-HMDRenderState::HMDRenderState(ovrHmd hmd, Profile* userProfile, const OVR::HMDInfo& hmdInfo)
-    : HMD(hmd), HMDInfo(hmdInfo)
-{
-	RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
-
-    Distortion[0] = CalculateDistortionRenderDesc(StereoEye_Left,  RenderInfo, 0);
-    Distortion[1] = CalculateDistortionRenderDesc(StereoEye_Right, RenderInfo, 0);
-
-    ClearColor[0] = ClearColor[1] = ClearColor[2] = ClearColor[3] =0.0f;
-
-    EnabledHmdCaps = 0;
-}
-
-HMDRenderState::~HMDRenderState()
-{
-}
-
-ovrHmdDesc HMDRenderState::GetDesc()
+ovrHmdDesc HMDRenderState::GetDesc() const
 {
     ovrHmdDesc d;
     memset(&d, 0, sizeof(d));
     
     d.Type = ovrHmd_Other;
      
-    d.ProductName       = HMDInfo.ProductName;    
-    d.Manufacturer      = HMDInfo.Manufacturer;
-    d.Resolution.w      = HMDInfo.ResolutionInPixels.w;
-    d.Resolution.h      = HMDInfo.ResolutionInPixels.h;
-    d.WindowsPos.x      = HMDInfo.DesktopX;
-    d.WindowsPos.y      = HMDInfo.DesktopY;
-    d.DisplayDeviceName = HMDInfo.DisplayDeviceName;
-    d.DisplayId         = HMDInfo.DisplayId;
+    d.ProductName       = OurHMDInfo.ProductName;    
+    d.Manufacturer      = OurHMDInfo.Manufacturer;
+    d.Resolution.w      = OurHMDInfo.ResolutionInPixels.w;
+    d.Resolution.h      = OurHMDInfo.ResolutionInPixels.h;
+    d.WindowsPos.x      = OurHMDInfo.DesktopX;
+    d.WindowsPos.y      = OurHMDInfo.DesktopY;
+    d.DisplayDeviceName = OurHMDInfo.DisplayDeviceName;
+    d.DisplayId         = OurHMDInfo.DisplayId;
+    d.VendorId          = (short)OurHMDInfo.VendorId;
+    d.ProductId         = (short)OurHMDInfo.ProductId;
+    d.FirmwareMajor     = (short)OurHMDInfo.FirmwareMajor;
+    d.FirmwareMinor     = (short)OurHMDInfo.FirmwareMinor;
+    d.CameraFrustumFarZInMeters  = OurHMDInfo.CameraFrustumFarZInMeters;
+    d.CameraFrustumHFovInRadians = OurHMDInfo.CameraFrustumHFovInRadians;
+    d.CameraFrustumNearZInMeters = OurHMDInfo.CameraFrustumNearZInMeters;
+    d.CameraFrustumVFovInRadians = OurHMDInfo.CameraFrustumVFovInRadians;
+
+    OVR_strcpy(d.SerialNumber, sizeof(d.SerialNumber), OurHMDInfo.PrintedSerial.ToCStr());
 
     d.HmdCaps           = ovrHmdCap_Present | ovrHmdCap_NoVSync;
-    d.SensorCaps        = ovrSensorCap_YawCorrection | ovrSensorCap_Orientation;
-    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
+    d.TrackingCaps      = ovrTrackingCap_MagYawCorrection | ovrTrackingCap_Orientation;
+    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp |
+                          ovrDistortionCap_Vignette | ovrDistortionCap_SRGB |
+                          ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits;
 
-    if (strstr(HMDInfo.ProductName, "DK1"))
+    if( OurHMDInfo.InCompatibilityMode )
+        d.HmdCaps |= ovrHmdCap_ExtendDesktop;
+
+    if (strstr(OurHMDInfo.ProductName, "DK1"))
     {
         d.Type = ovrHmd_DK1;        
     }
-    else if (strstr(HMDInfo.ProductName, "DK2"))
+    else if (strstr(OurHMDInfo.ProductName, "DK2"))
     {
         d.Type        = ovrHmd_DK2;
-        d.HmdCaps    |= ovrHmdCap_LowPersistence |
-                        ovrHmdCap_LatencyTest | ovrHmdCap_DynamicPrediction;
-        d.SensorCaps |= ovrSensorCap_Position;
+        d.HmdCaps    |= ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction;
+        d.TrackingCaps |= ovrTrackingCap_Position;
+		d.DistortionCaps |= ovrDistortionCap_Overdrive;
     }
         
-    DistortionRenderDesc& leftDistortion  = Distortion[0];
-    DistortionRenderDesc& rightDistortion = Distortion[1];
+    const DistortionRenderDesc& leftDistortion  = Distortion[0];
+    const DistortionRenderDesc& rightDistortion = Distortion[1];
   
     // The suggested FOV (assuming eye rotation)
     d.DefaultEyeFov[0] = CalculateFovFromHmdInfo(StereoEye_Left, leftDistortion, RenderInfo, OVR_DEFAULT_EXTRA_EYE_ROTATION);
@@ -92,8 +89,8 @@ ovrHmdDesc HMDRenderState::GetDesc()
     // FOV extended across the entire screen
     d.MaxEyeFov[0] = GetPhysicalScreenFov(StereoEye_Left, leftDistortion);
     d.MaxEyeFov[1] = GetPhysicalScreenFov(StereoEye_Right, rightDistortion);
-
-    if (HMDInfo.Shutter.Type == HmdShutter_RollingRightToLeft)
+    
+    if (OurHMDInfo.Shutter.Type == HmdShutter_RollingRightToLeft)
     {
         d.EyeRenderOrder[0] = ovrEye_Right;
         d.EyeRenderOrder[1] = ovrEye_Left;
@@ -104,20 +101,26 @@ ovrHmdDesc HMDRenderState::GetDesc()
         d.EyeRenderOrder[1] = ovrEye_Right;
     }    
 
+    // MA: Taking this out on purpose.
+	// Important information for those that are required to do their own timing,
+    // because of shortfalls in timing code.
+	//d.VsyncToNextVsync = OurHMDInfo.Shutter.VsyncToNextVsync;
+	//d.PixelPersistence = OurHMDInfo.Shutter.PixelPersistence;
+
     return d;
 }
 
 
-ovrSizei HMDRenderState::GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel)
+ovrSizei HMDRenderState::GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel) const
 {
     OVR_ASSERT((unsigned)eye < 2);
     StereoEye seye = (eye == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
     return CalculateIdealPixelSize(seye, Distortion[eye], fov, pixelsPerDisplayPixel);
 }
 
-ovrEyeRenderDesc HMDRenderState::calcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov)
+ovrEyeRenderDesc HMDRenderState::CalcRenderDesc(ovrEyeType eyeType, const ovrFovPort& fov) const
 {    
-    HmdRenderInfo&   hmdri = RenderInfo;
+    const HmdRenderInfo&   hmdri = RenderInfo;
     StereoEye        eye   = (eyeType == ovrEye_Left) ? StereoEye_Left : StereoEye_Right;
     ovrEyeRenderDesc e0;
     
@@ -129,15 +132,6 @@ ovrEyeRenderDesc HMDRenderState::calcRenderDesc(ovrEyeType eyeType, const ovrFov
 
     return e0;
 }
-
-
-void HMDRenderState::setupRenderDesc( ovrEyeRenderDesc eyeRenderDescOut[2],
-                                      const ovrFovPort eyeFovIn[2] )
-{
-    eyeRenderDescOut[0] = EyeRenderDesc[0] = calcRenderDesc(ovrEye_Left,  eyeFovIn[0]);
-    eyeRenderDescOut[1] = EyeRenderDesc[1] = calcRenderDesc(ovrEye_Right, eyeFovIn[1]);   
-}
-
 
 }} // namespace OVR::CAPI
 

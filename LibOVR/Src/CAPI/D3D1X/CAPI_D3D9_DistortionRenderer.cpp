@@ -70,7 +70,7 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 	screenSize     = config->D3D9.Header.RTSize;
 	distortionCaps = arg_distortionCaps;
 
-	GfxState = *new GraphicsState(device);
+	GfxState = *new GraphicsState(device, distortionCaps);
 
 	CreateVertexDeclaration();
 	CreateDistortionShaders();
@@ -81,7 +81,7 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
 
 
 /**************************************************************/
-void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
+void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
 {
 	//Doesn't do a lot in here??
 	const ovrD3D9Texture* tex = (const ovrD3D9Texture*)eyeTexture;
@@ -99,51 +99,70 @@ void DistortionRenderer::SubmitEye(int eyeId, ovrTexture* eyeTexture)
     ovrHmd_GetRenderScaleAndOffset( erd.Fov,
                                     eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
                                     eachEye[eyeId].UVScaleOffset );
+
+	if (RState.DistortionCaps & ovrDistortionCap_FlipInput)
+	{
+		eachEye[eyeId].UVScaleOffset[0].y = -eachEye[eyeId].UVScaleOffset[0].y;
+		eachEye[eyeId].UVScaleOffset[1].y = 1.0f - eachEye[eyeId].UVScaleOffset[1].y;
+	}
 }
 
+void DistortionRenderer::renderEndFrame()
+{
+    RenderBothDistortionMeshes();
+
+    if(RegisteredPostDistortionCallback)
+        RegisteredPostDistortionCallback(device);
+
+    if(LatencyTest2Active)
+    {
+        // TODO:
+        //renderLatencyPixel(LatencyTest2DrawColor);
+    }
+}
 
 /******************************************************************/
-void DistortionRenderer::EndFrame(bool swapBuffers,
-                                  unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor)
+void DistortionRenderer::EndFrame(bool swapBuffers)
 {
-	OVR_UNUSED(swapBuffers);
-	OVR_UNUSED(latencyTesterDrawColor);
+	///QUESTION : Clear the screen? 
+	///QUESTION : Ensure the screen is the render target
 
-	///QUESTION : Should I be clearing the screen? 
-	///QUESTION : Should I be ensuring the screen is the render target
-
-	if (!TimeManager.NeedDistortionTimeMeasurement())
+    // Don't spin if we are explicitly asked not to
+    if (RState.DistortionCaps & ovrDistortionCap_TimeWarp &&
+        !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
     {
-		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
-		{
-			// Wait for timewarp distortion if it is time and Gpu idle
-			WaitTillTimeAndFlushGpu(TimeManager.GetFrameTiming().TimewarpPointTime);
-		}
+        if (!TimeManager.NeedDistortionTimeMeasurement())
+        {
+            // Wait for timewarp distortion if it is time and Gpu idle
+            FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
 
-        RenderBothDistortionMeshes();
+            renderEndFrame();
+        }
+        else
+        {
+            // If needed, measure distortion time so that TimeManager can better estimate
+            // latency-reducing time-warp wait timing.
+            WaitUntilGpuIdle();
+            double  distortionStartTime = ovr_GetTimeInSeconds();
+
+            renderEndFrame();
+
+            WaitUntilGpuIdle();
+            TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+        }
     }
     else
     {
-        // If needed, measure distortion time so that TimeManager can better estimate
-        // latency-reducing time-warp wait timing.
-        WaitUntilGpuIdle();
-        double  distortionStartTime = ovr_GetTimeInSeconds();
-
-        RenderBothDistortionMeshes();
-        WaitUntilGpuIdle();
-
-        TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+        renderEndFrame();
     }
 
-    if(latencyTesterDrawColor)
+    if(RegisteredPostDistortionCallback)
+        RegisteredPostDistortionCallback(device);
+
+    if(LatencyTestDrawColor)
     {
-		///QUESTION : Is this still to be supported?
+		// TODO: Support latency tester quad
         ///renderLatencyQuad(latencyTesterDrawColor);
-    }
-
-    if(latencyTester2DrawColor)
-    {
-        // TODO:
     }
 
     if (swapBuffers)
@@ -159,7 +178,10 @@ void DistortionRenderer::EndFrame(bool swapBuffers,
 
         // Force GPU to flush the scene, resulting in the lowest possible latency.
         // It's critical that this flush is *after* present.
-        WaitUntilGpuIdle();
+        // Doesn't need to be done if running through the Oculus driver.
+        if (RState.OurHMDInfo.InCompatibilityMode &&
+            !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+            WaitUntilGpuIdle();
     }
 }
 
@@ -174,38 +196,29 @@ void DistortionRenderer::WaitUntilGpuIdle()
          if(pEventQuery!=NULL)
          {
             pEventQuery->Issue(D3DISSUE_END) ;
-            while(S_FALSE == pEventQuery->GetData(NULL, 0, D3DGETDATA_FLUSH)) ;
+            while(S_FALSE == pEventQuery->GetData(NULL, 0, D3DGETDATA_FLUSH)){}
+            pEventQuery->Release();
          }
      }
 }
 
-double DistortionRenderer::WaitTillTimeAndFlushGpu(double absTime)
+double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
 {
-	double       initialTime = ovr_GetTimeInSeconds();
+	double initialTime = ovr_GetTimeInSeconds();
 	if (initialTime >= absTime)
 		return 0.0;
 
 	WaitUntilGpuIdle();
 
-	double newTime   = initialTime;
-	volatile int i;
-
-	while (newTime < absTime)
-	{
-		for (int j = 0; j < 50; j++)
-			i = 0;
-		newTime = ovr_GetTimeInSeconds();
-	}
-
-	// How long we waited
-	return newTime - initialTime;
+    return WaitTillTime(absTime);
 }
 
 
 
-DistortionRenderer::GraphicsState::GraphicsState(IDirect3DDevice9* d)
+DistortionRenderer::GraphicsState::GraphicsState(IDirect3DDevice9* d, unsigned arg_distortionCaps)
 : device(d)
 , numSavedStates(0)
+, distortionCaps(arg_distortionCaps)
 {
 }
 
@@ -238,6 +251,7 @@ void DistortionRenderer::GraphicsState::Save()
     RecordAndSetState(0, D3DSAMP_BORDERCOLOR,        0x000000 );
     RecordAndSetState(0, D3DSAMP_ADDRESSU,           D3DTADDRESS_BORDER );
     RecordAndSetState(0, D3DSAMP_ADDRESSV,           D3DTADDRESS_BORDER );
+    RecordAndSetState(0, D3DSAMP_SRGBTEXTURE,        (distortionCaps & ovrDistortionCap_SRGB) ? TRUE : FALSE );
 
 	RecordAndSetState(1, D3DRS_MULTISAMPLEANTIALIAS, FALSE );
 	RecordAndSetState(1, D3DRS_DITHERENABLE,         FALSE );
@@ -254,6 +268,7 @@ void DistortionRenderer::GraphicsState::Save()
  	RecordAndSetState(1, D3DRS_DEPTHBIAS ,           0 );
     RecordAndSetState(1, D3DRS_LIGHTING,             FALSE );
    	RecordAndSetState(1, D3DRS_FOGENABLE,            FALSE );
+    RecordAndSetState(1, D3DRS_SRGBWRITEENABLE,      (distortionCaps & ovrDistortionCap_SRGB) ? TRUE : FALSE );
 }
 
 

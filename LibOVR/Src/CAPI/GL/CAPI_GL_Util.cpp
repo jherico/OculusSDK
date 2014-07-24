@@ -36,6 +36,7 @@ namespace OVR { namespace CAPI { namespace GL {
 
 PFNWGLGETPROCADDRESS                     wglGetProcAddress;
 
+PFNGLGETERRORPROC                        glGetError;
 PFNGLENABLEPROC                          glEnable;
 PFNGLDISABLEPROC                         glDisable;
 PFNGLGETFLOATVPROC                       glGetFloatv;
@@ -54,6 +55,9 @@ PFNGLDRAWARRAYSPROC                      glDrawArrays;
 PFNGLGENTEXTURESPROC                     glGenTextures;
 PFNGLDELETETEXTURESPROC                  glDeleteTextures;
 PFNGLBINDTEXTUREPROC                     glBindTexture;
+PFNGLTEXIMAGE2DPROC                      glTexImage2D;
+PFNGLBLENDFUNCPROC                       glBlendFunc;
+PFNGLFRONTFACEPROC                       glFrontFace;
 
 PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
 PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
@@ -64,7 +68,16 @@ PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
 
 #endif
 
+PFNGLENABLEIPROC                         glEnablei;
+PFNGLDISABLEIPROC                        glDisablei;
+PFNGLCOLORMASKIPROC                      glColorMaski;
+PFNGLGETINTEGERI_VPROC                   glGetIntegeri_v;
+PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
+PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 PFNGLDELETESHADERPROC                    glDeleteShader;
+PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
+PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
+PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
 PFNGLBINDFRAMEBUFFERPROC                 glBindFramebuffer;
 PFNGLACTIVETEXTUREPROC                   glActiveTexture;
 PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
@@ -131,6 +144,7 @@ void InitGLExtensions()
 	if (!hInst)
 		return;
 
+	glGetError =                        (PFNGLGETERRORPROC)                        GetProcAddress(hInst, "glGetError");
 	glGetFloatv =                       (PFNGLGETFLOATVPROC)                       GetProcAddress(hInst, "glGetFloatv");
 	glGetIntegerv =                     (PFNGLGETINTEGERVPROC)                     GetProcAddress(hInst, "glGetIntegerv");
 	glGetString =                       (PFNGLGETSTRINGPROC)                       GetProcAddress(hInst, "glGetString");
@@ -145,19 +159,32 @@ void InitGLExtensions()
 	glFinish =                          (PFNGLFINISHPROC)                          GetProcAddress(hInst, "glFinish");
     glDrawArrays =                      (PFNGLDRAWARRAYSPROC)                      GetProcAddress(hInst, "glDrawArrays");
 	glDrawElements =                    (PFNGLDRAWELEMENTSPROC)                    GetProcAddress(hInst, "glDrawElements");
-    glGenTextures =                     (PFNGLGENTEXTURESPROC)                     GetProcAddress(hInst,"glGenTextures");
-    glDeleteTextures =                  (PFNGLDELETETEXTURESPROC)                  GetProcAddress(hInst,"glDeleteTextures");
-    glBindTexture =                     (PFNGLBINDTEXTUREPROC)                     GetProcAddress(hInst,"glBindTexture");
+    glGenTextures =                     (PFNGLGENTEXTURESPROC)                     GetProcAddress(hInst, "glGenTextures");
+    glDeleteTextures =                  (PFNGLDELETETEXTURESPROC)                  GetProcAddress(hInst, "glDeleteTextures");
+    glBindTexture =                     (PFNGLBINDTEXTUREPROC)                     GetProcAddress(hInst, "glBindTexture");
+    glTexImage2D =                      (PFNGLTEXIMAGE2DPROC)                      GetProcAddress(hInst, "glTexImage2D");
 	glTexParameteri =                   (PFNGLTEXPARAMETERIPROC)                   GetProcAddress(hInst, "glTexParameteri");
+	glBlendFunc =                       (PFNGLBLENDFUNCPROC)                       GetProcAddress(hInst, "glBlendFunc");
+	glFrontFace =                       (PFNGLFRONTFACEPROC)                       GetProcAddress(hInst, "glFrontFace");
 
     wglGetProcAddress =                 (PFNWGLGETPROCADDRESS)                     GetProcAddress(hInst, "wglGetProcAddress");
 
     wglGetSwapIntervalEXT =             (PFNWGLGETSWAPINTERVALEXTPROC)             GetFunction("wglGetSwapIntervalEXT");
     wglSwapIntervalEXT =                (PFNWGLSWAPINTERVALEXTPROC)                GetFunction("wglSwapIntervalEXT");
 #elif defined(OVR_OS_LINUX)
+
     glXSwapIntervalEXT =                (PFNGLXSWAPINTERVALEXTPROC)                GetFunction("glXSwapIntervalEXT");
 #endif
-
+    
+    glGenFramebuffers =                 (PFNGLGENFRAMEBUFFERSPROC)                 GetFunction("glGenFramebuffersEXT");
+    glDeleteFramebuffers =              (PFNGLDELETEFRAMEBUFFERSPROC)              GetFunction("glDeleteFramebuffersEXT");
+	glEnablei =                         (PFNGLENABLEIPROC)                         GetFunction("glEnableIndexedEXT");
+	glDisablei =                        (PFNGLDISABLEIPROC)                        GetFunction("glDisableIndexedEXT");
+	glColorMaski =                      (PFNGLCOLORMASKIPROC)                      GetFunction("glColorMaskIndexedEXT");
+	glGetIntegeri_v =                   (PFNGLGETINTEGERI_VPROC)                   GetFunction("glGetIntegerIndexedvEXT");
+    glCheckFramebufferStatus =          (PFNGLCHECKFRAMEBUFFERSTATUSPROC)          GetFunction("glCheckFramebufferStatusEXT");
+    glFramebufferRenderbuffer =         (PFNGLFRAMEBUFFERRENDERBUFFERPROC)         GetFunction("glFramebufferRenderbufferEXT");
+    glFramebufferTexture2D =            (PFNGLFRAMEBUFFERTEXTURE2DPROC)            GetFunction("glFramebufferTexture2DEXT");
     glBindFramebuffer =                 (PFNGLBINDFRAMEBUFFERPROC)                 GetFunction("glBindFramebufferEXT");
     glGenVertexArrays =                 (PFNGLGENVERTEXARRAYSPROC)                 GetFunction("glGenVertexArrays");
     glDeleteVertexArrays =              (PFNGLDELETEVERTEXARRAYSPROC)              GetFunction("glDeleteVertexArrays");
@@ -490,7 +517,7 @@ void Texture::SetSampleMode(int sm)
         break;
 
     case Sample_Nearest:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
@@ -527,4 +554,7 @@ void Texture::UpdatePlaceholderTexture(GLuint texId, const Sizei& textureSize)
 	IsUserAllocated = true;
 }
 
+
 }}}
+
+

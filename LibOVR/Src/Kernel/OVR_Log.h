@@ -103,8 +103,13 @@ enum LogMessageType
 class Log
 {
     friend class System;
+
+#ifdef OVR_OS_WIN32
+    void* hEventSource;
+#endif
+
 public: 
-    Log(unsigned logMask = LogMask_Debug) : LoggingMask(logMask) { }
+    Log(unsigned logMask = LogMask_Debug);
     virtual ~Log();
 
     // Log formating buffer size used by default LogMessageVarg. Longer strings are truncated.
@@ -131,7 +136,7 @@ public:
     // Default log output implementation used by by LogMessageVarg.
     // Debug flag may be used to re-direct output on some platforms, but doesn't
     // necessarily disable it in release builds; that is the job of the called.    
-    static void     DefaultLogOutput(const char* textBuffer, bool debug);
+    void            DefaultLogOutput(const char* textBuffer, LogMessageType messageType);
 
     // Determines if the specified message type is for debugging only.
     static bool     IsDebugMessage(LogMessageType messageType)
@@ -184,7 +189,7 @@ void LogError(const char* fmt, ...) OVR_LOG_VAARG_ATTRIBUTE(1,2);
 
     // Macro to do debug logging, printf-style.
     // An extra set of set of parenthesis must be used around arguments,
-    // as in: OVR_LOG_DEBUG(("Value %d", 2)).
+    // as in: OVR_DEBUG_LOG(("Value %d", 2)).
     #define OVR_DEBUG_LOG(args)       do { OVR::LogDebug args; } while(0)
     #define OVR_DEBUG_LOG_TEXT(args)  do { OVR::LogDebugText args; } while(0)
 

@@ -116,6 +116,7 @@ bool Buffer::Data(int use, const void *buffer, size_t size)
     sr.SysMemPitch = 0;
     sr.SysMemSlicePitch = 0;
 
+    D3DBuffer = NULL;
     HRESULT hr = pParams->pDevice->CreateBuffer(&desc, buffer ? &sr : NULL, &D3DBuffer.GetRawRef());
     if (SUCCEEDED(hr))
     {

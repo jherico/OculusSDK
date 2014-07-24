@@ -503,7 +503,7 @@ class Model : public Node
 {
 public:
     Array<Vertex>     Vertices;
-    Array<UInt16>     Indices;
+    Array<uint16_t>   Indices;
     PrimitiveType     Type;
     Ptr<ShaderFill>   Fill;
     bool              Visible;	
@@ -528,20 +528,20 @@ public:
 
 
     // Returns the index next added vertex will have.
-    UInt16 GetNextVertexIndex() const
+    uint16_t GetNextVertexIndex() const
     {
-        return (UInt16)Vertices.GetSize();
+        return (uint16_t)Vertices.GetSize();
     }
 
-    UInt16 AddVertex(const Vertex& v)
+    uint16_t AddVertex(const Vertex& v)
     {
         OVR_ASSERT(!VertexBuffer && !IndexBuffer);
-        UInt16 index = (UInt16)Vertices.GetSize();
+        uint16_t index = (uint16_t)Vertices.GetSize();
         Vertices.PushBack(v);
         return index;
     }
 
-    void AddTriangle(UInt16 a, UInt16 b, UInt16 c)
+    void AddTriangle(uint16_t a, uint16_t b, uint16_t c)
     {
         Indices.PushBack(a);
         Indices.PushBack(b);
@@ -550,8 +550,8 @@ public:
 
     // Uses texture coordinates for uniform world scaling (must use a repeat sampler).
     void  AddSolidColorBox(float x1, float y1, float z1,
-        float x2, float y2, float z2,
-        Color c);
+                           float x2, float y2, float z2,
+                           Color c);
 };
 
 
@@ -619,15 +619,18 @@ enum DisplayMode
 // Rendering parameters used by RenderDevice::CreateDevice.
 struct RendererParams
 {
-    int  Multisample;
-    int  Fullscreen;
+    int     Multisample;
+    int     Fullscreen;
+    // Resolution of the rendering buffer used during creation.
+    // Allows buffer of different size then the widow if not zero.
+    Sizei   Resolution;
 
     // Windows - Monitor name for fullscreen mode.
-    String MonitorName;
+    String  MonitorName;
     // MacOS
-    long   DisplayId;
+    long    DisplayId;
 
-    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
+    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0), Resolution(0) {}
 
     bool IsDisplaySet() const
     {
@@ -642,7 +645,6 @@ class RenderDevice : public RefCountBase<RenderDevice>
 protected:
     int             WindowWidth, WindowHeight;
     RendererParams  Params;
-    Recti           VP;
 
     Matrix4f        Proj;
     Ptr<Buffer>     pTextVertexBuffer;
@@ -790,8 +792,8 @@ public:
 
     // This is a View matrix only, it will be combined with the projection matrix from SetProjection
     virtual void Render(const Matrix4f& view, Model* model);
-    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices);
-    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,
+    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,int stride);
+    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,int stride,
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool updateUniformData = true);
 
     virtual ShaderFill *CreateSimpleFill() { return DefaultFill; }
@@ -811,7 +813,7 @@ int GetNumMipLevels(int w, int h);
 
 // Filter an rgba image with a 2x2 box filter, for mipmaps.
 // Image size must be a power of 2.
-void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest);
+void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest);
 
 }}
 

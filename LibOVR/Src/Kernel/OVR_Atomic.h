@@ -1,6 +1,6 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Atomic.h
 Content     :   Contains atomic operations and inline fastest locking
                 functionality. Will contain #ifdefs for OS efficiency.
@@ -26,6 +26,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ************************************************************************************/
+
 #ifndef OVR_Atomic_h
 #define OVR_Atomic_h
 
@@ -33,7 +34,10 @@ limitations under the License.
 
 // Include System thread functionality.
 #if defined(OVR_OS_WIN32)
-#include <windows.h>
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
 #else
 #include <pthread.h>
 #endif
@@ -50,7 +54,7 @@ template<class C> class AtomicOps;
 template<class T> class AtomicInt;
 template<class T> class AtomicPtr;
 
-class   Lock;
+class Lock;
 
 
 //-----------------------------------------------------------------------------------
@@ -130,11 +134,11 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 #if !defined(OVR_ENABLE_THREADS)
 
     // Provide a type for no-thread-support cases. Used by AtomicOpsRaw_DefImpl.
-    typedef UInt32 T;   
+    typedef uint32_t T;   
 
     // *** Thread - Safe Atomic Versions.
 
-#elif defined(OVR_OS_WIN32)
+#elif defined(OVR_OS_WIN32)  
 
     // Use special defined for VC6, where volatile is not used and
     // InterlockedCompareExchange is declared incorrectly.
@@ -153,10 +157,10 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
     inline static bool  CompareAndSet_NoSync(volatile T* p, T c, T val)  { return InterlockedCompareExchange((InterlockETPtr)p, (ET)val, (ET)c) == (ET)c; }
 
 #elif defined(OVR_CPU_PPC64) || defined(OVR_CPU_PPC)
-    typedef UInt32 T;
-    static inline UInt32   Exchange_NoSync(volatile UInt32 *i, UInt32 j)
+    typedef uint32_t T;
+    static inline uint32_t Exchange_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 ret;
+        uint32_t ret;
 
         asm volatile("1:\n\t"
                      "lwarx  %[r],0,%[i]\n\t"
@@ -167,9 +171,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline UInt32   ExchangeAdd_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t ExchangeAdd_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 dummy, ret;
+        uint32_t dummy, ret;
 
         asm volatile("1:\n\t"
                      "lwarx  %[r],0,%[i]\n\t"
@@ -181,9 +185,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt32 *i, UInt32 c, UInt32 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint32_t *i, uint32_t c, uint32_t value)
     {
-        UInt32 ret;
+        uint32_t ret;
 
         asm volatile("1:\n\t"
                      "lwarx  %[r],0,%[i]\n\t"
@@ -199,11 +203,11 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
     }
 
 #elif defined(OVR_CPU_MIPS)
-    typedef UInt32 T;
+    typedef uint32_t T;
 
-    static inline UInt32   Exchange_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t Exchange_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 ret;
+        uint32_t ret;
 
         asm volatile("1:\n\t"
                      "ll     %[r],0(%[i])\n\t"
@@ -215,9 +219,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline UInt32   ExchangeAdd_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t ExchangeAdd_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 ret;
+        uint32_t ret;
 
         asm volatile("1:\n\t"
                      "ll     %[r],0(%[i])\n\t"
@@ -230,9 +234,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt32 *i, UInt32 c, UInt32 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint32_t *i, uint32_t c, uint32_t value)
     {
-        UInt32 ret, dummy;
+        uint32_t ret, dummy;
 
         asm volatile("1:\n\t"
                      "move   %[r],$0\n\t"
@@ -250,9 +254,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
     }
 
 #elif defined(OVR_CPU_ARM) && defined(OVR_CC_ARM)
-    typedef UInt32 T;
+    typedef uint32_t T;
 
-    static inline UInt32   Exchange_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t Exchange_NoSync(volatile uint32_t *i, uint32_t j)
     {
         for(;;)
         {
@@ -261,7 +265,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
                 return r;
         }
     }
-    static inline UInt32   ExchangeAdd_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t ExchangeAdd_NoSync(volatile uint32_t *i, uint32_t j)
     {
         for(;;)
         {
@@ -271,7 +275,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         }
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt32 *i, UInt32 c, UInt32 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint32_t *i, uint32_t c, uint32_t value)
     {
         for(;;)
         {
@@ -284,11 +288,11 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
     }
 
 #elif defined(OVR_CPU_ARM)
-    typedef UInt32 T;
+    typedef uint32_t T;
 
-    static inline UInt32   Exchange_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t Exchange_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 ret, dummy;
+        uint32_t ret, dummy;
 
         asm volatile("1:\n\t"
             "ldrex  %[r],[%[i]]\n\t"
@@ -300,9 +304,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline UInt32   ExchangeAdd_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t ExchangeAdd_NoSync(volatile uint32_t *i, uint32_t j)
     {
-        UInt32 ret, dummy, test;
+        uint32_t ret, dummy, test;
 
         asm volatile("1:\n\t"
             "ldrex  %[r],[%[i]]\n\t"
@@ -315,9 +319,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt32 *i, UInt32 c, UInt32 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint32_t *i, uint32_t c, uint32_t value)
     {
-        UInt32 ret = 1, dummy, test;
+        uint32_t ret = 1, dummy, test;
 
         asm volatile("1:\n\t"
             "ldrex  %[o],[%[i]]\n\t"
@@ -334,9 +338,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
     }
 
 #elif defined(OVR_CPU_X86)
-    typedef UInt32 T;
+    typedef uint32_t T;
 
-    static inline UInt32   Exchange_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t Exchange_NoSync(volatile uint32_t *i, uint32_t j)
     {
         asm volatile("xchgl %1,%[i]\n"
                      : "+m" (*i), "=q" (j) : [i] "m" (*i), "1" (j) : "cc", "memory");
@@ -344,7 +348,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return j;
     }
 
-    static inline UInt32   ExchangeAdd_NoSync(volatile UInt32 *i, UInt32 j)
+    static inline uint32_t ExchangeAdd_NoSync(volatile uint32_t *i, uint32_t j)
     {
         asm volatile("lock; xaddl %1,%[i]\n"
                      : "+m" (*i), "+q" (j) : [i] "m" (*i) : "cc", "memory");
@@ -352,9 +356,9 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
         return j;
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt32 *i, UInt32 c, UInt32 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint32_t *i, uint32_t c, uint32_t value)
     {
-        UInt32 ret;
+        uint32_t ret;
 
         asm volatile("lock; cmpxchgl %[v],%[i]\n"
                      : "+m" (*i), "=a" (ret) : [i] "m" (*i), "1" (c), [v] "q" (value) : "cc", "memory");
@@ -364,7 +368,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 
 #elif defined(OVR_CC_GNU) && (__GNUC__ >= 4 && __GNUC_MINOR__ >= 1)
 
-    typedef UInt32 T;
+    typedef uint32_t T;
 
     static inline T   Exchange_NoSync(volatile T *i, T j)
     {
@@ -396,10 +400,10 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
 #if !defined(OVR_64BIT_POINTERS) || !defined(OVR_ENABLE_THREADS)
 
     // Provide a type for no-thread-support cases. Used by AtomicOpsRaw_DefImpl.
-    typedef UInt64 T;
+    typedef uint64_t T;
 
     // *** Thread - Safe OS specific versions.
-#elif defined(OVR_OS_WIN32)
+#elif defined(OVR_OS_WIN32) 
 
     // This is only for 64-bit systems.
     typedef LONG64      T;
@@ -410,11 +414,11 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
 
 #elif defined(OVR_CPU_PPC64)
  
-    typedef UInt64 T;
+    typedef uint64_t T;
 
-    static inline UInt64   Exchange_NoSync(volatile UInt64 *i, UInt64 j)
+    static inline uint64_t Exchange_NoSync(volatile uint64_t *i, uint64_t j)
     {
-        UInt64 dummy, ret;
+        uint64_t dummy, ret;
 
         asm volatile("1:\n\t"
                      "ldarx  %[r],0,%[i]\n\t"
@@ -426,9 +430,9 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline UInt64   ExchangeAdd_NoSync(volatile UInt64 *i, UInt64 j)
+    static inline uint64_t ExchangeAdd_NoSync(volatile uint64_t *i, uint64_t j)
     {
-        UInt64 dummy, ret;
+        uint64_t dummy, ret;
 
         asm volatile("1:\n\t"
                      "ldarx  %[r],0,%[i]\n\t"
@@ -440,9 +444,9 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
         return ret;
     }
 
-    static inline bool     CompareAndSet_NoSync(volatile UInt64 *i, UInt64 c, UInt64 value)
+    static inline bool     CompareAndSet_NoSync(volatile uint64_t *i, uint64_t c, uint64_t value)
     {
-        UInt64 ret, dummy;
+        uint64_t ret, dummy;
 
         asm volatile("1:\n\t"
                      "ldarx  %[r],0,%[i]\n\t"
@@ -459,7 +463,7 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
 
 #elif defined(OVR_CC_GNU) && (__GNUC__ >= 4 && __GNUC_MINOR__ >= 1)
 
-    typedef UInt64 T;
+    typedef uint64_t T;
 
     static inline T   Exchange_NoSync(volatile T *i, T j)
     {
@@ -787,7 +791,6 @@ public:
 };
 
 
-
 //-----------------------------------------------------------------------------------
 // ***** Lock
 
@@ -816,7 +819,7 @@ public:
     inline void Unlock() { }
 
    // Windows.   
-#elif defined(OVR_OS_WIN32)
+#elif defined(OVR_OS_WIN32) 
 
     CRITICAL_SECTION cs;
 public:   
@@ -881,7 +884,7 @@ private:
 
     // UseCount and max alignment.
     volatile int    UseCount;
-    UInt64          Buffer[(sizeof(Lock)+sizeof(UInt64)-1)/sizeof(UInt64)];
+    uint64_t        Buffer[(sizeof(Lock)+sizeof(uint64_t)-1)/sizeof(uint64_t)];
 };
 
 

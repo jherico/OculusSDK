@@ -24,7 +24,7 @@ limitations under the License.
 #ifndef INC_RenderProfiler_h
 #define INC_RenderProfiler_h
 
-#include "OVR.h"
+#include "OVR_Kernel.h"
 
 // TODO: Refactor option menu so dependencies are in a separate file.
 #include "OptionMenu.h"

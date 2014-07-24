@@ -1,6 +1,6 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Types.h
 Content     :   Standard library defines and simple types
 Created     :   September 19, 2012
@@ -27,6 +27,16 @@ limitations under the License.
 
 #ifndef OVR_Types_H
 #define OVR_Types_H
+
+#include "OVR_Compiler.h"
+
+// Unsupported compiler configurations
+#if _MSC_VER == 0x1600
+#  if _MSC_FULL_VER < 160040219
+#     error "Oculus does not support VS2010 without SP1 installed: It will crash in Release mode"
+#  endif
+#endif
+
 
 //-----------------------------------------------------------------------------------
 // ****** Operating System
@@ -115,47 +125,6 @@ limitations under the License.
 
 
 //-----------------------------------------------------------------------------------
-// ***** Compiler
-//
-//  The following compilers are defined: (OVR_CC_x)
-//
-//     MSVC     - Microsoft Visual C/C++
-//     INTEL    - Intel C++ for Linux / Windows
-//     GNU      - GNU C++
-//     ARM      - ARM C/C++
-
-#if defined(__INTEL_COMPILER)
-// Intel 4.0                    = 400
-// Intel 5.0                    = 500
-// Intel 6.0                    = 600
-// Intel 8.0                    = 800
-// Intel 9.0                    = 900
-#  define OVR_CC_INTEL       __INTEL_COMPILER
-
-#elif defined(_MSC_VER)
-// MSVC 5.0                     = 1100
-// MSVC 6.0                     = 1200
-// MSVC 7.0 (VC2002)            = 1300
-// MSVC 7.1 (VC2003)            = 1310
-// MSVC 8.0 (VC2005)            = 1400
-// MSVC 9.0 (VC2008)            = 1500
-// MSVC 10.0 (VC2010)           = 1600
-// MSVC 11.0 (VC2012)           = 1700
-// MSVC 12.0 (VC2013)           = 1800
-#  define OVR_CC_MSVC        _MSC_VER
-
-#elif defined(__GNUC__)
-#  define OVR_CC_GNU
-
-#elif defined(__CC_ARM)
-#  define OVR_CC_ARM
-
-#else
-#  error "Oculus does not support this Compiler"
-#endif
-
-
-//-----------------------------------------------------------------------------------
 // ***** Compiler Warnings
 
 // Disable MSVC warnings
@@ -208,6 +177,23 @@ limitations under the License.
 
 
 //-----------------------------------------------------------------------------------
+// ***** int8_t, int16_t, etc.
+
+#if defined(OVR_CC_MSVC) && (OVR_CC_VER <= 1500) // VS2008 and earlier
+    typedef signed char        int8_t; 
+    typedef unsigned char     uint8_t;
+    typedef signed short      int16_t;
+    typedef unsigned short   uint16_t;
+    typedef signed int        int32_t;
+    typedef unsigned int     uint32_t;
+    typedef signed __int64    int64_t;
+    typedef unsigned __int64 uint64_t;
+#else
+    #include <stdint.h>
+#endif
+
+
+//-----------------------------------------------------------------------------------
 // ***** Type definitions for Common Systems
 
 namespace OVR {
@@ -219,7 +205,7 @@ typedef size_t          UPInt;
 typedef ptrdiff_t       SPInt;
 
 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_WIN32) 
 
 typedef char            SByte;  // 8 bit Integer (Byte)
 typedef unsigned char   UByte;
@@ -256,30 +242,48 @@ typedef uint64_t        UInt64;
 
 #endif
 
-
-// ***** BaseTypes Namespace
-
-// BaseTypes namespace is explicitly declared to allow base types to be used
-// by customers directly without other contents of OVR namespace.
-//
-// Its is expected that OVR samples will declare 'using namespace OVR::BaseTypes'
-// to allow using these directly without polluting the target scope with other
-// OVR declarations, such as Ptr<>, String or Mutex.
-namespace BaseTypes
+struct OVR_GUID
 {
-    using OVR::UPInt;
-    using OVR::SPInt;
-    using OVR::UByte;
-    using OVR::SByte;
-    using OVR::UInt16;
-    using OVR::SInt16;
-    using OVR::UInt32;
-    using OVR::SInt32;
-    using OVR::UInt64;
-    using OVR::SInt64;
-} // OVR::BaseTypes
+	uint32_t Data1;
+	uint16_t Data2;
+	uint16_t Data3;
+	uint8_t  Data4[8];
+};
+
+
 
 } // OVR
+
+
+
+//-----------------------------------------------------------------------------------
+// ****** Standard C/C++ Library
+//
+// Identifies which standard library is currently being used. 
+//
+//    LIBSTDCPP   - GNU libstdc++, used by GCC.
+//    LIBCPP      - LLVM libc++, typically used by clang and GCC.
+//    DINKUMWARE  - Used by Microsoft and various non-Microsoft compilers (e.g. Sony clang).
+
+#if !defined(OVR_STDLIB_LIBSTDCPP)
+    #if defined(__GLIBCXX__)
+        #define OVR_STDLIB_LIBSTDCPP 1
+    #endif
+#endif
+
+#if !defined(OVR_STDLIB_LIBCPP)
+    #if defined(__clang__)
+        #if defined(__cplusplus) && __has_include(<__config>)
+            #define OVR_STDLIB_LIBCPP 1
+        #endif
+    #endif 
+#endif
+
+#if !defined(OVR_STDLIB_DINKUMWARE)
+    #if defined(_YVALS) // Dinkumware globally #defines _YVALS from the #includes above.
+        #define OVR_STDLIB_DINKUMWARE 1
+    #endif
+#endif
 
 
 //-----------------------------------------------------------------------------------
@@ -302,17 +306,7 @@ namespace BaseTypes
 #define OVR_BIG_ENDIAN          2
 
 
-// Force inline substitute - goes before function declaration
-#if defined(OVR_CC_MSVC)
-#  define OVR_FORCE_INLINE  __forceinline
-#elif defined(OVR_CC_GNU)
-#  define OVR_FORCE_INLINE  __attribute__((always_inline)) inline
-#else
-#  define OVR_FORCE_INLINE  inline
-#endif  // OVR_CC_MSVC
-
-
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_WIN32) 
     
     // ***** Win32
 
@@ -369,6 +363,137 @@ namespace BaseTypes
 #endif // defined(OVR_OS_WIN32)
 
 
+//-----------------------------------------------------------------------------------
+// ***** OVR_PTR_SIZE
+// 
+// Specifies the byte size of pointers (same as sizeof void*).
+
+#if !defined(OVR_PTR_SIZE)
+    #if defined(__WORDSIZE)
+        #define OVR_PTR_SIZE ((__WORDSIZE) / 8)
+    #elif defined(_WIN64) || defined(__LP64__) || defined(_LP64) || defined(_M_IA64) || defined(__ia64__) || defined(__arch64__) || defined(__64BIT__) || defined(__Ptr_Is_64)
+        #define OVR_PTR_SIZE 8
+    #elif defined(__CC_ARM) && (__sizeof_ptr == 8)
+        #define OVR_PTR_SIZE 8
+    #else
+        #define OVR_PTR_SIZE 4
+    #endif
+#endif
+
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_WORD_SIZE
+// 
+// Specifies the byte size of a machine word/register. Not necessarily the same as
+// the size of pointers, but usually >= the size of pointers.
+
+#if !defined(OVR_WORD_SIZE)
+   #define OVR_WORD_SIZE OVR_PTR_SIZE // For our currently supported platforms these are equal.
+#endif
+
+
+// ------------------------------------------------------------------------
+// ***** OVR_FORCE_INLINE
+//
+// Force inline substitute - goes before function declaration
+// Example usage:
+//     OVR_FORCE_INLINE void Test();
+
+#if !defined(OVR_FORCE_INLINE)
+    #if defined(OVR_CC_MSVC)
+        #define OVR_FORCE_INLINE  __forceinline
+    #elif defined(OVR_CC_GNU)
+        #define OVR_FORCE_INLINE  __attribute__((always_inline)) inline
+    #else
+        #define OVR_FORCE_INLINE  inline
+    #endif  // OVR_CC_MSVC
+#endif
+
+
+// ------------------------------------------------------------------------
+// ***** OVR_NO_INLINE
+//
+// Cannot be used with inline or OVR_FORCE_INLINE.
+// Example usage:
+//     OVR_NO_INLINE void Test();
+
+#if !defined(OVR_NO_INLINE)
+    #if defined(OVR_CC_MSVC) && (_MSC_VER >= 1500) // VS2008+
+        #define OVR_NO_INLINE __declspec(noinline)
+    #elif !defined(OVR_CC_MSVC)
+        #define OVR_NO_INLINE __attribute__((noinline))
+    #endif
+#endif
+
+
+// -----------------------------------------------------------------------------------
+// ***** OVR_STRINGIZE
+//
+// Converts a preprocessor symbol to a string.
+//
+// Example usage:
+//     printf("Line: %s", OVR_STRINGIZE(__LINE__));
+//
+#if !defined(OVR_STRINGIFY)
+    #define OVR_STRINGIZEIMPL(x) #x
+    #define OVR_STRINGIZE(x)     OVR_STRINGIZEIMPL(x)
+#endif
+
+
+// -----------------------------------------------------------------------------------
+// ***** OVR_JOIN
+//
+// Joins two preprocessing symbols together. Supports the case when either or the
+// the symbols are macros themselves.
+//
+// Example usage:
+//    char OVR_JOIN(unique_, __LINE__);  // Results in (e.g.) char unique_123;
+//
+#if !defined(OVR_JOIN)
+    #define OVR_JOIN(a, b)  OVR_JOIN1(a, b)
+    #define OVR_JOIN1(a, b) OVR_JOIN2(a, b)
+    #define OVR_JOIN2(a, b) a##b
+#endif
+
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_OFFSETOF
+// 
+// Portable implementation of offsetof for structs and classes. offsetof and GCC's 
+// __builtin_offsetof work only with POD types (standard-layout types under C++11), 
+// despite that it can safely work with a number of types that aren't POD. This 
+// version works with more types without generating compiler warnings or errors.
+// Returns the offset as a size_t, as per offsetof.
+//
+// Example usage:
+//     struct Test{ int i; float f; };
+//     size_t fPos = OVR_OFFSETOF(Test, f);
+
+#if defined(OVR_CC_GNU)
+    #define OVR_OFFSETOF(class_, member_) ((size_t)(((uintptr_t)&reinterpret_cast<const volatile char&>((((class_*)65536)->member_))) - 65536))
+#else
+    #define OVR_OFFSETOF(class_, member_) offsetof(class_, member_)
+#endif
+
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_SIZEOF_MEMBER
+//
+// Implements a portable way to determine the size of struct or class data member. 
+// C++11 allows this directly via sizeof (see OVR_CPP_NO_EXTENDED_SIZEOF), and this 
+// macro exists to handle pre-C++11 compilers.
+// Returns the offset as a size_t, as per sizeof.
+//
+// Example usage:
+//     struct Test{ int i; float f; };
+//     size_t fSize = OVR_SIZEOF_MEMBER(Test, f);
+//
+#if defined(OVR_CPP_NO_EXTENDED_SIZEOF)
+    #define OVR_SIZEOF_MEMBER(class_, member_) (sizeof(((class_*)0)->member_))
+#else
+    #define OVR_SIZEOF_MEMBER(class_, member_) (sizeof(class_::member_))
+#endif
+
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_DEBUG_BREAK, OVR_ASSERT
@@ -376,14 +501,14 @@ namespace BaseTypes
 // If not in debug build, macros do nothing
 #ifndef OVR_BUILD_DEBUG
 
-#  define OVR_DEBUG_CODE(c) c
+#  define OVR_DEBUG_CODE(c)
 #  define OVR_DEBUG_BREAK  ((void)0)
 #  define OVR_ASSERT(p)    ((void)0)
 
 #else 
 
 // Microsoft Win32 specific debugging support
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_WIN32) 
 #  ifdef OVR_CPU_X86
 #    if defined(__cplusplus_cli)
 #      define OVR_DEBUG_BREAK   do { __debugbreak(); } while(0)
@@ -402,7 +527,7 @@ namespace BaseTypes
 #  define OVR_DEBUG_BREAK       do { *((int *) 0) = 1; } while(0)
 #endif
 
-#define OVR_DEBUG_CODE(c)
+#define OVR_DEBUG_CODE(c) c
 
 // This will cause compiler breakpoint
 #define OVR_ASSERT(p)           do { if (!(p))  { OVR_DEBUG_BREAK; } } while(0)
@@ -410,15 +535,137 @@ namespace BaseTypes
 #endif // OVR_BUILD_DEBUG
 
 
-// Compile-time assert; produces compiler error if condition is false
-#define OVR_COMPILER_ASSERT(x)  { int zero = 0; switch(zero) {case 0: case x:;} }
+// ------------------------------------------------------------------------
+// ***** OVR_COMPILER_ASSERT
+//
+// Compile-time assert; produces compiler error if condition is false.
+// The expression must be a compile-time constant expression.
+// 
+// Example usage:
+//     OVR_COMPILER_ASSERT(sizeof(int32_t == 4));
 
+#if OVR_CPP_NO_STATIC_ASSERT
+    #define OVR_COMPILER_ASSERT(x)  { int zero = 0; switch(zero) {case 0: case x:;} }
+#else
+    #define OVR_COMPILER_ASSERT(x)  static_assert((x), #x)
+#endif
+
+
+// ------------------------------------------------------------------------
+// ***** static_assert
+//
+// Portable support for C++11 static_assert.
+// Acts as if the following were declared:
+//     void static_assert(bool const_expression, const char* msg);
+//
+// Example usage:
+//     static_assert(sizeof(int32_t) == 4, "int32_t expected to be 4 bytes.");
+
+#if defined(OVR_CPP_NO_STATIC_ASSERT)
+    #if defined(OVR_CC_GNU) || defined(OVR_CC_CLANG)
+        #define OVR_SA_UNUSED __attribute__((unused))
+    #else
+        #define OVR_SA_UNUSED
+    #endif
+    #define OVR_SA_PASTE(a,b) a##b
+    #define OVR_SA_HELP(a,b)  OVR_SA_PASTE(a,b)
+
+    #if defined(__COUNTER__)
+        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __COUNTER__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
+    #else
+        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __LINE__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
+    #endif
+#endif
+
+
+// ------------------------------------------------------------------------
+// ***** OVR_ARRAY_COUNT
+//
+// Returns the element count of a C array. 
+//
+// Example usage:
+//     float itemArray[16];
+//     for(size_t i = 0; i < OVR_ARRAY_COUNT(itemArray); i++) { ... }
+
+#if defined(OVR_CPP_NO_CONSTEXPR)
+    #ifndef OVR_ARRAY_COUNT
+        #define OVR_ARRAY_COUNT(x) (sizeof(x) / sizeof(x[0]))
+    #endif
+#else
+    // Smarter C++11 version which knows the difference between arrays and pointers. 
+    template <typename T, size_t N>
+    char (&OVRArrayCountHelper(T (&x)[N]))[N];
+    #define OVR_ARRAY_COUNT(x) (sizeof(OVRArrayCountHelper(x)))
+#endif
+
+
+// ------------------------------------------------------------------------
+// ***** OVR_CURRENT_FUNCTION
+//
+// Portable wrapper for __PRETTY_FUNCTION__, C99 __func__, __FUNCTION__.
+// This represents the most expressive version available.
+// Acts as if the following were declared:
+//     static const char OVR_CURRENT_FUNCTION[] = "function-name";
+//
+// Example usage:
+//     void Test() { printf("%s", OVR_CURRENT_FUNCTION); }
+
+#if defined(OVR_CC_GNU) || defined(OVR_CC_CLANG) || (defined(__ICC) && (__ICC >= 600)) // GCC, clang, Intel
+    #define OVR_CURRENT_FUNCTION __PRETTY_FUNCTION__
+#elif defined(__FUNCSIG__) // VC++
+    #define OVR_CURRENT_FUNCTION __FUNCSIG__
+#elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901) // C99 compilers
+    #define OVR_CURRENT_FUNCTION __func__
+#else
+    #define OVR_CURRENT_FUNCTION __FUNCTION__
+#endif
+
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_DEPRECATED / OVR_DEPRECATED_MSG
+// 
+// Portably annotates a function or struct as deprecated.
+// Note that clang supports __deprecated_enum_msg, which may be useful to support.
+//
+// Example usage:
+//    OVR_DEPRECATED void Test();       // Use on the function declaration, as opposed to definition.
+//
+//    struct OVR_DEPRECATED Test{ ... };
+//
+//    OVR_DEPRECATED_MSG("Test is deprecated")
+//    void Test();
+
+#if !defined(OVR_DEPRECATED)
+    #if defined(OVR_CC_MSVC) && (OVR_CC_VERSION > 1400) // VS2005+
+        #define OVR_DEPRECATED          __declspec(deprecated)
+        #define OVR_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
+    #elif defined(OVR_CC_CLANG) && OVR_CC_HAS_FEATURE(attribute_deprecated_with_message)
+        #define OVR_DEPRECATED          __declspec(deprecated)
+        #define OVR_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #elif defined(OVR_CC_GNU) && (OVR_CC_VERSION >= 405)
+        #define OVR_DEPRECATED          __declspec(deprecated)
+        #define OVR_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #elif !defined(OVR_CC_MSVC)
+        #define OVR_DEPRECATED          __attribute__((deprecated))
+        #define OVR_DEPRECATED_MSG(msg) __attribute__((deprecated))
+    #else
+        #define OVR_DEPRECATED
+        #define OVR_DEPRECATED_MSG(msg)
+    #endif
+#endif
 
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_UNUSED - Unused Argument handling
-
 // Macro to quiet compiler warnings about unused parameters/variables.
+//
+// Example usage:
+//     void Test() {
+//         int x = SomeFunction();
+//         OVR_UNUSED(x);
+//     }
+//
+
 #if defined(OVR_CC_GNU)
 #  define   OVR_UNUSED(a)   do {__typeof__ (&a) __attribute__ ((unused)) __tmp = &a; } while(0)
 #else
@@ -438,8 +685,10 @@ namespace BaseTypes
 
 //-----------------------------------------------------------------------------------
 // ***** Configuration Macros
+//
+// Expands to the current build type as a const char string literal.
+// Acts as the following declaration: const char OVR_BUILD_STRING[];
 
-// SF Build type
 #ifdef OVR_BUILD_DEBUG
 #  define OVR_BUILD_STRING  "Debug"
 #else
@@ -469,6 +718,7 @@ namespace BaseTypes
 // - used with OVR_DEFINE_NEW macro
 //# define OVR_BUILD_DEFINE_NEW
 //
+
 
 
 #endif  // OVR_Types_h

@@ -1,6 +1,6 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_KeyCodes.h
 Content     :   Common keyboard constants
 Created     :   September 19, 2012

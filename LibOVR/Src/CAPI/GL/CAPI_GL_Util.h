@@ -33,12 +33,13 @@ limitations under the License.
 #include "../../Kernel/OVR_Log.h"
 
 #if defined(OVR_OS_WIN32)
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #endif
 
 #if defined(OVR_OS_MAC)
-#include <OpenGL/gl3.h>
-#include <OpenGL/gl3ext.h>
+#include <OpenGL/gl.h>
+#include <OpenGL/glext.h>
 #else
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
@@ -60,6 +61,7 @@ namespace OVR { namespace CAPI { namespace GL {
 // Let Windows apps build without linking GL.
 #if defined(OVR_OS_WIN32)
 
+typedef GLenum (__stdcall *PFNGLGETERRORPROC) ();
 typedef void (__stdcall *PFNGLENABLEPROC) (GLenum);
 typedef void (__stdcall *PFNGLDISABLEPROC) (GLenum);
 typedef void (__stdcall *PFNGLGETFLOATVPROC) (GLenum, GLfloat*);
@@ -75,21 +77,29 @@ typedef void (__stdcall *PFNGLDRAWELEMENTSPROC) (GLenum mode, GLsizei count, GLe
 typedef void (__stdcall *PFNGLGENTEXTURESPROC) (GLsizei n, GLuint *textures);
 typedef void (__stdcall *PFNGLDELETETEXTURESPROC) (GLsizei n, GLuint *textures);
 typedef void (__stdcall *PFNGLBINDTEXTUREPROC) (GLenum target, GLuint texture);
+typedef void (__stdcall *PFNGLTEXIMAGE2DPROC) (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLint format, GLenum type, const GLvoid *pixels);
 typedef void (__stdcall *PFNGLCLEARCOLORPROC) (GLfloat r, GLfloat g, GLfloat b, GLfloat a);
 typedef void (__stdcall *PFNGLCLEARDEPTHPROC) (GLclampd depth);
 typedef void (__stdcall *PFNGLTEXPARAMETERIPROC) (GLenum target, GLenum pname, GLint param);
 typedef void (__stdcall *PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
+typedef void (__stdcall *PFNGLBLENDFUNCPROC) (GLenum sfactor, GLenum dfactor);
+typedef void (__stdcall *PFNGLFRONTFACEPROC) (GLenum mode);
 
 extern PFNWGLGETPROCADDRESS                     wglGetProcAddress;
 extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
 extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
 
+extern PFNGLGETERRORPROC                        glGetError;
 extern PFNGLENABLEPROC                          glEnable;
+extern PFNGLENABLEIPROC                         glEnablei;
 extern PFNGLDISABLEPROC                         glDisable;
+extern PFNGLDISABLEIPROC                        glDisablei;
 extern PFNGLCOLORMASKPROC                       glColorMask;
+extern PFNGLCOLORMASKIPROC                      glColorMaski;
 extern PFNGLGETFLOATVPROC                       glGetFloatv;
 extern PFNGLGETSTRINGPROC                       glGetString;
 extern PFNGLGETINTEGERVPROC                     glGetIntegerv;
+extern PFNGLGETINTEGERI_VPROC                   glGetIntegeri_v;
 extern PFNGLCLEARPROC                           glClear;
 extern PFNGLCLEARCOLORPROC                      glClearColor;
 extern PFNGLCLEARDEPTHPROC                      glClearDepth;
@@ -99,9 +109,12 @@ extern PFNGLDRAWELEMENTSPROC                    glDrawElements;
 extern PFNGLGENTEXTURESPROC                     glGenTextures;
 extern PFNGLDELETETEXTURESPROC                  glDeleteTextures;
 extern PFNGLBINDTEXTUREPROC                     glBindTexture;
+extern PFNGLTEXIMAGE2DPROC                      glTexImage2D;
 extern PFNGLTEXPARAMETERIPROC                   glTexParameteri;
 extern PFNGLFLUSHPROC                           glFlush;
 extern PFNGLFINISHPROC                          glFinish;
+extern PFNGLBLENDFUNCPROC                       glBlendFunc;
+extern PFNGLFRONTFACEPROC                       glFrontFace;
 
 #elif defined(OVR_OS_LINUX)
 
@@ -109,7 +122,12 @@ extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
 
 #endif // defined(OVR_OS_WIN32)
 
+extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
+extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 extern PFNGLDELETESHADERPROC                    glDeleteShader;
+extern PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
+extern PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
+extern PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
 extern PFNGLBINDFRAMEBUFFERPROC                 glBindFramebuffer;
 extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
 extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
@@ -223,9 +241,10 @@ struct RenderParams
 {
 #if defined(OVR_OS_WIN32)
     HWND   Window;
+    HDC    DC;
 #elif defined(OVR_OS_LINUX)
-    Display* Disp;
-    Window   Win;
+    _XDisplay*  Disp;
+    Window      Win;
 #endif
 
     ovrSizei  RTSize;
@@ -532,6 +551,8 @@ private:
 typedef ShaderImpl<Shader_Vertex,  GL_VERTEX_SHADER> VertexShader;
 typedef ShaderImpl<Shader_Fragment, GL_FRAGMENT_SHADER> FragmentShader;
 
+
 }}}
+
 
 #endif // INC_OVR_CAPI_GL_Util_h

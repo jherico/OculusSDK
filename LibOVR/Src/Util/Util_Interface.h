@@ -1,6 +1,5 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
 Filename    :   Util_Interface.h
 Content     :   Simple interface, utilised by internal demos,
 				with access to wider SDK as needed. 
@@ -30,7 +29,7 @@ limitations under the License.
 
 #ifndef OVR_Util_Interface_h
 #define OVR_Util_Interface_h
-#include "../../Src/OVR_CAPI.h"
+#include "../OVR_CAPI.h"
 
 //Files left in to ease its possible return......
 

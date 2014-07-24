@@ -26,6 +26,7 @@ limitations under the License.
 
 #include "CAPI_FrameTimeManager.h"
 
+#include "../Kernel/OVR_Log.h"
 
 namespace OVR { namespace CAPI {
 
@@ -47,6 +48,7 @@ void FrameLatencyTracker::Reset()
     MatchCount             = 0;
     RenderLatencySeconds   = 0.0;
     TimewarpLatencySeconds = 0.0;
+    LatencyRecordTime      = 0.0;
     
     FrameDeltas.Clear();
 }
@@ -162,10 +164,18 @@ void FrameLatencyTracker::MatchRecord(const Util::FrameTimeRecordSet &r)
                         if (deltaSeconds > 0.0)
                         {
                             FrameDeltas.AddTimeDelta(deltaSeconds);
-                            LatencyRecordTime      = scanoutFrame.TimeSeconds;
-                            RenderLatencySeconds   = scanoutFrame.TimeSeconds - renderFrame.RenderIMUTimeSeconds;
-                            TimewarpLatencySeconds = (renderFrame.TimewarpIMUTimeSeconds == 0.0)  ?  0.0 :
-                                                     (scanoutFrame.TimeSeconds - renderFrame.TimewarpIMUTimeSeconds);
+
+                            // FIRMWARE HACK: don't take new readings if they're 10ms higher than previous reading
+                            // but only do that for 1 second, after that accept it regardless of the timing difference
+                            double newRenderLatency = scanoutFrame.TimeSeconds - renderFrame.RenderIMUTimeSeconds;                            
+                            if( newRenderLatency < RenderLatencySeconds + 0.01 ||
+                                scanoutFrame.TimeSeconds > LatencyRecordTime + 1.0)
+                            {
+                                LatencyRecordTime      = scanoutFrame.TimeSeconds;
+                                RenderLatencySeconds   = scanoutFrame.TimeSeconds - renderFrame.RenderIMUTimeSeconds;
+                                TimewarpLatencySeconds = (renderFrame.TimewarpIMUTimeSeconds == 0.0)  ?  0.0 :
+                                                         (scanoutFrame.TimeSeconds - renderFrame.TimewarpIMUTimeSeconds);
+                            }
                         }
 
                         renderFrame.MatchedRecord = true;
@@ -189,10 +199,14 @@ void FrameLatencyTracker::MatchRecord(const Util::FrameTimeRecordSet &r)
     }
 }
 
+bool FrameLatencyTracker::IsLatencyTimingAvailable()
+{
+    return ovr_GetTimeInSeconds() < (LatencyRecordTime + 2.0);
+}
 
 void FrameLatencyTracker::GetLatencyTimings(float latencies[3])
 {
-    if (ovr_GetTimeInSeconds() > (LatencyRecordTime + 2.0))
+    if (!IsLatencyTimingAvailable())
     {
         latencies[0] = 0.0f;
         latencies[1] = 0.0f;
@@ -242,11 +256,15 @@ void FrameTimeManager::ResetFrameTiming(unsigned frameIndex,
     FrameTimeDeltas.Clear();
     DistortionRenderTimes.Clear();
     ScreenLatencyTracker.Reset();
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    //TimewarpAdjuster.Reset();
 
     FrameTiming.FrameIndex               = frameIndex;
     FrameTiming.NextFrameTime            = 0.0;
     FrameTiming.ThisFrameTime            = 0.0;
     FrameTiming.Inputs.FrameDelta        = calcFrameDelta();
+    // This one is particularly critical, and has been missed in the past because
+    // this init function wasn't called for app-rendered.
     FrameTiming.Inputs.ScreenDelay       = calcScreenDelay();
     FrameTiming.Inputs.TimewarpWaitDelta = 0.0f;
 
@@ -316,15 +334,34 @@ double  FrameTimeManager::calcTimewarpWaitDelta() const
     {
         if (NeedDistortionTimeMeasurement())
             return 0.0;
-        return -(DistortionRenderTimes.GetMedianTimeDelta() + 0.002);
+        return -(DistortionRenderTimes.GetMedianTimeDelta() + 0.0035);
+
+        //Revisit dynamic pre-Timewarp delay adjustment logic
+        /*return -(DistortionRenderTimes.GetMedianTimeDelta() + 0.002 +
+                 TimewarpAdjuster.GetDelayReduction());*/
     }
    
     // Just a hard-coded "high" value for game-drawn code.
     // TBD: Just return 0 and let users calculate this themselves?
-    return -0.003;   
+    return -0.004;
+
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    //return -(0.003 + TimewarpAdjuster.GetDelayReduction());
 }
 
-
+//Revisit dynamic pre-Timewarp delay adjustment logic
+/*
+void FrameTimeManager::updateTimewarpTiming()
+{
+    // If timewarp timing changes based on this sample, update it.
+    double newTimewarpWaitDelta = calcTimewarpWaitDelta();
+    if (newTimewarpWaitDelta != FrameTiming.Inputs.TimewarpWaitDelta)
+    {
+        FrameTiming.Inputs.TimewarpWaitDelta = newTimewarpWaitDelta;
+        LocklessTiming.SetState(FrameTiming);
+    }
+}
+*/
 
 void FrameTimeManager::Timing::InitTimingFromInputs(const FrameTimeManager::TimingInputs& inputs,
                                                     HmdShutterTypeEnum shutterType,
@@ -407,6 +444,9 @@ double FrameTimeManager::BeginFrame(unsigned frameIndex)
     RenderIMUTimeSeconds = 0.0;
     TimewarpIMUTimeSeconds = 0.0;
 
+    // TPH - putting an assert so this doesn't remain a hidden problem.
+    OVR_ASSERT(FrameTiming.Inputs.ScreenDelay != 0);
+
     // ThisFrameTime comes from the end of last frame, unless it it changed.
     double thisFrameTime = (FrameTiming.NextFrameTime != 0.0) ?
                            FrameTiming.NextFrameTime : ovr_GetTimeInSeconds();
@@ -425,6 +465,16 @@ void FrameTimeManager::EndFrame()
     FrameTiming.NextFrameTime = ovr_GetTimeInSeconds();    
     if (FrameTiming.ThisFrameTime > 0.0)
     {
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    /*
+        double actualFrameDelta = FrameTiming.NextFrameTime - FrameTiming.ThisFrameTime;
+
+        if (VsyncEnabled)
+            TimewarpAdjuster.UpdateTimewarpWaitIfSkippedFrames(this, actualFrameDelta,
+                                                               FrameTiming.NextFrameTime);
+
+        FrameTimeDeltas.AddTimeDelta(actualFrameDelta);
+    */
         FrameTimeDeltas.AddTimeDelta(FrameTiming.NextFrameTime - FrameTiming.ThisFrameTime);
         FrameTiming.Inputs.FrameDelta = calcFrameDelta();
     }
@@ -432,7 +482,6 @@ void FrameTimeManager::EndFrame()
     // Write to Lock-less
     LocklessTiming.SetState(FrameTiming);
 }
-
 
 
 // Thread-safe function to query timing for a future frame
@@ -475,18 +524,20 @@ double FrameTimeManager::GetEyePredictionTime(ovrEyeType eye)
     return ovr_GetTimeInSeconds() + ScreenSwitchingDelay + NoVSyncToScanoutDelay;
 }
 
-Transformf FrameTimeManager::GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye)
+Posef FrameTimeManager::GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye)
 {
-    double         eyeRenderTime = GetEyePredictionTime(eye);
-    ovrSensorState eyeState      = ovrHmd_GetSensorState(hmd, eyeRenderTime);
-
-//    EyeRenderPoses[eye] = eyeState.Predicted.Pose;
-
+    double           eyeRenderTime = GetEyePredictionTime(eye);
+    ovrTrackingState eyeState      = ovrHmd_GetTrackingState(hmd, eyeRenderTime);
+        
     // Record view pose sampling time for Latency reporting.
     if (RenderIMUTimeSeconds == 0.0)
-        RenderIMUTimeSeconds = eyeState.Recorded.TimeInSeconds;
+    {
+        // TODO: Figure out why this are not as accurate as ovr_GetTimeInSeconds()
+        //RenderIMUTimeSeconds = eyeState.RawSensorData.TimeInSeconds;
+        RenderIMUTimeSeconds = ovr_GetTimeInSeconds();
+    }
 
-    return eyeState.Predicted.Pose;
+    return eyeState.HeadPose.ThePose;
 }
 
 
@@ -521,14 +572,19 @@ void FrameTimeManager::GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eyeId,
     double timewarpStartEnd[2] = { 0.0, 0.0 };    
     GetTimewarpPredictions(eyeId, timewarpStartEnd);
       
-    ovrSensorState startState = ovrHmd_GetSensorState(hmd, timewarpStartEnd[0]);
-    ovrSensorState endState   = ovrHmd_GetSensorState(hmd, timewarpStartEnd[1]);
+    //HMDState* p = (HMDState*)hmd;
+    ovrTrackingState startState = ovrHmd_GetTrackingState(hmd, timewarpStartEnd[0]);
+    ovrTrackingState endState   = ovrHmd_GetTrackingState(hmd, timewarpStartEnd[1]);
 
     if (TimewarpIMUTimeSeconds == 0.0)
-        TimewarpIMUTimeSeconds = startState.Recorded.TimeInSeconds;
+    {
+        // TODO: Figure out why this are not as accurate as ovr_GetTimeInSeconds()
+        //TimewarpIMUTimeSeconds = startState.RawSensorData.TimeInSeconds;
+        TimewarpIMUTimeSeconds = ovr_GetTimeInSeconds();
+    }
 
-    Quatf quatFromStart = startState.Predicted.Pose.Orientation;
-    Quatf quatFromEnd   = endState.Predicted.Pose.Orientation;
+    Quatf quatFromStart = startState.HeadPose.ThePose.Orientation;
+    Quatf quatFromEnd   = endState.HeadPose.ThePose.Orientation;
     Quatf quatFromEye   = renderPose.Orientation; //EyeRenderPoses[eyeId].Orientation;
     quatFromEye.Invert();
     
@@ -578,13 +634,16 @@ bool  FrameTimeManager::NeedDistortionTimeMeasurement() const
 {
     if (!VsyncEnabled)
         return false;
-    return DistortionRenderTimes.GetCount() < 10;
+    return DistortionRenderTimes.GetCount() < DistortionRenderTimes.Capacity;
 }
 
 
 void  FrameTimeManager::AddDistortionTimeMeasurement(double distortionTimeSeconds)
 {
     DistortionRenderTimes.AddTimeDelta(distortionTimeSeconds);
+
+    //Revisit dynamic pre-Timewarp delay adjustment logic
+    //updateTimewarpTiming();
 
     // If timewarp timing changes based on this sample, update it.
     double newTimewarpWaitDelta = calcTimewarpWaitDelta();
@@ -597,11 +656,11 @@ void  FrameTimeManager::AddDistortionTimeMeasurement(double distortionTimeSecond
 
 
 void FrameTimeManager::UpdateFrameLatencyTrackingAfterEndFrame(
-                                    unsigned char frameLatencyTestColor,
+                                    unsigned char frameLatencyTestColor[3],
                                     const Util::FrameTimeRecordSet& rs)
 {    
     // FrameTiming.NextFrameTime in this context (after EndFrame) is the end frame time.
-    ScreenLatencyTracker.SaveDrawColor(frameLatencyTestColor,
+    ScreenLatencyTracker.SaveDrawColor(frameLatencyTestColor[0],
                                        FrameTiming.NextFrameTime,
                                        RenderIMUTimeSeconds,
                                        TimewarpIMUTimeSeconds);
@@ -619,6 +678,118 @@ void FrameTimeManager::UpdateFrameLatencyTrackingAfterEndFrame(
 
 
 //-----------------------------------------------------------------------------------
+//Revisit dynamic pre-Timewarp delay adjustment logic
+/*
+void FrameTimeManager::TimewarpDelayAdjuster::Reset()    
+{
+    State                           = State_WaitingToReduceLevel;
+    DelayLevel                      = 0;
+    InitialFrameCounter             = 0;
+    TimewarpDelayReductionSeconds   = 0.0;
+    DelayLevelFinishTime            = 0.0;
+
+    memset(WaitTimeIndexForLevel, 0, sizeof(WaitTimeIndexForLevel));
+    // If we are at level 0, waits are infinite.
+    WaitTimeIndexForLevel[0] = MaxTimeIndex;
+}
+
+
+void FrameTimeManager::TimewarpDelayAdjuster::
+        UpdateTimewarpWaitIfSkippedFrames(FrameTimeManager* manager,
+                                          double measuredFrameDelta, double nextFrameTime)
+{    
+    // Times in seconds
+    const static double delayTimingTiers[7] = { 1.0, 5.0, 15.0, 30.0, 60.0, 120.0, 1000000.0 };
+
+    const double currentFrameDelta = manager->FrameTiming.Inputs.FrameDelta;
+
+
+    // Once we detected frame spike, we skip several frames before testing again.    
+    if (InitialFrameCounter > 0)
+    {
+        InitialFrameCounter --;
+        return;
+    }
+
+    // Skipped frame would usually take 2x longer then regular frame
+    if (measuredFrameDelta > currentFrameDelta * 1.8)
+    {        
+        if (State == State_WaitingToReduceLevel)
+        {
+            // If we got here, escalate the level again. 
+            if (DelayLevel < MaxDelayLevel)
+            {
+                DelayLevel++;
+                InitialFrameCounter = 3;
+            }
+        }
+
+        else if (State == State_VerifyingAfterReduce)
+        {
+            // So we went down to this level and tried to wait to see if there was
+            // as skipped frame and there is -> go back up a level and incrment its timing tier
+            if (DelayLevel < MaxDelayLevel)
+            {
+                DelayLevel++;
+                State = State_WaitingToReduceLevel;
+                
+                // For higher level delays reductions, i.e. more then half a frame,
+                // we don't go into the infinite wait tier.
+                int maxTimingTier = MaxTimeIndex;
+                if (DelayLevel > MaxInfiniteTimingLevel)
+                    maxTimingTier--;
+
+                if (WaitTimeIndexForLevel[DelayLevel] < maxTimingTier )
+                    WaitTimeIndexForLevel[DelayLevel]++;
+            }
+        }
+
+        DelayLevelFinishTime          = nextFrameTime +
+                                        delayTimingTiers[WaitTimeIndexForLevel[DelayLevel]];
+        TimewarpDelayReductionSeconds = currentFrameDelta * 0.125 * DelayLevel;
+        manager->updateTimewarpTiming();
+
+    }
+
+    else if (nextFrameTime > DelayLevelFinishTime)
+    {        
+        if (State == State_WaitingToReduceLevel)
+        {
+            if (DelayLevel > 0)
+            {
+                DelayLevel--;
+                State = State_VerifyingAfterReduce;
+                // Always use 1 sec to see if "down sampling mode" caused problems
+                DelayLevelFinishTime = nextFrameTime + 1.0f; 
+            }
+        }
+        else if (State == State_VerifyingAfterReduce)
+        {
+            // Prior display level successfully reduced,
+            // try to see we we could go down further after wait.
+            WaitTimeIndexForLevel[DelayLevel+1] = 0;            
+            State                               = State_WaitingToReduceLevel;
+            DelayLevelFinishTime                = nextFrameTime +
+                                                  delayTimingTiers[WaitTimeIndexForLevel[DelayLevel]];
+        }
+
+        // TBD: Update TimeWarpTiming
+        TimewarpDelayReductionSeconds = currentFrameDelta * 0.125 * DelayLevel;
+        manager->updateTimewarpTiming();
+    }
+
+
+    //static int oldDelayLevel = 0;
+
+    //if (oldDelayLevel != DelayLevel)
+    //{
+        //OVR_DEBUG_LOG(("DelayLevel:%d tReduction = %0.5f ", DelayLevel, TimewarpDelayReductionSeconds));
+        //oldDelayLevel = DelayLevel;
+    //}
+    }
+    */
+
+//-----------------------------------------------------------------------------------
 // ***** TimeDeltaCollector
 
 void TimeDeltaCollector::AddTimeDelta(double timeSeconds)
@@ -634,40 +805,49 @@ void TimeDeltaCollector::AddTimeDelta(double timeSeconds)
         Count--;
     }
     TimeBufferSeconds[Count++] = timeSeconds;
+
+    ReCalcMedian = true;
 }
 
 double TimeDeltaCollector::GetMedianTimeDelta() const
 {
-    double  SortedList[Capacity];
-    bool    used[Capacity];
-
-    memset(used, 0, sizeof(used));
-    SortedList[0] = 0.0; // In case Count was 0...
-
-    // Probably the slowest way to find median...
-    for (int i=0; i<Count; i++)
+    if(ReCalcMedian)
     {
-        double smallestDelta = 1000000.0;
-        int    index = 0;
+        double  SortedList[Capacity];
+        bool    used[Capacity];
 
-        for (int j = 0; j < Count; j++)
+        memset(used, 0, sizeof(used));
+        SortedList[0] = 0.0; // In case Count was 0...
+
+        // Probably the slowest way to find median...
+        for (int i=0; i<Count; i++)
         {
-            if (!used[j])
-            {                
-                if (TimeBufferSeconds[j] < smallestDelta)
-                {
-                    smallestDelta = TimeBufferSeconds[j];
-                    index = j;
+            double smallestDelta = 1000000.0;
+            int    index = 0;
+
+            for (int j = 0; j < Count; j++)
+            {
+                if (!used[j])
+                {                
+                    if (TimeBufferSeconds[j] < smallestDelta)
+                    {
+                        smallestDelta = TimeBufferSeconds[j];
+                        index = j;
+                    }
                 }
             }
+
+            // Mark as used
+            used[index]   = true;
+            SortedList[i] = smallestDelta;
         }
 
-        // Mark as used
-        used[index]   = true;
-        SortedList[i] = smallestDelta;
+        Median = SortedList[Count/4];
+        ReCalcMedian = false;
     }
 
-    return SortedList[Count/2];
+    // FIRMWARE HACK: Don't take the actual median, but err on the low time side
+    return Median;
 }
       
 

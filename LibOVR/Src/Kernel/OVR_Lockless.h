@@ -1,6 +1,6 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Lockless.h
 Content     :   Lock-less classes for producer/consumer communication
 Created     :   November 9, 2013
@@ -42,12 +42,22 @@ namespace OVR {
 // necessarily getting every one that happens (vsync timing, SensorFusion updates).
 //
 // This is multiple consumer safe, but is currently only used with a single consumer.
+//
+// The SlotType can be the same as T, but should probably be a larger fixed size.
+// This allows for forward compatibility when the updater is shared between processes.
 
-template<class T>
+// FIXME: ExchangeAdd_Sync() should be replaced with a portable read-only primitive,
+// so that the lockless pose state can be read-only on remote processes and to reduce
+// false sharing between processes and improve performance.
+
+template<class T, class SlotType>
 class LocklessUpdater
 {
 public:
-	LocklessUpdater() : UpdateBegin( 0 ), UpdateEnd( 0 ) {}
+	LocklessUpdater() : UpdateBegin( 0 ), UpdateEnd( 0 )
+    {
+        OVR_COMPILER_ASSERT(sizeof(T) <= sizeof(SlotType));
+    }
 
 	T		GetState() const
 	{
@@ -92,7 +102,7 @@ public:
 
     mutable AtomicInt<int> UpdateBegin;
     mutable AtomicInt<int> UpdateEnd;
-    T		               Slots[2];
+    SlotType               Slots[2];
 };
 
 

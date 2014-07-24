@@ -1,6 +1,5 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
 Filename    :   OVR_Stereo.h
 Content     :   Stereo rendering functions
 Created     :   November 30, 2013
@@ -28,13 +27,18 @@ limitations under the License.
 #ifndef OVR_Stereo_h
 #define OVR_Stereo_h
 
-#include "OVR_Device.h"
+#include "Sensors/OVR_DeviceConstants.h"
+#include "Displays/OVR_Display.h"
+#include "OVR_Profile.h"
 
 // CAPI Forward declaration.
 typedef struct ovrFovPort_ ovrFovPort;
 typedef struct ovrRecti_ ovrRecti;
 
 namespace OVR {
+
+class SensorDevice; // Opaque forward declaration
+
 
 //-----------------------------------------------------------------------------------
 // ***** Stereo Enumerations
@@ -77,7 +81,6 @@ struct FovPort
     // C-interop support: FovPort <-> ovrFovPort (implementation in OVR_CAPI.cpp).
     FovPort(const ovrFovPort& src);
     operator ovrFovPort () const;
-
 
     static FovPort CreateFromRadians(float horizontalFov, float verticalFov)
     {
@@ -132,7 +135,6 @@ struct FovPort
         return fov;
     }
 };
-
 
 
 //-----------------------------------------------------------------------------------
@@ -222,12 +224,12 @@ struct LensConfig
 // For internal use - storing and loading lens config data
 
 // Returns true on success.
-bool LoadLensConfig ( LensConfig *presult, UByte const *pbuffer, int bufferSizeInBytes );
+bool LoadLensConfig ( LensConfig *presult, uint8_t const *pbuffer, int bufferSizeInBytes );
 
 // Returns number of bytes needed.
 int SaveLensConfigSizeInBytes ( LensConfig const &config );
 // Returns true on success.
-bool SaveLensConfig ( UByte *pbuffer, int bufferSizeInBytes, LensConfig const &config );
+bool SaveLensConfig ( uint8_t *pbuffer, int bufferSizeInBytes, LensConfig const &config );
 
 
 //-----------------------------------------------------------------------------------
@@ -248,6 +250,181 @@ struct DistortionRenderDesc
 };
 
 
+//-------------------------------------------------------------------------------------
+// ***** HMDInfo 
+
+// This structure describes various aspects of the HMD allowing us to configure rendering.
+//
+//  Currently included data:
+//   - Physical screen dimensions, resolution, and eye distances.
+//     (some of these will be configurable with a tool in the future).
+//     These arguments allow us to properly setup projection across HMDs.
+//   - DisplayDeviceName for identifying HMD screen; system-specific interpretation.
+//
+// TBD:
+//  - Power on/ off?
+//  - Sensor rates and capabilities
+//  - Distortion radius/variables    
+//  - Screen update frequency
+//  - Distortion needed flag
+//  - Update modes:
+//      Set update mode: Stereo (both sides together), mono (same in both eyes),
+//                       Alternating, Alternating scan-lines.
+
+// Win32 Oculus VR Display Driver Shim Information
+struct Win32ShimInfo
+{
+	int DeviceNumber;
+	int NativeWidth;
+	int NativeHeight;
+	int Rotation;
+	int UseMirroring;
+
+	Win32ShimInfo() :
+		DeviceNumber(-1),
+		NativeWidth(-1),
+		NativeHeight(-1),
+		Rotation(-1),
+		UseMirroring(1)
+	{
+	}
+};
+
+class HMDInfo
+{
+public:
+	// Name string describing the product: "Oculus Rift DK1", etc.
+	String      ProductName;
+	String      Manufacturer;
+
+	unsigned    Version;
+
+	// Characteristics of the HMD screen and enclosure
+	HmdTypeEnum HmdType;
+	Size<int>   ResolutionInPixels;
+	Size<float> ScreenSizeInMeters;
+	float       ScreenGapSizeInMeters;
+	float       CenterFromTopInMeters;
+	float       LensSeparationInMeters;
+
+	// Timing & shutter data. All values in seconds.
+	struct ShutterInfo
+	{
+		HmdShutterTypeEnum  Type;
+		float   VsyncToNextVsync;                // 1/framerate
+		float   VsyncToFirstScanline;            // for global shutter, vsync->shutter open.
+		float   FirstScanlineToLastScanline;     // for global shutter, will be zero.
+		float   PixelSettleTime;                 // estimated.
+		float   PixelPersistence;                // Full persistence = 1/framerate.
+	}           Shutter;
+
+	// Desktop coordinate position of the screen (can be negative; may not be present on all platforms)
+	int         DesktopX;
+	int         DesktopY;
+
+	// Windows:
+	// "\\\\.\\DISPLAY3", etc. Can be used in EnumDisplaySettings/CreateDC.
+	String      DisplayDeviceName;
+	Win32ShimInfo ShimInfo;
+
+	// MacOS:
+	int         DisplayId;
+
+	bool	    InCompatibilityMode;
+
+	// Printed serial number for the HMD; should match external sticker
+    String      PrintedSerial;
+
+    // Tracker descriptor information:
+    int         VendorId;
+    int         ProductId;
+    int         FirmwareMajor;
+    int         FirmwareMinor;
+
+    float   CameraFrustumHFovInRadians;
+    float   CameraFrustumVFovInRadians;
+    float   CameraFrustumNearZInMeters;
+    float   CameraFrustumFarZInMeters;
+
+	// Constructor initializes all values to 0s.
+	// To create a "virtualized" HMDInfo, use CreateDebugHMDInfo instead.
+	HMDInfo() :
+		Version(0),
+		HmdType(HmdType_None),
+		ResolutionInPixels(0),
+		ScreenSizeInMeters(0.0f),
+		ScreenGapSizeInMeters(0.0f),
+		CenterFromTopInMeters(0),
+		LensSeparationInMeters(0),
+		DisplayId(-1),
+		InCompatibilityMode(false)
+	{
+		DesktopX = 0;
+		DesktopY = 0;
+		Shutter.Type = HmdShutter_LAST;
+		Shutter.VsyncToNextVsync = 0.0f;
+		Shutter.VsyncToFirstScanline = 0.0f;
+		Shutter.FirstScanlineToLastScanline = 0.0f;
+		Shutter.PixelSettleTime = 0.0f;
+		Shutter.PixelPersistence = 0.0f;
+
+        CameraFrustumHFovInRadians = 0;
+        CameraFrustumVFovInRadians = 0;
+        CameraFrustumNearZInMeters = 0;
+        CameraFrustumFarZInMeters = 0;
+    }
+
+	// Operator = copies local fields only (base class must be correct already)
+	void operator=(const HMDInfo& src)
+	{
+		ProductName = src.ProductName;
+		Manufacturer = src.Manufacturer;
+		Version = src.Version;
+		HmdType = src.HmdType;
+		ResolutionInPixels = src.ResolutionInPixels;
+		ScreenSizeInMeters = src.ScreenSizeInMeters;
+		ScreenGapSizeInMeters = src.ScreenGapSizeInMeters;
+		CenterFromTopInMeters = src.CenterFromTopInMeters;
+		LensSeparationInMeters = src.LensSeparationInMeters;
+		DesktopX = src.DesktopX;
+		DesktopY = src.DesktopY;
+		Shutter = src.Shutter;
+		DisplayDeviceName = src.DisplayDeviceName;
+		ShimInfo = src.ShimInfo;
+		DisplayId = src.DisplayId;
+		InCompatibilityMode = src.InCompatibilityMode;
+        VendorId = src.VendorId;
+        ProductId = src.ProductId;
+        FirmwareMajor = src.FirmwareMajor;
+        FirmwareMinor = src.FirmwareMinor;
+        PrintedSerial = src.PrintedSerial;
+        CameraFrustumHFovInRadians = src.CameraFrustumHFovInRadians;
+        CameraFrustumVFovInRadians = src.CameraFrustumVFovInRadians;
+        CameraFrustumNearZInMeters = src.CameraFrustumNearZInMeters;
+        CameraFrustumFarZInMeters = src.CameraFrustumFarZInMeters;
+    }
+
+	void SetScreenParameters(int hres, int vres,
+							 float hsize, float vsize,
+							 float vCenterFromTopInMeters, float lensSeparationInMeters,
+							 bool compatibilityMode)
+	{
+		ResolutionInPixels = Sizei(hres, vres);
+		ScreenSizeInMeters = Sizef(hsize, vsize);
+		CenterFromTopInMeters = vCenterFromTopInMeters;
+		LensSeparationInMeters = lensSeparationInMeters;
+		InCompatibilityMode = compatibilityMode;
+	}
+
+	bool IsSameDisplay(const HMDInfo& o) const
+	{
+		return DisplayId == o.DisplayId &&
+			DisplayDeviceName.CompareNoCase(o.DisplayDeviceName) == 0;
+	}
+
+	static bool CreateFromSensorAndDisplay(SensorDevice* sensor, Display* display, HMDInfo* hmdi);
+};
+
 
 //-----------------------------------------------------------------------------------
 // ***** HmdRenderInfo
@@ -256,7 +433,7 @@ struct DistortionRenderDesc
 
 struct HmdRenderInfo
 {
-    // The start of this sturucture is intentionally very similar to HMDInfo in OVER_Device.h
+    // The start of this structure is intentionally very similar to HMDInfo in OVER_Device.h
     // However to reduce interdependencies, one does not simply #include the other.
 
     HmdTypeEnum HmdType;
@@ -336,14 +513,12 @@ struct HmdRenderInfo
 };
 
 
-
-
 //-----------------------------------------------------------------------------------
 
 // Stateless computation functions, in somewhat recommended execution order.
 // For examples on how to use many of them, see the StereoConfig::UpdateComputedState function.
 
-const float OVR_DEFAULT_EXTRA_EYE_ROTATION = 30.0f * Math<float>::DegreeToRadFactor;
+const float OVR_DEFAULT_EXTRA_EYE_ROTATION = 30.0f * MATH_FLOAT_DEGREETORADFACTOR;
 
 // Creates a dummy debug HMDInfo matching a particular HMD model.
 // Useful for development without an actual HMD attached.
@@ -431,9 +606,9 @@ Vector2f TransformScreenNDCToTanFovSpace ( DistortionRenderDesc const &distortio
 void TransformScreenNDCToTanFovSpaceChroma ( Vector2f *resultR, Vector2f *resultG, Vector2f *resultB, 
                                              DistortionRenderDesc const &distortion,
                                              const Vector2f &framebufferNDC );
-Vector2f TransformTanFovSpaceToRendertargetTexUV ( StereoEyeParams const &eyeParams,
+Vector2f TransformTanFovSpaceToRendertargetTexUV ( ScaleAndOffset2D const &eyeToSourceUV,
                                                    Vector2f const &tanEyeAngle );
-Vector2f TransformTanFovSpaceToRendertargetNDC ( StereoEyeParams const &eyeParams,
+Vector2f TransformTanFovSpaceToRendertargetNDC ( ScaleAndOffset2D const &eyeToSourceNDC,
                                                  Vector2f const &tanEyeAngle );
 Vector2f TransformScreenPixelToScreenNDC( Recti const &distortionViewport,
                                           Vector2f const &pixel );
@@ -454,6 +629,18 @@ Vector2f TransformTanFovSpaceToScreenNDC( DistortionRenderDesc const &distortion
                                           const Vector2f &tanEyeAngle, bool usePolyApprox = false );
 Vector2f TransformRendertargetNDCToTanFovSpace( const ScaleAndOffset2D &eyeToSourceNDC,
                                                 const Vector2f &textureNDC );
+
+// Handy wrappers.
+inline Vector2f TransformTanFovSpaceToRendertargetTexUV ( StereoEyeParams const &eyeParams,
+                                                          Vector2f const &tanEyeAngle )
+{
+    return TransformTanFovSpaceToRendertargetTexUV ( eyeParams.EyeToSourceUV, tanEyeAngle );
+}
+inline Vector2f TransformTanFovSpaceToRendertargetNDC ( StereoEyeParams const &eyeParams,
+                                                        Vector2f const &tanEyeAngle )
+{
+    return TransformTanFovSpaceToRendertargetNDC ( eyeParams.EyeToSourceNDC, tanEyeAngle );
+}
 
 } //namespace OVR
 

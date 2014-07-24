@@ -28,10 +28,27 @@ limitations under the License.
 #include "OVR_System.h"
 #include "OVR_Threads.h"
 #include "OVR_Timer.h"
+#include "../Displays/OVR_Display.h"
+#ifdef OVR_OS_WIN32
+#include "../Displays/OVR_Win32_ShimFunctions.h"
+#endif
 
 namespace OVR {
 
-// *****  OVR::System Implementation
+
+// Stack of destroy listeners (push/pop semantics)
+static SystemSingletonInternal *SystemShutdownListenerStack = 0;
+static Lock stackLock;
+
+void SystemSingletonInternal::PushDestroyCallbacks()
+{
+    Lock::Locker locker(&stackLock);
+
+    // Push listener onto the stack
+    NextSingleton = SystemShutdownListenerStack;
+    SystemShutdownListenerStack = this;
+}
+
 
 // Initializes System core, installing allocator.
 void System::Init(Log* log, Allocator *palloc)
@@ -41,6 +58,29 @@ void System::Init(Log* log, Allocator *palloc)
         Log::SetGlobalLog(log);
         Timer::initializeTimerSystem();
         Allocator::setInstance(palloc);
+		Display::Initialize();
+#ifdef OVR_OS_WIN32
+		// This code will look for the first display. If it's a display
+		// that's extending the destkop, the code will assume we're in
+		// compatibility mode. Compatibility mode prevents shim loading
+		// and renders only to extended Rifts.
+		// If we find a display and it's application exclusive,
+		// we load the shim so we can render to it.
+		// If no display is available, we revert to whatever the
+		// driver tells us we're in
+		Ptr<DisplaySearchHandle> searchHandle = *Display::GetDisplaySearchHandle();
+		Ptr<Display> pDisplay = NULL;
+
+        if (Display::GetDisplayCount(searchHandle) > 0)
+        {
+            pDisplay = Display::GetDisplay(0, searchHandle);
+        }
+
+		if( pDisplay == NULL )
+			Win32::DisplayShim::GetInstance().Initialize(Display::InCompatibilityMode());
+		else
+			Win32::DisplayShim::GetInstance().Initialize(!pDisplay->ApplicationExclusive);
+#endif
     }
     else
     {
@@ -52,13 +92,33 @@ void System::Destroy()
 {    
     if (Allocator::GetInstance())
     {
-        // Wait for all threads to finish; this must be done so that memory
-        // allocator and all destructors finalize correctly.
-#ifdef OVR_ENABLE_THREADS
-        Thread::FinishAllThreads();
+#ifdef OVR_OS_WIN32
+		Win32::DisplayShim::GetInstance().Shutdown();
 #endif
 
-        // Shutdown heap and destroy SysAlloc singleton, if any.
+		// Invoke all of the post-finish callbacks (normal case)
+        for (SystemSingletonInternal *listener = SystemShutdownListenerStack; listener; listener = listener->NextSingleton)
+		{
+			listener->OnThreadDestroy();
+		}
+
+#ifdef OVR_ENABLE_THREADS
+		// Wait for all threads to finish; this must be done so that memory
+		// allocator and all destructors finalize correctly.
+		Thread::FinishAllThreads();
+#endif
+
+		// Invoke all of the post-finish callbacks (normal case)
+        for (SystemSingletonInternal *next, *listener = SystemShutdownListenerStack; listener; listener = next)
+		{
+            next = listener->NextSingleton;
+
+			listener->OnSystemDestroy();
+		}
+
+        SystemShutdownListenerStack = 0;
+
+		// Shutdown heap and destroy SysAlloc singleton, if any.
         Allocator::GetInstance()->onSystemShutdown();
         Allocator::setInstance(0);
 
@@ -77,5 +137,5 @@ bool System::IsInitialized()
     return Allocator::GetInstance() != 0;
 }
 
-} // OVR
 
+} // namespace OVR

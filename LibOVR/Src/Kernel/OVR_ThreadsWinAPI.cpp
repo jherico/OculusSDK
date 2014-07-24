@@ -28,6 +28,7 @@ limitations under the License.
 #include "OVR_Threads.h"
 #include "OVR_Hash.h"
 #include "OVR_Log.h"
+#include "OVR_Timer.h"
 
 #ifdef OVR_ENABLE_THREADS
 
@@ -541,7 +542,7 @@ __declspec(thread)  Thread*    pCurrentThread      = 0;
 
 // *** Thread constructors.
 
-Thread::Thread(UPInt stackSize, int processor)
+Thread::Thread(size_t stackSize, int processor)
 {    
     CreateParams params;
     params.stackSize = stackSize;
@@ -549,7 +550,7 @@ Thread::Thread(UPInt stackSize, int processor)
     Init(params);
 }
 
-Thread::Thread(Thread::ThreadFn threadFunction, void*  userHandle, UPInt stackSize, 
+Thread::Thread(Thread::ThreadFn threadFunction, void*  userHandle, size_t stackSize, 
                  int processor, Thread::ThreadState initialState)
 {
     CreateParams params(threadFunction, userHandle, stackSize, processor, initialState);
@@ -597,9 +598,14 @@ Thread::~Thread()
 // Default Run implementation
 int Thread::Run()
 {
-    // Call pointer to function, if available.    
-    return (ThreadFunction) ? ThreadFunction(this, UserHandle) : 0;
+	if (!ThreadFunction)
+		return 0;
+
+	int ret = ThreadFunction(this, UserHandle);
+
+	return ret;
 }
+
 void Thread::OnExit()
 {   
 }
@@ -608,7 +614,7 @@ void Thread::OnExit()
 void Thread::FinishAndRelease()
 {
     // Note: thread must be US.
-    ThreadFlags &= (UInt32)~(OVR_THREAD_STARTED);
+    ThreadFlags &= (uint32_t)~(OVR_THREAD_STARTED);
     ThreadFlags |= OVR_THREAD_FINISHED;
 
     // Release our reference; this is equivalent to 'delete this'
@@ -624,9 +630,9 @@ class ThreadList : public NewOverrideBase
     //------------------------------------------------------------------------
     struct ThreadHashOp
     {
-        UPInt operator()(const Thread* ptr)
+        size_t operator()(const Thread* ptr)
         {
-            return (((UPInt)ptr) >> 6) ^ (UPInt)ptr;
+            return (((size_t)ptr) >> 6) ^ (size_t)ptr;
         }
     };
 
@@ -722,11 +728,12 @@ int Thread::PRun()
     if (ThreadFlags & OVR_THREAD_START_SUSPENDED)
     {
         Suspend();
-        ThreadFlags &= (UInt32)~OVR_THREAD_START_SUSPENDED;
+        ThreadFlags &= (uint32_t)~OVR_THREAD_START_SUSPENDED;
     }
 
     // Call the virtual run function
     ExitCode = Run();    
+
     return ExitCode;
 }
 
@@ -761,7 +768,7 @@ void    Thread::SetExitFlag(bool exitFlag)
     if (exitFlag)
         ThreadFlags |= OVR_THREAD_EXIT;
     else
-        ThreadFlags &= (UInt32) ~OVR_THREAD_EXIT;
+        ThreadFlags &= (uint32_t) ~OVR_THREAD_EXIT;
 }
 
 
@@ -779,12 +786,39 @@ bool    Thread::IsSuspended() const
 Thread::ThreadState Thread::GetThreadState() const
 {
     if (IsSuspended())
-        return Suspended;    
+        return Suspended;
     if (ThreadFlags & OVR_THREAD_STARTED)
-        return Running;    
+        return Running;
     return NotRunning;
 }
+// Join thread
+bool Thread::Join(int maxWaitMs) const
+{
+    // If polling,
+    if (maxWaitMs == 0)
+    {
+        // Just return if finished
+        return IsFinished();
+    }
+    // If waiting forever,
+    else if (maxWaitMs > 0)
+    {
+        // Try waiting once
+        WaitForSingleObject(ThreadHandle, maxWaitMs);
 
+        // Return if the wait succeeded
+        return IsFinished();
+    }
+
+    // While not finished,
+    while (!IsFinished())
+    {
+        // Wait for the thread handle to signal
+        WaitForSingleObject(ThreadHandle, INFINITE);
+    }
+
+    return true;
+}
 
 
 // ***** Thread management
@@ -852,8 +886,9 @@ bool Thread::Start(ThreadState initialState)
     ExitCode        = 0;
     SuspendCount    = 0;
     ThreadFlags     = (initialState == Running) ? 0 : OVR_THREAD_START_SUSPENDED;
+
     ThreadHandle = (HANDLE) _beginthreadex(0, (unsigned)StackSize,
-                                           Thread_Win32StartFn, this, 0, (unsigned*)&IdValue);
+                   Thread_Win32StartFn, this, 0, (unsigned*)&IdValue);
 
     // Failed? Fail the function
     if (ThreadHandle == 0)
@@ -890,13 +925,15 @@ bool Thread::Resume()
         return 0;
 
     // Decrement count, and resume thread if it is 0
-    SInt32 oldCount = SuspendCount.ExchangeAdd_Acquire(-1);
+    int32_t oldCount = SuspendCount.ExchangeAdd_Acquire(-1);
     if (oldCount >= 1)
     {
         if (oldCount == 1)
         {
-            if (::ResumeThread(ThreadHandle) != 0xFFFFFFFF)            
-                return 1;            
+            if (::ResumeThread(ThreadHandle) != 0xFFFFFFFF)
+            {
+                return 1;
+            }
         }
         else
         {
@@ -922,7 +959,7 @@ void Thread::Exit(int exitCode)
     FinishAndRelease();
     ThreadList::RemoveRunningThread(this);
 
-    // Call the exit function.    
+    // Call the exit function.
     _endthreadex((unsigned)exitCode);
 }
 
@@ -979,6 +1016,7 @@ void Thread::SetThreadName( const char* name )
     }
     __except( GetExceptionCode()==0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER )
     {
+        return;
     }
 #endif // OVR_BUILD_SHIPPING
 }
@@ -1001,5 +1039,3 @@ ThreadId GetCurrentThreadId()
 } // OVR
 
 #endif
-
-

@@ -48,11 +48,11 @@ Quatf Player::GetOrientation(bool baseOnly)
     return baseOnly ? baseQ : baseQ * HeadPose.Rotation;
 }
 
-Transformf Player::VirtualWorldTransformfromRealPose(const Transformf &sensorHeadPose)
+Posef Player::VirtualWorldTransformfromRealPose(const Posef &sensorHeadPose)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
 
-    return Transformf(baseQ * sensorHeadPose.Rotation,
+    return Posef(baseQ * sensorHeadPose.Rotation,
                  BodyPos + baseQ.Rotate(sensorHeadPose.Translation));
 }
 

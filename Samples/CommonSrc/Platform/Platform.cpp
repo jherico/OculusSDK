@@ -21,15 +21,13 @@ limitations under the License.
 
 ************************************************************************************/
 
-
-
 #include "Platform.h"
 #include <Kernel/OVR_Std.h>
 #include <Kernel/OVR_Timer.h>
 #include "../Render/Render_Device.h"
 #include "Gamepad.h"
 
-namespace OVR { namespace Platform {
+namespace OVR { namespace OvrPlatform {
 
 
 const SetupGraphicsDeviceSet* SetupGraphicsDeviceSet::PickSetupDevice(const char* typeArg) const

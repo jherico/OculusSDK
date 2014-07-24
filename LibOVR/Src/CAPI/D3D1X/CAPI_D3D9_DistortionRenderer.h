@@ -29,6 +29,7 @@ limitations under the License.
 #undef new
 
 #if defined (OVR_OS_WIN32)
+#define WIN32_LEAN_AND_MEAN
 #if _MSC_VER < 1700
 #include <d3dx9.h>
 #else
@@ -63,23 +64,23 @@ public:
     virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
                             unsigned distortionCaps);
 
-    virtual void SubmitEye(int eyeId, ovrTexture* eyeTexture);
+    virtual void SubmitEye(int eyeId, const ovrTexture* eyeTexture);
 
-    virtual void EndFrame(bool swapBuffers, unsigned char* latencyTesterDrawColor, unsigned char* latencyTester2DrawColor);
+    virtual void EndFrame(bool swapBuffers);
 
     // TBD: Make public?
     void         WaitUntilGpuIdle();
 
 	// Similar to ovr_WaitTillTime but it also flushes GPU.
 	// Note, it exits when time expires, even if GPU is not in idle state yet.
-	double       WaitTillTimeAndFlushGpu(double absTime);
+	double       FlushGpuAndWaitTillTime(double absTime);
 
 protected:
 	
 	class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
 	{
 	public:
-		GraphicsState(IDirect3DDevice9* d);
+		GraphicsState(IDirect3DDevice9* d, unsigned arg_distortionCaps);
 		virtual void Save();
 		virtual void Restore();
 
@@ -98,6 +99,7 @@ protected:
 		//Keep track of how many we've done, for reverting
 		int numSavedStates;
 		IDirect3DDevice9* device;
+        unsigned distortionCaps;
 	};
 
 private:
@@ -110,6 +112,7 @@ private:
 	void         RecordAndSetState(int which, int type, DWORD newValue);
 	void         RevertAllStates(void);
 
+    void         renderEndFrame();
 	
 	//Data, structures and pointers
 	IDirect3DDevice9            * device;

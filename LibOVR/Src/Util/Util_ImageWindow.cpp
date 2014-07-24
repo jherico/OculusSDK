@@ -23,12 +23,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 *************************************************************************************/
-#include "../../Include/OVR.h"
+#include "../../Include/OVR_Kernel.h"
 
 #include "Util_ImageWindow.h"
 
 #if defined(OVR_OS_WIN32)
 
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include "DWrite.h"
@@ -51,7 +52,14 @@ namespace OVR { namespace Util {
 	
 ID2D1Factory* ImageWindow::pD2DFactory = NULL;
 IDWriteFactory* ImageWindow::pDWriteFactory = NULL;
-ImageWindow* ImageWindow::globalWindow[4];
+
+
+// TODO(review): This appears to be (at present) necessary, the global list is accessed by the
+// render loop in Samples.  In the current version, windows will just be lost when windowCount
+// exceeds MaxWindows; I've left that in place, since this is unfamiliar code. I'm not sure what
+// thread-safety guarantees this portion of the code needs to satisfy, so I don't want to
+// change it to a list or whatever.  Asserts added to catch the error.
+ImageWindow* ImageWindow::globalWindow[ImageWindow::MaxWindows];
 int ImageWindow::windowCount = 0;
 
 LRESULT CALLBACK MainWndProc(
@@ -115,9 +123,9 @@ ImageWindow::ImageWindow( uint32_t width, uint32_t height ) :
 		writeFactory = (DWriteCreateFactoryFn)GetProcAddress( hInstWrite, "DWriteCreateFactory" );
 	}
 
-	globalWindow[windowCount] = this;
-
-	++windowCount;
+    // TODO: see note where globalWindow is declared.
+	globalWindow[windowCount++ % MaxWindows] = this;
+    OVR_ASSERT(windowCount < MaxWindows);
 
 	if( pD2DFactory == NULL && createFactory && writeFactory )
 	{
@@ -155,7 +163,7 @@ ImageWindow::~ImageWindow()
 			globalWindow[i] = NULL;
 			break;
 		}
-}
+    }
 
 	if( greyBitmap )
 		greyBitmap->Release();
@@ -240,14 +248,14 @@ void ImageWindow::AssociateSurface( void* surface )
 				tmpTarget = NULL;
 			}
 
-			result = tmpTarget->CreateBitmap( size, colorBitmapProps, &colorBitmap );
-			if( result != S_OK )
+			if (tmpTarget)
 			{
-				greyBitmap->Release();
-				greyBitmap = NULL;
-
-				tmpTarget->Release();
-				tmpTarget = NULL;
+				result = tmpTarget->CreateBitmap(size, colorBitmapProps, &colorBitmap);
+				if (result != S_OK)
+				{
+					tmpTarget->Release();
+					tmpTarget = NULL;
+				}
 			}
 			pRT = tmpTarget;
 		}
@@ -508,4 +516,14 @@ void ImageWindow::addText( float x, float y, float r, float g, float b, OVR::Str
 
 }}
 
-#endif //defined(OVR_OS_WIN32)
+#else //defined(OVR_OS_WIN32)
+
+namespace OVR { namespace Util {
+
+ImageWindow* ImageWindow::globalWindow[4];
+int ImageWindow::windowCount = 0;
+
+}}
+
+#endif //#else //defined(OVR_OS_WIN32)
+

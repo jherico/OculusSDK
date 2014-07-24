@@ -28,7 +28,7 @@ limitations under the License.
 
 namespace OVR { namespace Render { namespace GL { namespace Win32 {
 
-typedef HRESULT (__stdcall *PFNDWMENABLECOMPOSITIONPROC) (UINT);
+typedef HRESULT (WINAPI *PFNDWMENABLECOMPOSITIONPROC) (UINT);
 
 #pragma warning(disable : 4995)
 PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition;
@@ -201,16 +201,16 @@ BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 {
     RenderDevice* renderer = (RenderDevice*)dwData;
 
-    MONITORINFOEX monitor;
+    MONITORINFOEXA monitor;
     monitor.cbSize = sizeof(monitor);
 
-    if (::GetMonitorInfo(hMonitor, &monitor) && monitor.szDevice[0])
+    if (::GetMonitorInfoA(hMonitor, &monitor) && monitor.szDevice[0])
     {
-        DISPLAY_DEVICE dispDev;
+        DISPLAY_DEVICEA dispDev;
         memset(&dispDev, 0, sizeof(dispDev));
         dispDev.cb = sizeof(dispDev);
 
-        if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
+        if (::EnumDisplayDevicesA(monitor.szDevice, 0, &dispDev, 0))
         {
             if (strstr(String(dispDev.DeviceName).ToCStr(), renderer->GetParams().Display.MonitorName.ToCStr()))
             {
