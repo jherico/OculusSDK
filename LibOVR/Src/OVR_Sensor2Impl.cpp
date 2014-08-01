@@ -975,21 +975,21 @@ void UpdateDK2Timestamps(SensorTimeFilter& tf,
                 if (rawValues[i] < lowMks)
                 {
                     LogText("Timestamp %d rollover, was: %u, now: %u\n", i, lowMks, rawValues[i]);
-                    timestamps[i]->TimestampMks += 0x100000000;
+                    timestamps[i]->TimestampMks += 0x100000000LL;
                 }
                 // Update the low bits
-                timestamps[i]->TimestampMks = (timestamps[i]->TimestampMks & 0xFFFFFFFF00000000) | rawValues[i];
+                timestamps[i]->TimestampMks = (timestamps[i]->TimestampMks & 0xFFFFFFFF00000000LL) | rawValues[i];
             }
             else
             {
                 // Take the high bits from the main timestamp first (not a typo in the first argument!)
                 timestamps[i]->TimestampMks = 
-                    (timestamps[0]->TimestampMks & 0xFFFFFFFF00000000) | rawValues[i];
+                    (timestamps[0]->TimestampMks & 0xFFFFFFFF00000000LL) | rawValues[i];
                 // Now force it into the reasonable range around the expanded main timestamp
                 if (timestamps[i]->TimestampMks > timestamps[0]->TimestampMks + 0x1000000)
-                    timestamps[i]->TimestampMks -= 0x100000000;
-                else if (timestamps[i]->TimestampMks + 0x100000000 < timestamps[0]->TimestampMks + 0x1000000)
-                    timestamps[i]->TimestampMks += 0x100000000;
+                    timestamps[i]->TimestampMks -= 0x100000000LL;
+                else if (timestamps[i]->TimestampMks + 0x100000000LL < timestamps[0]->TimestampMks + 0x1000000LL)
+                    timestamps[i]->TimestampMks += 0x100000000LL;
             }
 
             updateIndices[updateCount] = i;
