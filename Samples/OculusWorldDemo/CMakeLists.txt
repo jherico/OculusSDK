@@ -5,6 +5,13 @@ file(GLOB_RECURSE ASSET_FILES Assets/Tuscany/*)
 
 # All the Oculus VR functionality comes from this DLL
 set(EXTRA_LIBS OVR_C)
+# While the samples use the C API, they also use the 
+# core SDK functionality quite a bit
+list(APPEND EXTRA_LIBS OculusVR)
+list(APPEND EXTRA_LIBS ${OVR_LIBRARIES})
+
+# Supplementary rendering wrapper functionality
+list(APPEND EXTRA_LIBS CommonSrc)
 
 if (WIN32)
     add_executable(OculusWorldDemo WIN32 ${SOURCE_FILES})
@@ -24,14 +31,6 @@ else()
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Assets  ${CMAKE_CURRENT_BINARY_DIR}/Assets)
 endif()
-
-# While the samples use the C API, they also use the 
-# core SDK functionality quite a bit
-list(APPEND EXTRA_LIBS OculusVR)
-list(APPEND EXTRA_LIBS ${OVR_LIBRARIES})
-
-# Supplementary rendering wrapper functionality
-list(APPEND EXTRA_LIBS CommonSrc)
 
 # Scene loading
 list(APPEND EXTRA_LIBS TinyXML2)

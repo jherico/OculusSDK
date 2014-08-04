@@ -34,7 +34,7 @@ namespace OVR { namespace CAPI {
 
 
 HMDRenderState::HMDRenderState(ovrHmd hmd, Profile* userProfile, const OVR::HMDInfo& hmdInfo)
-    : HMD(hmd), HMDInfo(hmdInfo), SwapBufferCallback(nullptr), SwapBufferUserData(nullptr)
+    : HMD(hmd), HMDInfo(hmdInfo), SwapBufferCallback(0), SwapBufferUserData(0)
 {
 	RenderInfo = GenerateHmdRenderInfoFromHmdInfo( HMDInfo, userProfile );
 
