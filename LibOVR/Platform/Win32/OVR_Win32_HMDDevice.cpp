@@ -314,7 +314,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
                 // Hard-coded defaults in case the device doesn't have the data itself.
                 if (wcsstr(ddm.DeviceID, L"OVR0003"))
                 {   // DK2 prototypes and variants (default to HmdType_DK2)
-                    hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12576f, 0.07074f, 0.12576f*0.5f, 0.0635f );
+                    hmdCreateDesc.SetScreenParameters(mx, my, 1920, 1080, 0.12576f, 0.07074f, 0.07074f*0.5f, 0.0635f );
                 }
 				else if (wcsstr(ddm.DeviceID, L"OVR0002"))
 				{   // HD Prototypes (default to HmdType_DKHDProto) 

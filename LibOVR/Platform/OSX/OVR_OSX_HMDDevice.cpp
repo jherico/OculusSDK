@@ -215,7 +215,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
 
         CGRect desktop = CGDisplayBounds(Displays[i]);
         
-        if (vendor == 16082 && ( (product == 1)||(product == 2) ) ) // 7" or HD
+        if (vendor == 16082 && ( (product == 1)||(product == 2)||(product == 3) ) ) // 7" or HD
         {
             char idstring[9];
             idstring[0] = 'A'-1+((vendor>>10) & 31);
@@ -229,7 +229,7 @@ void HMDDeviceFactory::EnumerateDevices(EnumerateVisitor& visitor)
             if (product == 3)
             {   // DK2 prototypes and variants (default to HmdType_DK2)
                 hmdCreateDesc.SetScreenParameters(desktop.origin.x, desktop.origin.y,
-                                                  1920, 1080, 0.12576f, 0.07074f, 0.12576f*0.5f, 0.0635f );
+                                                  1920, 1080, 0.12576f, 0.07074f, 0.07074f*0.5f, 0.0635f );
             }
 			else if (product == 2)
 			{   // HD Prototypes (default to HmdType_DKHDProto) 

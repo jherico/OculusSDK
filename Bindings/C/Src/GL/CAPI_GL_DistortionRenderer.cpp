@@ -299,7 +299,7 @@ DistortionRenderer::GraphicsState::GraphicsState()
     char prefix[64];
     bool foundVersion = false;
     
-    for (int i = 10; i < 30; ++i)
+    for (int i = 10; i < 40; ++i)
     {
         int major = i / 10;
         int minor = i % 10;
@@ -316,7 +316,7 @@ DistortionRenderer::GraphicsState::GraphicsState()
     if (!foundVersion)
     {
         glGetIntegerv(GL_MAJOR_VERSION, &GlMajorVersion);
-        glGetIntegerv(GL_MAJOR_VERSION, &GlMinorVersion);
+        glGetIntegerv(GL_MINOR_VERSION, &GlMinorVersion);
 	}
 
 	OVR_ASSERT(GlMajorVersion >= 2);
@@ -695,7 +695,7 @@ void DistortionRenderer::initShaders()
     } else if (glState->GlMajorVersion < 4 || (glState->GlMajorVersion == 4 && glState->GlMinorVersion < 4)) {
       shaderPrefix = glsl3Prefix;
     } else {
-      shaderPrefix = glsl4Prefix;
+      shaderPrefix = glsl3Prefix;
     }
 
     {
