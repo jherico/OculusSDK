@@ -71,6 +71,7 @@ OculusWorldDemoApp::OculusWorldDemoApp()
       PositionTrackingEnabled(true),
 	  PixelLuminanceOverdrive(true),
       MirrorToWindow(true),
+      SupportsSrgb(true),
 
       // Scene state
       SceneMode(Scene_World),
@@ -246,6 +247,10 @@ bool OculusWorldDemoApp::SetupWindowAndRendering(int argc, const char** argv)
     RenderParams.Display     = DisplayId(Hmd->DisplayDeviceName, Hmd->DisplayId);
     RenderParams.Multisample = 1;
     RenderParams.Resolution  = Hmd->Resolution;
+
+    if (OVR_strcmp(graphics, "GL") == 0 && !(Hmd->HmdCaps & ovrHmdCap_ExtendDesktop))
+        SupportsSrgb = false;
+
     //RenderParams.Fullscreen = true;
     pRender = pPlatform->SetupGraphics(OVR_DEFAULT_RENDER_DEVICE_SET,
                                        graphics, RenderParams);
@@ -496,8 +501,9 @@ void OculusWorldDemoApp::CalculateHmdValues()
 
 	ovrRenderAPIConfig config         = pRender->Get_ovrRenderAPIConfig();
     unsigned           distortionCaps = ovrDistortionCap_Chromatic |
-										ovrDistortionCap_Vignette |
-										ovrDistortionCap_SRGB;
+										ovrDistortionCap_Vignette;
+    if (SupportsSrgb)
+        distortionCaps |= ovrDistortionCap_SRGB;
 	if(PixelLuminanceOverdrive)
 		distortionCaps |= ovrDistortionCap_Overdrive;
     if (TimewarpEnabled)
@@ -586,9 +592,11 @@ Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requ
     // Does that require actual reallocation?
     if (Sizei(rt.Tex.Header.TextureSize) != newRTSize)        
     {        
-        rt.pTex = *pRender->CreateTexture(Texture_RGBA | Texture_RenderTarget |
-                                          (MultisampleEnabled ? 4 : 1)  | Texture_SRGB ,
-                                          newRTSize.w, newRTSize.h, NULL);
+        int format = Texture_RGBA | Texture_RenderTarget | (MultisampleEnabled ? 4 : 1);
+        if (SupportsSrgb)
+            format |= Texture_SRGB;
+
+        rt.pTex = *pRender->CreateTexture(format, newRTSize.w, newRTSize.h, NULL);
         rt.pTex->SetSampleMode(Sample_ClampBorder | Sample_Linear);
 
 
@@ -1205,7 +1213,7 @@ void OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
             OVR_sprintf(gpustat, sizeof(gpustat), " GPU Tex: %u MB", texMemInMB);
             OVR_strcat(buf, sizeof(buf), gpustat);
         }
-        
+
         DrawTextBox(pRender, 0.0f, 0.0f, textHeight, buf, DrawText_Center);
     }
     break;

@@ -151,6 +151,8 @@ public:
         Destroy();
     }
 
+	static void OVR_CDECL DirectDisplayInitialize();
+
     // Returns 'true' if system was properly initialized.
     static bool OVR_CDECL IsInitialized();
 

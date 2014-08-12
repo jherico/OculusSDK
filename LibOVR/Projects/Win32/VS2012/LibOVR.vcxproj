@@ -96,7 +96,6 @@
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h" />
-    <ClInclude Include="..\..\..\Src\Util\Util_Settings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.cpp" />
@@ -170,7 +169,6 @@
     <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp" />
-    <ClCompile Include="..\..\..\Src\Util\Util_Settings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_ps.psh">

@@ -100,7 +100,7 @@ namespace OVR { namespace CAPI { namespace GL {
   
         "_VS_OUT vec4 oColor;\n"
         "_VS_OUT vec2 oTexCoord;\n"
-    
+
         "void main()\n"
         "{\n"
 	    "	gl_Position = vec4(Position.xy * Scale + PositionOffset, 0.5, 1.0);\n"
@@ -123,11 +123,11 @@ namespace OVR { namespace CAPI { namespace GL {
         "_FS_IN vec4 oColor;\n"
         "_FS_IN vec2 oTexCoord;\n"
     
+        "_FRAGCOLOR_DECLARATION\n"
+
         "void main()\n"
         "{\n"
-        "   gl_FragColor = texture2D(Texture0, oTexCoord);\n"
-        "   if(oColor.a < 0.02)\n"
-        "       gl_FragColor.a = 0.0;\n"
+        "   _FRAGCOLOR = oColor * texture2D(Texture0, oTexCoord);\n"
         "}\n";
 
     // The following is copied from the generated D3D SimpleTexturedQuad_ps_refl.h file, with D3D_NS renamed to GL.

@@ -159,9 +159,6 @@
     <ClCompile Include="..\..\..\Src\Kernel\OVR_ThreadCommandQueue.cpp">
       <Filter>Kernel</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\Util\Util_Settings.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp">
       <Filter>CAPI</Filter>
     </ClCompile>
@@ -381,9 +378,6 @@
     <ClInclude Include="..\..\..\Src\Displays\OVR_Display.h">
       <Filter>Displays</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Src\Util\Util_Settings.h">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h">
       <Filter>CAPI</Filter>
     </ClInclude>
@@ -428,6 +422,12 @@
     <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleQuad_ps.psh">
       <Filter>CAPI\Shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh">
+      <Filter>CAPI\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh">
+      <Filter>CAPI\Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CAPI">
@@ -466,13 +466,5 @@
     <Filter Include="CAPI\Textures">
       <UniqueIdentifier>{4133d45b-be4b-4813-afea-9ad61ce3fe11}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh">
-      <Filter>CAPI\Shaders</Filter>
-    </None>
-    <None Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </None>
   </ItemGroup>
 </Project>

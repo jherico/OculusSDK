@@ -39,13 +39,16 @@ void OculusWorldDemoApp::InitMainFilePath()
     {
         String prefixPath1(pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1),
             prefixPath2(WORLDDEMO_ASSET_PATH2),
-            prefixPath3(WORLDDEMO_ASSET_PATH3);
+            prefixPath3(WORLDDEMO_ASSET_PATH3),
+            prefixPath4(WORLDDEMO_ASSET_PATH4);
         if (SysFile(prefixPath1 + MainFilePath).IsValid())
             MainFilePath = prefixPath1 + MainFilePath;
         else if (SysFile(prefixPath2 + MainFilePath).IsValid())
             MainFilePath = prefixPath2 + MainFilePath;
         else if (SysFile(prefixPath3 + MainFilePath).IsValid())
             MainFilePath = prefixPath3 + MainFilePath;
+        else if (SysFile(prefixPath4 + MainFilePath).IsValid())
+            MainFilePath = prefixPath4 + MainFilePath;
     }
 }
 

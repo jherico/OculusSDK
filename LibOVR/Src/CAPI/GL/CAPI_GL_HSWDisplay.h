@@ -55,13 +55,18 @@ namespace OVR { namespace CAPI { namespace GL {
         void LoadGraphics();
 
         OVR::CAPI::GL::RenderParams        RenderParams;
-        GLuint                             FrameBuffer;     // This is a container for a texture, depth buffer, stencil buffer to be rendered to. To consider: Make a wrapper class, like the OculusWorldDemo RBuffer class. 
+        int                                GLMajorVersion;      // Derived from glGetString(GL_VERSION). To consider: Move this into GL::RenderParams.
+        int                                GLMinorVersion;      // 
+        bool                               SupportsVao;         // True if Vertex Array Objects are supported by the OpenGL version.
+        GLuint                             FrameBuffer;         // This is a container for a texture, depth buffer, stencil buffer to be rendered to. To consider: Make a wrapper class, like the OculusWorldDemo RBuffer class. 
         Ptr<OVR::CAPI::GL::Texture>        pTexture;
         Ptr<OVR::CAPI::GL::ShaderSet>      pShaderSet;
         Ptr<OVR::CAPI::GL::VertexShader>   pVertexShader;
         Ptr<OVR::CAPI::GL::FragmentShader> pFragmentShader;
         Ptr<OVR::CAPI::GL::Buffer>         pVB;
-        Matrix4f                           OrthoProjection[2];     // Projection for 2D.
+        GLuint                             VAO;                 // Vertex Array Object.
+        bool                               VAOInitialized;      // True if the VAO was initialized with vertex buffer data.
+        Matrix4f                           OrthoProjection[2];  // Projection for 2D.
 
     private:
         OVR_NON_COPYABLE(HSWDisplay)

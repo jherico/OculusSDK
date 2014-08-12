@@ -36,9 +36,6 @@ limitations under the License.
 #include "../../Kernel/OVR_Allocator.h"
 #include "../../Kernel/OVR_Color.h"
 
-#include "../Textures/healthAndSafety.tga.h"
-
-
 
 namespace OVR { namespace CAPI { 
 
@@ -233,7 +230,9 @@ void HSWDisplay::LoadGraphics()
         if(caps.TextureCaps & (D3DPTEXTURECAPS_SQUAREONLY | D3DPTEXTURECAPS_POW2))
             { HSWDISPLAY_LOG(("[HSWDisplay D3D9] Square textures allowed only.")); }
 
-        pTexture = *LoadTextureTga(RenderParams, healthAndSafety_tga, (int)sizeof(healthAndSafety_tga), 255);
+        size_t textureSize;
+        const uint8_t* TextureData = GetDefaultTexture(textureSize);
+        pTexture = *LoadTextureTga(RenderParams, TextureData, (int)textureSize, 255);
         OVR_ASSERT(pTexture);
     }
 
@@ -269,9 +268,6 @@ void HSWDisplay::LoadGraphics()
             }
         }
     }
-
-    // Calculate ortho projection.
-    GetOrthoProjection(RenderState, OrthoProjection);
 }
 
 
@@ -327,9 +323,10 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         if(!pTexture)
             LoadGraphics();
 
-        HRESULT hResult;
+        // Calculate ortho projection.
+        GetOrthoProjection(RenderState, OrthoProjection);
 
-        hResult = RenderParams.Device->BeginScene();
+        HRESULT hResult = RenderParams.Device->BeginScene();
         if(FAILED(hResult))
             { HSWDISPLAY_LOG(("[HSWDisplay D3D9] BeginScene failed. %d (%x)", hResult, hResult)); }
 

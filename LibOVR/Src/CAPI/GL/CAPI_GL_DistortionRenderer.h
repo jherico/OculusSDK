@@ -67,6 +67,12 @@ protected:
         virtual void Save();
         virtual void Restore();
         
+#ifdef OVR_OS_MAC
+        // Asking for Core Profile is equivalent to asking whether we have a
+        // 3.2+ context on mac.
+        bool isAtLeastOpenGL3();
+#endif
+
     protected:
         void ApplyBool(GLenum Name, GLint Value, GLint index = -1);
         

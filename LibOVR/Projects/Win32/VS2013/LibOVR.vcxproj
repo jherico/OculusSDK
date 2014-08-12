@@ -97,7 +97,6 @@
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h" />
-    <ClInclude Include="..\..\..\Src\Util\Util_Settings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.cpp" />
@@ -171,7 +170,6 @@
     <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp" />
-    <ClCompile Include="..\..\..\Src\Util\Util_Settings.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_ps.psh">
@@ -266,8 +264,28 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh" />
-    <None Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{EA50E705-5113-49E5-B105-2512EDC8DDC6}</ProjectGuid>

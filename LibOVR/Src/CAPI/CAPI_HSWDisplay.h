@@ -212,6 +212,9 @@ protected:
     // Generates an appropriate stereo ortho projection matrix.
     static void GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f OrthoProjection[2]);
 
+    // Returns the default HSW display texture data.
+    static const uint8_t* GetDefaultTexture(size_t& TextureSize);
+
 protected:
     bool                   Enabled;            // If true then the HSW display system is enabled. True by default. 
     bool                   Displayed;          // If true then the warning is currently visible and the following variables have meaning. Else there is no warning being displayed for this application on the given HMD.

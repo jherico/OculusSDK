@@ -37,9 +37,6 @@ limitations under the License.
 #include "../../Kernel/OVR_Allocator.h"
 #include "../../Kernel/OVR_Color.h"
 
-
-#include "../Textures/healthAndSafety.tga.h"
-
 // We currently borrow the SimpleQuad shaders
 #include "../Shaders/SimpleTexturedQuad_vs.h"
 #include "../Shaders/SimpleTexturedQuad_vs_refl.h"
@@ -324,7 +321,11 @@ void HSWDisplay::LoadGraphics()
     #endif
 
     if(!pTexture) // To do: Add support for .dds files, which would be significantly smaller than the size of the tga.
-        pTexture = *LoadTextureTga(RenderParams, pSamplerState, healthAndSafety_tga, (int)sizeof(healthAndSafety_tga), 255);
+    {
+        size_t textureSize;
+        const uint8_t* TextureData = GetDefaultTexture(textureSize);
+        pTexture = *LoadTextureTga(RenderParams, pSamplerState, TextureData, (int)textureSize, 255);
+    }
 
     if(!UniformBufferArray[0])
     {
@@ -418,9 +419,6 @@ void HSWDisplay::LoadGraphics()
             }
         }
     }
-
-    // Calculate ortho projection.
-    GetOrthoProjection(RenderState, OrthoProjection);
 }
 
 
@@ -445,6 +443,8 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         if(!pVB)
             LoadGraphics();
 
+        // Calculate ortho projection.
+        GetOrthoProjection(RenderState, OrthoProjection);
 
         // Save settings
         // To do: Merge this saved state with that done by DistortionRenderer::GraphicsState::Save(), and put them in a shared location.

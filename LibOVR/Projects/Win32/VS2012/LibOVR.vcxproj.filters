@@ -159,9 +159,6 @@
     <ClCompile Include="..\..\..\Src\Kernel\OVR_ThreadCommandQueue.cpp">
       <Filter>Kernel</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\Util\Util_Settings.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp">
       <Filter>CAPI</Filter>
     </ClCompile>
@@ -380,9 +377,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\Src\Kernel\OVR_ThreadCommandQueue.h">
       <Filter>Kernel</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\Src\Util\Util_Settings.h">
-      <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h">
       <Filter>CAPI</Filter>

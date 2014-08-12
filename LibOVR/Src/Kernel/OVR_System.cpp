@@ -35,6 +35,7 @@ limitations under the License.
 
 namespace OVR {
 
+extern bool anyRiftsInExtendedMode();
 
 // Stack of destroy listeners (push/pop semantics)
 static SystemSingletonInternal *SystemShutdownListenerStack = 0;
@@ -49,6 +50,26 @@ void SystemSingletonInternal::PushDestroyCallbacks()
     SystemShutdownListenerStack = this;
 }
 
+void System::DirectDisplayInitialize()
+{    
+#ifdef OVR_OS_WIN32
+	// Set up display code for Windows
+	Win32::DisplayShim::GetInstance();
+
+		// This code will look for the first display. If it's a display
+		// that's extending the destkop, the code will assume we're in
+		// compatibility mode. Compatibility mode prevents shim loading
+		// and renders only to extended Rifts.
+		// If we find a display and it's application exclusive,
+		// we load the shim so we can render to it.
+		// If no display is available, we revert to whatever the
+		// driver tells us we're in
+
+	bool anyExtendedRifts = anyRiftsInExtendedMode() || Display::InCompatibilityMode( false );
+	
+	Win32::DisplayShim::GetInstance().Initialize(anyExtendedRifts);
+#endif
+        }
 
 // Initializes System core, installing allocator.
 void System::Init(Log* log, Allocator *palloc)
@@ -59,28 +80,7 @@ void System::Init(Log* log, Allocator *palloc)
         Timer::initializeTimerSystem();
         Allocator::setInstance(palloc);
 		Display::Initialize();
-#ifdef OVR_OS_WIN32
-		// This code will look for the first display. If it's a display
-		// that's extending the destkop, the code will assume we're in
-		// compatibility mode. Compatibility mode prevents shim loading
-		// and renders only to extended Rifts.
-		// If we find a display and it's application exclusive,
-		// we load the shim so we can render to it.
-		// If no display is available, we revert to whatever the
-		// driver tells us we're in
-		Ptr<DisplaySearchHandle> searchHandle = *Display::GetDisplaySearchHandle();
-		Ptr<Display> pDisplay = NULL;
-
-        if (Display::GetDisplayCount(searchHandle) > 0)
-        {
-            pDisplay = Display::GetDisplay(0, searchHandle);
-        }
-
-		if( pDisplay == NULL )
-			Win32::DisplayShim::GetInstance().Initialize(Display::InCompatibilityMode());
-		else
-			Win32::DisplayShim::GetInstance().Initialize(!pDisplay->ApplicationExclusive);
-#endif
+		DirectDisplayInitialize();
     }
     else
     {

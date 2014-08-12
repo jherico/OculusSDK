@@ -48,6 +48,7 @@ using namespace OVR::Util::Render;
 #define WORLDDEMO_ASSET_PATH2 "../../../Assets/Tuscany/"
 // This path allows the shortcut to work.
 #define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH4 "../Assets/Tuscany/"
 
 using namespace OVR;
 using namespace OVR::OvrPlatform;
@@ -171,6 +172,8 @@ protected:
     Sizei               WindowSize;
     int                 ScreenNumber;
     int                 FirstScreenInCycle;
+
+    bool                SupportsSrgb;
 
     struct RenderTarget
     {

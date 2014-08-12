@@ -39,6 +39,7 @@ limitations under the License.
 
 namespace OVR {
 
+
 class DisplaySearchHandle : virtual public RefCountBaseV<DisplaySearchHandle>
 {
 public:
@@ -114,7 +115,7 @@ public:
 	// any necessary shimming and function hooks. This should be one
 	// of the very first things your application does when it
 	// initializes LibOVR
-	static bool        Initialize();
+	static bool         Initialize();
 
 	// Returns a count of the detected displays. These are Rift displays
 	// attached directly to an active display port
@@ -185,9 +186,10 @@ public:
         return false;
     }
 
-    // In compatibility mode?
-    static bool InCompatibilityMode();
-	static DisplaySearchHandle* GetDisplaySearchHandle();
+    // Check if right now the current rendering application should be in compatibility mode
+    static bool InCompatibilityMode( bool displaySearch = true );
+
+    static DisplaySearchHandle* GetDisplaySearchHandle();
 };
 
 

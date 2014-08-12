@@ -246,16 +246,15 @@ static ovrBool CAPI_ovrInitializeCalled = 0;
 
 static OVR::Service::NetClient* CAPI_pNetClient = 0;
 
+OVR_EXPORT void ovr_InitializeRenderingShim()
+{
+	OVR::System::DirectDisplayInitialize();
+}
 
 OVR_EXPORT ovrBool ovr_Initialize()
 {
     if (CAPI_ovrInitializeCalled)
         return 1;
-
-#ifdef OVR_OS_WIN32
-    // Set up display code for Windows
-    Win32::DisplayShim::GetInstance();
-#endif
 
     // We must set up the system for the plugin to work
     if (!OVR::System::IsInitialized())
@@ -513,7 +512,7 @@ OVR_EXPORT ovrTrackingState ovrHmd_GetTrackingState(ovrHmd hmddesc, double absTi
     {
         HMDState* p = (HMDState*)hmddesc->Handle;
         result = p->PredictedTrackingState(absTime);
-}
+    }
 
 #ifdef OVR_OS_WIN32
 		// Set up display code for Windows
@@ -602,7 +601,7 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmddesc,
     // Debug state checks: Must be in BeginFrame, on the same thread.
     hmds->checkBeginFrameScope("ovrHmd_EndFrame");
     ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_EndFrame");  
-
+    
     hmds->pRenderer->SetLatencyTestColor(hmds->LatencyTestActive ? hmds->LatencyTestDrawColor : NULL);
 
     // TBD: Move directly into renderer
@@ -616,7 +615,7 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmddesc,
     {
         hmds->pRenderer->SetLatencyTest2Color(NULL);
     }
-
+    
     if (hmds->pRenderer)
 	{
 		hmds->pRenderer->SaveGraphicsState();
@@ -639,7 +638,7 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmddesc,
     }
     // Call after present
     ovrHmd_EndFrameTiming(hmddesc);
-
+    
     if (dk2LatencyTest)
     {
         Util::FrameTimeRecordSet recordset;
@@ -728,7 +727,7 @@ OVR_EXPORT ovrFrameTiming ovrHmd_BeginFrameTiming(ovrHmd hmddesc, unsigned int f
 
     // Compute DeltaSeconds.
     f.DeltaSeconds = (hmds->LastFrameTimeSeconds == 0.0f) ? 0.0f :
-                     (float) (thisFrameTime - hmds->LastFrameTimeSeconds);    
+                     (float) (thisFrameTime - hmds->LastFrameTimeSeconds);
     hmds->LastFrameTimeSeconds = thisFrameTime;
     if (f.DeltaSeconds > 1.0f)
         f.DeltaSeconds = 1.0f;
@@ -965,90 +964,90 @@ OVR_EXPORT ovrBool ovrHmd_DismissHSWDisplay(ovrHmd hmd)
 // -----------------------------------------------------------------------------------
 // ***** Property Access
 OVR_EXPORT ovrBool ovrHmd_GetBool(ovrHmd hmddesc, const char* propertyName, ovrBool defaultVal)
-{
+    {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-	{
-		return hmds->getBoolValue(propertyName, (defaultVal != 0));
-	}
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->getBoolValue(propertyName, (defaultVal != 0));
+        }
 
     return defaultVal;
 }
 
 OVR_EXPORT ovrBool ovrHmd_SetBool(ovrHmd hmddesc, const char* propertyName, ovrBool value)
-{
+    {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {
-        return hmds->setBoolValue(propertyName, value != 0) ? 1 : 0;
-    }
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->setBoolValue(propertyName, value != 0) ? 1 : 0;
+        }
     return false;
-}
+    }
 
 OVR_EXPORT int ovrHmd_GetInt(ovrHmd hmddesc, const char* propertyName, int defaultVal)
 {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {
-        return hmds->getIntValue(propertyName, defaultVal);
-    }
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->getIntValue(propertyName, defaultVal);
+        }
 
     return defaultVal;
 }
 
 OVR_EXPORT ovrBool ovrHmd_SetInt(ovrHmd hmddesc, const char* propertyName, int value)
-{
+    {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
         return hmds->setIntValue(propertyName, value);
-    }
+        }
     return false;
-}
+    }
 
 OVR_EXPORT float ovrHmd_GetFloat(ovrHmd hmddesc, const char* propertyName, float defaultVal)
 {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-	{
-		return hmds->getFloatValue(propertyName, defaultVal);
-	}
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->getFloatValue(propertyName, defaultVal);
+        }
 
     return defaultVal;
 }
 
 OVR_EXPORT ovrBool ovrHmd_SetFloat(ovrHmd hmddesc, const char* propertyName, float value)
-{
+    {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
         return hmds->setFloatValue(propertyName, value);
-    }
+        }
     return false;
-}
+    }
 
 OVR_EXPORT unsigned int ovrHmd_GetFloatArray(ovrHmd hmddesc, const char* propertyName,
                               float values[], unsigned int arraySize)
 {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {       
-		return hmds->getFloatArray(propertyName, values, arraySize);
-    }
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->getFloatArray(propertyName, values, arraySize);
+        }
 
     return 0;
 }
@@ -1056,12 +1055,12 @@ OVR_EXPORT unsigned int ovrHmd_GetFloatArray(ovrHmd hmddesc, const char* propert
 // Modify float[] property; false if property doesn't exist or is readonly.
 OVR_EXPORT ovrBool ovrHmd_SetFloatArray(ovrHmd hmddesc, const char* propertyName,
                                         float values[], unsigned int arraySize)
-{
+    {
     OVR_ASSERT(hmddesc && propertyName);
     
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {       
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
         return hmds->setFloatArray(propertyName, values, arraySize);
     }
 
@@ -1073,11 +1072,11 @@ OVR_EXPORT const char* ovrHmd_GetString(ovrHmd hmddesc, const char* propertyName
 {
     OVR_ASSERT(hmddesc && propertyName);
     
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
-    {
-		return hmds->getString(propertyName, defaultVal);
-    }
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
+        {
+            return hmds->getString(propertyName, defaultVal);
+        }
 
     return defaultVal;
 }
@@ -1087,11 +1086,11 @@ OVR_EXPORT ovrBool ovrHmd_SetString(ovrHmd hmddesc, const char* propertyName,
 {
     OVR_ASSERT(hmddesc && propertyName);
 
-    HMDState* hmds = (HMDState*)hmddesc->Handle;
-    if (hmds)
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        if (hmds)
         {
-        return hmds->setString(propertyName, value) ? 1 : 0;
-    }
+            return hmds->setString(propertyName, value) ? 1 : 0;
+        }
 
     return 0;
 }

@@ -437,7 +437,13 @@ void DistortionRenderer::GraphicsState::Save()
 
 	IsValid = true;
 }
-    
+
+#ifdef OVR_OS_MAC
+bool DistortionRenderer::GraphicsState::isAtLeastOpenGL3()
+{
+    return !(GlMajorVersion < 3|| (GlMajorVersion == 3 && GlMinorVersion < 2));
+}
+#endif
 
 void DistortionRenderer::GraphicsState::Restore()
 {
@@ -458,7 +464,14 @@ void DistortionRenderer::GraphicsState::Restore()
     if (SupportsVao)
     {
 #ifdef OVR_OS_MAC
-		glBindVertexArrayAPPLE(VertexArrayBinding);
+        if (isAtLeastOpenGL3())
+        {
+            glBindVertexArray(VertexArrayBinding);
+        }
+        else
+        {
+            glBindVertexArrayAPPLE(VertexArrayBinding);
+        }
 #else
 		glBindVertexArray(VertexArrayBinding);
 #endif
@@ -735,7 +748,14 @@ void DistortionRenderer::renderPrimitives(
 		if (*vao != 0)
 		{
 #ifdef OVR_OS_MAC
-        	glBindVertexArrayAPPLE(*vao);
+            if (glState->isAtLeastOpenGL3())
+            {
+                glBindVertexArray(*vao);
+            }
+            else
+            {
+                glBindVertexArrayAPPLE(*vao);
+            }
 #else
 			glBindVertexArray(*vao);
 #endif
@@ -744,14 +764,35 @@ void DistortionRenderer::renderPrimitives(
 				glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
 			else
 				glDrawArrays(prim, 0, count);
+
+#ifdef OVR_OS_MAC
+            if (glState->isAtLeastOpenGL3())
+            {
+                glBindVertexArray(*vao);
+            }
+            else
+            {
+                glBindVertexArrayAPPLE(0);
+            }
+#else
+            glBindVertexArray(0);
+#endif
 		}
 		else
 		{
             if (glState->SupportsVao)
             {
 #ifdef OVR_OS_MAC
-                glGenVertexArraysAPPLE(1, vao);
-                glBindVertexArrayAPPLE(*vao);
+                if (glState->isAtLeastOpenGL3())
+                {
+                    glGenVertexArrays(1, vao);
+                    glBindVertexArray(*vao);
+                }
+                else
+                {
+                    glGenVertexArraysAPPLE(1, vao);
+                    glBindVertexArrayAPPLE(*vao);
+                }
 #else
                 glGenVertexArrays(1, vao);
                 glBindVertexArray(*vao);
@@ -802,6 +843,22 @@ void DistortionRenderer::renderPrimitives(
             }
 
 			delete[] locs;
+
+            if (glState->SupportsVao)
+            {
+#ifdef OVR_OS_MAC
+                if (glState->isAtLeastOpenGL3())
+                {
+                    glBindVertexArray(0);
+                }
+                else
+                {
+                    glBindVertexArrayAPPLE(0);
+                }
+#else
+                glBindVertexArray(0);
+#endif
+            }
 		}
 	}
 }

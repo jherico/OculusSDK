@@ -106,6 +106,7 @@ struct LocklessSensorState
     SensorDataType    RawSensorData;
     Pose<double>      WorldFromCamera;
 	uint32_t          StatusFlags;
+    uint32_t          _PAD_0_;
 
 	// ImuFromCpf for HMD pose tracking
 	Posed             ImuFromCpf;

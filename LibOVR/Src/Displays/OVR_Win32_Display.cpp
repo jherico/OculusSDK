@@ -56,7 +56,7 @@ typedef struct
 	UINT	ExpectedWidth;
 	UINT	ExpectedHeight;
 	HWND	hWindow;
-	BOOL	InCompatibilityMode;
+	bool	InCompatibilityMode;
 } ContextStruct;
 
 static ContextStruct GlobalDisplayContext = {0};
@@ -458,82 +458,132 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
         ULONG uReturn = 0;
         HRESULT hr = pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn);
 
-        if (!uReturn)
+        if (FAILED(hr) || !uReturn)
         {
             break;
         }
 
-		VARIANT vtProp;
-		hr = pclsObj->Get(L"InstanceName", 0, &vtProp, 0, 0);
+        VARIANT vtProp;
+        hr = pclsObj->Get(L"InstanceName", 0, &vtProp, 0, 0);
 
-		WCHAR* instanceName = vtProp.bstrVal;
-		WCHAR* nextToken = NULL;
-		if (wcstok_s(instanceName, L"\\", &nextToken) != NULL)
-		{
-			WCHAR* aToken = wcstok_s(NULL, L"\\", &nextToken);
+        WCHAR* instanceName = vtProp.bstrVal;
+        WCHAR* nextToken = NULL;
+        if (SUCCEEDED(hr) &&
+            wcstok_s(instanceName, L"\\", &nextToken) != NULL)
+        {
+            WCHAR* aToken = wcstok_s(NULL, L"\\", &nextToken);
 
-			if (aToken != NULL)
-			{
-				VariantClear(&vtProp);
+            if (aToken != NULL)
+            {
+                VariantClear(&vtProp);
 
-				if (wcscmp(aToken, displayName) != 0)
-				{
-					pclsObj->Release();
-					continue;
-				}
+                if (wcscmp(aToken, displayName) != 0)
+                {
+                    pclsObj->Release();
+                    continue;
+                }
 
-				// Read serial
+                // Read serial
 
-				UINT32* serialArray = NULL;
+                hr = pclsObj->Get(L"SerialNumberID", 0, &vtProp, 0, 0);
 
-				hr = pclsObj->Get(L"SerialNumberID", 0, &vtProp, 0, 0);
+                if (SUCCEEDED(hr))
+                {
+                    if (vtProp.vt != VT_NULL && vtProp.parray != NULL)
+                    {
+                        static const int MaxSerialBytes = 14;
+                        char serialNumber[MaxSerialBytes] = { 0 };
 
-				static const int MaxSerialBytes = 14;
-				char serialNumber[MaxSerialBytes];
+                        UINT32* serialArray = (UINT32*)vtProp.parray->pvData;
+                        for (int i = 0; i < MaxSerialBytes; ++i)
+                        {
+                            serialNumber[i] = (BYTE)(serialArray[i] & 0xff);
+                        }
 
-				serialArray = (UINT32*)vtProp.parray->pvData;
+                        serialNumber[sizeof(serialNumber)-1] = '\0';
+                        serialNumberStr = serialNumber;
+                    }
+                    else
+                    {
+                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for SerialNumberID"));
+                    }
 
-				for (int i = 0; i < MaxSerialBytes; ++i)
-				{
-					serialNumber[i] = (BYTE)(serialArray[i] & 0xff);
-				}
-				serialNumber[sizeof(serialNumber) - 1] = '\0';
-				serialNumberStr = serialNumber;
+                    VariantClear(&vtProp);
+                }
+                else
+                {
+                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display SerialNumberID: %d", (int)hr));
+                }
 
-				VariantClear(&vtProp);
+                // Read length of name
 
-				// Read length of name
+                int userFriendlyNameLen = 0;
 
-				hr = pclsObj->Get(L"UserFriendlyNameLength", 0, &vtProp, 0, 0);
+                hr = pclsObj->Get(L"UserFriendlyNameLength", 0, &vtProp, 0, 0);
 
-				int userFriendlyNameLen = vtProp.iVal;
+                if (SUCCEEDED(hr))
+                {
+                    if (vtProp.vt != VT_NULL)
+                    {
+                        userFriendlyNameLen = vtProp.iVal;
 
-				VariantClear(&vtProp);
+                        if (userFriendlyNameLen <= 0)
+                        {
+                            userFriendlyNameLen = 0;
 
-				// Read name
+                            OVR_DEBUG_LOG(("[Win32Display] WARNING: UserFriendlyNameLength = 0"));
+                        }
+                    }
+                    else
+                    {
+                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for UserFriendlyNameLength"));
+                    }
 
-				static const int MaxNameBytes = 64;
-				char userFriendlyName[MaxNameBytes] = { 0 };
+                    VariantClear(&vtProp);
+                }
+                else
+                {
+                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display UserFriendlyNameLength: %d", (int)hr));
+                }
 
-				UINT32* nameArray = NULL;
+                // Read name
 
-				hr = pclsObj->Get(L"UserFriendlyName", 0, &vtProp, 0, 0);
+                hr = pclsObj->Get(L"UserFriendlyName", 0, &vtProp, 0, 0);
 
-				nameArray = (UINT32*)vtProp.parray->pvData;
-				for (int i = 0; i < MaxNameBytes && i < userFriendlyNameLen; ++i)
-				{
-					userFriendlyName[i] = (BYTE)(nameArray[i] & 0xff);
-				}
-				userFriendlyName[sizeof(userFriendlyName) - 1] = '\0';
-				userFriendlyNameStr = userFriendlyName;
+                if (SUCCEEDED(hr) && userFriendlyNameLen > 0)
+                {
+                    if (vtProp.vt != VT_NULL && vtProp.parray != NULL)
+                    {
+                        static const int MaxNameBytes = 64;
+                        char userFriendlyName[MaxNameBytes] = { 0 };
 
-				VariantClear(&vtProp);
-			}
-		}
+                        UINT32* nameArray = (UINT32*)vtProp.parray->pvData;
+                        for (int i = 0; i < MaxNameBytes && i < userFriendlyNameLen; ++i)
+                        {
+                            userFriendlyName[i] = (BYTE)(nameArray[i] & 0xff);
+                        }
 
-		pclsObj->Release();
+                        userFriendlyName[sizeof(userFriendlyName)-1] = '\0';
+                        userFriendlyNameStr = userFriendlyName;
+                    }
+                    else
+                    {
+                        // See: https://developer.oculusvr.com/forums/viewtopic.php?f=34&t=10961
+                        // This can happen if someone has an EDID override in the registry.
+                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for UserFriendlyName"));
+                    }
 
-		break;
+                    VariantClear(&vtProp);
+                }
+                else
+                {
+                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display UserFriendlyName: %d", (int)hr));
+                }
+            }
+        }
+
+        pclsObj->Release();
+        break;
 	}
 
 	HMODULE hModule = GetModuleHandleA("wbemuuid");
@@ -547,6 +597,42 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 	pEnumerator->Release();
 
 	return true;
+}
+
+// This is function that's used 
+bool anyRiftsInExtendedMode()
+{
+	bool result = false;
+
+	MonitorSet monitors;
+	monitors.MonitorCount = 0;
+	// Get all the monitor handles 
+	EnumDisplayMonitors(NULL, NULL, MonitorEnumProc, (LPARAM)&monitors);
+
+	DISPLAY_DEVICE dd, ddm;
+	UINT           i, j;
+
+	for( i = 0;
+		(ZeroMemory(&dd, sizeof(dd)), dd.cb = sizeof(dd),
+		EnumDisplayDevices(0, i, &dd, 0)) != 0;  i++ )
+	{
+		for( j = 0;
+			(ZeroMemory(&ddm, sizeof(ddm)), ddm.cb = sizeof(ddm),
+			EnumDisplayDevices(dd.DeviceName, j, &ddm, 0)) != 0;  j++ )
+		{
+			// Our monitor hardware has string "RTD2205" in it
+			// Nate's device "CVT0003"
+			if( wcsstr(ddm.DeviceID, L"RTD2205") ||
+				wcsstr(ddm.DeviceID, L"CVT0003") ||
+				wcsstr(ddm.DeviceID, L"MST0030") ||
+				wcsstr(ddm.DeviceID, L"OVR00") ) // Part of Oculus EDID.
+			{
+				result = true;
+			}
+		}
+	}
+
+	return result;
 }
 
 static int discoverExtendedRifts(OVR::Win32::DisplayDesc* descriptorArray, int inputArraySize, bool includeEDID)
@@ -706,9 +792,11 @@ static int discoverExtendedRifts(OVR::Win32::DisplayDesc* descriptorArray, int i
 //-------------------------------------------------------------------------------------
 // ***** Display 
 
-bool Display::InCompatibilityMode()
+bool Display::InCompatibilityMode( bool displaySearch )
 {
 	bool result = false;
+	if( displaySearch )
+	{
     OVR::Win32::DisplayDesc displayArray[8];
 
 	int extendedRiftCount = discoverExtendedRifts(displayArray, 8, false);
@@ -718,7 +806,12 @@ bool Display::InCompatibilityMode()
 	}
 	else
 	{
-		result = !!GlobalDisplayContext.InCompatibilityMode;
+			result = GlobalDisplayContext.InCompatibilityMode;
+		}
+	}
+	else
+	{
+		result = GlobalDisplayContext.InCompatibilityMode;
 	}
 
 	return result;

@@ -186,13 +186,13 @@ typedef enum
 /// Used with ovrHmd_ConfigureRendering and ovrHmd_CreateDistortionMesh.
 typedef enum
 {        
-    ovrDistortionCap_Chromatic	= 0x01,		///	Supports chromatic aberration correction.
-    ovrDistortionCap_TimeWarp	= 0x02,		///	Supports timewarp.
-    ovrDistortionCap_Vignette	= 0x08,		///	Supports vignetting around the edges of the view.
-	ovrDistortionCap_NoRestore  = 0x10,		///  Do not save and restore the graphics state when rendering distortion.
-	ovrDistortionCap_FlipInput  = 0x20,		///  Flip the vertical texture coordinate of input images.
-	ovrDistortionCap_SRGB       = 0x40,		///  Assume input images are in sRGB gamma-corrected color space.
-	ovrDistortionCap_Overdrive  = 0x80,		///  Overdrive brightness transitions to reduce artifacts on DK2+ displays
+    ovrDistortionCap_Chromatic	    = 0x01,		///	Supports chromatic aberration correction.
+    ovrDistortionCap_TimeWarp	    = 0x02,		///	Supports timewarp.
+    ovrDistortionCap_Vignette	    = 0x08,		///	Supports vignetting around the edges of the view.
+    ovrDistortionCap_NoRestore      = 0x10,		///  Do not save and restore the graphics state when rendering distortion.
+    ovrDistortionCap_FlipInput      = 0x20,		///  Flip the vertical texture coordinate of input images.
+    ovrDistortionCap_SRGB           = 0x40,		///  Assume input images are in sRGB gamma-corrected color space.
+    ovrDistortionCap_Overdrive      = 0x80,		///  Overdrive brightness transitions to reduce artifacts on DK2+ displays
 
     ovrDistortionCap_ProfileNoTimewarpSpinWaits = 0x10000,  /// Use when profiling with timewarp to remove false positives
 } ovrDistortionCaps;
@@ -456,8 +456,20 @@ typedef struct ovrTexture_
 extern "C" {
 #endif
 
+// ovr_InitializeRenderingShim initializes the rendering shim appart from everything
+// else in LibOVR. This may be helpful if the application prefers to avoid
+// creating any OVR resources (allocations, service connections, etc) at this point.
+// ovr_InitializeRenderingShim does not bring up anything within LibOVR except the
+// necessary hooks to enable the Direct-to-Rift functionality.
+//
+// Either ovr_InitializeRenderingShim() or ovr_Initialize() must be called before any
+// Direct3D or OpenGL initilization is done by applictaion (creation of devices, etc).
+// ovr_Initialize() must still be called after to use the rest of LibOVR APIs.
+OVR_EXPORT void ovr_InitializeRenderingShim();
+
 // Library init/shutdown, must be called around all other OVR code.
-// No other functions calls are allowed before ovr_Initialize succeeds or after ovr_Shutdown.
+// No other functions calls besides ovr_InitializeRenderingShim are allowed
+// before ovr_Initialize succeeds or after ovr_Shutdown.
 /// Initializes all Oculus functionality.
 OVR_EXPORT ovrBool  ovr_Initialize();
 /// Shuts down all Oculus functionality.

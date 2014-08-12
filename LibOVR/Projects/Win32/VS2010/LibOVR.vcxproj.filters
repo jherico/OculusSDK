@@ -156,9 +156,6 @@
     <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp">
       <Filter>Util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\Util\Util_Settings.cpp">
-      <Filter>Util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp">
       <Filter>CAPI</Filter>
     </ClCompile>
@@ -373,9 +370,6 @@
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h">
-      <Filter>Util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\Src\Util\Util_Settings.h">
       <Filter>Util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h">

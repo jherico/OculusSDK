@@ -28,6 +28,7 @@ limitations under the License.
 #include "CAPI_HMDState.h"
 #include "../Kernel/OVR_Log.h"
 #include "../Kernel/OVR_String.h"
+#include "Textures/healthAndSafety.tga.h" // TGA file as a C array declaration.
 
 
 //-------------------------------------------------------------------------------------
@@ -388,6 +389,14 @@ void HSWDisplay::GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f 
     OrthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, RenderState.EyeRenderDesc[0].ViewAdjust.x);
     OrthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, RenderState.EyeRenderDesc[1].ViewAdjust.x);
 }
+
+
+const uint8_t* HSWDisplay::GetDefaultTexture(size_t& TextureSize)
+{
+    TextureSize = sizeof(healthAndSafety_tga);
+    return healthAndSafety_tga;
+}
+
 
 
 }} // namespace OVR::CAPI

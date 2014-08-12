@@ -1,8 +1,8 @@
-Oculus SDK 0.4.0 Release Notes - Runtime Rev 1
+Oculus SDK 0.4.1 Release Notes - Runtime Rev 1
 ----------------------------------------------
 
 After installing the SDK, update the Oculus DK2 firmware
-to the most recent version 2.11. Firmware update dialog can be found under
+to the most recent version, 2.11. The Firmware update dialog can be found under
 "Tools / Advanced / Update Firmware..." menu of the Oculus Configuration
 Utility. If you experience any issues, please refer to the Troubleshooting
 and Known Issues sections below.
@@ -11,82 +11,33 @@ and Known Issues sections below.
 New SDK Features
 ----------------
 
-* Added DK2 Positional Tracking support.
+* Added “Pause Service...” option to the Configuration Utility, which temporarily
+  releases DK2 sensor, allowing 0.3.x SDK applications to run.
 
-* Introduced Oculus Runtime that is installed separately from the SDK.
-  Runtime package includes the Oculus Config Utility, service and drivers.
+* Added Mac OS support. Mac does not currently include a display driver, so it
+  always works in Extend Desktop mode.
 
-* Oculus SDK now relies on OVRService resident process that communicates
-  to hardware, handling tracking and sensor fusion. The service allows
-  multiple processes to access headset tracking data simultaneously.
-
-* Added Health and Safety Warning screen that should be displayed on application
-  startup. SDK Rendering mode automatically displays the screen, providing APIs
-  to dismiss it. In Application Rendering mode, developers are responsible for
-  implementing their own warning based on Oculus bitmap.
-  
-* Added ovrHmd_GetHSWDisplayState and ovrHmd_DismissHSWDisplay APIs for
-  controlling rendering and timing of the safety warning.
-  
-* Introduced Oculus Display Driver under Windows that routes rendering output
-  directly to the Rift. Driver settings can be changed in the Oculus Config Utility.
-  
-* Added the ovrHmdCap_ExtendDesktop flag that indicates that headset is operating
-  in extend desktop (backwards compatible) mode. If this flag is set, Oculus
-  display driver is disabled.
-  
-* Added ovrHmd_AttachToWindow function used to direct window swap chain output
-  to the Rift through the display driver.
-  
-* Added ovrHmdCap_NoMirrorToWindow option, which disabled mirroring of headset output
-  to a window (enabled by default). Disabling mirroring improves performance.
-  
-* Added display luminance overdrive option that reduces screen ghosting effect on DK2.
-  This is implemented as an extra pass in SDK Rendered mode, enabled by the ovrDistortionCap_Overdrive flag.
-  
-* Added CameraPose and LeveledCameraPose data to ovrTrackingState, allowing
-  users to identify location of the external camera. This data can be used to
-  detect when players approach the edge of the tracking volume.
-  
-* Added ovrHmd_RecenterPose function, used to re-initialize positional tracking
-  origin based on the current location.
-  
-* Added RawSensorData to ovrTrackingState, giving access to the raw IMU and
-  magnetometer readings.
-
-  
-API Changes
------------
-* Various "Sensor" functions and structures were renamed to "Tracking"
-  equivalents. For example, ovrSensorState is now ovrTrackingState,
-  returned by ovrHmd_GetTrackingState.
-  
-* ovrHmd is now a pointer to ovrHmdDesc, with relevant members being
-  accessible directly. ovrHmd_GetHmdDesc function was removed.  
-  
-* ovrHmd_StartSensor and ovrHmd_StopSensor functions were removed; please
-  use ovrHmd_ConfigureTracking instead.
-  
-* ovrHmd_BeginEyeRender and ovrHmd_EndEyeRender have been removed;
-  texture data is for both eyes is now passed in ovrHmd_EndFrame.
-  
-* Please refer to the Oculus Developer Guide Appendix A for further details.
+* Added ovr_InitializeRenderingShim function that can be used to hook rendering,
+  needed for Direct to HMD Mode, without spinning up the rest of LibOVR.
 
 
-Unity Integration Changes
--------------------------
-* Exposed all CAPI functionality through OVRHmd.cs wrapper.
 
-* Added TimeWarp to minimize latency.
+Bug Fixes since 0.4.0
+---------------------
 
-* Switched to SDK distortion rendering for better quality/performance.
+* Removed SSE4.1 requirement that was problematic for some older AMD CPUs.
+* Fixed OpenGL support on AMD cards in direct mode.
+* Resolved Blue Screen (BSOD) that happened starting some demos
+  with some video adapters.
+* Fixed BSOD or boot-up Black screen issued caused by interaction with Display Link.
+  Display Link still need to be uninstalled for OVR direct mode to work.
+* Improved OpenGL support in the driver shim.
 
-* Added direct-to-Rift rendering support. Just launch "<AppName>_DirectToRift.exe".
-
-* Switched to asymmetric frusta to improve pixel density.
-
-* Fixed issues with viewport management, deferred rendering, and linear lighting.
-
+Unity
+* Fixed shadows and some Unity shaders by switching back to a symmetric
+  frustum for rendering.
+* Fixed D3D11 rendering.
+* Miscellaneous improvements in stability and timewarp precision.
 
 
 
@@ -116,7 +67,7 @@ Here we describe these issues and provide advice on addressing them.
 
 
 
-0.4.0 Rev 1 Known Issues - LibOVR and Display Driver
+0.4.1 Rev 1 Known Issues - LibOVR and Display Driver
 ----------------------------------------------------
 
 * Monitors in multiple display configurations will blink when activating the Rift.
@@ -136,9 +87,6 @@ Here we describe these issues and provide advice on addressing them.
 * DK2 display may fail to work if plugged in after DK1 was unplugged and used in
   Direct Mode. When this happens, status LED will blink with alternating
   yellow-blue pattern. The work around is to switch to Extended Desktop mode and back.
-
-* OpenGL is presently not functional on AMD hardware in Direct Mode.
-  Extended desktop mode may be used as a work-around.
 
 * Open GL rendering can have vsync tear with Nvidida cards in Extended Desktop mode.
   Try direct Display Mode.
@@ -160,15 +108,21 @@ Here we describe these issues and provide advice on addressing them.
 * Sample renderer doesn't and OWD sample does not honor Multisampling
   setting in OpenGL.
 
+* The runtime installer does not support downgrading to previous versions
+  of the installer.  If you need to go back to a previous version, first
+  uninstall the current version and then install the previous one.
+
 
 Known Issues - Unity
 --------------------
 
+* Unity app latency on Mac is higher than in C++ OWD resulting in slightly swimmy display.
+
 * Direct Mode Unity apps may judder on multi-monitor configurations.
   Please try disconnecting one monitor as a work-around.
 
-* Unity applications built with DX11 support may crash at exit or on startup 
-  the first time they are run. Use DX9 where possible.
+* Unity applications built with DX11 support may crash at exit.
+  Use DX9 where possible.
 
 * OpenGL in Direct mode is not functional in Unity.
 
@@ -178,12 +132,5 @@ Known Issues - UE4
 
 * UE4: OpenGL is not supported on Windows in current release.
 
-* UE4: Direct Mode may have significantly lower framerate than Extended Mode.
-
 * UE4: Direct Mode sometimes does not Vsync correctly.
-
-
-
-
-
 
