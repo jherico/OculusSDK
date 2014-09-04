@@ -46,7 +46,7 @@ limitations under the License.
 
 namespace OVR {
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 inline char* OVR_CDECL OVR_itoa(int val, char *dest, size_t destsize, int radix)
 {
 #if defined(OVR_MSVC_SAFESTRING)
@@ -352,7 +352,7 @@ int      OVR_CDECL OVR_wcsicmp(const wchar_t* a, const wchar_t* b);
 
 inline int OVR_CDECL OVR_wcsicoll(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
     return ::_wcsicoll(a, b);
 #else
@@ -366,7 +366,7 @@ inline int OVR_CDECL OVR_wcsicoll(const wchar_t* a, const wchar_t* b)
 
 inline int OVR_CDECL OVR_wcscoll(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32)  || defined(OVR_OS_LINUX)
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_LINUX)
     return wcscoll(a, b);
 #else
     // not supported, use regular wcscmp

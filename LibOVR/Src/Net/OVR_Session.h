@@ -44,11 +44,13 @@ class Session;
 // Based on Semantic Versioning ( http://semver.org/ )
 //
 // Please update changelog below:
-// 1.0.0 - Initial DK2 release version (July 21, 2014) -catid
+// 1.0.0 - [SDK 0.4.0] Initial version (July 21, 2014)
+// 1.1.0 - Add Get/SetDriverMode_1, HMDCountUpdate_1
+//         Version mismatch results (July 28, 2014)
 //-----------------------------------------------------------------------------
 
 static const uint16_t RPCVersion_Major = 1; // MAJOR version when you make incompatible API changes,
-static const uint16_t RPCVersion_Minor = 0; // MINOR version when you add functionality in a backwards-compatible manner, and
+static const uint16_t RPCVersion_Minor = 1; // MINOR version when you add functionality in a backwards-compatible manner, and
 static const uint16_t RPCVersion_Patch = 0; // PATCH version when you make backwards-compatible bug fixes.
 
 // Client starts communication by sending its version number.
@@ -118,7 +120,7 @@ struct RPC_S2C_Authorization
         return bs->Read(PatchVersion);
     }
 
-    static void Generate(Net::BitStream* bs);
+    static void Generate(Net::BitStream* bs, String errorString = "");
 
     bool Validate();
 };
@@ -132,6 +134,7 @@ enum SessionResult
 	SessionResult_BindFailure,
 	SessionResult_ListenFailure,
 	SessionResult_ConnectFailure,
+    SessionResult_ConnectInProgress,
     SessionResult_AlreadyConnected,
 };
 
@@ -196,28 +199,37 @@ protected:
     }
 
 public:
-    virtual void SetState(EConnectionState s) {
-        if (s==State)
-            return;
-
-        Mutex::Locker locker(&StateMutex);
-        State = s;
-        if (State != Client_Connecting)
-            ConnectingWait.NotifyAll();
-    }
-
-    void WaitOnConnecting() {
-        while (State == Client_Connecting)
+    virtual void SetState(EConnectionState s)
+    {
+        if (s != State)
         {
             Mutex::Locker locker(&StateMutex);
+
+            if (s != State)
+            {
+                State = s;
+
+                if (State != Client_Connecting)
+                {
+                    ConnectingWait.NotifyAll();
+                }
+            }
+        }
+    }
+
+    void WaitOnConnecting()
+    {
+        Mutex::Locker locker(&StateMutex);
+
+        while (State == Client_Connecting)
+        {
             ConnectingWait.Wait(&StateMutex);
         }
     }
 
-	SockAddr Address;
-
-    OVR::Mutex         StateMutex;
-    OVR::WaitCondition ConnectingWait;
+	SockAddr      Address;
+    Mutex         StateMutex;
+    WaitCondition ConnectingWait;
 };
 
 

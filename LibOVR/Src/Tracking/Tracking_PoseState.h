@@ -43,7 +43,7 @@ public:
 	typedef typename CompatibleTypes<Pose<T> >::Type CompatibleType;
 
 	PoseState() : TimeInSeconds(0.0) { }
-    PoseState(Pose<T> pose, double time) : TimeInSeconds(time), ThePose(pose) { }
+    PoseState(Pose<T> pose, double time) : ThePose(pose), TimeInSeconds(time) { }
 
 	// float <-> double conversion constructor.
 	explicit PoseState(const PoseState<typename Math<T>::OtherFloatType> &src)

@@ -156,8 +156,7 @@ public:
     unsigned        SetEnabledHmdCaps();
 
     bool            ProcessLatencyTest(unsigned char rgbColorOut[3]);
-    void            ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTime);
-    
+
     // *** Rendering Setup
     bool        ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
                                    const ovrFovPort eyeFovIn[2],

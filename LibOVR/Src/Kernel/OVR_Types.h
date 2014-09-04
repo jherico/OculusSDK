@@ -30,6 +30,7 @@ limitations under the License.
 
 #include "OVR_Compiler.h"
 
+
 // Unsupported compiler configurations
 #if _MSC_VER == 0x1600
 #  if _MSC_FULL_VER < 160040219
@@ -163,16 +164,6 @@ limitations under the License.
 #  define _CRTDBG_MAP_ALLOC
 #  include <stdlib.h>
 #  include <crtdbg.h>
-
-#if 0
-// Uncomment this to help debug memory leaks under Visual Studio in OVR apps only.
-// This shouldn't be defined in customer releases.
-#  ifndef OVR_DEFINE_NEW
-#    define OVR_DEFINE_NEW new(__FILE__, __LINE__)
-#    define new OVR_DEFINE_NEW
-#  endif
-#endif
-
 #endif
 
 
@@ -205,7 +196,7 @@ typedef size_t          UPInt;
 typedef ptrdiff_t       SPInt;
 
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 
 typedef char            SByte;  // 8 bit Integer (Byte)
 typedef unsigned char   UByte;
@@ -240,6 +231,15 @@ typedef uint32_t        UInt32;
 typedef int64_t         SInt64;
 typedef uint64_t        UInt64;
 
+#endif
+    
+    
+//osx PID is a signed int32 (already defined to pid_t in OSX framework)
+//linux PID is a signed int32 (already defined)
+//win32 PID is an unsigned int64
+#ifdef OVR_OS_WIN32
+//process ID representation
+typedef unsigned long pid_t;
 #endif
 
 struct OVR_GUID
@@ -306,7 +306,7 @@ struct OVR_GUID
 #define OVR_BIG_ENDIAN          2
 
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     
     // ***** Win32
 
@@ -508,7 +508,7 @@ struct OVR_GUID
 #else 
 
 // Microsoft Win32 specific debugging support
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 #  ifdef OVR_CPU_X86
 #    if defined(__cplusplus_cli)
 #      define OVR_DEBUG_BREAK   do { __debugbreak(); } while(0)
@@ -575,6 +575,29 @@ struct OVR_GUID
     #else
         #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __LINE__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
     #endif
+#endif
+
+
+// ***** OVR_PROCESSOR_PAUSE
+//
+// Yields the processor for other hyperthreads, usually for the purpose of implementing spins and spin locks. 
+//
+// Example usage:
+//     while(!finished())
+//         OVR_PROCESSOR_PAUSE();
+
+#if defined(OVR_CPU_X86) || defined(OVR_CPU_X86_64)
+    #if defined(OVR_CC_GNU) || defined(OVR_CC_CLANG)
+        #define OVR_PROCESSOR_PAUSE() asm volatile("pause" ::: "memory") // Consumes 38-40 clocks on current Intel x86 and x64 hardware.
+    #elif defined(OVR_CC_MSVC)
+        #include <emmintrin.h>
+        #pragma intrinsic(_mm_pause) // Maps to asm pause.
+        #define OVR_PROCESSOR_PAUSE _mm_pause
+    #else
+        #define OVR_PROCESSOR_PAUSE()
+    #endif
+#else
+    #define OVR_PROCESSOR_PAUSE()
 #endif
 
 
@@ -718,6 +741,31 @@ struct OVR_GUID
 // - used with OVR_DEFINE_NEW macro
 //# define OVR_BUILD_DEFINE_NEW
 //
+
+
+//-----------------------------------------------------------------------------------
+// ***** Find normal allocations
+//
+// Our allocations are all supposed to go through the OVR System Allocator, so that
+// they can be run through a game's own preferred allocator.  Occasionally we will
+// accidentally introduce new code that doesn't adhere to this contract.  And it
+// then becomes difficult to track down these normal allocations.  This piece of
+// code makes it easy to check for normal allocations by asserting whenever they
+// happen in our code.
+
+//#define OVR_FIND_NORMAL_ALLOCATIONS
+#ifdef OVR_FIND_NORMAL_ALLOCATIONS
+
+inline void* operator new (size_t size, const char* filename, int line)
+{
+    void* ptr = new char[size];
+    OVR_ASSERT(false);
+    return ptr;
+}
+
+#define new new(__FILE__, __LINE__)
+
+#endif // OVR_FIND_NORMAL_ALLOCATIONS
 
 
 

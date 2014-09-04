@@ -156,9 +156,6 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         renderEndFrame();
     }
 
-    if(RegisteredPostDistortionCallback)
-        RegisteredPostDistortionCallback(device);
-
     if(LatencyTestDrawColor)
     {
 		// TODO: Support latency tester quad

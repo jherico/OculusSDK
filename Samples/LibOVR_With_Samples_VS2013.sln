@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30110.0
+VisualStudioVersion = 12.0.30501.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVR", "..\LibOVR\Projects\Win32\VS2013\LibOVR.vcxproj", "{EA50E705-5113-49E5-B105-2512EDC8DDC6}"
 EndProject
@@ -40,6 +40,7 @@ Global
 		{394FF596-A90B-4C95-888B-B743834ED15B}.Release|x64.Build.0 = Release|x64
 		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Debug|Win32.ActiveCfg = Debug|Win32
 		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Debug|Win32.Build.0 = Debug|Win32
+		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Debug|Win32.Deploy.0 = Debug|Win32
 		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Debug|x64.ActiveCfg = Debug|x64
 		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Debug|x64.Build.0 = Debug|x64
 		{CA4E4127-1BAD-447C-BFF9-5AF940EEC376}.Release|Win32.ActiveCfg = Release|Win32

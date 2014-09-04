@@ -44,7 +44,7 @@ typedef Delegate2<void, BitStream*, ReceivePayload*> RPCSlot;
 // typedef void ( *Slot ) ( OVR::Net::BitStream *userData, OVR::Net::ReceivePayload *pPayload );
 
 /// NetworkPlugin that maps strings to function pointers. Can invoke the functions using blocking calls with return values, or signal/slots. Networked parameters serialized with BitStream
-class RPC1 : public NetworkPlugin
+class RPC1 : public NetworkPlugin, public NewOverrideBase
 {
 public:
 	RPC1();

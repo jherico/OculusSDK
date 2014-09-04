@@ -87,7 +87,6 @@
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_D3D11_Device.h">
       <Filter>CommonSrc\Render</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\3rdParty\TinyXml\tinyxml2.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.h">
       <Filter>CommonSrc\Render</Filter>
     </ClInclude>

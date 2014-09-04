@@ -1036,7 +1036,35 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         numDistortions = 0;
        
         
-        distortions[numDistortions].EyeRelief                            = 0.010f;
+        distortions[numDistortions].EyeRelief                            = 0.008f;
+        distortions[numDistortions].Config.MetersPerTanAngleAtCenter     = 0.036f;
+        // TODO: Need to retune this distortion for minimum eye relief
+        distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
+        distortions[numDistortions].Config.K[0]                          = 1.003f;
+        distortions[numDistortions].Config.K[1]                          = 1.02f;
+        distortions[numDistortions].Config.K[2]                          = 1.042f;
+        distortions[numDistortions].Config.K[3]                          = 1.066f;
+        distortions[numDistortions].Config.K[4]                          = 1.094f;
+        distortions[numDistortions].Config.K[5]                          = 1.126f;
+        distortions[numDistortions].Config.K[6]                          = 1.162f;
+        distortions[numDistortions].Config.K[7]                          = 1.203f;
+        distortions[numDistortions].Config.K[8]                          = 1.25f;
+        distortions[numDistortions].Config.K[9]                          = 1.31f;
+        distortions[numDistortions].Config.K[10]                         = 1.38f;
+        distortions[numDistortions].MaxRadius                            = 1.0f;
+        
+        distortions[numDistortions].Config.ChromaticAberration[0]        = -0.0112f;
+        distortions[numDistortions].Config.ChromaticAberration[1]        = -0.015f;
+        distortions[numDistortions].Config.ChromaticAberration[2]        =  0.0187f;
+        distortions[numDistortions].Config.ChromaticAberration[3]        =  0.015f;
+        
+        numDistortions++;
+
+
+
+
+
+        distortions[numDistortions].EyeRelief                            = 0.018f;
         distortions[numDistortions].Config.MetersPerTanAngleAtCenter     = 0.036f;
 
         distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
@@ -1044,14 +1072,22 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[1]                          = 1.02f;
         distortions[numDistortions].Config.K[2]                          = 1.042f;
         distortions[numDistortions].Config.K[3]                          = 1.066f;
-        distortions[numDistortions].Config.K[4]                          = 1.094f;  //1.0945f;
-        distortions[numDistortions].Config.K[5]                          = 1.126f;  //1.127f;
-        distortions[numDistortions].Config.K[6]                          = 1.162f;  //1.167f;
-        distortions[numDistortions].Config.K[7]                          = 1.203f;  //1.218f;
-        distortions[numDistortions].Config.K[8]                          = 1.25f;   //1.283f;
-        distortions[numDistortions].Config.K[9]                          = 1.31f;   //1.37f;
-        distortions[numDistortions].Config.K[10]                         = 1.38f;   //1.48f;
+        distortions[numDistortions].Config.K[4]                          = 1.094f;
+        distortions[numDistortions].Config.K[5]                          = 1.126f;
+        distortions[numDistortions].Config.K[6]                          = 1.162f;
+        distortions[numDistortions].Config.K[7]                          = 1.203f;
+        distortions[numDistortions].Config.K[8]                          = 1.25f;
+        distortions[numDistortions].Config.K[9]                          = 1.31f;
+        distortions[numDistortions].Config.K[10]                         = 1.38f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
+        
+        distortions[numDistortions].Config.ChromaticAberration[0]        = -0.015f;
+        distortions[numDistortions].Config.ChromaticAberration[1]        = -0.02f;
+        distortions[numDistortions].Config.ChromaticAberration[2]        =  0.025f;
+        distortions[numDistortions].Config.ChromaticAberration[3]        =  0.02f;
+        
+        defaultDistortion = numDistortions;   // this is the default
+        numDistortions++;
         
         /*
         // Orange Lens on DK2
@@ -1072,22 +1108,6 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[10]                         = 1.56f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
         */
-        
-        defaultDistortion = numDistortions;   // this is the default
-        numDistortions++;
-
-        distortions[numDistortions] = distortions[0];
-        distortions[numDistortions].EyeRelief = 0.020f;
-        numDistortions++;
-
-        // Chromatic aberration doesn't seem to change with eye relief.
-        for ( int i = 0; i < numDistortions; i++ )
-        {
-            distortions[i].Config.ChromaticAberration[0]        = -0.015f;
-            distortions[i].Config.ChromaticAberration[1]        = -0.02f;
-            distortions[i].Config.ChromaticAberration[2]        =  0.025f;
-            distortions[i].Config.ChromaticAberration[3]        =  0.02f;
-        }
     }
     else
     {

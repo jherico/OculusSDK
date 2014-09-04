@@ -98,7 +98,6 @@ void SensorStateReader::RecenterPose()
 	const LocklessSensorState lstate = Updater->SharedSensorState.GetState();
 
 	Posed worldFromCpf = lstate.WorldFromImu.ThePose * lstate.ImuFromCpf;
-
 	double hmdYaw, hmdPitch, hmdRoll;
 	worldFromCpf.Rotation.GetEulerAngles<Axis_Y, Axis_X, Axis_Z>(&hmdYaw, &hmdPitch, &hmdRoll);
 
@@ -138,7 +137,7 @@ bool SensorStateReader::GetSensorStateAtTime(double absoluteTime, TrackingState&
         return false;
 	}
 
-	// Delta time from the last available data
+    // Delta time from the last available data
 	double pdt = absoluteTime - lstate.WorldFromImu.TimeInSeconds;
 	static const double maxPdt = 0.1;
 
@@ -167,6 +166,7 @@ bool SensorStateReader::GetSensorStateAtTime(double absoluteTime, TrackingState&
     ss.LeveledCameraPose = Posef(CenteredFromWorld * worldFromLeveledCamera);
 
     ss.RawSensorData = lstate.RawSensorData;
+    ss.LastVisionProcessingTime = lstate.LastVisionProcessingTime;
 
 	return true;
 }
@@ -203,5 +203,28 @@ uint32_t SensorStateReader::GetStatus() const
 	return lstate.StatusFlags;
 }
 
+void SensorStateReader::LoadProfileCenteredFromWorld(Profile* profile)
+{
+    double camerastate[7];
+    if (profile->GetDoubleValues(OVR_KEY_CAMERA_POSITION, camerastate, 7) == 0)
+    {
+        for (int i = 0; i < 7; i++) camerastate[i] = 0;
+        camerastate[3] = 1;//no offset. by default, give the quaternion w component value 1
+    }
+
+    OVR::Quatd orientation = OVR::Quatd(camerastate[0], camerastate[1], camerastate[2], camerastate[3]);
+    OVR::Vector3d position = OVR::Vector3d(camerastate[4], camerastate[5], camerastate[6]);
+
+    CenteredFromWorld = OVR::Posed(orientation, position);
+
+}
+
+void SensorStateReader::SaveProfileCenteredFromWorld(Profile* profile)
+{
+    OVR::Quatd rot = CenteredFromWorld.Rotation;
+    OVR::Vector3d trans = CenteredFromWorld.Translation;
+    double vals[7] = { rot.x, rot.y, rot.z, rot.w, trans.x, trans.y, trans.z };
+    profile->SetDoubleValues(OVR_KEY_CAMERA_POSITION, vals, 7);
+}
 
 }} // namespace OVR::Tracking

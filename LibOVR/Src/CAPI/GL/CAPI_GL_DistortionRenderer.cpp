@@ -98,6 +98,9 @@ DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager
 {
 	DistortionMeshVAOs[0] = 0;
 	DistortionMeshVAOs[1] = 0;
+
+    // Initialize render params.
+    memset(&RParams, 0, sizeof(RParams));
 }
 
 DistortionRenderer::~DistortionRenderer()
@@ -155,7 +158,6 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig,
         RParams.Win         = config->OGL.Win;
     if (!RParams.Win)
     {
-        int unused;
         RParams.Win = glXGetCurrentDrawable();
     }
     if (!RParams.Win)
@@ -270,9 +272,16 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
     if (swapBuffers)
     {
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
-		int swapInterval = (useVsync) ? 1 : 0;
+        int swapInterval = (useVsync) ? 1 : 0;
 #if defined(OVR_OS_WIN32)
-		if (wglGetSwapIntervalEXT() != swapInterval)
+#ifndef NO_SCREEN_TEAR_HEALING
+        if (TimeManager.ScreenTearingReaction())
+        {
+            swapInterval = 0;
+            useVsync = false;
+        }
+#endif // NO_SCREEN_TEAR_HEALING
+        if (wglGetSwapIntervalEXT() != swapInterval)
             wglSwapIntervalEXT(swapInterval);
 
         HDC dc = (RParams.DC != NULL) ? RParams.DC : GetDC(RParams.Window);
@@ -297,7 +306,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         {
             GLuint currentSwapInterval = 0;
             glXQueryDrawable(RParams.Disp, RParams.Win, GLX_SWAP_INTERVAL_EXT, &currentSwapInterval);
-            if (currentSwapInterval != swapInterval)
+            if (currentSwapInterval != (GLuint)swapInterval)
                 glXSwapIntervalEXT(RParams.Disp, RParams.Win, swapInterval);
         }
 
@@ -332,58 +341,17 @@ double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
 
     return WaitTillTime(absTime);
 }
-    
-    
+
+
 DistortionRenderer::GraphicsState::GraphicsState()
 {
-    bool foundVersion = false;
-    const char* glVersionString = (const char*)glGetString(GL_VERSION);
-    if (glVersionString)
-    {
-        OVR_DEBUG_LOG(("GL_VERSION STRING: %s", (const char*)glVersionString));
-        char prefix[64];
-
-        for (int i = 10; i < 30; ++i)
-        {
-            int major = i / 10;
-            int minor = i % 10;
-            OVR_sprintf(prefix, 64, "%d.%d", major, minor);
-            if (strstr(glVersionString, prefix) == glVersionString)
-            {
-                GlMajorVersion = major;
-                GlMinorVersion = minor;
-                foundVersion = true;
-                break;
-            }
-        }
-    }
-    
-    if (!foundVersion)
-    {
-        glGetIntegerv(GL_MAJOR_VERSION, &GlMajorVersion);
-        glGetIntegerv(GL_MAJOR_VERSION, &GlMinorVersion);
-	}
-
-	OVR_ASSERT(GlMajorVersion >= 2);
-    
-    if (GlMajorVersion >= 3)
-    {
-        SupportsVao = true;
-        SupportsDrawBuffers = true;
-    }
-    else
-    {
-        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-        SupportsVao = (strstr(extensions, "GL_ARB_vertex_array_object") != NULL
-                       || strstr(extensions, "GL_APPLE_vertex_array_object") != NULL);
-        SupportsDrawBuffers = (strstr(extensions, "GL_EXT_draw_buffers2") != NULL);
-    }
+    GetGLVersionAndExtensions(GLVersionInfo);
 }
-    
-    
+
+
 void DistortionRenderer::GraphicsState::ApplyBool(GLenum Name, GLint Value, GLint index)
 {
-	if (SupportsDrawBuffers && index != -1)
+    if (GLVersionInfo.SupportsDrawBuffers && index != -1)
 	{
 		if (Value != 0)
 			glEnablei(Name, index);
@@ -410,7 +378,7 @@ void DistortionRenderer::GraphicsState::Save()
     glGetIntegerv(GL_CURRENT_PROGRAM, &Program);
     glGetIntegerv(GL_ACTIVE_TEXTURE, &ActiveTexture);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &TextureBinding);
-    if (SupportsVao)
+    if (GLVersionInfo.SupportsVAO)
     {
         glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArrayBinding);
     }
@@ -420,7 +388,7 @@ void DistortionRenderer::GraphicsState::Save()
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &ArrayBufferBinding);
     }
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FrameBufferBinding);
-    if (SupportsDrawBuffers)
+    if (GLVersionInfo.SupportsDrawBuffers)
     {
         glGetIntegeri_v(GL_BLEND, 0, &Blend);
         glGetIntegeri_v(GL_COLOR_WRITEMASK, 0, ColorWritemask);
@@ -432,8 +400,10 @@ void DistortionRenderer::GraphicsState::Save()
     }
     glGetIntegerv(GL_DITHER, &Dither);
     glGetIntegerv(GL_RASTERIZER_DISCARD, &RasterizerDiscard);
-    if ((GlMajorVersion == 3 && GlMinorVersion >= 2) || GlMajorVersion >= 4)
+    if ((GLVersionInfo.MajorVersion == 3 && GLVersionInfo.MinorVersion >= 2) || GLVersionInfo.MajorVersion >= 4)
+    {
         glGetIntegerv(GL_SAMPLE_MASK, &SampleMask);
+    }
 
 	IsValid = true;
 }
@@ -441,7 +411,7 @@ void DistortionRenderer::GraphicsState::Save()
 #ifdef OVR_OS_MAC
 bool DistortionRenderer::GraphicsState::isAtLeastOpenGL3()
 {
-    return !(GlMajorVersion < 3|| (GlMajorVersion == 3 && GlMinorVersion < 2));
+    return (((GLVersionInfo.MajorVersion * 100) + GLVersionInfo.MinorVersion) >= 302); // OpenGL 3.2 or later
 }
 #endif
 
@@ -461,7 +431,7 @@ void DistortionRenderer::GraphicsState::Restore()
     glUseProgram(Program);
     glActiveTexture(ActiveTexture);
     glBindTexture(GL_TEXTURE_2D, TextureBinding);
-    if (SupportsVao)
+    if (GLVersionInfo.SupportsVAO)
     {
 #ifdef OVR_OS_MAC
         if (isAtLeastOpenGL3())
@@ -485,15 +455,22 @@ void DistortionRenderer::GraphicsState::Restore()
     
 	ApplyBool(GL_BLEND, Blend, 0);
     
-    if (SupportsDrawBuffers)
+    if (GLVersionInfo.SupportsDrawBuffers)
+    {
         glColorMaski(0, (GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    }
     else
+    {
         glColorMask((GLboolean)ColorWritemask[0], (GLboolean)ColorWritemask[1], (GLboolean)ColorWritemask[2], (GLboolean)ColorWritemask[3]);
+    }
     
     ApplyBool(GL_DITHER, Dither);
     ApplyBool(GL_RASTERIZER_DISCARD, RasterizerDiscard);
-	if ((GlMajorVersion == 3 && GlMinorVersion >= 2) || GlMajorVersion >= 4)
+    if ((GLVersionInfo.MajorVersion == 3 && GLVersionInfo.MinorVersion >= 2) ||
+        GLVersionInfo.MajorVersion >= 4)
+    {
         ApplyBool(GL_SAMPLE_MASK, SampleMask);
+    }
 }
 
 
@@ -525,9 +502,13 @@ void DistortionRenderer::initBuffersAndShaders()
         {
             pCurVBVert->ScreenPosNDC.x = pCurOvrVert->ScreenPosNDC.x;
             pCurVBVert->ScreenPosNDC.y = pCurOvrVert->ScreenPosNDC.y;
-            pCurVBVert->TanEyeAnglesR  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR);
-            pCurVBVert->TanEyeAnglesG  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesG);
-            pCurVBVert->TanEyeAnglesB  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesB);
+
+            // Previous code here did this: pCurVBVert->TanEyeAnglesR = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR); However that's an usafe
+            // cast of unrelated types which can result in undefined behavior by a conforming compiler. A safe equivalent is simply memcpy.
+            static_assert(sizeof(OVR::Vector2f) == sizeof(ovrVector2f), "Mismatch of structs that are presumed binary equivalents.");
+            memcpy(&pCurVBVert->TanEyeAnglesR, &pCurOvrVert->TanEyeAnglesR, sizeof(pCurVBVert->TanEyeAnglesR));
+            memcpy(&pCurVBVert->TanEyeAnglesG, &pCurOvrVert->TanEyeAnglesG, sizeof(pCurVBVert->TanEyeAnglesG));
+            memcpy(&pCurVBVert->TanEyeAnglesB, &pCurOvrVert->TanEyeAnglesB, sizeof(pCurVBVert->TanEyeAnglesB));
 
             // Convert [0.0f,1.0f] to [0,255]
 			if (DistortionCaps & ovrDistortionCap_Vignette)
@@ -569,7 +550,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
     
-    if (glState->SupportsDrawBuffers)
+    if (glState->GLVersionInfo.SupportsDrawBuffers)
     {
         glDisablei(GL_BLEND, 0);
         glColorMaski(0, GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
@@ -582,8 +563,10 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     
     glDisable(GL_DITHER);
     glDisable(GL_RASTERIZER_DISCARD);
-    if ((glState->GlMajorVersion >= 3 && glState->GlMinorVersion >= 2) || glState->GlMajorVersion >= 4)
+    if ((glState->GLVersionInfo.MajorVersion >= 3 && glState->GLVersionInfo.MinorVersion >= 2) || glState->GLVersionInfo.MajorVersion >= 4)
+    {
         glDisable(GL_SAMPLE_MASK);
+    }
         
 	glClearColor(
 		RState.ClearColor[0],
@@ -780,7 +763,7 @@ void DistortionRenderer::renderPrimitives(
 		}
 		else
 		{
-            if (glState->SupportsVao)
+            if (glState->GLVersionInfo.SupportsVAO)
             {
 #ifdef OVR_OS_MAC
                 if (glState->isAtLeastOpenGL3())
@@ -836,7 +819,7 @@ void DistortionRenderer::renderPrimitives(
 				glDrawArrays(prim, 0, count);
 
 
-            if (!glState->SupportsVao)
+            if (!glState->GLVersionInfo.SupportsVAO)
             {
 				for (int i = 0; i < attributeCount; ++i)
                     glDisableVertexAttribArray(locs[i]);
@@ -844,7 +827,7 @@ void DistortionRenderer::renderPrimitives(
 
 			delete[] locs;
 
-            if (glState->SupportsVao)
+            if (glState->GLVersionInfo.SupportsVAO)
             {
 #ifdef OVR_OS_MAC
                 if (glState->isAtLeastOpenGL3())
@@ -874,7 +857,8 @@ void DistortionRenderer::initShaders()
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
 
     const char* shaderPrefix =
-        (glState->GlMajorVersion < 3 || (glState->GlMajorVersion == 3 && glState->GlMinorVersion < 2)) ?
+        (glState->GLVersionInfo.MajorVersion < 3 ||
+         (glState->GLVersionInfo.MajorVersion == 3 && glState->GLVersionInfo.MinorVersion < 2)) ?
             glsl2Prefix : glsl3Prefix;
 
     {
@@ -979,11 +963,13 @@ void DistortionRenderer::destroy()
 	SaveGraphicsState();
 
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
-
+    
 	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
 	{
-        if (glState->SupportsVao)
+        if (glState->GLVersionInfo.SupportsVAO)
+        {
             glDeleteVertexArrays(1, &DistortionMeshVAOs[eyeNum]);
+        }
 
 		DistortionMeshVAOs[eyeNum] = 0;
 

@@ -117,10 +117,27 @@ public:
 };
 
 
+// Generates a Human-readable labels with built-in checksums
+// Returns false on error
+bool GenerateHumanString(int dataBits,               // Number of bits to store
+                         int checkBits,              // Number of extra bits of checksum data
+                         const unsigned char* input, // Bytes stored LSB-first
+                         int dataBytes,              // Size of data buffer in bytes
+                         String& resultStr);         // Output string
+
+// Returns number of bytes written to result, or zero on failure
+int ProcessHumanString(int dataBits,               // Number of bits to expect
+                       int checkBits,              // Number of extra bits of checksum data
+                       String humanStr,            // Human readable input string
+                       unsigned char* result,      // Output data buffer stored LSB-first
+                       int resultBytes);           // Size of result buffer in bytes
+
+
 //#define SERIAL_FORMAT_UNIT_TEST
 #ifdef SERIAL_FORMAT_UNIT_TEST
 void TestSerialFormatStuff();
 #endif
+
 
 } // OVR
 

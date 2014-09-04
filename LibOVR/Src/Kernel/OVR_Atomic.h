@@ -42,6 +42,10 @@ limitations under the License.
 #include <pthread.h>
 #endif
 
+#ifdef OVR_CC_MSVC
+#include <intrin.h>
+#pragma intrinsic(_ReadBarrier, _WriteBarrier, _ReadWriteBarrier)
+#endif
 
 namespace OVR {
 
@@ -118,7 +122,6 @@ struct AtomicOpsRawBase
     struct AcquireSync { inline AcquireSync() { } ~AcquireSync() { asm volatile("dmb\n"); } };
     struct ReleaseSync { inline ReleaseSync() { asm volatile("dmb\n"); } };
 
-
 #elif defined(OVR_CC_GNU) && (__GNUC__ >= 4)
     // __sync functions are already full sync
     struct FullSync { inline FullSync() { } };
@@ -138,7 +141,7 @@ struct AtomicOpsRaw_4ByteImpl : public AtomicOpsRawBase
 
     // *** Thread - Safe Atomic Versions.
 
-#elif defined(OVR_OS_WIN32)  
+#elif defined(OVR_OS_WIN32) 
 
     // Use special defined for VC6, where volatile is not used and
     // InterlockedCompareExchange is declared incorrectly.
@@ -403,7 +406,7 @@ struct AtomicOpsRaw_8ByteImpl : public AtomicOpsRawBase
     typedef uint64_t T;
 
     // *** Thread - Safe OS specific versions.
-#elif defined(OVR_OS_WIN32) 
+#elif defined(OVR_OS_WIN32)
 
     // This is only for 64-bit systems.
     typedef LONG64      T;
@@ -537,7 +540,22 @@ struct AtomicOpsRaw_DefImpl : public O
 #else
     inline static void  Store_Release(volatile O_T* p, O_T val)  { O_ReleaseSync sync; OVR_UNUSED(sync); *p = val; }
 #endif
-    inline static O_T   Load_Acquire(const volatile O_T* p)      { O_AcquireSync sync; OVR_UNUSED(sync); return *p; }
+    inline static O_T   Load_Acquire(const volatile O_T* p)
+    {
+        O_AcquireSync sync;
+        OVR_UNUSED(sync);
+
+#if defined(OVR_CC_MSVC)
+        _ReadBarrier(); // Compiler fence and load barrier
+#elif defined(OVR_CC_INTEL)
+        __memory_barrier(); // Compiler fence
+#else
+        // GCC-compatible:
+        asm volatile ("" : : : "memory"); // Compiler fence
+#endif
+
+        return *p;
+    }
 };
 
 
@@ -819,7 +837,7 @@ public:
     inline void Unlock() { }
 
    // Windows.   
-#elif defined(OVR_OS_WIN32) 
+#elif defined(OVR_OS_WIN32)
 
     CRITICAL_SECTION cs;
 public:   

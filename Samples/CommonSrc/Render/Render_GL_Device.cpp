@@ -26,7 +26,8 @@ limitations under the License.
 #include "OVR_CAPI_GL.h"
 
 namespace OVR { namespace Render { namespace GL {
-    
+
+
 #if !defined(OVR_OS_MAC)
 
 // GL Hooks for PC.
@@ -716,47 +717,10 @@ static const char* FShaderSrcs[FShader_Count] =
 
 RenderDevice::RenderDevice(const RendererParams&)
 {
-    int GlMajorVersion = 0;
-    int GlMinorVersion = 0;
-    bool isES = false;
-    
-    const char* glVersionString = (const char*)glGetString(GL_VERSION);
+    GetGLVersionAndExtensions(GLVersionInfo);
 
-#ifdef OVR_CC_MSVC
-    // Hack: This is using sscanf_s on MSVC to kill the security warning.
-    // Normally the two functions are not interchangeable because the string format
-    // is different for %s types, however we only use %d so it's fine.
-#define _OVR_SSCANF sscanf_s
-#else
-#define _OVR_SSCANF sscanf
-#endif
+    OVR_ASSERT(GLVersionInfo.MajorVersion >= 2);
 
-    isES = strstr( glVersionString, "OpenGL ES-CM" ) != NULL;
-    if( isES )
-    {
-        _OVR_SSCANF(glVersionString, "OpenGL ES-CM %d.%d", &GlMajorVersion, &GlMinorVersion);
-    }
-    else
-    {
-        isES = strstr( glVersionString, "OpenGL ES " ) != NULL;
-        if ( isES )
-        {
-            _OVR_SSCANF(glVersionString, "OpenGL ES %d.%d", &GlMajorVersion, &GlMinorVersion);
-        }
-        else
-        {
-            _OVR_SSCANF(glVersionString, "%d.%d", &GlMajorVersion, &GlMinorVersion);
-        }
-    }
-
-#undef _OVR_SSCANF
-
-    OVR_ASSERT( isES == false );
-	OVR_ASSERT(GlMajorVersion >= 2);
-
-    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-    SupportsVao         = (GlMajorVersion >= 3) || (strstr("GL_ARB_vertex_array_object", extensions) != NULL);
-    
     for (int i = 0; i < VShader_Count; i++)
     {
         OVR_ASSERT ( VShaderSrcs[i] != NULL );      // You forgot a shader!
@@ -776,8 +740,10 @@ RenderDevice::RenderDevice(const RendererParams&)
 
     glGenFramebuffers(1, &CurrentFbo);
     
-    if (SupportsVao)
+    if (GLVersionInfo.SupportsVAO)
+    {
         glGenVertexArrays(1, &Vao);
+    }
 }
 
 RenderDevice::~RenderDevice()
@@ -794,14 +760,20 @@ void RenderDevice::Shutdown()
 
 	glDeleteFramebuffers(1, &CurrentFbo);
     
-    if (SupportsVao)
+    if (GLVersionInfo.SupportsVAO)
+    {
         glDeleteVertexArrays(1, &Vao);
+    }
     
     for (int i = 0; i < VShader_Count; ++i)
+    {
         VertexShaders[i].Clear();
+    }
 
     for (int i = 0; i < FShader_Count; ++i)
+    {
         FragShaders[i].Clear();
+    }
 
     DefaultFill.Clear();
     DepthBuffers.Clear();
@@ -863,6 +835,11 @@ void RenderDevice::SetViewport(const Recti& vp)
 	else
 		wh = WindowHeight;
 	glViewport(vp.x, wh - vp.y - vp.h, vp.w, vp.h);
+}
+
+void RenderDevice::Flush()
+{
+    glFlush();
 }
 
 void RenderDevice::WaitUntilGpuIdle()
@@ -943,8 +920,10 @@ Fill* RenderDevice::CreateSimpleFill(int flags)
     
 void RenderDevice::Render(const Matrix4f& matrix, Model* model)
 {
-    if (SupportsVao)
+    if (GLVersionInfo.SupportsVAO)
+    {
         glBindVertexArray(Vao);
+    }
 
     // Store data in buffers if not already
     if (!model->VertexBuffer)
@@ -953,6 +932,7 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
         vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex));
         model->VertexBuffer = vb;
     }
+
     if (!model->IndexBuffer)
     {
         Ptr<Render::Buffer> ib = *CreateBuffer();
@@ -1454,4 +1434,129 @@ RBuffer::~RBuffer()
         glDeleteRenderbuffers(1, &BufId);
 }
 
-}}}
+
+//// GLVersion
+
+static void ParseGLVersion(GLVersionAndExtensions& versionInfo)
+{
+    const char* version = (const char*)glGetString(GL_VERSION);
+    int fields = 0, major = 0, minor = 0;
+    bool isGLES = false;
+
+    OVR_ASSERT(version);
+    if (version)
+    {
+        OVR_DEBUG_LOG(("GL_VERSION: %s", (const char*)version));
+
+#ifdef OVR_CC_MSVC
+        // Hack: This is using sscanf_s on MSVC to kill the security warning.
+        // Normally the two functions are not interchangeable because the string format
+        // is different for %s types, however we only use %d so it's fine.
+#define TEMP_OVR_SSCANF sscanf_s
+#else
+#define TEMP_OVR_SSCANF sscanf
+#endif
+
+        // Skip all leading non-digits before reading %d.
+        // Example GL_VERSION strings:
+        //   "1.5 ATI-1.4.18"
+        //   "OpenGL ES-CM 3.2"
+        fields = TEMP_OVR_SSCANF(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
+        isGLES = (strstr(version, "OpenGL ES") != NULL);
+
+#undef TEMP_OVR_SSCANF
+    }
+    else
+    {
+        LogText("Warning: GL_VERSION was NULL\n");
+    }
+
+    // If two fields were not found,
+    if (fields != 2)
+    {
+        static_assert(sizeof(major) == sizeof(GLint), "type mis-match");
+
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+    }
+
+    // Write version data
+    versionInfo.MajorVersion = major;
+    versionInfo.MinorVersion = minor;
+    versionInfo.IsGLES = isGLES;
+}
+
+static bool HasGLExtension(const char* extensions, const char* searchKey)
+{
+    const int searchKeyLen = (int)strlen(searchKey);
+    const char* p = extensions;
+
+    for (;;)
+    {
+        p = strstr(p, searchKey);
+
+        // If not found,
+        if (p == NULL)
+        {
+            break;
+        }
+
+        // Only match full string
+        if ((p == extensions || p[-1] == ' ') &&
+            (p[searchKeyLen] == '\0' || p[searchKeyLen] == ' '))
+        {
+            return true;
+        }
+
+        // Skip ahead
+        p += searchKeyLen;
+    }
+
+    return false;
+}
+
+static void ParseGLExtensions(GLVersionAndExtensions& versionInfo)
+{
+    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+
+    OVR_ASSERT(extensions);
+    if (!extensions)
+    {
+        extensions = ""; // Note: glGetString() can return null
+        LogText("Warning: GL_EXTENSIONS was NULL\n");
+    }
+    else
+    {
+        // Cannot print this to debug log: It's too long!
+        //OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", (const char*)extensions));
+    }
+
+    versionInfo.Extensions = extensions;
+
+    if (versionInfo.MajorVersion >= 3)
+    {
+        versionInfo.SupportsVAO = true;
+    }
+    else
+    {
+        versionInfo.SupportsVAO =
+            HasGLExtension(extensions, "GL_ARB_vertex_array_object") ||
+            HasGLExtension(extensions, "GL_APPLE_vertex_array_object");
+    }
+
+    versionInfo.SupportsDrawBuffers = HasGLExtension(extensions, "GL_EXT_draw_buffers2");
+
+    // Add more extension checks here...
+}
+
+void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo)
+{
+    ParseGLVersion(versionInfo);
+
+    // GL Version must be parsed before parsing extensions:
+
+    ParseGLExtensions(versionInfo);
+}
+
+
+}}} // namespace OVR::Render::GL

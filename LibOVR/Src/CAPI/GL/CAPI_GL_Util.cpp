@@ -28,7 +28,6 @@ limitations under the License.
 namespace OVR { namespace CAPI { namespace GL {
 
 
-
 // GL Hooks for non-Mac.
 #if !defined(OVR_OS_MAC)
 
@@ -78,6 +77,7 @@ PFNGLENABLEIPROC                         glEnablei;
 PFNGLDISABLEIPROC                        glDisablei;
 PFNGLCOLORMASKIPROC                      glColorMaski;
 PFNGLGETINTEGERI_VPROC                   glGetIntegeri_v;
+PFNGLGETSTRINGIPROC                      glGetStringi;
 PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
 PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 PFNGLDELETESHADERPROC                    glDeleteShader;
@@ -124,7 +124,7 @@ PFNGLUNIFORM1FVPROC                      glUniform1fv;
 PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
 PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
-PFNGLFEEDBACKBUFFERPROC                  glFeedbackBuffer;
+PFNGLBLENDFUNCSEPARATEPROC               glBlendFuncSeparate;
 
 
 #if defined(OVR_OS_WIN32)
@@ -191,6 +191,7 @@ void InitGLExtensions()
     glXSwapIntervalEXT =                (PFNGLXSWAPINTERVALEXTPROC)                GetFunction("glXSwapIntervalEXT");
 #endif
     
+	glGetStringi =                      (PFNGLGETSTRINGIPROC)                      GetFunction("glGetStringi");
     glGenFramebuffers =                 (PFNGLGENFRAMEBUFFERSPROC)                 GetFunction("glGenFramebuffersEXT");
     glDeleteFramebuffers =              (PFNGLDELETEFRAMEBUFFERSPROC)              GetFunction("glDeleteFramebuffersEXT");
 	glEnablei =                         (PFNGLENABLEIPROC)                         GetFunction("glEnableIndexedEXT");
@@ -242,7 +243,7 @@ void InitGLExtensions()
     glDetachShader =                    (PFNGLDETACHSHADERPROC)                    GetFunction("glDetachShader");
     glBindAttribLocation =              (PFNGLBINDATTRIBLOCATIONPROC)              GetFunction("glBindAttribLocation");
     glGetAttribLocation =               (PFNGLGETATTRIBLOCATIONPROC)               GetFunction("glGetAttribLocation");
-    glFeedbackBuffer =                  (PFNGLFEEDBACKBUFFERPROC)                  GetFunction("glFeedbackBuffer");
+    glBlendFuncSeparate =               (PFNGLBLENDFUNCSEPARATEPROC)               GetFunction("glBlendFuncSeparate");
 }
     
 #endif
@@ -499,7 +500,7 @@ void ShaderBase::InitUniforms(const Uniform* refl, size_t reflSize)
     UniformData = (unsigned char*)OVR_ALLOC(UniformsSize);
 }
 
-Texture::Texture(RenderParams* rp, int w, int h) : IsUserAllocated(true), pParams(rp), TexId(0), Width(w), Height(h)
+Texture::Texture(RenderParams* rp, int w, int h) : IsUserAllocated(false), pParams(rp), TexId(0), Width(w), Height(h)
 {
 	if (w && h)
 		glGenTextures(1, &TexId);
@@ -573,6 +574,160 @@ void Texture::UpdatePlaceholderTexture(GLuint texId, const Sizei& textureSize)
 }
 
 
-}}}
+//// GLVersion
+
+void GLVersionAndExtensions::ParseGLVersion()
+{
+    const char* version = (const char*)glGetString(GL_VERSION);
+    int fields = 0, major = 0, minor = 0;
+    bool isGLES = false;
+
+    OVR_ASSERT(version);
+    if (version)
+    {
+        OVR_DEBUG_LOG(("GL_VERSION: %s", (const char*)version));
+
+        // Skip all leading non-digits before reading %d.
+        // Example GL_VERSION strings:
+        //   "1.5 ATI-1.4.18"
+        //   "OpenGL ES-CM 3.2"
+        OVR_DISABLE_MSVC_WARNING(4996) // "scanf may be unsafe"
+        fields = sscanf(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
+        isGLES = (strstr(version, "OpenGL ES") != NULL);
+        OVR_RESTORE_MSVC_WARNING()
+    }
+    else
+    {
+        LogText("Warning: GL_VERSION was NULL\n");
+    }
+
+    // If two fields were not found,
+    if (fields != 2)
+    {
+        static_assert(sizeof(major) == sizeof(GLint), "type mis-match");
+
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+    }
+
+    // Write version data
+    MajorVersion  = major;
+    MinorVersion  = minor;
+    WholeVersion  = (major * 100) + minor;
+    IsGLES        = isGLES;
+    IsCoreProfile = (MajorVersion >= 3); // Until we get a better way to detect core profiles, we err on the conservative side and set to true if the version is >= 3.
+}
 
 
+bool GLVersionAndExtensions::HasGLExtension(const char* searchKey) const
+{
+    if(Extensions && Extensions[0]) // If we have an extension string to search for individual extensions...
+    {
+        const int searchKeyLen = (int)strlen(searchKey);
+        const char* p = Extensions;
+
+        for (;;)
+        {
+            p = strstr(p, searchKey);
+
+            // If not found,
+            if (p == NULL)
+            {
+                break;
+            }
+
+            // Only match full string
+            if ((p == Extensions || p[-1] == ' ') &&
+                (p[searchKeyLen] == '\0' || p[searchKeyLen] == ' '))
+            {
+                return true;
+            }
+
+            // Skip ahead
+            p += searchKeyLen;
+        }
+    }
+    else
+    {
+        if(MajorVersion >= 3) // If glGetIntegerv(GL_NUM_EXTENSIONS, ...) is supported...
+        {
+            GLint extensionCount = 0;
+            glGetIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
+            GLenum err = glGetError();
+            
+            if(err == 0)
+            {
+                for(GLint i = 0; i != extensionCount; ++i)
+                {
+                    const char* extension = (const char*)glGetStringi(GL_EXTENSIONS, (GLuint)i);
+                    
+                    if(extension) // glGetStringi returns NULL upon error.
+                    {
+                        if(strcmp(extension, searchKey) == 0)
+                            return true;
+                    }
+                    else
+                        break;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+
+void GLVersionAndExtensions::ParseGLExtensions()
+{
+    if(MajorVersion >= 3)
+    {
+        // Set to empty because we need to use glGetStringi to read extensions on recent OpenGL.
+        Extensions = "";
+    }
+    else
+    {
+        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+
+        OVR_ASSERT(extensions);
+        if (!extensions)
+        {
+            extensions = ""; // Note: glGetString() can return null
+            LogText("Warning: GL_EXTENSIONS was NULL\n");
+        }
+        else
+        {
+            // Cannot print this to debug log: It's too long!
+            //OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", (const char*)extensions));
+        }
+
+        Extensions = extensions;
+    }
+
+    // To do: revise the code below to loop through calls to glGetStringi(GL_EXTENSIONS, ...) so that all extensions below 
+    // can be searched with a single pass over the extensions instead of a full loop per HasGLExtensionCall. 
+
+    if (MajorVersion >= 3)
+    {
+        SupportsVAO = true;
+    }
+    else
+    {
+        SupportsVAO =
+            HasGLExtension("GL_ARB_vertex_array_object") ||
+            HasGLExtension("GL_APPLE_vertex_array_object");
+    }
+
+    SupportsDrawBuffers = HasGLExtension("GL_EXT_draw_buffers2");
+
+    // Add more extension checks here...
+}
+
+void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo)
+{
+    versionInfo.ParseGLVersion();
+    // GL Version must be parsed before parsing extensions:
+    versionInfo.ParseGLExtensions();
+    // To consider: Call to glGetStringi(GL_SHADING_LANGUAGE_VERSION, ...) check/validate the GLSL support.
+}
+
+
+}}} // namespace OVR::CAPI::GL

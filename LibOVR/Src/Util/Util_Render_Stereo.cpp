@@ -545,8 +545,10 @@ void StereoConfig::UpdateComputedState()
         eyeTypes[1]     = StereoEye_Right;
         break;
 
-    default:        
-        OVR_ASSERT( false ); break;
+    default:
+        numEyes = 0;
+        OVR_ASSERT( false );
+        break;
     }
 
     // If either of these fire, you've probably forgotten to call SetRendertargetSize()
@@ -1069,14 +1071,14 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTri
     }
 
     // Populate vertex buffer info
-    float xOffset = 0.0f;
-    float uOffset = 0.0f;
+    //float xOffset = 0.0f;  Not currently used.
+    //float uOffset = 0.0f;
 
-    if (rightEye)
-    {
-        xOffset = 1.0f;
-        uOffset = 0.5f;
-    }
+    //if (rightEye)
+    //{
+    //    xOffset = 1.0f;
+    //    uOffset = 0.5f;
+    //}
 
     // First pass - build up raw vertex data.
     HeightmapMeshVertexData* pcurVert = *ppVertices;

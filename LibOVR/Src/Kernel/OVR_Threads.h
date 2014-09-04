@@ -325,13 +325,13 @@ public:
     // and set to the return value if Run function after the thread is finished.
     inline int    GetExitCode() const { return ExitCode; }
     // Returns an OS handle 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     void*          GetOSHandle() const { return ThreadHandle; }
 #else
     pthread_t      GetOSHandle() const { return ThreadHandle; }
 #endif
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     ThreadId       GetThreadId() const { return IdValue; }
 #else
     ThreadId       GetThreadId() const { return (ThreadId)GetOSHandle(); }
@@ -369,7 +369,7 @@ protected:
     int            Processor;
     ThreadPriority Priority;
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     void*               ThreadHandle;
     volatile ThreadId   IdValue;
 

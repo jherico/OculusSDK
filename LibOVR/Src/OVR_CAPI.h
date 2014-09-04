@@ -193,6 +193,7 @@ typedef enum
     ovrDistortionCap_FlipInput      = 0x20,		///  Flip the vertical texture coordinate of input images.
     ovrDistortionCap_SRGB           = 0x40,		///  Assume input images are in sRGB gamma-corrected color space.
     ovrDistortionCap_Overdrive      = 0x80,		///  Overdrive brightness transitions to reduce artifacts on DK2+ displays
+    ovrDistortionCap_HqDistortion   = 0x100,	/// High-quality sampling of distortion buffer for anti-aliasing
 
     ovrDistortionCap_ProfileNoTimewarpSpinWaits = 0x10000,  /// Use when profiling with timewarp to remove false positives
 } ovrDistortionCaps;
@@ -319,6 +320,11 @@ typedef struct ovrTrackingState_
 
     /// Tracking status described by ovrStatusBits.
     unsigned int   StatusFlags;
+
+    //// 0.4.1
+
+    /// Time spent processing the last vision frame
+    double         LastVisionProcessingTime;
 } ovrTrackingState;
 
 
@@ -465,7 +471,7 @@ extern "C" {
 // Either ovr_InitializeRenderingShim() or ovr_Initialize() must be called before any
 // Direct3D or OpenGL initilization is done by applictaion (creation of devices, etc).
 // ovr_Initialize() must still be called after to use the rest of LibOVR APIs.
-OVR_EXPORT void ovr_InitializeRenderingShim();
+OVR_EXPORT void     ovr_InitializeRenderingShim();
 
 // Library init/shutdown, must be called around all other OVR code.
 // No other functions calls besides ovr_InitializeRenderingShim are allowed
@@ -776,6 +782,9 @@ OVR_EXPORT ovrBool      ovrHmd_ProcessLatencyTest(ovrHmd hmd, unsigned char rgbC
 /// Buffer is valid until next call.
 OVR_EXPORT const char*  ovrHmd_GetLatencyTestResult(ovrHmd hmd);
 
+/// Returns the latency testing color in rgbColorOut to render when using a DK2
+/// Returns false if this feature is disabled or not-applicable (e.g. using a DK1)
+OVR_EXPORT ovrBool      ovrHmd_GetLatencyTest2DrawColor(ovrHmd hmddesc, unsigned char rgbColorOut[3]);
 
 
 //-------------------------------------------------------------------------------------
@@ -849,27 +858,30 @@ OVR_EXPORT ovrBool ovrHmd_DismissHSWDisplay(ovrHmd hmd);
 // For now, access profile entries; this will change.
 #if !defined(OVR_KEY_USER)
 
-    #define OVR_KEY_USER                        "User"
-    #define OVR_KEY_NAME                        "Name"
-    #define OVR_KEY_GENDER                      "Gender"
-    #define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"
-    #define OVR_KEY_EYE_HEIGHT                  "EyeHeight"
-    #define OVR_KEY_IPD                         "IPD"
-    #define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"
+#define OVR_KEY_USER                        "User"
+#define OVR_KEY_NAME                        "Name"
+#define OVR_KEY_GENDER                      "Gender"
+#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"
+#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"
+#define OVR_KEY_IPD                         "IPD"
+#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"
+#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld"
 
-	// TODO: remove this duplication with OVR_Profile.h
-	// Default measurements empirically determined at Oculus to make us happy
-	// The neck model numbers were derived as an average of the male and female averages from ANSUR-88
-	// NECK_TO_EYE_HORIZONTAL = H22 - H43 = INFRAORBITALE_BACK_OF_HEAD - TRAGION_BACK_OF_HEAD
-	// NECK_TO_EYE_VERTICAL = H21 - H15 = GONION_TOP_OF_HEAD - ECTOORBITALE_TOP_OF_HEAD
-	// These were determined to be the best in a small user study, clearly beating out the previous default values
-	#define OVR_DEFAULT_GENDER                  "Unknown"
-	#define OVR_DEFAULT_PLAYER_HEIGHT           1.778f
-	#define OVR_DEFAULT_EYE_HEIGHT              1.675f
-	#define OVR_DEFAULT_IPD                     0.064f
-	#define OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL  0.0805f
-	#define OVR_DEFAULT_NECK_TO_EYE_VERTICAL    0.075f
-	#define OVR_DEFAULT_EYE_RELIEF_DIAL         3
+// TODO: remove this duplication with OVR_Profile.h
+// Default measurements empirically determined at Oculus to make us happy
+// The neck model numbers were derived as an average of the male and female averages from ANSUR-88
+// NECK_TO_EYE_HORIZONTAL = H22 - H43 = INFRAORBITALE_BACK_OF_HEAD - TRAGION_BACK_OF_HEAD
+// NECK_TO_EYE_VERTICAL = H21 - H15 = GONION_TOP_OF_HEAD - ECTOORBITALE_TOP_OF_HEAD
+// These were determined to be the best in a small user study, clearly beating out the previous default values
+#define OVR_DEFAULT_GENDER                  "Unknown"
+#define OVR_DEFAULT_PLAYER_HEIGHT           1.778f
+#define OVR_DEFAULT_EYE_HEIGHT              1.675f
+#define OVR_DEFAULT_IPD                     0.064f
+#define OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL  0.0805f
+#define OVR_DEFAULT_NECK_TO_EYE_VERTICAL    0.075f
+#define OVR_DEFAULT_EYE_RELIEF_DIAL         3
+#define OVR_DEFAULT_CAMERA_POSITION			{0,0,0,1,0,0,0}
+
 #endif
 
 /// Get boolean property. Returns first element if property is a boolean array.

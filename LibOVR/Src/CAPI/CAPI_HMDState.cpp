@@ -42,31 +42,70 @@ HMDState::HMDState(const OVR::Service::HMDNetworkInfo& netInfo,
 				   const OVR::HMDInfo& hmdInfo,
 				   Profile* profile,
 				   Service::NetClient* client) :
-    pClient(client),
     pProfile(profile),
     pHmdDesc(0),
     pWindow(0),
-    NetInfo(netInfo),
+    pClient(client),
     NetId(netInfo.NetId),
+    NetInfo(netInfo),
     OurHMDInfo(hmdInfo),
+    pLastError(NULL),
     EnabledHmdCaps(0),
-    LastFrameTimeSeconds(0.f),
-    LastGetFrameTimeSeconds(0.),
+    EnabledServiceHmdCaps(0),
+    SharedStateReader(),
+    TheSensorStateReader(),
+    TheLatencyTestStateReader(),
     LatencyTestActive(false),
-    LatencyTest2Active(false)
+  //LatencyTestDrawColor(),
+    LatencyTest2Active(false),
+  //LatencyTest2DrawColor(),
+    TimeManager(true),
+    RenderState(),
+    pRenderer(),
+    pHSWDisplay(),
+    LastFrameTimeSeconds(0.),
+    LastGetFrameTimeSeconds(0.),
+  //LastGetStringValue(),
+    RenderingConfigured(false),
+    BeginFrameCalled(false),
+    BeginFrameThreadId(),
+    RenderAPIThreadChecker(),
+    BeginFrameTimingCalled(false)
 {
     sharedInit(profile);
 }
 
+
 HMDState::HMDState(const OVR::HMDInfo& hmdInfo, Profile* profile) :
-    pClient(0),
-    pHmdDesc(0),
-    NetId(InvalidVirtualHmdId),
     pProfile(profile),
+    pHmdDesc(0),
+    pWindow(0),
+    pClient(0),
+    NetId(InvalidVirtualHmdId),
+    NetInfo(),
     OurHMDInfo(hmdInfo),
+    pLastError(NULL),
     EnabledHmdCaps(0),
+    EnabledServiceHmdCaps(0),
+    SharedStateReader(),
+    TheSensorStateReader(),
+    TheLatencyTestStateReader(),
+    LatencyTestActive(false),
+  //LatencyTestDrawColor(),
+    LatencyTest2Active(false),
+  //LatencyTest2DrawColor(),
+    TimeManager(true),
+    RenderState(),
+    pRenderer(),
+    pHSWDisplay(),
     LastFrameTimeSeconds(0.),
-    LastGetFrameTimeSeconds(0.)
+    LastGetFrameTimeSeconds(0.),
+  //LastGetStringValue(),
+    RenderingConfigured(false),
+    BeginFrameCalled(false),
+    BeginFrameThreadId(),
+    RenderAPIThreadChecker(),
+    BeginFrameTimingCalled(false)
 {
     sharedInit(profile);
 }
@@ -82,7 +121,10 @@ HMDState::~HMDState()
     ConfigureRendering(0,0,0,0);
 
     if (pHmdDesc)
-        delete pHmdDesc;
+    {
+        OVR_FREE(pHmdDesc);
+        pHmdDesc = NULL;
+    }
 }
 
 void HMDState::sharedInit(Profile* profile)
@@ -96,7 +138,7 @@ void HMDState::sharedInit(Profile* profile)
     UpdateRenderProfile(profile);
 
     OVR_ASSERT(!pHmdDesc);
-    pHmdDesc         = new ovrHmdDesc;
+    pHmdDesc         = (ovrHmdDesc*)OVR_ALLOC(sizeof(ovrHmdDesc));
     *pHmdDesc        = RenderState.GetDesc();
     pHmdDesc->Handle = this;
 
@@ -119,6 +161,8 @@ void HMDState::sharedInit(Profile* profile)
     BeginFrameCalled   = false;
     BeginFrameThreadId = 0;
     BeginFrameTimingCalled = false;
+
+    TheSensorStateReader.LoadProfileCenteredFromWorld(profile);
 
     // Construct the HSWDisplay. We will later reconstruct it with a specific ovrRenderAPI type if the application starts using SDK-based rendering.
     if(!pHSWDisplay)
@@ -264,7 +308,7 @@ ovrTrackingState HMDState::PredictedTrackingState(double absTime)
     TheSensorStateReader.GetSensorStateAtTime(absTime, ss);
 
     // Zero out the status flags
-    if (!pClient || !pClient->IsConnected())
+    if (!pClient || !pClient->IsConnected(false, false))
     {
         ss.StatusFlags = 0;
     }
@@ -360,8 +404,7 @@ bool HMDState::getBoolValue(const char* propertyName, bool defaultVal)
 
 bool HMDState::setBoolValue(const char* propertyName, bool value)
 {
-    NetClient::GetInstance()->SetBoolValue(GetNetId(), propertyName, value);
-    return true;
+    return NetClient::GetInstance()->SetBoolValue(GetNetId(), propertyName, value);
 }
 
 int HMDState::getIntValue(const char* propertyName, int defaultVal)
@@ -379,8 +422,7 @@ int HMDState::getIntValue(const char* propertyName, int defaultVal)
 
 bool HMDState::setIntValue(const char* propertyName, int value)
 {
-    NetClient::GetInstance()->SetIntValue(GetNetId(), propertyName, value);
-    return true;
+    return NetClient::GetInstance()->SetIntValue(GetNetId(), propertyName, value);
 }
 
 float HMDState::getFloatValue(const char* propertyName, float defaultVal)
@@ -411,8 +453,7 @@ float HMDState::getFloatValue(const char* propertyName, float defaultVal)
 
 bool HMDState::setFloatValue(const char* propertyName, float value)
 {
-    NetClient::GetInstance()->SetNumberValue(GetNetId(), propertyName, value);
-    return true;
+    return NetClient::GetInstance()->SetNumberValue(GetNetId(), propertyName, value);
 }
 
 static unsigned CopyFloatArrayWithLimit(float dest[], unsigned destSize,
@@ -501,11 +542,11 @@ bool HMDState::setFloatArray(const char* propertyName, float values[], unsigned 
         da[i] = values[i];
     }
 
-    NetClient::GetInstance()->SetNumberValues(GetNetId(), propertyName, da, arraySize);
+    bool result = NetClient::GetInstance()->SetNumberValues(GetNetId(), propertyName, da, arraySize);
 
     delete[] da;
 
-    return true;
+    return result;
 }
 
 const char* HMDState::getString(const char* propertyName, const char* defaultVal)
@@ -529,8 +570,7 @@ const char* HMDState::getString(const char* propertyName, const char* defaultVal
 
 bool HMDState::setString(const char* propertyName, const char* value)
 {
-    NetClient::GetInstance()->SetStringValue(GetNetId(), propertyName, value);
-    return true;
+    return NetClient::GetInstance()->SetStringValue(GetNetId(), propertyName, value);
 }
 
 
@@ -539,93 +579,7 @@ bool HMDState::setString(const char* propertyName, const char* value)
 
 bool HMDState::ProcessLatencyTest(unsigned char rgbColorOut[3])
 {    
-    bool result = false;
-
-    result = NetClient::GetInstance()->LatencyUtil_ProcessInputs(Timer::GetSeconds(), rgbColorOut);
-
-#if 0 //def ENABLE_LATENCY_TESTER
-    // Check create.
-    if (pLatencyTester)
-    {
-        if (pLatencyTester->IsConnected())
-        {
-            Color colorToDisplay;
-
-            LatencyUtil.ProcessInputs();
-            result = LatencyUtil.DisplayScreenColor(colorToDisplay);
-            rgbColorOut[0] = colorToDisplay.R;
-            rgbColorOut[1] = colorToDisplay.G;
-            rgbColorOut[2] = colorToDisplay.B;
-        }
-        else
-        {
-            // Disconnect.
-            LatencyUtil.SetDevice(NULL);
-            pLatencyTester = 0;
-            LogText("LATENCY SENSOR disconnected.\n");
-        }
-    }
-    else if (AddLatencyTestCount > 0)
-    {
-        // This might have some unlikely race condition issue which could cause us to miss a device...
-        AddLatencyTestCount = 0;
-
-        pLatencyTester = *GlobalState::pInstance->GetManager()->EnumerateDevices<LatencyTestDevice>().CreateDevice();
-        if (pLatencyTester)
-        {
-            LatencyUtil.SetDevice(pLatencyTester);
-            LogText("LATENCY TESTER connected\n");
-        }        
-    }
-#endif
-    
-    return result;
-}
-
-void HMDState::ProcessLatencyTest2(unsigned char rgbColorOut[3], double startTime)
-{
-    OVR_UNUSED2(rgbColorOut, startTime);
-    /*
-    // Check create.
-    if (!(EnabledHmdCaps & ovrHmdCap_LatencyTest))
-        return;
-
-    if (pLatencyTesterDisplay && !LatencyUtil2.HasDisplayDevice())
-    {
-        if (!pLatencyTesterDisplay->IsConnected())
-        {
-            LatencyUtil2.SetDisplayDevice(NULL);
-        }
-    }
-    else if (AddLatencyTestDisplayCount > 0)
-    {
-        // This might have some unlikely race condition issue
-        // which could cause us to miss a device...
-        AddLatencyTestDisplayCount = 0;
-
-        pLatencyTesterDisplay = *GlobalState::pInstance->GetManager()->
-                                 EnumerateDevices<LatencyTestDevice>().CreateDevice();
-        if (pLatencyTesterDisplay)
-        {
-            LatencyUtil2.SetDisplayDevice(pLatencyTesterDisplay);
-        }
-    }
-
-    if (LatencyUtil2.HasDevice() && pSensor && pSensor->IsConnected())
-    {
-        LatencyUtil2.BeginTest(startTime);
-
-        Color colorToDisplay;
-        LatencyTest2Active = LatencyUtil2.DisplayScreenColor(colorToDisplay);
-        rgbColorOut[0] = colorToDisplay.R;
-        rgbColorOut[1] = colorToDisplay.G;
-        rgbColorOut[2] = colorToDisplay.B;
-    }
-    else
-    {
-        LatencyTest2Active = false;
-    }
-    */
+    return NetClient::GetInstance()->LatencyUtil_ProcessInputs(Timer::GetSeconds(), rgbColorOut);
 }
 
 //-------------------------------------------------------------------------------------

@@ -89,6 +89,11 @@ public:
 
     // Sensor status described by ovrStatusBits.
 	uint32_t     StatusFlags;
+
+    //// 0.4.1
+
+    // Time spent processing the last vision frame
+    double LastVisionProcessingTime;
 };
 
 
@@ -110,6 +115,7 @@ struct LocklessSensorState
 
 	// ImuFromCpf for HMD pose tracking
 	Posed             ImuFromCpf;
+    double            LastVisionProcessingTime;
 
 	// Initialized to invalid state
 	LocklessSensorState() :
@@ -119,7 +125,7 @@ struct LocklessSensorState
 
     LocklessSensorState& operator = (const LocklessSensorStatePadding& rhs);
 };
-
+    
 // Padded out version stored in the updater slots
 // Designed to be a larger fixed size to allow the data to grow in the future
 // without breaking older compiled code.

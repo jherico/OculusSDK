@@ -31,7 +31,7 @@ namespace OVR { namespace Render { namespace GL { namespace Win32 {
 typedef HRESULT (WINAPI *PFNDWMENABLECOMPOSITIONPROC) (UINT);
 
 #pragma warning(disable : 4995)
-PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition;
+PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition = NULL;
 
 
 // ***** GL::Win32::RenderDevice

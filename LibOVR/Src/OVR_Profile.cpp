@@ -136,7 +136,7 @@ String GetBaseOVRPath(bool create_dir)
             CreateDirectory(wpath, NULL);
         }
     }
-        
+
 #elif defined(OVR_OS_MAC)
 
     const char* home = getenv("HOME");
@@ -158,8 +158,7 @@ String GetBaseOVRPath(bool create_dir)
 
 #else
 
-    passwd* pwd = getpwuid(getuid());
-    const char* home = pwd->pw_dir;
+    const char* home = getenv("HOME");
     path = home;
     path += "/.config/Oculus";
 
@@ -183,7 +182,7 @@ String GetBaseOVRPath(bool create_dir)
 
 String ProfileManager::GetProfilePath()
 {
-	return BasePath + "/ProfileDB.json";
+    return BasePath + "/ProfileDB.json";
 }
 
 static JSON* FindTaggedData(JSON* data, const char** tag_names, const char** qtags, int num_qtags)
@@ -274,10 +273,10 @@ template<> ProfileManager* OVR::SystemSingletonBase<ProfileManager>::SlowGetInst
 }
 
 ProfileManager::ProfileManager(bool sys_register) :
-	Changed(false)
+    Changed(false)
 {
-	// Attempt to get the base path automatically, but this may fail
-	BasePath = GetBaseOVRPath(false);
+    // Attempt to get the base path automatically, but this may fail
+    BasePath = GetBaseOVRPath(false);
 
     if (sys_register)
         PushDestroyCallbacks();
@@ -296,11 +295,11 @@ void ProfileManager::OnSystemDestroy()
 // In the service process it is important to set the base path because this cannot be detected automatically
 void ProfileManager::SetBasePath(String basePath)
 {
-	if (basePath != BasePath)
-	{
-		BasePath = basePath;
-		LoadCache(false);
-	}
+    if (basePath != BasePath)
+    {
+        BasePath = basePath;
+        LoadCache(false);
+    }
 }
 
 // Clear the local profile cache
@@ -315,10 +314,10 @@ void ProfileManager::ClearProfileData()
 // Serializes the profiles to disk.
 void ProfileManager::Save()
 {
-	Lock::Locker lockScope(&ProfileLock);
+    Lock::Locker lockScope(&ProfileLock);
 
-	if (ProfileCache == NULL)
-		return;
+    if (ProfileCache == NULL)
+        return;
 
     // Save the profile to disk
     BasePath = GetBaseOVRPath(true);  // create the base directory if it doesn't exist
@@ -357,7 +356,7 @@ Profile* ProfileManager::GetDefaultProfile(HmdTypeEnum device)
 
             // TODO: These defaults are a little bogus and designed for continuity with 0.3
             // eye-relief values.  We need better measurement-based numbers in future releases
-            float max_eye_plate[2] = { 0.01965f + 0.017f, 0.01965f + 0.017f };
+            float max_eye_plate[2] = { 0.01965f + 0.018f, 0.01965f + 0.018f };
             profile->SetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, max_eye_plate, 2);
         }
         else
@@ -789,8 +788,8 @@ bool ProfileManager::SetDefaultUser(const ProfileDeviceKey& deviceKey, const cha
     const char* tag_names[2] = {"Product", "Serial"};
     const char* tags[2];
 
-	const char* product_str = deviceKey.ProductName.IsEmpty() ? NULL : deviceKey.ProductName.ToCStr();
-	const char* serial_str = deviceKey.PrintedSerial.IsEmpty() ? NULL : deviceKey.PrintedSerial.ToCStr();
+    const char* product_str = deviceKey.ProductName.IsEmpty() ? NULL : deviceKey.ProductName.ToCStr();
+    const char* serial_str = deviceKey.PrintedSerial.IsEmpty() ? NULL : deviceKey.PrintedSerial.ToCStr();
 
     if (product_str && serial_str)
     {
@@ -985,7 +984,7 @@ bool ProfileManager::SetTaggedProfile(const char** tag_names, const char** tags,
 //-----------------------------------------------------------------------------
 Profile* ProfileManager::GetDefaultUserProfile(const ProfileDeviceKey& deviceKey)
 {
-	const char* userName = GetDefaultUser(deviceKey);
+    const char* userName = GetDefaultUser(deviceKey);
 
     Profile* profile = GetProfile(deviceKey, userName);
 
@@ -1009,11 +1008,11 @@ Profile* ProfileManager::GetProfile(const ProfileDeviceKey& deviceKey, const cha
             return NULL;
     }
     
-	Profile* profile = new Profile(BasePath);
+    Profile* profile = new Profile(BasePath);
 
-	if (deviceKey.Valid)
+    if (deviceKey.Valid)
     {
-		if (!profile->LoadDeviceProfile(deviceKey) && (user == NULL))
+        if (!profile->LoadDeviceProfile(deviceKey) && (user == NULL))
         {
             profile->Release();
             return NULL;
@@ -1022,8 +1021,8 @@ Profile* ProfileManager::GetProfile(const ProfileDeviceKey& deviceKey, const cha
     
     if (user)
     {
-		const char* product_str = deviceKey.ProductName.IsEmpty() ? NULL : deviceKey.ProductName.ToCStr();
-		const char* serial_str = deviceKey.PrintedSerial.IsEmpty() ? NULL : deviceKey.PrintedSerial.ToCStr();
+        const char* product_str = deviceKey.ProductName.IsEmpty() ? NULL : deviceKey.ProductName.ToCStr();
+        const char* serial_str = deviceKey.PrintedSerial.IsEmpty() ? NULL : deviceKey.PrintedSerial.ToCStr();
 
         if (!profile->LoadProfile(ProfileCache.GetPtr(), user, product_str, serial_str))
         {
@@ -1084,7 +1083,7 @@ void Profile::CopyItems(JSON* root, String prefix)
 //-----------------------------------------------------------------------------
 bool Profile::LoadDeviceFile(unsigned int productId, const char* printedSerialNumber)
 {
-	if (printedSerialNumber[0] == 0)
+    if (printedSerialNumber[0] == 0)
         return false;
 
     String path = BasePath + "/Devices.json";
@@ -1115,7 +1114,7 @@ bool Profile::LoadDeviceFile(unsigned int productId, const char* printedSerialNu
             JSON* product_item = device->GetItemByName("ProductID");
             JSON* serial_item = device->GetItemByName("Serial");
             if (product_item && serial_item &&
-				(product_item->dValue == productId) && (serial_item->Value == printedSerialNumber))
+                (product_item->dValue == productId) && (serial_item->Value == printedSerialNumber))
             {   
                 // found the entry for this device so recursively copy all the settings to the profile
                 CopyItems(device, "");
@@ -1144,7 +1143,7 @@ static int BCDByte(unsigned int byte)
 bool Profile::LoadDeviceProfile(const ProfileDeviceKey& deviceKey)
 {
     bool success = false;
-	if (!deviceKey.Valid)
+    if (!deviceKey.Valid)
             return false;
 
 #if 0
@@ -1162,7 +1161,7 @@ bool Profile::LoadDeviceProfile(const ProfileDeviceKey& deviceKey)
 #endif
             // Grab the model and serial number from the device and use it to access the device
             // profile file stored on the local machine
-		success = LoadDeviceFile(deviceKey.ProductId, deviceKey.PrintedSerial);
+        success = LoadDeviceFile(deviceKey.ProductId, deviceKey.PrintedSerial);
     //}
 
     return success;
@@ -1390,10 +1389,7 @@ int Profile::GetDoubleValues(const char* key, double* values, int num_vals) cons
 
         return count;
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -1576,7 +1572,7 @@ void Profile::SetDoubleValues(const char* key, const double* vals, int num_vals)
 //------------------------------------------------------------------------------
 bool Profile::IsDefaultProfile()
 {
-	return 0 == OVR::String::CompareNoCase("Default", GetValue(OVR_KEY_NAME));
+    return 0 == OVR::String::CompareNoCase("Default", GetValue(OVR_KEY_NAME));
 }
 
 

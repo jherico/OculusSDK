@@ -41,9 +41,7 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** D3D11 Specific
 
-
 #include <d3d11.h>
-
 
 /// Used to configure slave D3D rendering (i.e. for devices created externally).
 struct ovrD3D11ConfigData

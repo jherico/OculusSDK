@@ -191,6 +191,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="../../../OculusRoomModel.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.cpp" />
     <ClCompile Include="..\..\..\RenderTiny_D3D11_Device.cpp" />
     <ClCompile Include="..\..\..\Win32_OculusRoomTiny.cpp" />
     <ClCompile Include="..\..\..\Win32_OculusRoomTiny_Util.cpp" />
@@ -199,6 +200,7 @@
     <ResourceCompile Include="../../../OculusRoomTiny2.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h" />
     <ClInclude Include="..\..\..\HSWDisplay_Util.h" />
     <ClInclude Include="..\..\..\RenderTiny_D3D11_Device.h" />
   </ItemGroup>

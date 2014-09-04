@@ -232,9 +232,6 @@ Texture* LoadTextureTga(RenderParams& rParams, int samplerMode, const uint8_t* p
 HSWDisplay::HSWDisplay(ovrRenderAPIType api, ovrHmd hmd, const HMDRenderState& renderState)
   : OVR::CAPI::HSWDisplay(api, hmd, renderState)
   , RenderParams()
-  , GLMajorVersion(0)
-  , GLMinorVersion(0)
-  , SupportsVao(false)
   , FrameBuffer(0)
   , pTexture()
   , pShaderSet()
@@ -276,10 +273,8 @@ bool HSWDisplay::Initialize(const ovrRenderAPIConfig* apiConfig)
             if (config->OGL.Win)
                 RenderParams.Win= config->OGL.Win;
             if (!RenderParams.Win)
-            {
-                int unused;
                 RenderParams.Win = glXGetCurrentDrawable();
-            }
+
             if (!RenderParams.Win)
             {
                 OVR_DEBUG_LOG(("XGetInputFocus failed."));
@@ -332,17 +327,14 @@ void HSWDisplay::UnloadGraphics()
     if(VAO)
     {
         #ifdef OVR_OS_MAC
-    		if(GLMajorVersion >= 3)
-			{
-				glDeleteVertexArrays(1, &VAO);
-        	}
-			else
-			{
-        	    glDeleteVertexArraysAPPLE(1, &VAO);
-			}
-		#else
+            if(GLVersionInfo.WholeVersion >= 302)
+                glDeleteVertexArrays(1, &VAO);
+            else
+                glDeleteVertexArraysAPPLE(1, &VAO);
+        #else
             glDeleteVertexArrays(1, &VAO);
         #endif
+        
         VAO = 0;
         VAOInitialized = false;
     }
@@ -352,31 +344,10 @@ void HSWDisplay::UnloadGraphics()
 
 void HSWDisplay::LoadGraphics()
 {
-    const char* glVersionString = (const char*)glGetString(GL_VERSION);
-
-    OVR_ASSERT(glVersionString);
-    if (glVersionString)
-    {
-        int fieldCount = sscanf(glVersionString, isdigit(*glVersionString) ? "%d.%d" : "%*[^0-9]%d.%d", &GLMajorVersion, &GLMinorVersion); // Skip all leading non-digits before reading %d. Example glVersionStrings: "1.5 ATI-1.4.18", "OpenGL ES-CM 3.2"
-        
-        if(fieldCount != 2)
-        {
-            static_assert(sizeof(GLMajorVersion) == sizeof(GLint), "type mis-match");
-            glGetIntegerv(GL_MAJOR_VERSION, &GLMajorVersion);
-        }
-    }
-
-    // SupportsVao
-    if(GLMajorVersion >= 3)
-        SupportsVao = true;
-    else
-    {
-        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-        SupportsVao = (strstr(extensions, "GL_ARB_vertex_array_object") || strstr(extensions, "GL_APPLE_vertex_array_object"));
-    }
-
     if (FrameBuffer == 0)
+    {
         glGenFramebuffers(1, &FrameBuffer);
+    }
 
     if (!pTexture) // To do: Add support for .dds files, which would be significantly smaller than the size of the tga.
     {
@@ -385,12 +356,14 @@ void HSWDisplay::LoadGraphics()
         pTexture = *LoadTextureTga(RenderParams, Sample_Linear | Sample_Clamp, TextureData, (int)textureSize, 255);
     }
 
-    if(!pShaderSet)
+    if (!pShaderSet)
+    {
         pShaderSet = *new ShaderSet();
+    }
 
     if(!pVertexShader)
     {
-        OVR::String strShader((GLMajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
+        OVR::String strShader((GLVersionInfo.MajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
         strShader += SimpleTexturedQuad_vs;
 
         pVertexShader = *new VertexShader(&RenderParams, const_cast<char*>(strShader.ToCStr()), strShader.GetLength(), SimpleTexturedQuad_vs_refl, OVR_ARRAY_COUNT(SimpleTexturedQuad_vs_refl));
@@ -399,7 +372,7 @@ void HSWDisplay::LoadGraphics()
 
     if(!pFragmentShader)
     {
-        OVR::String strShader((GLMajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
+        OVR::String strShader((GLVersionInfo.MajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
         strShader += SimpleTexturedQuad_ps;
 
         pFragmentShader = *new FragmentShader(&RenderParams, const_cast<char*>(strShader.ToCStr()), strShader.GetLength(), SimpleTexturedQuad_ps_refl, OVR_ARRAY_COUNT(SimpleTexturedQuad_ps_refl));
@@ -432,18 +405,15 @@ void HSWDisplay::LoadGraphics()
     }
 
     // We don't generate the vertex arrays here
-    if(!VAO && SupportsVao)
+    if (!VAO && GLVersionInfo.SupportsVAO)
     {
         OVR_ASSERT(!VAOInitialized);
+        
         #ifdef OVR_OS_MAC
-    		if(GLMajorVersion >= 3)
-			{
-				glGenVertexArrays(1, &VAO);
-        	}
-			else
-			{
-	            glGenVertexArraysAPPLE(1, &VAO);
-			}
+            if(GLVersionInfo.WholeVersion >= 302)
+                glGenVertexArrays(1, &VAO);
+            else
+                glGenVertexArraysAPPLE(1, &VAO);
         #else
             glGenVertexArrays(1, &VAO);
         #endif
@@ -455,9 +425,13 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 {
     if(RenderEnabled && eyeTexture)
     {
-        // Hack - Clear previous errors.
+        // glGetError clears any previous error state. We call it here in order to start with
+        // a clean slate, as we are asserting below that our calls do not generate errors.
         glGetError();
         
+        if(GLVersionInfo.MajorVersion == 0) // If not yet initialized...
+            GetGLVersionAndExtensions(GLVersionInfo);
+
         // We need to render to the eyeTexture with the texture viewport.
         // Setup rendering to the texture.
         ovrGLTexture* eyeTextureGL = const_cast<ovrGLTexture*>(reinterpret_cast<const ovrGLTexture*>(eyeTexture));
@@ -468,15 +442,19 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 
         // Save state
         // To do: Converge this with the state setting/restoring functionality present in the distortion renderer.
+        // Consider usage of the EXT_direct_state_access (http://www.opengl.org/registry/specs/EXT/direct_state_access.txt) extension.
         // Note that the glGet functions below will block until command buffer has completed.
         // glPushAttrib is deprecated, so we use glGet* to save/restore fixed-function settings.
         // https://www.opengl.org/sdk/docs/man/docbook4/xhtml/glGet.xml
         //
-        GLint RenderModeSaved;
-        glGetIntegerv(GL_RENDER_MODE, &RenderModeSaved);
-        OVR_ASSERT(glGetError() == 0);
-        OVR_ASSERT(RenderModeSaved == GL_RENDER); // Make sure it's not GL_SELECT or GL_FEEDBACK.
-
+        GLint RenderModeSaved = 0;
+        if(!GLVersionInfo.IsCoreProfile) // glGetIntegerv can fail if an OpenGL 3.x+ core profile is enabled due to GL_RENDER_MODE being no longer supported.
+        {
+            glGetIntegerv(GL_RENDER_MODE, &RenderModeSaved);
+            OVR_ASSERT(glGetError() == 0);
+            OVR_ASSERT(RenderModeSaved == GL_RENDER); // Make sure it's not GL_SELECT or GL_FEEDBACK.
+        }
+        
         GLint FrameBufferBindingSaved; // OpenGL renamed GL_FRAMEBUFFER_BINDING to GL_DRAW_FRAMEBUFFER_BINDING and adds GL_READ_FRAMEBUFFER_BINDING.
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &FrameBufferBindingSaved);
         OVR_ASSERT(glGetError() == 0);
@@ -494,8 +472,8 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         OVR_ASSERT(glGetError() == 0);
 
         GLdouble DepthRangeSaved[2];
-        #if defined(OVR_OS_MAC)
-            // Using glDepthRange as a conditional will always evaluate to true on Mac.
+        #if defined(OVR_OS_MAC) || defined(OVR_OS_LINUX)
+            // Using glDepthRange as a conditional will always evaluate to true on Mac/Linux.
             glGetDoublev(GL_DEPTH_RANGE, DepthRangeSaved);
         #else
             GLfloat DepthRangefSaved[2];
@@ -547,7 +525,7 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         OVR_ASSERT(glGetError() == 0);
 
         GLint SampleMaskSaved = 0;
-        if(((GLMajorVersion * 100) + GLMinorVersion) >= 302) // OpenGL 3.2 or later
+        if (GLVersionInfo.WholeVersion >= 302) // OpenGL 3.2 or later
         {
             glGetIntegerv(GL_SAMPLE_MASK, &SampleMaskSaved);
             OVR_ASSERT(glGetError() == 0);
@@ -572,37 +550,46 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &TextureBindingSaved);
         OVR_ASSERT(glGetError() == 0);
 
-        // https://www.opengl.org/sdk/docs/man/docbook4/xhtml/glVertexAttribPointer.xml
+        GLint VertexArrayBindingSaved = 0;
+        if (GLVersionInfo.SupportsVAO)
+            glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArrayBindingSaved);
+
+        // If the core profile is enabled then we can't get the vertex attributes unless there is
+        // an active VAO. Otherwise there can be an error with some OpenGL implementations (notably Apple's).
+        // If the core profile is not enabled then pre-OpenGL 3.0 behavior is possible in which the
+        // application may not be using VAOs and thus there may be active vertex attributes.
         GLint   VertexAttribEnabledSaved[kSavedVertexAttribCount];
         GLint   VertexAttribSizeSaved[kSavedVertexAttribCount];
         GLint   VertexAttribTypeSaved[kSavedVertexAttribCount];
         GLint   VertexAttribNormalizedSaved[kSavedVertexAttribCount];
         GLint   VertexAttribStrideSaved[kSavedVertexAttribCount];
         GLvoid* VertexAttribPointerSaved[kSavedVertexAttribCount];
-        for(GLuint i = 0; i < kSavedVertexAttribCount; i++)
+
+        if(VertexArrayBindingSaved || !GLVersionInfo.IsCoreProfile)
         {
-            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &VertexAttribEnabledSaved[i]);
+            for(GLuint i = 0; i < kSavedVertexAttribCount; i++)
+            {
+                // https://www.opengl.org/sdk/docs/man/docbook4/xhtml/glVertexAttribPointer.xml
+                glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &VertexAttribEnabledSaved[i]);
 
-            glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_SIZE,       &VertexAttribSizeSaved[i]);
-            glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_TYPE,       &VertexAttribTypeSaved[i]);
-            glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &VertexAttribNormalizedSaved[i]);
-            glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_STRIDE,     &VertexAttribStrideSaved[i]);
-            glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER,    &VertexAttribPointerSaved[i]); 
+                glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_SIZE,       &VertexAttribSizeSaved[i]);
+                glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_TYPE,       &VertexAttribTypeSaved[i]);
+                glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &VertexAttribNormalizedSaved[i]);
+                glGetVertexAttribiv(i,       GL_VERTEX_ATTRIB_ARRAY_STRIDE,     &VertexAttribStrideSaved[i]);
+                glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER,    &VertexAttribPointerSaved[i]); 
 
-            OVR_ASSERT(glGetError() == 0);
+                OVR_ASSERT(glGetError() == 0);
+            }
         }
-
-        GLint VertexArrayBindingSaved = 0;
-        if (SupportsVao)
-            glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &VertexArrayBindingSaved);
-
         //
         // End of save state
 
 
         // Load the graphics if not loaded already.
         if (!pTexture)
+        {
             LoadGraphics();
+        }
 
         // Calculate ortho projection.
         GetOrthoProjection(RenderState, OrthoProjection);
@@ -628,10 +615,10 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         // Set fixed-function render states
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         OVR_ASSERT(glGetError() == 0);
-        #if defined(OVR_OS_MAC) // On Mac we are directly using OpenGL functions instead of function pointers.
+        #if defined(OVR_OS_MAC) || defined(OVR_OS_LINUX) // On Mac/Linux we are directly using OpenGL functions instead of function pointers.
             glDepthRange(0.0,  1.0);
         #else
-            if(glDepthRange) // If we can use the double version (glDepthRangef may not be available)...
+            if(glDepthRange) // If we can use the double version (glDepthRangef isn't available with older OpenGL, glDepthRange isn't available with OpenGL ES)...
                 glDepthRange(0.0,  1.0);
             else
                 glDepthRangef(0.f,  1.f);
@@ -645,8 +632,10 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         glDisable(GL_DITHER);
         glDisable(GL_RASTERIZER_DISCARD);
         glDisable(GL_SCISSOR_TEST);
-        if(((GLMajorVersion * 100) + GLMinorVersion) >= 302) // OpenGL 3.2 or later
+        if (GLVersionInfo.WholeVersion >= 302) // OpenGL 3.2 or later
+        {
             glDisable(GL_SAMPLE_MASK);
+        }
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
         OVR_ASSERT(glGetError() == 0);
 
@@ -668,18 +657,15 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         // To do: We must add support for vertext array objects (VAOs) here. When using an OpenGL 3.2+ core profile, 
         // the application is required to use vertex array objects and glVertexAttribPointer will fail otherwise.
 
-        if(SupportsVao)
+        if (GLVersionInfo.SupportsVAO)
         {
             OVR_ASSERT(VAO != 0);
+            
             #ifdef OVR_OS_MAC
-    			if(GLMajorVersion >= 3)
-				{
-					glBindVertexArray(VAO);
-        		}
-				else
-				{
-					glBindVertexArrayAPPLE(VAO);
-				}
+                if(GLVersionInfo.WholeVersion >= 302)
+                    glBindVertexArray(VAO);
+                else
+            	    glBindVertexArrayAPPLE(VAO);
             #else
 		    	glBindVertexArray(VAO);
             #endif
@@ -718,19 +704,15 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         OVR_ASSERT(glGetError() == 0);
 
-        if(SupportsVao)
+        if (GLVersionInfo.SupportsVAO)
         {
             VAOInitialized = true;
 
             #ifdef OVR_OS_MAC
-            	if(GLMajorVersion >= 3)
-            	{
-            	    glBindVertexArray(0);
-            	}
-            	else
-            	{
+                if(GLVersionInfo.WholeVersion >= 302)
+                    glBindVertexArray(0);
+                else
             	    glBindVertexArrayAPPLE(0);
-            	}
             #else
 		    	glBindVertexArray(0);
             #endif
@@ -740,31 +722,21 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         // We restore the state in the reverse order that we saved it.
         // To do: Make the code below avoid changes that are effectively no-ops.
         //
-        if (SupportsVao)
+        if (GLVersionInfo.SupportsVAO)
         {
-#ifdef OVR_OS_MAC
-            if(GLMajorVersion >= 3)
-            {
+            #ifdef OVR_OS_MAC
+                if(GLVersionInfo.WholeVersion >= 302)
+                    glBindVertexArray(VertexArrayBindingSaved);
+                else
+                    glBindVertexArrayAPPLE(VertexArrayBindingSaved);
+            #else
                 glBindVertexArray(VertexArrayBindingSaved);
-            }
-            else
-            {
-                glBindVertexArrayAPPLE(VertexArrayBindingSaved);
-            }
-#else
-            glBindVertexArray(VertexArrayBindingSaved);
-#endif
+            #endif
         }
 
-        for (GLuint i = 0; i < kSavedVertexAttribCount; i++)
+        if(VertexArrayBindingSaved || !GLVersionInfo.IsCoreProfile) // If the OpenGL version is older or in core profile compatibility mode, or if there's a VAO currently installed...
         {
-            // We have a problem here: if the GL context was initialized with a core profile version 3.x or later, calls to glVertexAttribPointer can fail when there is no Vertex Array Object
-            // in place. That case is possible here, and we don't have an easy means to detect that a core profile was specified and thus that the glVertexAttribPointer call below could fail.
-            // Our current solution is to call glVertexAttribPointer only if vertex array objects are not supported. We cannot simply decide based on whether the given vertex attrib was enabled
-            // or if there was a vertex array object installed. With our solution below a problem can occur when using OpenGL 3.x+ which supports VAOs, the user has vertex attrib pointers installed,
-            // the currently installed VAO is 0, and the user is somehow dependent on us returning to the user with those vertex attrib pointers reinstalled.
-
-            if (!SupportsVao || (VertexArrayBindingSaved != 0)) // If the OpenGL version is older or in core profile compatibility mode, or if there's a VAO currently installed...
+            for (GLuint i = 0; i < kSavedVertexAttribCount; i++)
             {
                 glVertexAttribPointer(i, VertexAttribSizeSaved[i], VertexAttribTypeSaved[i], (GLboolean)VertexAttribNormalizedSaved[i], VertexAttribStrideSaved[i], VertexAttribPointerSaved[i]);
 
@@ -776,14 +748,14 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
                 OVR_ASSERT(glGetError() == 0);
             }
         }
-
+    
         glBindTexture(GL_TEXTURE_2D, TextureBindingSaved);
         glActiveTexture(ActiveTextureSaved);
         glUseProgram(ProgramSaved);
         glBindBuffer(GL_ARRAY_BUFFER, ArrayBufferBindingSaved);
         glColorMask((GLboolean)ColorWriteMaskSaved[0], (GLboolean)ColorWriteMaskSaved[1], (GLboolean)ColorWriteMaskSaved[2], (GLboolean)ColorWriteMaskSaved[3]);
 
-        if(((GLMajorVersion * 100) + GLMinorVersion) >= 302) // OpenGL 3.2 or later
+        if (GLVersionInfo.WholeVersion >= 302) // OpenGL 3.2 or later
         {
             if(SampleMaskSaved)
                 glEnable(GL_SAMPLE_MASK);
@@ -806,7 +778,8 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         else
             glDisable(GL_DITHER);
 
-        glBlendFunc(BlendSrcRGBSaved, BlendDstRGBSaved); // What about BlendSrcAlphaSaved / BlendDstAlphaSaved?
+        // With OpenGL 4.0+, we may need to be aware of glBlendFuncSeparatei.
+        glBlendFuncSeparate(BlendSrcRGBSaved, BlendDstRGBSaved, BlendSrcAlphaSaved, BlendDstAlphaSaved);
 
         if(BlendSaved)
             glEnable(GL_BLEND);
@@ -826,7 +799,7 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
             glDisable(GL_DEPTH_TEST);
 
         glDepthMask(DepthWriteMaskSaved ? GL_TRUE : GL_FALSE);  
-        #if defined(OVR_OS_MAC) // On Mac we are directly using OpenGL functions instead of function pointers.
+        #if defined(OVR_OS_MAC) || defined(OVR_OS_LINUX) // On Mac/Linux we are directly using OpenGL functions instead of function pointers.
             glDepthRange(DepthRangeSaved[0], DepthRangeSaved[1]);
         #else
             if(glDepthRange) // If we can use the double version (glDepthRangef may not be available)...
@@ -839,7 +812,9 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         glViewport(ViewportSaved[0], ViewportSaved[1], ViewportSaved[2], ViewportSaved[3]);
         glBindTexture(GL_TEXTURE_2D, TextureBinding2DSaved);
         glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferBindingSaved);
-        //glRenderMode(RenderModeSaved);
+        
+        if(!GLVersionInfo.IsCoreProfile)
+            glRenderMode(RenderModeSaved);
 
         OVR_ASSERT(glGetError() == 0);
         //
@@ -848,12 +823,4 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 }
 
  
-
 }}} // namespace OVR::CAPI::GL
-
-
-
-
-
-
-

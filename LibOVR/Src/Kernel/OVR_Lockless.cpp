@@ -37,7 +37,7 @@ namespace OVR { namespace LocklessTest {
 
 const int TestIterations = 10000000;
 
-// Use volatile dummys to force compiler to do spinning.
+// Use volatile dummies to force compiler to do spinning.
 volatile int Dummy1;
 int          Unused1[32];
 volatile int Dummy2;
@@ -89,7 +89,7 @@ struct TestData
 
 
 volatile bool              FirstItemWritten = false;
-LocklessUpdater<TestData>  TestDataUpdater;
+LocklessUpdater<TestData, TestData>  TestDataUpdater;
 
 // Use this lock to verify that testing algorithm is otherwise correct...
 Lock                       TestLock;   
@@ -213,13 +213,10 @@ void StartLocklessTest()
     producerThread->Start();
     consumerThread->Start();
 
-    /*
     while (!producerThread->IsFinished() && consumerThread->IsFinished())
     {
         Thread::MSleep(500);
-    } */
-
-    // TBD: Cleanup
+    }
 }
 
 

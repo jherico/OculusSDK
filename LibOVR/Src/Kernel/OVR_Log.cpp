@@ -29,7 +29,7 @@ limitations under the License.
 #include <stdarg.h>
 #include <stdio.h>
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #elif defined(OVR_OS_ANDROID)

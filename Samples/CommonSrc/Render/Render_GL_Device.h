@@ -43,9 +43,9 @@ limitations under the License.
     #include <GL/glx.h>
 #endif
 
-
 namespace OVR { namespace Render { namespace GL {
-    
+
+
 #if !defined(OVR_OS_MAC)
 
 // GL extension Hooks for PC.
@@ -113,6 +113,44 @@ extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
 extern void InitGLExtensions();
 
 #endif
+
+
+
+//// GLVersion
+
+/*
+    FIXME: CODE DUPLICATION WARNING
+
+    Right now we have this same code in CommonSrc and in CAPI::GL.
+    At some point we need to consolidate these, in Kernel or Util.
+    Be sure to update both locations for now!
+*/
+
+struct GLVersionAndExtensions
+{
+    // Version information
+    int         MajorVersion;        // Best guess at major version
+    int         MinorVersion;        // Best guess at minor version
+    bool        IsGLES;              // Open GL ES?
+
+    // Extension information
+    bool        SupportsVAO;         // Supports Vertex Array Objects?
+    bool        SupportsDrawBuffers; // Supports Draw Buffers?
+    const char* Extensions;          // Other extensions string (will not be null)
+
+    GLVersionAndExtensions()
+    {
+        IsGLES = false;
+        MajorVersion = 0;
+        MinorVersion = 0;
+        SupportsDrawBuffers = false;
+        SupportsVAO = false;
+        Extensions = "";
+    }
+};
+
+void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
+
 
 class RenderDevice;
 
@@ -243,10 +281,10 @@ protected:
     Ptr<Texture>             CurRenderTarget;
     Array<Ptr<Texture> >     DepthBuffers;
     GLuint                   CurrentFbo;
+    GLVersionAndExtensions   GLVersionInfo;
 
     const LightingParams*    Lighting;
-    bool SupportsVao;
-    
+
 public:
     RenderDevice(const RendererParams& p);
     virtual ~RenderDevice();
@@ -258,6 +296,7 @@ public:
     virtual void SetViewport(const Recti& vp);
 		
     virtual void WaitUntilGpuIdle();
+    virtual void Flush();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1,
                        bool clearColor = true, bool clearDepth = true);
@@ -291,6 +330,7 @@ public:
 
     void SetTexture(Render::ShaderStage, int slot, const Texture* t);
 };
+
 
 }}}
 

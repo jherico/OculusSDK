@@ -219,20 +219,40 @@ void FrameLatencyTracker::GetLatencyTimings(float latencies[3])
         latencies[2] = (float)FrameDeltas.GetMedianTimeDelta();
     }    
 }
-    
-    
+
+
 //-------------------------------------------------------------------------------------
 
-FrameTimeManager::FrameTimeManager(bool vsyncEnabled)
-    : VsyncEnabled(vsyncEnabled), DynamicPrediction(true), SdkRender(false),
-      FrameTiming()
+FrameTimeManager::FrameTimeManager(bool vsyncEnabled) :
+    VsyncEnabled(vsyncEnabled),
+    DynamicPrediction(true),
+    SdkRender(false),
+    DirectToRift(false),
+#ifndef NO_SCREEN_TEAR_HEALING
+    ScreenTearing(false),
+    TearingFrameCount(0),
+#endif // NO_SCREEN_TEAR_HEALING
+    FrameTiming()
 {    
     RenderIMUTimeSeconds = 0.0;
     TimewarpIMUTimeSeconds = 0.0;
-    
-    // HACK: SyncToScanoutDelay observed close to 1 frame in video cards.
-    //       Overwritten by dynamic latency measurement on DK2.
-    VSyncToScanoutDelay   = 0.013f;
+
+    // If driver is in use,
+    DirectToRift = !Display::InCompatibilityMode(false);
+    if (DirectToRift)
+    {
+        // The latest driver provides a post-present vsync-to-scan-out delay
+        // that is roughly zero.  The latency tester will provide real numbers
+        // but when it is unavailable for some reason, we should default to
+        // an expected value.
+        VSyncToScanoutDelay = 0.0001f;
+    }
+    else
+    {
+        // HACK: SyncToScanoutDelay observed close to 1 frame in video cards.
+        //       Overwritten by dynamic latency measurement on DK2.
+        VSyncToScanoutDelay = 0.013f;
+    }
     NoVSyncToScanoutDelay = 0.004f;
 }
 
@@ -302,6 +322,10 @@ double  FrameTimeManager::calcScreenDelay() const
     double  screenDelay = ScreenSwitchingDelay;
     double  measuredVSyncToScanout;
 
+#ifndef NO_SCREEN_TEAR_HEALING
+    bool tearing = false;
+#endif // NO_SCREEN_TEAR_HEALING
+
     // Use real-time DK2 latency tester HW for prediction if its is working.
     // Do sanity check under 60 ms
     if (!VsyncEnabled)
@@ -311,8 +335,14 @@ double  FrameTimeManager::calcScreenDelay() const
     else if ( DynamicPrediction &&
               (ScreenLatencyTracker.FrameDeltas.GetCount() > 3) &&
               (measuredVSyncToScanout = ScreenLatencyTracker.FrameDeltas.GetMedianTimeDelta(),
-               (measuredVSyncToScanout > 0.0001) && (measuredVSyncToScanout < 0.06)) ) 
+               (measuredVSyncToScanout > -0.0001) && (measuredVSyncToScanout < 0.06)) ) 
     {
+#ifndef NO_SCREEN_TEAR_HEALING
+        if (DirectToRift && measuredVSyncToScanout > 0.010 && measuredVSyncToScanout < 0.030)
+        {
+            tearing = true;
+        }
+#endif // NO_SCREEN_TEAR_HEALING
         screenDelay += measuredVSyncToScanout;
     }
     else
@@ -320,11 +350,51 @@ double  FrameTimeManager::calcScreenDelay() const
         screenDelay += VSyncToScanoutDelay;
     }
 
+#ifndef NO_SCREEN_TEAR_HEALING
+    if (tearing)
+    {
+        if (TearingFrameCount > 75)
+        {
+            if (!ScreenTearing)
+            {
+                ScreenTearing = true;
+                HealingFrameCount = 0;
+            }
+        }
+        else
+        {
+            TearingFrameCount++;
+        }
+    }
+    else
+    {
+        TearingFrameCount = 0;
+        ScreenTearing = false;
+    }
+#endif // NO_SCREEN_TEAR_HEALING
+
     return screenDelay;
 }
 
+#ifndef NO_SCREEN_TEAR_HEALING
 
-double  FrameTimeManager::calcTimewarpWaitDelta() const
+bool FrameTimeManager::ScreenTearingReaction()
+{
+    if (ScreenTearing)
+    {
+        if (HealingFrameCount < 75)
+        {
+            ++HealingFrameCount;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+#endif // NO_SCREEN_TEAR_HEALING
+
+double FrameTimeManager::calcTimewarpWaitDelta() const
 {
     // If timewarp timing hasn't been calculated, we should wait.
     if (!VsyncEnabled)
@@ -842,11 +912,11 @@ double TimeDeltaCollector::GetMedianTimeDelta() const
             SortedList[i] = smallestDelta;
         }
 
+        // FIRMWARE HACK: Don't take the actual median, but err on the low time side
         Median = SortedList[Count/4];
         ReCalcMedian = false;
     }
 
-    // FIRMWARE HACK: Don't take the actual median, but err on the low time side
     return Median;
 }
       

@@ -189,6 +189,10 @@ public:
     // Check if right now the current rendering application should be in compatibility mode
     static bool InCompatibilityMode( bool displaySearch = true );
 
+    // Get/set the mode for all applications
+    static bool GetDriverMode(bool& driverInstalled, bool& compatMode, bool& hideDK1Mode);
+    static bool SetDriverMode(bool compatMode, bool hideDK1Mode);
+
     static DisplaySearchHandle* GetDisplaySearchHandle();
 };
 

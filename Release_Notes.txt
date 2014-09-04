@@ -1,8 +1,8 @@
-Oculus SDK 0.4.1 Release Notes - Runtime Rev 1
+ÔªøOculus SDK 0.4.2 Release Notes - Runtime Rev 1
 ----------------------------------------------
 
 After installing the SDK, update the Oculus DK2 firmware
-to the most recent version, 2.11. The Firmware update dialog can be found under
+to the most recent version, 2.12. The Firmware update dialog can be found under
 "Tools / Advanced / Update Firmware..." menu of the Oculus Configuration
 Utility. If you experience any issues, please refer to the Troubleshooting
 and Known Issues sections below.
@@ -11,34 +11,30 @@ and Known Issues sections below.
 New SDK Features
 ----------------
 
-* Added ìPause Service...î option to the Configuration Utility, which temporarily
-  releases DK2 sensor, allowing 0.3.x SDK applications to run.
+* Added OVRServiceLauncher Windows service, resolving the issue with the service not 
+  launching automatically on some systems.  
 
-* Added Mac OS support. Mac does not currently include a display driver, so it
-  always works in Extend Desktop mode.
+* Added a new chroma setting for minimum eye relief, improving chromatic aberration 
+  correction when configured through the Oculus Configuration Utility.
+  
+* Added ‚ÄúRiftsaver‚Äù mode, which turns off Rift display in direct mode if the headset is not in use.
 
-* Added ovr_InitializeRenderingShim function that can be used to hook rendering,
-  needed for Direct to HMD Mode, without spinning up the rest of LibOVR.
+* Adding App rendered support for DK2 latency testing in CAPI and OculusRoomTiny.
 
 
 
-Bug Fixes since 0.4.0
+Bug Fixes since 0.4.1
 ---------------------
 
-* Removed SSE4.1 requirement that was problematic for some older AMD CPUs.
-* Fixed OpenGL support on AMD cards in direct mode.
-* Resolved Blue Screen (BSOD) that happened starting some demos
-  with some video adapters.
-* Fixed BSOD or boot-up Black screen issued caused by interaction with Display Link.
-  Display Link still need to be uninstalled for OVR direct mode to work.
-* Improved OpenGL support in the driver shim.
+* Removed ATL references from the LibOVR Win32 Display code.
+* Fixed full core utilization of Oculus Configuration Utility when in Desktop mode.
+* Fixed the lag in Oculus Configuration Utility when the service is stopped.
+* Miscellaneous improvements to the Oculus Runtime Service (now called OVRServer)
 
 Unity
-* Fixed shadows and some Unity shaders by switching back to a symmetric
-  frustum for rendering.
-* Fixed D3D11 rendering.
-* Miscellaneous improvements in stability and timewarp precision.
-
+* Fixed crashes and corruption when using 64-bit client with 32-bit service.
+* Fixed NullReferenceExceptions due to script initialization order.
+* Fixed race conditions in TimeWarp responsible for camera stutter.
 
 
 Troubleshooting
@@ -67,7 +63,7 @@ Here we describe these issues and provide advice on addressing them.
 
 
 
-0.4.1 Rev 1 Known Issues - LibOVR and Display Driver
+0.4.2 Rev 1 Known Issues - LibOVR and Display Driver
 ----------------------------------------------------
 
 * Monitors in multiple display configurations will blink when activating the Rift.
@@ -97,8 +93,6 @@ Here we describe these issues and provide advice on addressing them.
 * Updates on another monitor may interfere with vsync timing on the Rift and this can
   manifest  as visible tearing in the Rift. This can be eliminated in Windows 7 by 
   disabling Windows composition.
-
-* Locking the screen in Windows will cause Oculus Rift applications to lose tracking.
   
 * It is necessary to restart the Config Util after updating the Headset firmware.
 

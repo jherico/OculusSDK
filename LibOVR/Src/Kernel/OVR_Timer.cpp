@@ -27,7 +27,7 @@ limitations under the License.
 #include "OVR_Timer.h"
 #include "OVR_Log.h"
 
-#if defined (OVR_OS_WIN32) 
+#if defined (OVR_OS_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <MMSystem.h>
@@ -99,7 +99,7 @@ uint64_t Timer::GetTicksNanos()
 //------------------------------------------------------------------------
 // *** Win32 Specific Timer
 
-#elif defined (OVR_OS_WIN32) 
+#elif defined (OVR_OS_WIN32)
 
 
 // This helper class implements high-resolution wrapper that combines timeGetTime() output
@@ -154,7 +154,6 @@ PerformanceTimer Win32_PerfTimer;
 
 void PerformanceTimer::Initialize()
 {
-
     MMRESULT mmr = timeBeginPeriod(1);
     OVR_ASSERT(TIMERR_NOERROR == mmr);
     OVR_UNUSED(mmr);
@@ -164,13 +163,16 @@ void PerformanceTimer::Initialize()
     getFrequency();
 
 	// Set Vista flag.  On Vista, we can just use QPC() without all the extra work
-	UsingVista = false;
-	OSVERSIONINFOA vi;
-	vi.dwOSVersionInfoSize = sizeof(vi);
-	if (GetVersionExA(&vi))
-	{
-		UsingVista = vi.dwMajorVersion >= 6;
-	}
+    OSVERSIONINFOEX ver;
+	ZeroMemory(&ver, sizeof(OSVERSIONINFOEX));
+	ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+	ver.dwMajorVersion = 6; // Vista+
+
+    DWORDLONG condMask = 0;
+    VER_SET_CONDITION(condMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+
+	// VerifyVersionInfo returns true if the OS meets the conditions set above
+	UsingVista = VerifyVersionInfo(&ver, VER_MAJORVERSION, condMask) != 0;
 
 	OVR_DEBUG_LOG(("Performance timer Vista flag = %d", (int)UsingVista));
 }
@@ -178,7 +180,6 @@ void PerformanceTimer::Initialize()
 void PerformanceTimer::Shutdown()
 {
     DeleteCriticalSection(&TimeCS);
-
     MMRESULT mmr = timeEndPeriod(1);
     OVR_ASSERT(TIMERR_NOERROR == mmr);
     OVR_UNUSED(mmr);
@@ -211,6 +212,7 @@ uint64_t PerformanceTimer::GetTimeNanos()
 
     // Get raw value and perf counter "At the same time".
     QueryPerformanceCounter(&li);
+
     DWORD mmTimeMs = timeGetTime();
     if (OldMMTimeMs > mmTimeMs)
         MMTimeWrapCounter++;

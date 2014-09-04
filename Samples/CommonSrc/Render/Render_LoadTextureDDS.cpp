@@ -22,10 +22,6 @@ limitations under the License.
 ************************************************************************************/
 #include "Render_Device.h"
 
-#ifdef OVR_DEFINE_NEW
-#undef new
-#endif
-
 namespace OVR { namespace Render {
 
 static const size_t   OVR_DDS_PF_FOURCC = 0x4;

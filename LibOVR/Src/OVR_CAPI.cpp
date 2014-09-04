@@ -110,6 +110,7 @@ TrackingState::TrackingState(const ovrTrackingState& s)
     LeveledCameraPose = s.LeveledCameraPose;
     RawSensorData = s.RawSensorData;
     StatusFlags = s.StatusFlags;
+    LastVisionProcessingTime = s.LastVisionProcessingTime;
 }
 
 TrackingState::operator ovrTrackingState() const
@@ -120,6 +121,7 @@ TrackingState::operator ovrTrackingState() const
     result.LeveledCameraPose = LeveledCameraPose;
     result.RawSensorData  = RawSensorData;
     result.StatusFlags  = StatusFlags;
+    result.LastVisionProcessingTime = LastVisionProcessingTime;
     return result;
 }
 
@@ -221,14 +223,14 @@ OVR_EXPORT double ovr_GetTimeInSeconds()
 // Waits until the specified absolute time.
 OVR_EXPORT double ovr_WaitTillTime(double absTime)
 {
-    volatile int i;
     double       initialTime = ovr_GetTimeInSeconds();
     double       newTime     = initialTime;
     
     while(newTime < absTime)
     {
-        for (int j = 0; j < 50; j++)
-            i = 0;
+        for (int j = 0; j < 5; j++)
+            OVR_PROCESSOR_PAUSE();
+
         newTime = ovr_GetTimeInSeconds();
     }
 
@@ -248,7 +250,7 @@ static OVR::Service::NetClient* CAPI_pNetClient = 0;
 
 OVR_EXPORT void ovr_InitializeRenderingShim()
 {
-	OVR::System::DirectDisplayInitialize();
+    OVR::System::DirectDisplayInitialize();
 }
 
 OVR_EXPORT ovrBool ovr_Initialize()
@@ -270,7 +272,7 @@ OVR_EXPORT ovrBool ovr_Initialize()
     // If the server could not start running,
     if (Service::NetServer::GetInstance()->IsInitialized())
     {
-        CAPI_pNetClient->Connect();
+        CAPI_pNetClient->Connect(true);
     }
     else
     {
@@ -278,13 +280,13 @@ OVR_EXPORT ovrBool ovr_Initialize()
         // or another SingleProcess-mode app is running in the background.
         // In this case, it's using the hardware and we should not also attempt to use
         // the hardware.
-        LogError("[LibOVR] Server is already running");
+        LogError("{ERR-079} [LibOVR] Server is already running");
     }
 #else
-    CAPI_pNetClient->Connect();
+    CAPI_pNetClient->Connect(true);
 #endif
 
-	CAPI_ovrInitializeCalled = 1;
+    CAPI_ovrInitializeCalled = 1;
 
     return 1;
 }
@@ -292,13 +294,13 @@ OVR_EXPORT ovrBool ovr_Initialize()
 OVR_EXPORT void ovr_Shutdown()
 {  
     // We should clean up the system to be complete
-	if (OVR::System::IsInitialized() && CAPI_SystemInitCalled)
+    if (OVR::System::IsInitialized() && CAPI_SystemInitCalled)
     {
-		OVR::System::Destroy();
-	}
+        OVR::System::Destroy();
+    }
 
     CAPI_SystemInitCalled = 0;
-	CAPI_ovrInitializeCalled = 0;
+    CAPI_ovrInitializeCalled = 0;
 }
 
 
@@ -313,10 +315,10 @@ OVR_EXPORT void ovr_Shutdown()
 
 OVR_EXPORT int ovrHmd_Detect()
 {
-	if (!CAPI_ovrInitializeCalled)
+    if (!CAPI_ovrInitializeCalled)
         return 0;
 
-	return CAPI_pNetClient->Hmd_Detect();
+    return CAPI_pNetClient->Hmd_Detect();
 }
 
 
@@ -341,6 +343,15 @@ OVR_EXPORT ovrHmd ovrHmd_Create(int index)
         // If two seconds elapse and still no HMD detected,
         if (Timer::GetSeconds() - t0 > 2.)
         {
+            if (!NetClient::GetInstance()->IsConnected(false, false))
+            {
+                NetClient::GetInstance()->SetLastError("Not connected to service");
+            }
+            else
+            {
+                NetClient::GetInstance()->SetLastError("No HMD Detected");
+            }
+
             return 0;
         }
     }
@@ -350,6 +361,8 @@ OVR_EXPORT ovrHmd ovrHmd_Create(int index)
     if (!hmds)
     {
         CAPI_pNetClient->Hmd_Release(netInfo.NetId);
+
+        NetClient::GetInstance()->SetLastError("Unable to create HMD state");
         return 0;
     }
 
@@ -361,17 +374,17 @@ OVR_EXPORT ovrHmd ovrHmd_Create(int index)
 
 
 OVR_EXPORT ovrBool ovrHmd_AttachToWindow( ovrHmd hmd, void* window,
-										 const ovrRecti* destMirrorRect,
-										 const ovrRecti* sourceRenderTargetRect )
+                                         const ovrRecti* destMirrorRect,
+                                         const ovrRecti* sourceRenderTargetRect )
 {
-	OVR_UNUSED( destMirrorRect );
-	OVR_UNUSED( sourceRenderTargetRect );
+    OVR_UNUSED( destMirrorRect );
+    OVR_UNUSED( sourceRenderTargetRect );
 
-	if (!CAPI_ovrInitializeCalled)
-		return false;
+    if (!CAPI_ovrInitializeCalled)
+        return false;
 
-	if (!hmd || !hmd->Handle)
-		return false;
+    if (!hmd || !hmd->Handle)
+        return false;
 
 #ifdef OVR_OS_WIN32
     HMDState* hmds = (HMDState*)hmd->Handle;
@@ -379,16 +392,19 @@ OVR_EXPORT ovrBool ovrHmd_AttachToWindow( ovrHmd hmd, void* window,
     hmds->pWindow = window;
 
     Win32::DisplayShim::GetInstance().hWindow = (HWND)window;
+#else
+    OVR_UNUSED(window);
 #endif
-	return true;
+
+    return true;
 }
 
 OVR_EXPORT ovrHmd ovrHmd_CreateDebug(ovrHmdType type)
 {
-	if (!CAPI_ovrInitializeCalled)
+    if (!CAPI_ovrInitializeCalled)
         return 0;
 
-	HMDState* hmds = HMDState::CreateHMDState(type);
+    HMDState* hmds = HMDState::CreateHMDState(type);
 
     return hmds->pHmdDesc;
 }
@@ -427,20 +443,25 @@ OVR_EXPORT const char* ovrHmd_GetLastError(ovrHmd hmddesc)
         return "System initialize not called";
     }
 
+    VirtualHmdId netId = InvalidVirtualHmdId;
+
     if (hmddesc && hmddesc->Handle)
     {
         HMDState* p = (HMDState*)hmddesc->Handle;
-        return CAPI_pNetClient->Hmd_GetLastError(p->GetNetId());
+        netId = p->GetNetId();
     }
 
-	return "Uninitialized Hmd";
+    return CAPI_pNetClient->Hmd_GetLastError(netId);
 }
+
+#define OVR_VERSION_LIBOVR_PFX "libOVR:"
 
 // Returns version string representing libOVR version. Static, so
 // string remains valid for app lifespan
 OVR_EXPORT const char* ovr_GetVersionString()
 {
-	return "libOVR:" OVR_VERSION_STRING;
+	static const char* version = OVR_VERSION_LIBOVR_PFX OVR_VERSION_STRING;
+    return version + sizeof(OVR_VERSION_LIBOVR_PFX) - 1;
 }
 
 
@@ -486,18 +507,18 @@ OVR_EXPORT void ovrHmd_SetEnabledCaps(ovrHmd hmddesc, unsigned int capsBits)
 OVR_EXPORT ovrBool ovrHmd_ConfigureTracking(ovrHmd hmddesc, unsigned int supportedCaps,
                                                             unsigned int requiredCaps)
 {
-	if (hmddesc)
-	{
+    if (hmddesc)
+    {
         HMDState* p = (HMDState*)hmddesc->Handle;
         return p->ConfigureTracking(supportedCaps, requiredCaps);
     }
 
-	return 0;
+    return 0;
 }
 
 OVR_EXPORT void ovrHmd_RecenterPose(ovrHmd hmddesc)
 {
-	if (hmddesc)
+    if (hmddesc)
     {
         HMDState* p = (HMDState*)hmddesc->Handle;
         p->TheSensorStateReader.RecenterPose();
@@ -506,7 +527,7 @@ OVR_EXPORT void ovrHmd_RecenterPose(ovrHmd hmddesc)
 
 OVR_EXPORT ovrTrackingState ovrHmd_GetTrackingState(ovrHmd hmddesc, double absTime)
 {
-	ovrTrackingState result = {0};
+    ovrTrackingState result = {0};
 
     if (hmddesc)
     {
@@ -515,11 +536,11 @@ OVR_EXPORT ovrTrackingState ovrHmd_GetTrackingState(ovrHmd hmddesc, double absTi
     }
 
 #ifdef OVR_OS_WIN32
-		// Set up display code for Windows
-		Win32::DisplayShim::GetInstance().Active = (result.StatusFlags & ovrStatus_HmdConnected) != 0;
+        // Set up display code for Windows
+        Win32::DisplayShim::GetInstance().Active = (result.StatusFlags & ovrStatus_HmdConnected) != 0;
 #endif
 
-	return result;
+    return result;
 }
 
 
@@ -530,7 +551,7 @@ OVR_EXPORT ovrTrackingState ovrHmd_GetTrackingState(ovrHmd hmddesc, double absTi
 OVR_EXPORT ovrSizei ovrHmd_GetFovTextureSize(ovrHmd hmddesc, ovrEyeType eye, ovrFovPort fov,
                                              float pixelsPerDisplayPixel)
 {
-	ovrHmdStruct *  hmd = hmddesc->Handle;
+    ovrHmdStruct *  hmd = hmddesc->Handle;
     if (!hmd) return Sizei(0);
     
     HMDState* hmds = (HMDState*)hmd;
@@ -548,7 +569,7 @@ ovrBool ovrHmd_ConfigureRendering( ovrHmd hmddesc,
                                    const ovrFovPort eyeFovIn[2],
                                    ovrEyeRenderDesc eyeRenderDescOut[2] )
 {
-	ovrHmdStruct *  hmd = hmddesc->Handle;
+    ovrHmdStruct *  hmd = hmddesc->Handle;
     if (!hmd) return 0;
     return ((HMDState*)hmd)->ConfigureRendering(eyeRenderDescOut, eyeFovIn,
                                                 apiConfig, distortionCaps);
@@ -559,7 +580,7 @@ ovrBool ovrHmd_ConfigureRendering( ovrHmd hmddesc,
 // TBD: MA - Deprecated, need alternative
 void ovrHmd_SetVsync(ovrHmd hmddesc, ovrBool vsync)
 {
-	ovrHmdStruct *  hmd = hmddesc->Handle;
+    ovrHmdStruct *  hmd = hmddesc->Handle;
     if (!hmd) return;
 
     return ((HMDState*)hmd)->TimeManager.SetVsync(vsync? true : false);
@@ -604,21 +625,11 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmddesc,
     
     hmds->pRenderer->SetLatencyTestColor(hmds->LatencyTestActive ? hmds->LatencyTestDrawColor : NULL);
 
-    // TBD: Move directly into renderer
-	bool dk2LatencyTest = (hmds->EnabledHmdCaps & ovrHmdCap_DynamicPrediction) != 0;
-    if (dk2LatencyTest)
-    {
-        hmds->TimeManager.GetFrameLatencyTestDrawColor(hmds->LatencyTest2DrawColor);
-        hmds->pRenderer->SetLatencyTest2Color(hmds->LatencyTest2DrawColor);
-    }
-    else
-    {
-        hmds->pRenderer->SetLatencyTest2Color(NULL);
-    }
+    ovrHmd_GetLatencyTest2DrawColor(hmddesc, NULL); // We don't actually need to draw color, so send NULL
     
     if (hmds->pRenderer)
-	{
-		hmds->pRenderer->SaveGraphicsState();
+    {
+        hmds->pRenderer->SaveGraphicsState();
 
         // See if we need to show the HSWDisplay.
         if (hmds->pHSWDisplay) // Until we know that these are valid, assume any of them can't be.
@@ -634,19 +645,11 @@ OVR_EXPORT void ovrHmd_EndFrame(ovrHmd hmddesc,
         }
 
         hmds->pRenderer->EndFrame(true);
-		hmds->pRenderer->RestoreGraphicsState();
+        hmds->pRenderer->RestoreGraphicsState();
     }
     // Call after present
     ovrHmd_EndFrameTiming(hmddesc);
     
-    if (dk2LatencyTest)
-    {
-        Util::FrameTimeRecordSet recordset;
-        hmds->TheLatencyTestStateReader.GetRecordSet(recordset);
-        hmds->TimeManager.UpdateFrameLatencyTrackingAfterEndFrame( hmds->LatencyTest2DrawColor,
-                                                                   recordset);
-    }
-
     // Out of BeginFrame
     hmds->BeginFrameThreadId = 0;
     hmds->BeginFrameCalled   = false;
@@ -673,7 +676,7 @@ OVR_EXPORT void ovrHmd_RegisterPostDistortionCallback(ovrHmd hmddesc, PostDistor
 
 OVR_EXPORT ovrFrameTiming ovrHmd_GetFrameTiming(ovrHmd hmddesc, unsigned int frameIndex)
 {
-	ovrHmdStruct *  hmd = hmddesc->Handle;
+    ovrHmdStruct *  hmd = hmddesc->Handle;
     ovrFrameTiming f;
     memset(&f, 0, sizeof(f));
 
@@ -702,7 +705,7 @@ OVR_EXPORT ovrFrameTiming ovrHmd_GetFrameTiming(ovrHmd hmddesc, unsigned int fra
 
 OVR_EXPORT ovrFrameTiming ovrHmd_BeginFrameTiming(ovrHmd hmddesc, unsigned int frameIndex)
 {
-	ovrHmdStruct *  hmd = hmddesc->Handle;
+    ovrHmdStruct *  hmd = hmddesc->Handle;
     ovrFrameTiming f;
     memset(&f, 0, sizeof(f));
 
@@ -748,6 +751,15 @@ OVR_EXPORT void ovrHmd_EndFrameTiming(ovrHmd hmddesc)
 
     hmds->TimeManager.EndFrame();   
     hmds->BeginFrameTimingCalled = false;
+
+    bool dk2LatencyTest = (hmds->EnabledHmdCaps & ovrHmdCap_DynamicPrediction) != 0;
+    if (dk2LatencyTest)
+    {
+        Util::FrameTimeRecordSet recordset;
+        hmds->TheLatencyTestStateReader.GetRecordSet(recordset);
+        hmds->TimeManager.UpdateFrameLatencyTrackingAfterEndFrame( hmds->LatencyTest2DrawColor,
+            recordset);
+    }
 }
 
 
@@ -766,7 +778,7 @@ OVR_EXPORT void ovrHmd_ResetFrameTiming(ovrHmd hmddesc,  unsigned int frameIndex
 
 ovrPosef ovrHmd_GetEyePose(ovrHmd hmd, ovrEyeType eye)
 {
-	HMDState* hmds = (HMDState*)hmd->Handle;
+    HMDState* hmds = (HMDState*)hmd->Handle;
     if (!hmds) return ovrPosef();    
 
     // This isn't a great place, but since we removed ovrHmd_BeginEyeRender...
@@ -777,7 +789,7 @@ ovrPosef ovrHmd_GetEyePose(ovrHmd hmd, ovrEyeType eye)
     }
 
     hmds->checkBeginFrameTimingScope("ovrHmd_GetEyePose");
-	return hmds->TimeManager.GetEyePredictionPose(hmd, eye);
+    return hmds->TimeManager.GetEyePredictionPose(hmd, eye);
 }
 
 
@@ -788,7 +800,7 @@ OVR_EXPORT void ovrHmd_AddDistortionTimeMeasurement(ovrHmd hmddesc, double disto
     HMDState* hmds = (HMDState*)hmddesc->Handle;
 
     hmds->checkBeginFrameTimingScope("ovrHmd_GetTimewarpEyeMatrices");   
-	hmds->TimeManager.AddDistortionTimeMeasurement(distortionTimeSeconds);
+    hmds->TimeManager.AddDistortionTimeMeasurement(distortionTimeSeconds);
 }
 
 
@@ -798,7 +810,7 @@ OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye,
 {
     if (!hmddesc)
         return;
-	HMDState* hmds = (HMDState*)hmddesc->Handle;
+    HMDState* hmds = (HMDState*)hmddesc->Handle;
 
     // Debug checks: BeginFrame was called, on the same thread.
     hmds->checkBeginFrameTimingScope("ovrHmd_GetTimewarpEyeMatrices");   
@@ -845,15 +857,14 @@ OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmddesc,
                                                 ovrDistortionMesh *meshData)
 {
     // The 'internal' function below can be found in CAPI_HMDState.
-	// Not ideal, but navigating the convolutions of what compiles
-	// where, meant they are in the few places which actually lets these compile.
-	// Please relocate (if you wish) to a more meaningful place if you can navigate the compiler gymnastics :)
-	return(ovrHmd_CreateDistortionMeshInternal( hmddesc->Handle,
+    // Not ideal, but navigating the convolutions of what compiles
+    // where, meant they are in the few places which actually lets these compile.
+    // Please relocate (if you wish) to a more meaningful place if you can navigate the compiler gymnastics :)
+    return(ovrHmd_CreateDistortionMeshInternal( hmddesc->Handle,
                                                 eyeType, fov,
                                                 distortionCaps,
                                                 meshData,
-												0));
-
+                                                0));
 
 }
 
@@ -916,6 +927,36 @@ OVR_EXPORT const char*  ovrHmd_GetLatencyTestResult(ovrHmd hmddesc)
     return NetClient::GetInstance()->LatencyUtil_GetResultsString();
 }
 
+OVR_EXPORT ovrBool ovrHmd_GetLatencyTest2DrawColor(ovrHmd hmddesc, unsigned char rgbColorOut[3])
+{
+    HMDState* hmds = (HMDState*)hmddesc->Handle;
+    if (!hmds) return false;
+
+    // TBD: Move directly into renderer
+    bool dk2LatencyTest = (hmds->EnabledHmdCaps & ovrHmdCap_DynamicPrediction) != 0;
+    if (dk2LatencyTest)
+    {
+        hmds->TimeManager.GetFrameLatencyTestDrawColor(hmds->LatencyTest2DrawColor);
+        if(rgbColorOut != NULL)
+        {
+            rgbColorOut[0] = hmds->LatencyTest2DrawColor[0];
+            rgbColorOut[1] = hmds->LatencyTest2DrawColor[1];
+            rgbColorOut[2] = hmds->LatencyTest2DrawColor[2];
+        }
+
+        if(hmds->pRenderer != NULL)
+            hmds->pRenderer->SetLatencyTest2Color(hmds->LatencyTest2DrawColor);
+    }
+    else
+    {
+        if(hmds->pRenderer != NULL)
+            hmds->pRenderer->SetLatencyTest2Color(NULL);
+    }
+
+    return dk2LatencyTest;
+}
+
+
 OVR_EXPORT double ovrHmd_GetMeasuredLatencyTest2(ovrHmd hmddesc)
 {
     HMDState* p = (HMDState*)hmddesc->Handle;
@@ -936,8 +977,8 @@ OVR_EXPORT void ovrHmd_GetHSWDisplayState(ovrHmd hmd, ovrHSWDisplayState *hswDis
 {
     OVR::CAPI::HMDState* pHMDState = (OVR::CAPI::HMDState*)hmd->Handle;
 
-	if (pHMDState)
-	{
+    if (pHMDState)
+    {
         OVR::CAPI::HSWDisplay* pHSWDisplay = pHMDState->pHSWDisplay;
 
         if(pHSWDisplay)
@@ -949,8 +990,8 @@ OVR_EXPORT ovrBool ovrHmd_DismissHSWDisplay(ovrHmd hmd)
 {
     OVR::CAPI::HMDState* pHMDState = (OVR::CAPI::HMDState*)hmd->Handle;
 
-	if (pHMDState)
-	{
+    if (pHMDState)
+    {
         OVR::CAPI::HSWDisplay* pHSWDisplay = pHMDState->pHSWDisplay;
 
         if(pHSWDisplay)
@@ -963,136 +1004,189 @@ OVR_EXPORT ovrBool ovrHmd_DismissHSWDisplay(ovrHmd hmd)
 
 // -----------------------------------------------------------------------------------
 // ***** Property Access
-OVR_EXPORT ovrBool ovrHmd_GetBool(ovrHmd hmddesc, const char* propertyName, ovrBool defaultVal)
+OVR_EXPORT ovrBool ovrHmd_GetBool(ovrHmd hmddesc,
+                                  const char* propertyName,
+                                  ovrBool defaultVal)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
     {
-    OVR_ASSERT(hmddesc && propertyName);
-
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
             return hmds->getBoolValue(propertyName, (defaultVal != 0));
         }
+    }
 
-    return defaultVal;
+    return NetClient::GetInstance()->GetBoolValue(InvalidVirtualHmdId, propertyName, (defaultVal != 0)) ? 1 : 0;
 }
 
-OVR_EXPORT ovrBool ovrHmd_SetBool(ovrHmd hmddesc, const char* propertyName, ovrBool value)
+OVR_EXPORT ovrBool ovrHmd_SetBool(ovrHmd hmddesc,
+                                  const char* propertyName,
+                                  ovrBool value)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
     {
-    OVR_ASSERT(hmddesc && propertyName);
-
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
             return hmds->setBoolValue(propertyName, value != 0) ? 1 : 0;
         }
-    return false;
     }
 
-OVR_EXPORT int ovrHmd_GetInt(ovrHmd hmddesc, const char* propertyName, int defaultVal)
-{
-    OVR_ASSERT(hmddesc && propertyName);
+    return NetClient::GetInstance()->SetBoolValue(InvalidVirtualHmdId, propertyName, (value != 0)) ? 1 : 0;
+}
 
+OVR_EXPORT int ovrHmd_GetInt(ovrHmd hmddesc,
+                             const char* propertyName,
+                             int defaultVal)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
             return hmds->getIntValue(propertyName, defaultVal);
         }
-
-    return defaultVal;
-}
-
-OVR_EXPORT ovrBool ovrHmd_SetInt(ovrHmd hmddesc, const char* propertyName, int value)
-    {
-    OVR_ASSERT(hmddesc && propertyName);
-
-        HMDState* hmds = (HMDState*)hmddesc->Handle;
-        if (hmds)
-        {
-        return hmds->setIntValue(propertyName, value);
-        }
-    return false;
     }
 
-OVR_EXPORT float ovrHmd_GetFloat(ovrHmd hmddesc, const char* propertyName, float defaultVal)
-{
-    OVR_ASSERT(hmddesc && propertyName);
+    return NetClient::GetInstance()->GetIntValue(InvalidVirtualHmdId, propertyName, defaultVal);
+}
 
+OVR_EXPORT ovrBool ovrHmd_SetInt(ovrHmd hmddesc,
+                                 const char* propertyName,
+                                 int value)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
+        if (hmds)
+        {
+            return hmds->setIntValue(propertyName, value) ? 1 : 0;
+        }
+    }
+
+    return NetClient::GetInstance()->SetIntValue(InvalidVirtualHmdId, propertyName, value) ? 1 : 0;
+}
+
+OVR_EXPORT float ovrHmd_GetFloat(ovrHmd hmddesc,
+                                 const char* propertyName,
+                                 float defaultVal)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
             return hmds->getFloatValue(propertyName, defaultVal);
         }
-
-    return defaultVal;
-}
-
-OVR_EXPORT ovrBool ovrHmd_SetFloat(ovrHmd hmddesc, const char* propertyName, float value)
-    {
-    OVR_ASSERT(hmddesc && propertyName);
-
-        HMDState* hmds = (HMDState*)hmddesc->Handle;
-        if (hmds)
-        {
-        return hmds->setFloatValue(propertyName, value);
-        }
-    return false;
     }
 
-OVR_EXPORT unsigned int ovrHmd_GetFloatArray(ovrHmd hmddesc, const char* propertyName,
-                              float values[], unsigned int arraySize)
-{
-    OVR_ASSERT(hmddesc && propertyName);
+    return (float)NetClient::GetInstance()->GetNumberValue(InvalidVirtualHmdId, propertyName, defaultVal);
+}
 
+OVR_EXPORT ovrBool ovrHmd_SetFloat(ovrHmd hmddesc,
+                                   const char* propertyName,
+                                   float value)
+{
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
+        if (hmds)
+        {
+            return hmds->setFloatValue(propertyName, value) ? 1 : 0;
+        }
+    }
+
+    return NetClient::GetInstance()->SetNumberValue(InvalidVirtualHmdId, propertyName, value) ? 1 : 0;
+}
+
+OVR_EXPORT unsigned int ovrHmd_GetFloatArray(ovrHmd hmddesc,
+                                             const char* propertyName,
+                                             float values[],
+                                             unsigned int arraySize)
+{
+    OVR_ASSERT(propertyName);
+    OVR_ASSERT(hmddesc);
+    if (hmddesc)
+    {
+        HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
             return hmds->getFloatArray(propertyName, values, arraySize);
         }
+    }
 
+    // FIXME: Currently it takes a few lines of code to do this, so just not supported for now.
     return 0;
 }
 
 // Modify float[] property; false if property doesn't exist or is readonly.
-OVR_EXPORT ovrBool ovrHmd_SetFloatArray(ovrHmd hmddesc, const char* propertyName,
-                                        float values[], unsigned int arraySize)
+OVR_EXPORT ovrBool ovrHmd_SetFloatArray(ovrHmd hmddesc,
+                                        const char* propertyName,
+                                        float values[],
+                                        unsigned int arraySize)
+{
+    OVR_ASSERT(propertyName);
+    OVR_ASSERT(hmddesc);
+    if (hmddesc)
     {
-    OVR_ASSERT(hmddesc && propertyName);
-    
         HMDState* hmds = (HMDState*)hmddesc->Handle;
+        OVR_ASSERT(hmds);
         if (hmds)
         {
-        return hmds->setFloatArray(propertyName, values, arraySize);
+            return hmds->setFloatArray(propertyName, values, arraySize) ? 1 : 0;
+        }
     }
 
+    // FIXME: Currently it takes a few lines of code to do this, so just not supported for now.
     return 0;
 }
 
-OVR_EXPORT const char* ovrHmd_GetString(ovrHmd hmddesc, const char* propertyName,
+OVR_EXPORT const char* ovrHmd_GetString(ovrHmd hmddesc,
+                                        const char* propertyName,
                                         const char* defaultVal)
 {
-    OVR_ASSERT(hmddesc && propertyName);
-    
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
         HMDState* hmds = (HMDState*)hmddesc->Handle;
         if (hmds)
         {
             return hmds->getString(propertyName, defaultVal);
         }
+    }
 
-    return defaultVal;
+    return NetClient::GetInstance()->GetStringValue(InvalidVirtualHmdId, propertyName, defaultVal);
 }
  
-OVR_EXPORT ovrBool ovrHmd_SetString(ovrHmd hmddesc, const char* propertyName,
+OVR_EXPORT ovrBool ovrHmd_SetString(ovrHmd hmddesc,
+                                    const char* propertyName,
                                     const char* value)
 {
-    OVR_ASSERT(hmddesc && propertyName);
-
+    OVR_ASSERT(propertyName);
+    if (hmddesc)
+    {
         HMDState* hmds = (HMDState*)hmddesc->Handle;
         if (hmds)
         {
             return hmds->setString(propertyName, value) ? 1 : 0;
         }
+    }
 
-    return 0;
+    return NetClient::GetInstance()->SetStringValue(InvalidVirtualHmdId, propertyName, value) ? 1 : 0;
 }
 
 

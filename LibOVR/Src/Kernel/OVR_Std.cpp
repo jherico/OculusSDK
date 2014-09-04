@@ -37,7 +37,7 @@ namespace OVR {
 // Case insensitive compare implemented in platform-specific way.
 int OVR_CDECL OVR_stricmp(const char* a, const char* b)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
         return ::_stricmp(a, b);
     #else
@@ -51,7 +51,7 @@ int OVR_CDECL OVR_stricmp(const char* a, const char* b)
 
 int OVR_CDECL OVR_strnicmp(const char* a, const char* b, size_t count)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
     return ::_strnicmp(a, b, count);
 #else
@@ -122,7 +122,7 @@ wchar_t* OVR_CDECL OVR_wcscat(wchar_t* dest, size_t destsize, const wchar_t* src
 
 size_t  OVR_CDECL OVR_wcslen(const wchar_t* str)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     return wcslen(str);
 #else
     size_t i = 0;
@@ -134,7 +134,7 @@ size_t  OVR_CDECL OVR_wcslen(const wchar_t* str)
 
 int OVR_CDECL OVR_wcscmp(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32)  || defined(OVR_OS_LINUX)
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_LINUX)
     return wcscmp(a, b);
 #else
     // not supported, use custom implementation
@@ -161,7 +161,7 @@ int OVR_CDECL OVR_wcscmp(const wchar_t* a, const wchar_t* b)
 
 int OVR_CDECL OVR_wcsicmp(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
 #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
     return ::_wcsicmp(a, b);
 #else

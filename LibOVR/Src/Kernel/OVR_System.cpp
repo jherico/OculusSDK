@@ -51,25 +51,25 @@ void SystemSingletonInternal::PushDestroyCallbacks()
 }
 
 void System::DirectDisplayInitialize()
-{    
+{
 #ifdef OVR_OS_WIN32
 	// Set up display code for Windows
 	Win32::DisplayShim::GetInstance();
 
-		// This code will look for the first display. If it's a display
-		// that's extending the destkop, the code will assume we're in
-		// compatibility mode. Compatibility mode prevents shim loading
-		// and renders only to extended Rifts.
-		// If we find a display and it's application exclusive,
-		// we load the shim so we can render to it.
-		// If no display is available, we revert to whatever the
-		// driver tells us we're in
+	// This code will look for the first display. If it's a display
+	// that's extending the destkop, the code will assume we're in
+	// compatibility mode. Compatibility mode prevents shim loading
+	// and renders only to extended Rifts.
+	// If we find a display and it's application exclusive,
+	// we load the shim so we can render to it.
+	// If no display is available, we revert to whatever the
+	// driver tells us we're in
 
 	bool anyExtendedRifts = anyRiftsInExtendedMode() || Display::InCompatibilityMode( false );
 	
 	Win32::DisplayShim::GetInstance().Initialize(anyExtendedRifts);
 #endif
-        }
+}
 
 // Initializes System core, installing allocator.
 void System::Init(Log* log, Allocator *palloc)

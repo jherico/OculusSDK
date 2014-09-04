@@ -136,7 +136,7 @@ public:
     bool        FrameNeedsRendering(double curtime);
     void        ApplyDynamicResolutionScaling();
     void        UpdateFrameRateCounter(double curtime);
-
+    void        UpdateVisionProcessingTime(const ovrTrackingState& trackState);
 
     // Model creation and misc functions.
     Model*      CreateModel(Vector3f pos, struct SlabModel* sm);
@@ -172,8 +172,13 @@ protected:
     Sizei               WindowSize;
     int                 ScreenNumber;
     int                 FirstScreenInCycle;
-
     bool                SupportsSrgb;
+
+    // Last vision processing statistics
+    double              LastVisionProcessingTime;
+    int                 VisionTimesCount;
+    double              VisionProcessingSum;
+    double              VisionProcessingAverage;
 
     struct RenderTarget
     {
@@ -285,6 +290,7 @@ protected:
     bool                DisplaySleep;
     bool                PositionTrackingEnabled;
 	bool				PixelLuminanceOverdrive;
+    bool                HqAaDistortion;
     bool                MirrorToWindow;
 
     // Support toggling background color for distortion so that we can see

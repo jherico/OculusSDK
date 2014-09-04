@@ -11,6 +11,9 @@
     <ClCompile Include="..\..\..\Win32_OculusRoomTiny_Util.cpp">
       <Filter>Util</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.cpp">
+      <Filter>CommonSrc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="../../../OculusRoomTiny2.rc" />
@@ -19,6 +22,9 @@
     <Filter Include="Util">
       <UniqueIdentifier>{aa2ef577-a403-4088-a39c-0a87a96151a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="CommonSrc">
+      <UniqueIdentifier>{0b10aa1d-2337-4b0b-942a-843ac96a682f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\RenderTiny_D3D11_Device.h">
@@ -26,6 +32,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\HSWDisplay_Util.h">
       <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h">
+      <Filter>CommonSrc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

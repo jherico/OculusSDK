@@ -30,6 +30,7 @@ namespace OVR { namespace CAPI { namespace GL {
     "#define _VS_OUT varying\n"
     "#define _FS_IN varying\n"
     "#define _TEXTURELOD texture2DLod\n"
+    "#define _TEXTURE texture2D\n"
     "#define _FRAGCOLOR gl_FragColor\n";
     
     static const char glsl3Prefix[] =
@@ -39,6 +40,7 @@ namespace OVR { namespace CAPI { namespace GL {
     "#define _VS_OUT out\n"
     "#define _FS_IN in\n"
     "#define _TEXTURELOD textureLod\n"
+    "#define _TEXTURE texture\n"
     "#define _FRAGCOLOR FragColor\n";
     
     static const char SimpleQuad_vs[] =
@@ -127,7 +129,7 @@ namespace OVR { namespace CAPI { namespace GL {
 
         "void main()\n"
         "{\n"
-        "   _FRAGCOLOR = oColor * texture2D(Texture0, oTexCoord);\n"
+        "   _FRAGCOLOR = oColor * _TEXTURE(Texture0, oTexCoord);\n"
         "}\n";
 
     // The following is copied from the generated D3D SimpleTexturedQuad_ps_refl.h file, with D3D_NS renamed to GL.

@@ -58,7 +58,7 @@ RPC1::~RPC1()
 	delete blockingReturnValue;
 }
 
-void RPC1::RegisterSlot(OVR::String sharedIdentifier,  OVR::Observer<RPCSlot> *rpcSlotObserver )
+void RPC1::RegisterSlot(OVR::String sharedIdentifier,  OVR::Observer<RPCSlot>* rpcSlotObserver )
 {
 	slotHash.AddObserverToSubject(sharedIdentifier, rpcSlotObserver);
 }
@@ -77,7 +77,7 @@ void RPC1::UnregisterBlockingFunction(OVR::String uniqueID)
 	registeredBlockingFunctions.Remove(uniqueID);
 }
 
-bool RPC1::CallBlocking( OVR::String uniqueID, OVR::Net::BitStream * bitStream, Ptr<Connection> pConnection, OVR::Net::BitStream *returnData )
+bool RPC1::CallBlocking( OVR::String uniqueID, OVR::Net::BitStream* bitStream, Ptr<Connection> pConnection, OVR::Net::BitStream* returnData )
 {
     // If invalid parameters,
     if (!pConnection)
@@ -133,7 +133,7 @@ bool RPC1::CallBlocking( OVR::String uniqueID, OVR::Net::BitStream * bitStream, 
 	return true;
 }
 
-bool RPC1::Signal(OVR::String sharedIdentifier, OVR::Net::BitStream * bitStream, Ptr<Connection> pConnection)
+bool RPC1::Signal(OVR::String sharedIdentifier, OVR::Net::BitStream* bitStream, Ptr<Connection> pConnection)
 {
 	OVR::Net::BitStream out;
 	out.Write((MessageID) OVRID_RPC1);
@@ -150,7 +150,7 @@ bool RPC1::Signal(OVR::String sharedIdentifier, OVR::Net::BitStream * bitStream,
 	int32_t bytesSent = pSession->Send(&sp);
 	return bytesSent == sp.Bytes;
 }
-void RPC1::BroadcastSignal(OVR::String sharedIdentifier, OVR::Net::BitStream * bitStream)
+void RPC1::BroadcastSignal(OVR::String sharedIdentifier, OVR::Net::BitStream* bitStream)
 {
     OVR::Net::BitStream out;
     out.Write((MessageID) OVRID_RPC1);

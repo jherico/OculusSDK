@@ -55,9 +55,7 @@ namespace OVR { namespace CAPI { namespace GL {
         void LoadGraphics();
 
         OVR::CAPI::GL::RenderParams        RenderParams;
-        int                                GLMajorVersion;      // Derived from glGetString(GL_VERSION). To consider: Move this into GL::RenderParams.
-        int                                GLMinorVersion;      // 
-        bool                               SupportsVao;         // True if Vertex Array Objects are supported by the OpenGL version.
+        GLVersionAndExtensions             GLVersionInfo;
         GLuint                             FrameBuffer;         // This is a container for a texture, depth buffer, stencil buffer to be rendered to. To consider: Make a wrapper class, like the OculusWorldDemo RBuffer class. 
         Ptr<OVR::CAPI::GL::Texture>        pTexture;
         Ptr<OVR::CAPI::GL::ShaderSet>      pShaderSet;

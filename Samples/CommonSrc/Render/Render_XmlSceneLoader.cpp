@@ -24,10 +24,6 @@ limitations under the License.
 #include "Render_XmlSceneLoader.h"
 #include <Kernel/OVR_Log.h>
 
-#ifdef OVR_DEFINE_NEW
-#undef new
-#endif
-
 namespace OVR { namespace Render {
 
 XmlHandler::XmlHandler() : pXmlDocument(NULL)

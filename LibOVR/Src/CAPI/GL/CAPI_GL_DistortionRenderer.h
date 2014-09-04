@@ -77,10 +77,7 @@ protected:
         void ApplyBool(GLenum Name, GLint Value, GLint index = -1);
         
     public:
-        GLint GlMajorVersion;
-        GLint GlMinorVersion;
-        bool SupportsVao;
-        bool SupportsDrawBuffers;
+        GLVersionAndExtensions GLVersionInfo;
         
         GLint Viewport[4];
         GLfloat ClearColor[4];

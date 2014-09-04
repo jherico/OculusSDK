@@ -340,6 +340,12 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         if (RParams.pSwapChain)
         {
             UINT swapInterval = (RState.EnabledHmdCaps & ovrHmdCap_NoVSync) ? 0 : 1;
+#ifndef NO_SCREEN_TEAR_HEALING
+            if (TimeManager.ScreenTearingReaction())
+            {
+                swapInterval = 0;
+            }
+#endif // NO_SCREEN_TEAR_HEALING
             RParams.pSwapChain->Present(swapInterval, 0);
             
             // Force GPU to flush the scene, resulting in the lowest possible latency.
@@ -491,26 +497,33 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
 
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
-    {        
+    {
 		ShaderFill distortionShaderFill(DistortionShader);
         distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture);
+
+        if(RState.DistortionCaps & ovrDistortionCap_HqDistortion)
+        {
+            static float aaDerivMult = 0.5f;
+            DistortionShader->SetUniform1f("AaDerivativeMult", aaDerivMult);
+        }
+        else
+        {
+            // 0.0 disables high quality anti-aliasing
+            DistortionShader->SetUniform1f("AaDerivativeMultOffset", -1.0f);
+        }
 
 		if(overdriveActive)
 		{
             distortionShaderFill.SetTexture(1, pOverdriveTextures[LastUsedOverdriveTextureIndex]);
-
-            float invRtWidth  = 1.0f / (float)RParams.RTSize.w;
-            float invRtHeight = 1.0f / (float)RParams.RTSize.h;
-            DistortionShader->SetUniform2f("OverdriveInvRTSize", invRtWidth, invRtHeight);
-
+            
             static float overdriveScaleRegularRise = 0.1f;
-			static float overdriveScaleRegularFall = 0.05f;	// falling issues are hardly visible
+			static float overdriveScaleRegularFall = 0.05f;	// falling issues are hardly visible            
 			DistortionShader->SetUniform2f("OverdriveScales", overdriveScaleRegularRise, overdriveScaleRegularFall);
 		}
         else
         {
             // -1.0f disables PLO            
-            DistortionShader->SetUniform2f("OverdriveInvRTSize", -1.0f, -1.0f);
+            DistortionShader->SetUniform2f("OverdriveScales", -1.0f, -1.0f);
         }
 
         distortionShaderFill.SetInputLayout(DistortionVertexIL);
@@ -524,7 +537,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
                                           RState.EyeRenderPoses[eyeNum], timeWarpMatrices);
 
-            // Feed identity like matrices in until we get proper timewarp calculation going on
+            // Can feed identity like matrices incase of concern over timewarp calculations
 			DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
 			DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
 

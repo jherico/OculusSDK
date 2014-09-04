@@ -215,9 +215,9 @@ int Init()
     ovrHmd_SetEnabledCaps(HMD, ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction);
 
 	// Start the sensor which informs of the Rift's pose and motion
-    ovrHmd_ConfigureTracking(HMD, ovrTrackingCap_Orientation |
-                            ovrTrackingCap_MagYawCorrection |
-                            ovrTrackingCap_Position, 0);
+    ovrHmd_ConfigureTracking(HMD,   ovrTrackingCap_Orientation |
+                                    ovrTrackingCap_MagYawCorrection |
+                                    ovrTrackingCap_Position, 0);
 
     // This creates lights and models.
   	pRoomScene = new Scene;
@@ -304,13 +304,23 @@ void ProcessAndRender()
 		pRender->Render(&distortionShaderFill, MeshVBs[eyeNum], MeshIBs[eyeNum],sizeof(ovrDistortionVertex));
 	}
 
+    unsigned char latencyColor[3];
+    ovrBool drawDk2LatencyQuad = ovrHmd_GetLatencyTest2DrawColor(HMD, latencyColor);
+    if(drawDk2LatencyQuad)
+    {
+        const int latencyQuadSize = 20; // only needs to be 1-pixel, but larger helps visual debugging
+        pRender->SetViewport(HMD->Resolution.w - latencyQuadSize, 0, latencyQuadSize, latencyQuadSize);
+        pRender->Clear(latencyColor[0] / 255.0f, latencyColor[1] / 255.0f, latencyColor[2] / 255.0f, 0.0f);
+    }
+
 	pRender->SetDefaultRenderTarget();
 
 	pRender->Present( true ); // Vsync enabled
 
     // Only flush GPU for ExtendDesktop; not needed in Direct App Renering with Oculus driver.
     if (HMD->HmdCaps & ovrHmdCap_ExtendDesktop)
-		pRender->WaitUntilGpuIdle();  
+		pRender->WaitUntilGpuIdle();
+  
 	ovrHmd_EndFrameTiming(HMD);
     #endif
 }

@@ -155,14 +155,18 @@ protected:
 	{
 		// Configure open parameters based on read-only mode
 		SharedMemory::OpenParameters params;
-		params.globalName = name;
-		// FIXME: This is a hack.  We currently need to open this for read-write even when just reading from
-		// it because the LocklessUpdater class technically writes to it (increments by 0).
-		//params.accessMode = readOnly ? SharedMemory::AccessMode_ReadOnly : SharedMemory::AccessMode_ReadWrite;
-		//params.remoteMode = SharedMemory::RemoteMode_ReadOnly;
-		params.accessMode = SharedMemory::AccessMode_ReadWrite;
-		params.remoteMode = SharedMemory::RemoteMode_ReadWrite;
-		params.minSizeBytes = RegionSize;
+
+        // FIXME: This is a hack.  We currently need to allow clients to open this for read-write even
+        // though they only need read-only access.  This is because in the first 0.4 release the
+        // LocklessUpdater class technically writes to it (increments by 0) to read from the space.
+        // This was quickly corrected in 0.4.1 and we are waiting for the right time to disallow write
+        // access when everyone upgrades to 0.4.1+.
+        //params.remoteMode = SharedMemory::RemoteMode_ReadOnly;
+        params.remoteMode = SharedMemory::RemoteMode_ReadWrite;
+
+        params.globalName = name;
+        params.accessMode = readOnly ? SharedMemory::AccessMode_ReadOnly : SharedMemory::AccessMode_ReadWrite;
+        params.minSizeBytes = RegionSize;
 		params.openMode = readOnly ? SharedMemory::OpenMode_OpenOnly : SharedMemory::OpenMode_CreateOrOpen;
 
 		// Attempt to open the shared memory file

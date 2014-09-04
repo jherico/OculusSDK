@@ -64,7 +64,7 @@ typedef SharedObjectReader< LocklessFocusState > SharedFocusReader;
 //-----------------------------------------------------------------------------
 // RenderFocusReader
 
-class RenderFocusReader : public OVR::SystemSingletonBase<RenderFocusReader>
+class RenderFocusReader : public OVR::SystemSingletonBase<RenderFocusReader>, public NewOverrideBase
 {
     OVR_DECLARE_SINGLETON(RenderFocusReader);
 

@@ -58,6 +58,7 @@ limitations under the License.
 
 namespace OVR { namespace CAPI { namespace GL {
 
+
 // GL extension Hooks for Non-Mac.
 #if !defined(OVR_OS_MAC)
 
@@ -69,7 +70,8 @@ typedef void (__stdcall *PFNGLENABLEPROC) (GLenum);
 typedef void (__stdcall *PFNGLDISABLEPROC) (GLenum);
 typedef void (__stdcall *PFNGLGETFLOATVPROC) (GLenum, GLfloat*);
 typedef const GLubyte * (__stdcall *PFNGLGETSTRINGPROC) (GLenum);
-typedef void (__stdcall *PFNGLGETINTEGERVPROC) (GLenum, GLint*);
+typedef const GLubyte * (__stdcall *PFNGLGETSTRINGIPROC) (GLenum, GLuint);
+typedef void(__stdcall *PFNGLGETINTEGERVPROC) (GLenum, GLint*);
 typedef void (__stdcall *PFNGLGETDOUBLEVPROC) (GLenum, GLdouble*);
 typedef PROC (__stdcall *PFNWGLGETPROCADDRESS) (LPCSTR);
 typedef void (__stdcall *PFNGLFLUSHPROC) ();
@@ -91,7 +93,6 @@ typedef void (__stdcall *PFNGLTEXPARAMETERIPROC) (GLenum target, GLenum pname, G
 typedef void (__stdcall *PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
 typedef void (__stdcall *PFNGLBLENDFUNCPROC) (GLenum sfactor, GLenum dfactor);
 typedef void (__stdcall *PFNGLFRONTFACEPROC) (GLenum mode);
-typedef void (__stdcall *PFNGLFEEDBACKBUFFERPROC) (GLsizei size, GLenum type, GLfloat *buffer);
 typedef GLint (__stdcall *PFNGLRENDERMODEPROC) (GLenum mode);
 typedef void (__stdcall *PFNGLPOLYGONMODEPROC) (GLenum face, GLenum mode);
 
@@ -138,6 +139,7 @@ extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
 
 #endif // defined(OVR_OS_WIN32)
 
+extern PFNGLGETSTRINGIPROC                      glGetStringi;
 extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
 extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 extern PFNGLDELETESHADERPROC                    glDeleteShader;
@@ -183,7 +185,7 @@ extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
 extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
 extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
-extern PFNGLFEEDBACKBUFFERPROC                  glFeedbackBuffer;
+extern PFNGLBLENDFUNCSEPARATEPROC               glBlendFuncSeparate;
 
 extern void InitGLExtensions();
 
@@ -527,6 +529,7 @@ public:
         OVR_UNUSED(size);
         success = Compile((const char*) s);
         OVR_ASSERT(success);
+        OVR_UNUSED(success);
 		InitUniforms(refl, reflSize);
     }
     ~ShaderImpl()
@@ -571,7 +574,56 @@ typedef ShaderImpl<Shader_Vertex,  GL_VERTEX_SHADER> VertexShader;
 typedef ShaderImpl<Shader_Fragment, GL_FRAGMENT_SHADER> FragmentShader;
 
 
-}}}
+//// GLVersionAndExtensions
+//
+// FIXME: CODE DUPLICATION WARNING
+// Right now we have this same code in CommonSrc and in CAPI::GL.
+// At some point we need to consolidate these, in Kernel or Util.
+// Be sure to update both locations for now!
+//
+// This class needs to be initialized at runtime with GetGLVersionAndExtensions,
+// after an OpenGL context has been created. It must be re-initialized any time
+// a new OpenGL context is created, as the new context may differ in version or
+// supported functionality.
+struct GLVersionAndExtensions
+{
+    // Version information
+    int         MajorVersion;        // Best guess at major version
+    int         MinorVersion;        // Best guess at minor version
+    int         WholeVersion;        // Equals ((MajorVersion * 100) + MinorVersion). Example usage: if(glv.WholeVersion >= 302) // If OpenGL v3.02+ ...
+    bool        IsGLES;              // Open GL ES?
+    bool        IsCoreProfile;       // Is the current OpenGL context a core profile context? Its trueness may be a false positive but will never be a false negative.
+
+    // Extension information
+    bool        SupportsVAO;         // Supports Vertex Array Objects?
+    bool        SupportsDrawBuffers; // Supports Draw Buffers?
+    const char* Extensions;          // Other extensions string (will not be null)
+
+    GLVersionAndExtensions()
+      : MajorVersion(0),
+        MinorVersion(0),
+        WholeVersion(0),
+        IsGLES(false),
+        IsCoreProfile(false),
+        SupportsDrawBuffers(false),
+        SupportsVAO(false),
+        Extensions("")
+    {
+    }
+    
+    bool HasGLExtension(const char* searchKey) const;
+    
+protected:
+    friend void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
+    
+    void ParseGLVersion();
+    void ParseGLExtensions();
+};
+
+void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
+
+
+}}} // namespace OVR::CAPI::GL
 
 
 #endif // INC_OVR_CAPI_GL_Util_h

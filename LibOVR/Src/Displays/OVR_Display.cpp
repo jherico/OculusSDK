@@ -29,4 +29,8 @@ limitations under the License.
 
 namespace OVR {
 
-}
+
+// Place platform-independent code here
+
+
+} // namespace OVR

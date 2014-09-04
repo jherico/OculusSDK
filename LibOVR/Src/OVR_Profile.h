@@ -96,7 +96,7 @@ class ProfileManager : public NewOverrideBase, public SystemSingletonBase<Profil
 
 protected:
     ProfileManager(bool sys_register);
-    ~ProfileManager();
+    virtual ~ProfileManager();
     virtual void OnSystemDestroy();
 
 protected:
@@ -227,6 +227,7 @@ protected:
 #define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist"
 #define OVR_KEY_EYE_CUP                     "EyeCup"
 #define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"
+#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld"
 
 // Default measurements empirically determined at Oculus to make us happy
 // The neck model numbers were derived as an average of the male and female averages from ANSUR-88
@@ -240,6 +241,7 @@ protected:
 #define OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL  0.0805f
 #define OVR_DEFAULT_NECK_TO_EYE_VERTICAL    0.075f
 #define OVR_DEFAULT_EYE_RELIEF_DIAL         3
+#define OVR_DEFAULT_CAMERA_POSITION			{0,0,0,1,0,0,0}
 
 #endif // OVR_KEY_USER
 

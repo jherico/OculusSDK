@@ -65,7 +65,7 @@ void WSAStartupSingleton::AddRef()
 		// If an error code is returned
 		if (errCode != 0)
 		{
-			LogError("[Socket] Unable to initialize Winsock %d", errCode);
+			LogError("{ERR-007w} [Socket] Unable to initialize Winsock %d", errCode);
 		}
 	}
 }
@@ -135,6 +135,9 @@ BitStream& operator>>(BitStream& in, SockAddr& out)
 SockAddr::SockAddr()
 {
 	WSAStartupSingleton::AddRef();
+
+    // Zero out the address to squelch static analysis tools
+    ZeroMemory(&Addr6, sizeof(Addr6));
 }
 
 SockAddr::SockAddr(SockAddr* address)
@@ -197,7 +200,7 @@ void SockAddr::Set(const char* hostAddress, uint16_t port, int sockType)
 
     if (0 != errcode)
     {
-        OVR::LogError("getaddrinfo error: %s", gai_strerror(errcode));
+        OVR::LogError("{ERR-008w} getaddrinfo error: %s", gai_strerror(errcode));
     }
 
     OVR_ASSERT(0 != servinfo);
@@ -266,25 +269,29 @@ bool SockAddr::operator<( const SockAddr& right ) const
 	return memcmp(&Addr6, &right.Addr6, sizeof(Addr6)) < 0;
 }
 
-
-static void SetSocketOptions(SocketHandle sock)
+static bool SetSocketOptions(SocketHandle sock)
 {
+    int result = 0;
 	int sock_opt;
 
 	// This doubles the max throughput rate
 	sock_opt=1024*256;
-	setsockopt(sock, SOL_SOCKET, SO_RCVBUF, ( char * ) & sock_opt, sizeof ( sock_opt ) );
+    result |= setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)& sock_opt, sizeof (sock_opt));
 
 	// Immediate hard close. Don't linger the socket, or recreating the socket quickly on Vista fails.
 	// Fail with voice
 	sock_opt=0;
-	setsockopt(sock, SOL_SOCKET, SO_LINGER, ( char * ) & sock_opt, sizeof ( sock_opt ) );
+    result |= setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *)& sock_opt, sizeof (sock_opt));
 
 	// This doesn't make much difference: 10% maybe
 	// Not supported on console 2
 	sock_opt=1024*16;
-	setsockopt(sock, SOL_SOCKET, SO_SNDBUF, ( char * ) & sock_opt, sizeof ( sock_opt ) );
+    result |= setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)& sock_opt, sizeof (sock_opt));
+
+    // If all the setsockopt() returned 0 there were no failures, so return true for success, else false
+    return result == 0;
 }
+
 void _Ioctlsocket(SocketHandle sock, unsigned long nonblocking)
 {
 	ioctlsocket( sock, FIONBIO, &nonblocking );
@@ -311,7 +318,7 @@ static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParame
 
     if (0 != errcode)
     {
-        OVR::LogError("getaddrinfo error: %s", gai_strerror(errcode));
+        OVR::LogError("{ERR-020w} getaddrinfo error: %s", gai_strerror(errcode));
     }
 
 	for (aip = servinfo; aip != NULL; aip = aip->ai_next)
@@ -319,10 +326,9 @@ static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParame
 		// Open socket. The address type depends on what
 		// getaddrinfo() gave us.
 		sock = socket(aip->ai_family, aip->ai_socktype, aip->ai_protocol);
-		if (sock != 0)
+        if (sock != INVALID_SOCKET)
 		{
-			int ret = bind( sock, aip->ai_addr, (int) aip->ai_addrlen );
-			if (ret>=0)
+            if (bind(sock, aip->ai_addr, (int)aip->ai_addrlen) != SOCKET_ERROR)
 			{
 				// The actual socket is always non-blocking
 				// I control blocking or not using WSAEventSelect
@@ -330,12 +336,10 @@ static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParame
                 freeaddrinfo(servinfo);
 				return sock;
 			}
-			else
-			{
+
 				closesocket(sock);
 			}
 		}
-	}
 
     if (servinfo) { freeaddrinfo(servinfo); }
 	return INVALID_SOCKET;
@@ -583,7 +587,7 @@ void TCPSocketPollState::HandleEvent(TCPSocket* tcpSocket, SocketEvent_TCP* even
             socklen_t sockAddrSize = sizeof(sockAddr);
 
             SocketHandle newSock = accept(handle, (sockaddr*)&sockAddr, (socklen_t*)&sockAddrSize);
-            if (newSock > 0)
+            if (newSock != INVALID_SOCKET)
             {
                 SockAddr sa(&sockAddr);
                 eventHandler->TCP_OnAccept(tcpSocket, &sa, newSock);

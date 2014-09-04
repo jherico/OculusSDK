@@ -59,7 +59,7 @@ public:
         OVR_COMPILER_ASSERT(sizeof(T) <= sizeof(SlotType));
     }
 
-	T		GetState() const
+	T GetState() const
 	{
 		// Copy the state out, then retry with the alternate slot
 		// if we determine that our copy may have been partially
@@ -71,9 +71,9 @@ public:
 		{
 			// We are adding 0, only using these as atomic memory barriers, so it
 			// is ok to cast off the const, allowing GetState() to remain const.
-            end   = UpdateEnd.ExchangeAdd_Sync(0);
+            end   = UpdateEnd.Load_Acquire();
             state = Slots[ end & 1 ];
-            begin = UpdateBegin.ExchangeAdd_Sync(0);
+            begin = UpdateBegin.Load_Acquire();
 			if ( begin == end ) {
 				break;
 			}
@@ -81,7 +81,7 @@ public:
 			// The producer is potentially blocked while only having partially
 			// written the update, so copy out the other slot.
             state = Slots[ (begin & 1) ^ 1 ];
-            final = UpdateBegin.ExchangeAdd_NoSync(0);
+            final = UpdateBegin.Load_Acquire();
 			if ( final == begin ) {
 				break;
 			}
@@ -100,9 +100,9 @@ public:
         UpdateEnd.ExchangeAdd_Sync(1);
 	}
 
-    mutable AtomicInt<int> UpdateBegin;
-    mutable AtomicInt<int> UpdateEnd;
-    SlotType               Slots[2];
+    AtomicInt<int> UpdateBegin;
+    AtomicInt<int> UpdateEnd;
+    SlotType       Slots[2];
 };
 
 

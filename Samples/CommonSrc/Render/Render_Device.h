@@ -877,6 +877,7 @@ public:
     virtual void Present ( bool withVsync ) = 0;
     // Waits for rendering to complete; important for reducing latency.
     virtual void WaitUntilGpuIdle() { }
+    virtual void Flush() = 0;
 
     // Resources
     virtual Buffer*  CreateBuffer() { return NULL; }

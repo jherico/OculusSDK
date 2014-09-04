@@ -313,6 +313,7 @@ public:
 
     virtual void Present ( bool withVsync );
     virtual void WaitUntilGpuIdle();
+    virtual void Flush();
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
 	virtual size_t QueryGPUMemorySize();

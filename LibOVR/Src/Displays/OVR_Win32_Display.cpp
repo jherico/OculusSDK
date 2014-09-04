@@ -37,10 +37,14 @@ limitations under the License.
 #include <SetupAPI.h>
 #include <Mmsystem.h>
 #include <conio.h>
+
+#ifdef OVR_COMPAT_EDID_VIA_WMI
 # pragma comment(lib, "wbemuuid.lib")
 #include <wbemidl.h>
-#include <AtlBase.h>
-#include <AtlConv.h>
+#else // OVR_COMPAT_EDID_VIA_WMI
+#include <setupapi.h>
+#include <initguid.h>
+#endif // OVR_COMPAT_EDID_VIA_WMI
 
 // WIN32_LEAN_AND_MEAN included in OVR_Atomic.h may break 'byte' declaration.
 #ifdef WIN32_LEAN_AND_MEAN
@@ -56,7 +60,8 @@ typedef struct
 	UINT	ExpectedWidth;
 	UINT	ExpectedHeight;
 	HWND	hWindow;
-	bool	InCompatibilityMode;
+	bool	CompatibilityMode;
+    bool    HideDK1Mode;
 } ContextStruct;
 
 static ContextStruct GlobalDisplayContext = {0};
@@ -89,7 +94,7 @@ ULONG getRift( HANDLE hDevice, int index )
 {
 	ULONG riftCount = getRiftCount( hDevice );
 	DWORD bytesReturned = 0;
-	BOOL result; 
+	BOOL result;
 
 	if( riftCount >= (ULONG)index )
 	{
@@ -334,11 +339,10 @@ static BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwDa
 	return TRUE;
 };
 
+#ifdef OVR_COMPAT_EDID_VIA_WMI
 
 static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, String& userFriendlyNameStr )
 {
-	USES_CONVERSION;
-
 	IWbemLocator *pLoc = NULL;
 	IWbemServices *pSvc = NULL;
 	HRESULT hres;
@@ -350,8 +354,10 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 		hres = CoInitializeEx(0, COINIT_MULTITHREADED);
 		if (FAILED(hres))
 		{
-			OVR_DEBUG_LOG_TEXT(("Failed to initialize COM library. Error code = 0x%x\n", hres));
-			return false;
+            
+            LogError("{ERR-082} [Display] WARNING: Failed to initialize COM library. Error code = 0x%x", hres);
+            OVR_ASSERT(false);
+            return false;
 		}
 
 		hres = CoInitializeSecurity(
@@ -368,10 +374,9 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 
 		if (FAILED(hres))
 		{
-			OVR_DEBUG_LOG_TEXT(("Failed to initialize security. Error code = 0x%x\n", hres));
-			//CoUninitialize();
-			//return false;
-			selfInitialized = false;
+            LogError("{ERR-083} [Display] WARNING: Failed to initialize security. Error code = 0x%x", hres);
+            OVR_ASSERT(false);
+            selfInitialized = false;
 		}
 
 		initialized = true;
@@ -385,8 +390,9 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 
 	if (FAILED(hres))
 	{
-		OVR_DEBUG_LOG_TEXT(("Failed to create IWbemLocator object. Err code = 0x%x\n", hres));
-		return false;
+        LogError("{ERR-084} [Display] WARNING: Failed to create IWbemLocator object.Err code = 0x%x", hres);
+        OVR_ASSERT(false);
+        return false;
 	}
 
 	BSTR AbackB = SysAllocString(L"root\\WMI");
@@ -407,8 +413,9 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 
 	if (FAILED(hres))
 	{
-		OVR_DEBUG_LOG_TEXT(("Could not connect. Error code = 0x%x\n", hres));
-		pLoc->Release();
+        LogError("{ERR-085} [Display] WARNING: Could not connect to root\\WMI. Error code = 0x%x", hres);
+        OVR_ASSERT(false);
+        pLoc->Release();
 		return false;
 	}
 
@@ -425,8 +432,9 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 
 	if (FAILED(hres))
 	{
-		OVR_DEBUG_LOG_TEXT(("Could not set proxy blanket. Error code = 0x%x\n", hres));
-		pSvc->Release();
+        LogError("{ERR-086} [Display] WARNING: Could not set proxy blanket. Error code = 0x%x", hres);
+        OVR_ASSERT(false);
+        pSvc->Release();
 		pLoc->Release();
 		return false;
 	}
@@ -446,11 +454,15 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 
 	if (FAILED(hres))
 	{
-		OVR_DEBUG_LOG_TEXT(( "Query for operating system name failed. Error code = 0x%x\n", hres )); 
-		pSvc->Release();
+        LogError("{ERR-087} [Display] WARNING: Query for operating system name failed. Error code = 0x%x", hres);
+        OVR_ASSERT(false);
+        pSvc->Release();
 		pLoc->Release();
 		return false;
 	}
+
+    int enumeratedCount = 0;
+    bool found = false;
 
 	IWbemClassObject *pclsObj = 0;
 	while (pEnumerator)
@@ -463,29 +475,31 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
             break;
         }
 
-        VARIANT vtProp;
-        hr = pclsObj->Get(L"InstanceName", 0, &vtProp, 0, 0);
+        ++enumeratedCount;
 
-        WCHAR* instanceName = vtProp.bstrVal;
-        WCHAR* nextToken = NULL;
-        if (SUCCEEDED(hr) &&
+		VARIANT vtProp;
+		hr = pclsObj->Get(L"InstanceName", 0, &vtProp, 0, 0);
+
+		WCHAR* instanceName = vtProp.bstrVal;
+		WCHAR* nextToken = NULL;
+		if (SUCCEEDED(hr) &&
             wcstok_s(instanceName, L"\\", &nextToken) != NULL)
-        {
-            WCHAR* aToken = wcstok_s(NULL, L"\\", &nextToken);
+		{
+			WCHAR* aToken = wcstok_s(NULL, L"\\", &nextToken);
 
-            if (aToken != NULL)
-            {
-                VariantClear(&vtProp);
+			if (aToken != NULL)
+			{
+				VariantClear(&vtProp);
 
-                if (wcscmp(aToken, displayName) != 0)
-                {
+				if (wcscmp(aToken, displayName) != 0)
+				{
                     pclsObj->Release();
                     continue;
-                }
+				}
 
-                // Read serial
+				// Read serial
 
-                hr = pclsObj->Get(L"SerialNumberID", 0, &vtProp, 0, 0);
+				hr = pclsObj->Get(L"SerialNumberID", 0, &vtProp, 0, 0);
 
                 if (SUCCEEDED(hr))
                 {
@@ -505,21 +519,21 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
                     }
                     else
                     {
-                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for SerialNumberID"));
+                        LogError("{ERR-088} [Display] WARNING: Wrong data format for SerialNumberID");
                     }
 
                     VariantClear(&vtProp);
                 }
                 else
                 {
-                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display SerialNumberID: %d", (int)hr));
+                    LogError("{ERR-089} [Display] WARNING: Failure getting display SerialNumberID: %d", (int)hr);
                 }
 
-                // Read length of name
+				// Read length of name
 
                 int userFriendlyNameLen = 0;
 
-                hr = pclsObj->Get(L"UserFriendlyNameLength", 0, &vtProp, 0, 0);
+				hr = pclsObj->Get(L"UserFriendlyNameLength", 0, &vtProp, 0, 0);
 
                 if (SUCCEEDED(hr))
                 {
@@ -531,24 +545,24 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
                         {
                             userFriendlyNameLen = 0;
 
-                            OVR_DEBUG_LOG(("[Win32Display] WARNING: UserFriendlyNameLength = 0"));
+                            LogError("{ERR-090} [Display] WARNING: UserFriendlyNameLength = 0");
                         }
                     }
                     else
                     {
-                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for UserFriendlyNameLength"));
+                        LogError("{ERR-091} [Display] WARNING: Wrong data format for UserFriendlyNameLength");
                     }
 
                     VariantClear(&vtProp);
                 }
                 else
                 {
-                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display UserFriendlyNameLength: %d", (int)hr));
+                    LogError("{ERR-092} [Display] WARNING: Failure getting display UserFriendlyNameLength: %d", (int)hr);
                 }
 
-                // Read name
+				// Read name
 
-                hr = pclsObj->Get(L"UserFriendlyName", 0, &vtProp, 0, 0);
+				hr = pclsObj->Get(L"UserFriendlyName", 0, &vtProp, 0, 0);
 
                 if (SUCCEEDED(hr) && userFriendlyNameLen > 0)
                 {
@@ -570,20 +584,23 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
                     {
                         // See: https://developer.oculusvr.com/forums/viewtopic.php?f=34&t=10961
                         // This can happen if someone has an EDID override in the registry.
-                        OVR_DEBUG_LOG(("[Win32Display] WARNING: Wrong data format for UserFriendlyName"));
+                        LogError("{ERR-093} [Display] WARNING: Wrong data format for UserFriendlyName");
                     }
 
                     VariantClear(&vtProp);
                 }
                 else
                 {
-                    OVR_DEBUG_LOG(("[Win32Display] WARNING: Failure getting display UserFriendlyName: %d", (int)hr));
+                    LogError("{ERR-094} [Display] WARNING: Failure getting display UserFriendlyName: %d", (int)hr);
                 }
-            }
+			}
+
+            found = true;
+            pclsObj->Release();
+            break;
         }
 
-        pclsObj->Release();
-        break;
+		pclsObj->Release();
 	}
 
 	HMODULE hModule = GetModuleHandleA("wbemuuid");
@@ -596,8 +613,200 @@ static bool getCompatDisplayEDID( WCHAR* displayName, String& serialNumberStr, S
 	pLoc->Release();
 	pEnumerator->Release();
 
-	return true;
+    if (!found)
+    {
+        LogError("{ERR-095} [Display] WARNING: Unable to enumerate the rift via WMI (found %d monitors). This is not normally an issue. Running as a user with Administrator privileges has fixed this problem in the past.", enumeratedCount);
+        OVR_ASSERT(false);
+    }
+
+	return found;
 }
+
+#else // OVR_COMPAT_EDID_VIA_WMI
+
+#define NAME_SIZE 128
+
+DEFINE_GUID(GUID_CLASS_MONITOR,
+    0x4d36e96e, 0xe325, 0x11ce, 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1,
+    0x03, 0x18);
+
+static void truncateNonalphanum(char* str, int len)
+{
+    for (int i = 0; i < len; ++i)
+    {
+        char ch = str[i];
+
+        if ((ch < 'A' || ch > 'Z') &&
+            (ch < 'a' || ch > 'z') &&
+            (ch < '0' || ch > '9') &&
+            ch != ' ')
+        {
+            str[i] = '\0';
+            break;
+        }
+    }
+}
+
+static bool AccessDeviceRegistry(IN HDEVINFO devInfo, IN PSP_DEVINFO_DATA devInfoData,
+                                 const WCHAR* displayName, String& serialNumberStr, String& userFriendlyNameStr)
+{
+    // Match hardware id to display name
+    WCHAR hardwareId[128];
+    if (!SetupDiGetDeviceRegistryProperty(
+        devInfo,
+        devInfoData,
+        SPDRP_HARDWAREID,
+        NULL,
+        (PBYTE)hardwareId,
+        sizeof(hardwareId),
+        NULL))
+    {
+        LogError("{ERR-096} [Display] WARNING: SetupDiGetDeviceRegistryProperty for SPDRP_HARDWAREID failed. LastErr=%d", GetLastError());
+        OVR_ASSERT(false);
+        return false;
+    }
+    hardwareId[127] = 0;
+
+    // If the hardware id did not match,
+    if (!wcsstr(hardwareId, displayName))
+    {
+        // Stop here
+        return false;
+    }
+
+    // Grab hardware info registry key
+    HKEY hDevRegKey = SetupDiOpenDevRegKey(
+        devInfo,
+        devInfoData,
+        DICS_FLAG_GLOBAL,
+        0,
+        DIREG_DEV,
+        KEY_READ); // Only read permissions so it can be run without Administrator privs
+
+    if (hDevRegKey == INVALID_HANDLE_VALUE)
+    {
+        LogError("{ERR-097} [Display] WARNING: SetupDiOpenDevRegKey failed. LastErr=%d", GetLastError());
+        OVR_ASSERT(false);
+        return false;
+    }
+
+    // Enumerate keys in registry
+    bool found = false;
+
+    // For each key,
+    for (int i = 0;; i++)
+    {
+        BYTE EDIDdata[1024];
+        DWORD edidsize = sizeof(EDIDdata);
+
+        DWORD dwType, ActualValueNameLength = NAME_SIZE;
+        CHAR valueName[NAME_SIZE];
+
+        // Read the key value data
+        LSTATUS retValue = RegEnumValueA(
+            hDevRegKey,
+            i,
+            &valueName[0],
+            &ActualValueNameLength,
+            NULL,
+            &dwType,
+            EDIDdata,
+            &edidsize);
+
+        if (FAILED(retValue))
+        {
+            if (retValue == ERROR_NO_MORE_ITEMS)
+            {
+                break;
+            }
+
+            LogError("{ERR-098} [Display] WARNING: RegEnumValueA failed to read a key. LastErr=%d", retValue);
+            OVR_ASSERT(false);
+        }
+        else if (0 == strcmp(valueName, "EDID")) // Value is EDID:
+        {
+            // Tested working for DK1 and DK2:
+
+            char friendlyString[9];
+            memcpy(friendlyString, EDIDdata + 77, 8);
+            truncateNonalphanum(friendlyString, 8);
+            friendlyString[8] = '\0';
+
+            char edidString[14];
+            memcpy(edidString, EDIDdata + 95, 13);
+            truncateNonalphanum(edidString, 13);
+            edidString[13] = '\0';
+
+            serialNumberStr = edidString;
+            userFriendlyNameStr = friendlyString;
+
+            found = true;
+            break;
+        }
+    }
+
+    RegCloseKey(hDevRegKey);
+
+    return found;
+}
+
+static bool getCompatDisplayEDID(const WCHAR* displayName, String& serialNumberStr, String& userFriendlyNameStr)
+{
+    HDEVINFO devInfo = NULL;
+
+    devInfo = SetupDiGetClassDevsEx(
+        &GUID_CLASS_MONITOR, //class GUID
+        NULL, //enumerator
+        NULL, //HWND
+        DIGCF_PRESENT, // Flags //DIGCF_ALLCLASSES|
+        NULL, // device info, create a new one.
+        NULL, // machine name, local machine
+        NULL);// reserved
+
+    if (NULL == devInfo)
+    {
+        return false;
+    }
+
+    DWORD lastError = 0;
+
+    // For each display,
+    for (int i = 0;; i++)
+    {
+        SP_DEVINFO_DATA devInfoData = {};
+        devInfoData.cbSize = sizeof(devInfoData);
+
+        // Grab device info
+        if (SetupDiEnumDeviceInfo(devInfo, i, &devInfoData))
+        {
+            // Access device info from registry
+            if (AccessDeviceRegistry(devInfo, &devInfoData, displayName, serialNumberStr, userFriendlyNameStr))
+            {
+                return true;
+            }
+        }
+        else
+        {
+            lastError = GetLastError();
+
+            // If no more items found,
+            if (lastError != ERROR_NO_MORE_ITEMS)
+            {
+                LogError("{ERR-099} [Display] WARNING: SetupDiEnumDeviceInfo failed. LastErr=%d", lastError);
+                OVR_ASSERT(false);
+            }
+
+            break;
+        }
+    }
+
+    LogError("{ERR-100} [Display] WARNING: SetupDiEnumDeviceInfo did not return the rift display. LastErr=%d", lastError);
+    OVR_ASSERT(false);
+
+    return false;
+}
+
+#endif // OVR_COMPAT_EDID_VIA_WMI
 
 // This is function that's used 
 bool anyRiftsInExtendedMode()
@@ -797,27 +1006,28 @@ bool Display::InCompatibilityMode( bool displaySearch )
 	bool result = false;
 	if( displaySearch )
 	{
-    OVR::Win32::DisplayDesc displayArray[8];
+		OVR::Win32::DisplayDesc displayArray[8];
 
-	int extendedRiftCount = discoverExtendedRifts(displayArray, 8, false);
-	if( extendedRiftCount )
-	{
-		result = true;
-	}
-	else
-	{
-			result = GlobalDisplayContext.InCompatibilityMode;
+		int extendedRiftCount = discoverExtendedRifts(displayArray, 8, false);
+		if( extendedRiftCount )
+		{
+			result = true;
+		}
+		else
+		{
+			result = GlobalDisplayContext.CompatibilityMode;
 		}
 	}
 	else
 	{
-		result = GlobalDisplayContext.InCompatibilityMode;
+		result = GlobalDisplayContext.CompatibilityMode;
 	}
 
 	return result;
 }
 
 #define OVR_FLAG_COMPATIBILITY_MODE 1
+#define OVR_FLAG_HIDE_DK1 2
 
 bool Display::Initialize()
 {
@@ -830,7 +1040,7 @@ bool Display::Initialize()
 	if (hDevice != NULL && hDevice != INVALID_HANDLE_VALUE)
 	{
 		GlobalDisplayContext.hDevice             = hDevice;
-		GlobalDisplayContext.InCompatibilityMode = FALSE;
+		GlobalDisplayContext.CompatibilityMode = false;
 
 		DWORD bytesReturned = 0;
 		LONG compatiblityResult = OVR_STATUS_SUCCESS;
@@ -839,16 +1049,16 @@ bool Display::Initialize()
                                        &compatiblityResult, sizeof( LONG ), &bytesReturned, NULL );
 		if (result)
 		{
-			if( compatiblityResult & OVR_FLAG_COMPATIBILITY_MODE )
-				GlobalDisplayContext.InCompatibilityMode = TRUE;
-		}
+            GlobalDisplayContext.CompatibilityMode = (compatiblityResult & OVR_FLAG_COMPATIBILITY_MODE) != 0;
+            GlobalDisplayContext.HideDK1Mode = (compatiblityResult & OVR_FLAG_HIDE_DK1) != 0;
+        }
 		else
 		{
 			// If calling our driver fails in any way, assume compatibility mode as well
-			GlobalDisplayContext.InCompatibilityMode = TRUE;
+			GlobalDisplayContext.CompatibilityMode = true;
 		}
 
-		if (!GlobalDisplayContext.InCompatibilityMode)
+		if (!GlobalDisplayContext.CompatibilityMode)
 		{
 			Ptr<DisplaySearchHandle> searchHandle = *Display::GetDisplaySearchHandle();
 
@@ -861,17 +1071,87 @@ bool Display::Initialize()
 			}
 			else
 			{
-				GlobalDisplayContext.InCompatibilityMode = TRUE;
+				GlobalDisplayContext.CompatibilityMode = true;
 			}
 
 		}
 	}
 	else
 	{
-		GlobalDisplayContext.InCompatibilityMode = TRUE;
+		GlobalDisplayContext.CompatibilityMode = true;
 	}
 
 	return true;
+}
+
+bool Display::GetDriverMode(bool& driverInstalled, bool& compatMode, bool& hideDK1Mode)
+{
+    if (GlobalDisplayContext.hDevice == NULL)
+    {
+        driverInstalled = false;
+        compatMode = true;
+        hideDK1Mode = false;
+    }
+    else
+    {
+        driverInstalled = true;
+        compatMode = GlobalDisplayContext.CompatibilityMode;
+        hideDK1Mode = GlobalDisplayContext.HideDK1Mode;
+    }
+
+    return true;
+}
+
+bool Display::SetDriverMode(bool compatMode, bool hideDK1Mode)
+{
+    // If device is not initialized,
+    if (GlobalDisplayContext.hDevice == NULL)
+    {
+        OVR_ASSERT(false);
+        return false;
+    }
+
+    // If no change,
+    if ((compatMode == GlobalDisplayContext.CompatibilityMode) &&
+        (hideDK1Mode == GlobalDisplayContext.HideDK1Mode))
+    {
+        return true;
+    }
+
+    LONG mode_flags = 0;
+    if (compatMode)
+    {
+        mode_flags |= OVR_FLAG_COMPATIBILITY_MODE;
+    }
+    if (hideDK1Mode)
+    {
+        mode_flags |= OVR_FLAG_HIDE_DK1;
+    }
+
+    DWORD bytesReturned = 0;
+    LONG err = 1;
+
+    if (!DeviceIoControl(GlobalDisplayContext.hDevice,
+                         IOCTL_RIFTMGR_SETCOMPATIBILITYMODE,
+                         &mode_flags,
+                         sizeof(LONG),
+                         &err,
+                         sizeof(LONG),
+                         &bytesReturned,
+                         NULL) ||
+        (err != 0 && err != -3))
+    {
+        LogError("{ERR-001w} [Win32Display] Unable to set device mode to (compat=%d dk1hide=%d): err=%d",
+            (int)compatMode, (int)hideDK1Mode, (int)err);
+        return false;
+    }
+
+    OVR_DEBUG_LOG(("[Win32Display] Set device mode to (compat=%d dk1hide=%d)",
+        (int)compatMode, (int)hideDK1Mode));
+
+    GlobalDisplayContext.HideDK1Mode = hideDK1Mode;
+    GlobalDisplayContext.CompatibilityMode = compatMode;
+    return true;
 }
 
 DisplaySearchHandle* Display::GetDisplaySearchHandle()
@@ -950,10 +1230,8 @@ Ptr<Display> Display::GetDisplay(int index, DisplaySearchHandle* handle)
             }
 
             // FIXME: We have the EDID. Let's just use that instead.
-			uint32_t nativeWidth = 1080;
-			uint32_t nativeHeight = 1920;
-			uint32_t logicalWidth = 1920;
-			uint32_t logicalHeight = 1080;
+            uint32_t nativeWidth = 1080, nativeHeight = 1920;
+            uint32_t logicalWidth = 1920, logicalHeight = 1080;
 			uint32_t rotation = 0;
 
             switch (dEdid.ModelNumber)

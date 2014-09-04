@@ -55,10 +55,17 @@ bool RPC_C2S_Hello::Validate()
            HelloString.CompareNoCase(OfficialHelloString) == 0;
 }
 
-void RPC_S2C_Authorization::Generate(Net::BitStream* bs)
+void RPC_S2C_Authorization::Generate(Net::BitStream* bs, String errorString)
 {
     RPC_S2C_Authorization auth;
-    auth.AuthString = OfficialAuthorizedString;
+    if (errorString.IsEmpty())
+    {
+        auth.AuthString = OfficialAuthorizedString;
+    }
+    else
+    {
+        auth.AuthString = errorString;
+    }
     auth.MajorVersion = RPCVersion_Major;
     auth.MinorVersion = RPCVersion_Minor;
     auth.PatchVersion = RPCVersion_Patch;
@@ -169,17 +176,25 @@ SessionResult Session::Connect(ConnectParameters *cp)
             AllConnections.PushBack(c);
 
         }
-        
+
         if (cp2->Blocking)
         {
             c->WaitOnConnecting();
-
-            if (c->State == State_Connected)
-                return SessionResult_OK;
-            else
-                return SessionResult_ConnectFailure;
         }
-	}
+
+        if (c->State == State_Connected)
+        {
+            return SessionResult_OK;
+        }
+        else if (c->State == Client_Connecting)
+        {
+            return SessionResult_ConnectInProgress;
+        }
+        else
+        {
+            return SessionResult_ConnectFailure;
+        }
+    }
     else if (cp->Transport == TransportType_Loopback)
 	{
 		if (HasLoopbackListener)
@@ -284,8 +299,10 @@ int Session::Send(SendParameters *payload)
 			rp.pData = (uint8_t*)payload->pData; // FIXME
 			ListenerReceiveResult lrr = LRR_CONTINUE;
 			sl->OnReceive(&rp, &lrr);
-			if (lrr==LRR_RETURN)
-				return payload->Bytes;
+            if (lrr == LRR_RETURN)
+            {
+                return payload->Bytes;
+            }
 			else if (lrr == LRR_BREAK)
 			{
 				break;
@@ -522,11 +539,10 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
             if (!auth.Deserialize(&bsIn) ||
                 !auth.Validate())
             {
+                LogError("{ERR-001} [Session] REJECTED: OVRService did not authorize us: %s", auth.AuthString.ToCStr());
+
                 conn->SetState(State_Zombie);
                 invokeSessionEvent(&SessionListener::OnIncompatibleProtocol, conn);
-
-                LogError("[Session] REJECTED: Server did not respond with a valid authorization message");
-                AllConnections.RemoveAtUnordered(connIndex);
             }
             else
             {
@@ -550,13 +566,16 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
             if (!hello.Deserialize(&bsIn) ||
                 !hello.Validate())
             {
-                conn->SetState(State_Zombie);
-                invokeSessionEvent(&SessionListener::OnIncompatibleProtocol, conn);
-
-                LogError("[Session] REJECTED: Rift application is using an incompatible version %d.%d.%d (my version=%d.%d.%d)",
+                LogError("{ERR-002} [Session] REJECTED: Rift application is using an incompatible version %d.%d.%d (my version=%d.%d.%d)",
                          hello.MajorVersion, hello.MinorVersion, hello.PatchVersion,
                          RPCVersion_Major, RPCVersion_Minor, RPCVersion_Patch);
-                AllConnections.RemoveAtUnordered(connIndex);
+
+                conn->SetState(State_Zombie);
+
+                // Send auth response
+                BitStream bsOut;
+                RPC_S2C_Authorization::Generate(&bsOut, "Incompatible protocol version.  Please make sure your OVRService and SDK are both up to date.");
+                conn->pSocket->Send(bsOut.GetData(), bsOut.GetNumberOfBytesUsed());
             }
             else
             {
@@ -612,6 +631,7 @@ void Session::TCP_OnClosed(TCPSocket* s)
             invokeSessionEvent(&SessionListener::OnHandshakeAttemptFailed, conn);
             break;
         case State_Connected:
+        case State_Zombie:
             invokeSessionEvent(&SessionListener::OnDisconnected, conn);
             break;
         default:

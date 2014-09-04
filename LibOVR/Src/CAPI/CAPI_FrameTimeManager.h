@@ -40,7 +40,7 @@ namespace OVR { namespace CAPI {
 // how long to wait. 
 struct TimeDeltaCollector
 {
-    TimeDeltaCollector() : Count(0), ReCalcMedian(true), Median(-1.0) { }
+    TimeDeltaCollector() : Median(-1.0), Count(0), ReCalcMedian(true) { }
 
     void    AddTimeDelta(double timeSeconds);    
     void    Clear() { Count = 0; }    
@@ -132,7 +132,7 @@ public:
 class FrameTimeManager
 {
 public:
-    FrameTimeManager(bool vsyncEnabled = true);
+    FrameTimeManager(bool vsyncEnabled);
 
     // Data that affects frame timing computation.
     struct TimingInputs
@@ -222,11 +222,14 @@ public:
     void    GetLatencyTimings(float latencies[3])
     { return ScreenLatencyTracker.GetLatencyTimings(latencies); }
 
-
     const Timing& GetFrameTiming() const { return FrameTiming; }
 
-private:
+#ifndef NO_SCREEN_TEAR_HEALING
+    bool    IsScreenTearing() const { return ScreenTearing; };
+    bool    ScreenTearingReaction();
+#endif // NO_SCREEN_TEAR_HEALING
 
+private:
     double  calcFrameDelta() const;
     double  calcScreenDelay() const;
     double  calcTimewarpWaitDelta() const;
@@ -292,8 +295,18 @@ private:
     bool                VsyncEnabled;
     // Set if we are rendering via the SDK, so DistortionRenderTimes is valid.
     bool                DynamicPrediction;
-    // Set if SDk is doing teh rendering.
+    // Set if SDk is doing the rendering.
     bool                SdkRender;
+    // Direct to rift.
+    bool                DirectToRift;
+#ifndef NO_SCREEN_TEAR_HEALING
+    // Screen tearing detection
+    mutable bool        ScreenTearing;
+    // Number of frames tearing has been observed
+    mutable int         TearingFrameCount;
+    // Number of frames of reaction
+    mutable int         HealingFrameCount;
+#endif // NO_SCREEN_TEAR_HEALING
 
     // Total frame delay due to VsyncToFirstScanline, persistence and settle time.
     // Computed from RenderInfor.Shutter.

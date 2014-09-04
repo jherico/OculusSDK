@@ -219,7 +219,7 @@ void FILEFile::init()
     else if (OpenFlags & Open_Write)
         omode = "r+b";
 
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     SysErrorModeDisabler disabler(FileName.ToCStr());
 #endif
 
@@ -574,7 +574,7 @@ Ptr<File> FileFILEOpen(const String& path, int flags, int mode)
 // Helper function: obtain file information time.
 bool    SysFile::GetFileStat(FileStat* pfileStat, const String& path)
 {
-#if defined(OVR_OS_WIN32) 
+#if defined(OVR_OS_WIN32)
     // 64-bit implementation on Windows.
     struct __stat64 fileStat;
     // Stat returns 0 for success.

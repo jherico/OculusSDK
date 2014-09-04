@@ -107,7 +107,7 @@ Lock* SharedLock::GetLockAddRef()
 
     do {
         oldUseCount = UseCount;
-        if (oldUseCount == LockInitMarker)
+        if (oldUseCount == (int)LockInitMarker)
             continue;
 
         if (oldUseCount == 0)
@@ -137,7 +137,7 @@ void SharedLock::ReleaseLock(Lock* plock)
 
     do {
         oldUseCount = UseCount;
-        OVR_ASSERT(oldUseCount != LockInitMarker);
+        OVR_ASSERT(oldUseCount != (int)LockInitMarker);
 
         if (oldUseCount == 1)
         {

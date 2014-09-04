@@ -30,6 +30,8 @@ limitations under the License.
 #include "../Kernel/OVR_Lockless.h"
 #include "Tracking_SensorState.h"
 
+#include "../OVR_Profile.h"
+
 namespace OVR { namespace Tracking {
 
 
@@ -42,11 +44,12 @@ class SensorStateReader : public NewOverrideBase
 protected:
 	const CombinedSharedStateUpdater *Updater;
 
-	// Transform from real-world coordinates to centered coordinates
-	Posed CenteredFromWorld;
 
     // Last latency warning time
     mutable double LastLatWarnTime;
+
+    // Transform from real-world coordinates to centered coordinates
+    Posed CenteredFromWorld; 
 
 public:
 	SensorStateReader();
@@ -66,6 +69,9 @@ public:
 
 	// Get the sensor status (same as GetSensorStateAtTime(...).Status)
 	uint32_t     GetStatus() const;
+
+    void LoadProfileCenteredFromWorld(Profile* profile);
+    void SaveProfileCenteredFromWorld(Profile* profile);
 };
 
 

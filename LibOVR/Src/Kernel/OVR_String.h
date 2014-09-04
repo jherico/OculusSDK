@@ -192,6 +192,7 @@ public:
 
     // Returns  number of characters
     size_t      GetLength() const;
+    int         GetLengthI() const      { return (int)GetLength(); }
 
     // Returns  character at the specified index
     uint32_t    GetCharAt(size_t index) const;

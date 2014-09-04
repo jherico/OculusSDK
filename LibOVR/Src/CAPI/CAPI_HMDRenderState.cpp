@@ -62,7 +62,8 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     d.TrackingCaps      = ovrTrackingCap_MagYawCorrection | ovrTrackingCap_Orientation;
     d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp |
                           ovrDistortionCap_Vignette | ovrDistortionCap_SRGB |
-                          ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits;
+                          ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits |
+                          ovrDistortionCap_HqDistortion;
 
     if( OurHMDInfo.InCompatibilityMode )
         d.HmdCaps |= ovrHmdCap_ExtendDesktop;

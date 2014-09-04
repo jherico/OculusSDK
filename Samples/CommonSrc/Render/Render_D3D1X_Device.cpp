@@ -152,17 +152,12 @@ static const char* MultiTexturePixelShaderSrc =
     "float4 color1;\n"
     "float4 color2;\n"
 	"	color1 = Texture[0].Sample(Linear, ov.TexCoord);\n"
-	// go to linear space colors (assume gamma 2.0 for speed)
-    "	color1.rgb *= color1.rgb;\n"
     "	color2 = Texture[1].Sample(Linear, ov.TexCoord1);\n"
-	// go to linear space colors (assume gamma 2.0 for speed)
-	"	color2.rgb *= color2.rgb;\n"
-    "	color2.rgb = color2.rgb * lerp(1.2, 1.9, saturate(length(color2.rgb)));\n"
+    "	color2.rgb = color2.rgb * lerp(1.9, 1.2, saturate(length(color2.rgb)));\n"
     "	color2 = color1 * color2;\n"
     "   if (color2.a <= 0.4)\n"
     "		discard;\n"
-	// go to back to gamma space space colors (assume gamma 2.0 for speed)
-	"	return float4(sqrt(color2.rgb) / color2.a, 1);\n"
+	"	return float4(color2.rgb / color2.a, 1);\n"
     "}\n";
 
 #define LIGHTING_COMMON                 \
@@ -668,31 +663,37 @@ static const char* PostProcessHeightmapTimewarpPixelShaderSrc =
 
 //----------------------------------------------------------------------------
 
-static const char* VShaderSrcs[VShader_Count] =
+struct ShaderSource
 {
-    DirectVertexShaderSrc,
-    StdVertexShaderSrc,
-    PostProcessVertexShaderSrc,
-    PostProcessMeshVertexShaderSrc,
-    PostProcessMeshTimewarpVertexShaderSrc,
-    PostProcessMeshPositionalTimewarpVertexShaderSrc,
-    PostProcessHeightmapTimewarpVertexShaderSrc
+    const char* ShaderModel;
+    const char* SourceStr;
 };
-static const char* FShaderSrcs[FShader_Count] =
+
+static ShaderSource VShaderSrcs[VShader_Count] =
 {
-    SolidPixelShaderSrc,
-    GouraudPixelShaderSrc,
-    TexturePixelShaderSrc,
-	AlphaTexturePixelShaderSrc,
-	AlphaBlendedTexturePixelShaderSrc,
-    PostProcessPixelShaderWithChromAbSrc,
-    LitSolidPixelShaderSrc,
-    LitTexturePixelShaderSrc,
-    MultiTexturePixelShaderSrc,
-    PostProcessMeshPixelShaderSrc,
-    PostProcessMeshTimewarpPixelShaderSrc,
-    PostProcessMeshPositionalTimewarpPixelShaderSrc,
-    PostProcessHeightmapTimewarpPixelShaderSrc
+    {"vs_4_0", DirectVertexShaderSrc},
+    {"vs_4_0", StdVertexShaderSrc},
+    {"vs_4_0", PostProcessVertexShaderSrc},
+    {"vs_4_0", PostProcessMeshVertexShaderSrc},
+    {"vs_4_0", PostProcessMeshTimewarpVertexShaderSrc},
+    {"vs_4_1", PostProcessMeshPositionalTimewarpVertexShaderSrc},
+    {"vs_4_1", PostProcessHeightmapTimewarpVertexShaderSrc},
+};
+static ShaderSource FShaderSrcs[FShader_Count] =
+{
+    {"ps_4_0", SolidPixelShaderSrc},
+    {"ps_4_0", GouraudPixelShaderSrc},
+    {"ps_4_0", TexturePixelShaderSrc},
+	{"ps_4_0", AlphaTexturePixelShaderSrc},
+	{"ps_4_0", AlphaBlendedTexturePixelShaderSrc},
+    {"ps_4_0", PostProcessPixelShaderWithChromAbSrc},
+    {"ps_4_0", LitSolidPixelShaderSrc},
+    {"ps_4_0", LitTexturePixelShaderSrc},
+    {"ps_4_0", MultiTexturePixelShaderSrc},
+    {"ps_4_0", PostProcessMeshPixelShaderSrc},
+    {"ps_4_0", PostProcessMeshTimewarpPixelShaderSrc},
+    {"ps_4_0", PostProcessMeshPositionalTimewarpPixelShaderSrc},
+    {"ps_4_0", PostProcessHeightmapTimewarpPixelShaderSrc},
 };
 
 #ifdef OVR_BUILD_DEBUG
@@ -706,7 +707,7 @@ static void ReportCOMError(HRESULT hr, const char* file, int line)
 
         if (sizeof(TCHAR) == sizeof(char))
         {
-            LogError("[D3D] Error in %s on line %d : %s", file, line, errMsg);
+            LogError("{ERR-017w} [D3D] Error in %s on line %d : %s", file, line, errMsg);
         }
         else
         {
@@ -719,7 +720,7 @@ static void ReportCOMError(HRESULT hr, const char* file, int line)
                 len = count;
             }
             data[len] = '\0';
-            LogError("[D3D] Error in %s on line %d : %s", file, line, data);
+            LogError("{ERR-018w} [D3D] Error in %s on line %d : %s", file, line, data);
             delete[] data;
         }
 
@@ -825,7 +826,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 	if (FAILED(hr))
 	{
         OVR_LOG_COM_ERROR(hr);
-        LogError("[D3D1X] Unable to create device: %x", hr);
+        LogError("{ERR-019w} [D3D1X] Unable to create device: %x", hr);
         OVR_ASSERT(false);
 		return;
 	}
@@ -843,12 +844,14 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
         MaxTextureSet[i] = 0;
     }
 
-    ID3D10Blob* vsData = CompileShader("vs_4_1", DirectVertexShaderSrc);
+    ID3D10Blob* vsData = CompileShader(VShaderSrcs[0].ShaderModel, VShaderSrcs[0].SourceStr);
+
     VertexShaders[VShader_MV] = *new VertexShader(this, vsData);
     for(int i = 1; i < VShader_Count; i++)
     {
-        OVR_ASSERT ( VShaderSrcs[i] != NULL );      // You forgot a shader!
-        ID3D10Blob *pShader = CompileShader("vs_4_1", VShaderSrcs[i]);
+        OVR_ASSERT ( VShaderSrcs[i].SourceStr != NULL );      // You forgot a shader!
+        ID3D10Blob *pShader = CompileShader(VShaderSrcs[i].ShaderModel, VShaderSrcs[i].SourceStr);
+
         VertexShaders[i] = NULL;
         if ( pShader != NULL )
         {
@@ -858,8 +861,9 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     for(int i = 0; i < FShader_Count; i++)
     {
-        OVR_ASSERT ( FShaderSrcs[i] != NULL );      // You forgot a shader!
-        ID3D10Blob *pShader = CompileShader("ps_4_1", FShaderSrcs[i]);
+        OVR_ASSERT ( FShaderSrcs[i].SourceStr != NULL );      // You forgot a shader!
+        ID3D10Blob *pShader = CompileShader(FShaderSrcs[i].ShaderModel, FShaderSrcs[i].SourceStr);
+
         PixelShaders[i] = NULL;
         if ( pShader != NULL )
         {
@@ -2083,19 +2087,11 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         unsigned effectiveMipCount = mipcount;
         unsigned textureSize       = 0;
 
-#ifdef OVR_DEFINE_NEW
-#undef new
-#endif
-
         D3D1x_(SUBRESOURCE_DATA)* subresData = (D3D1x_(SUBRESOURCE_DATA)*)
                                                 OVR_ALLOC(sizeof(D3D1x_(SUBRESOURCE_DATA)) * mipcount);
         GenerateSubresourceData(width, height, convertedFormat, imageDimUpperLimit, data, subresData, largestMipWidth,
                                 largestMipHeight, textureSize, effectiveMipCount);
         TotalTextureMemoryUsage += textureSize;
-
-#ifdef OVR_DEFINE_NEW
-#define new OVR_DEFINE_NEW
-#endif
 
         if (!Device || !subresData)
         {
@@ -2520,6 +2516,9 @@ size_t RenderDevice::QueryGPUMemorySize()
     {
         OVR_LOG_COM_ERROR(hr);
     }
+
+	pDXGIAdapter->Release();
+	pDXGIDevice->Release();
     return adapterDesc.DedicatedVideoMemory;
 }
 
@@ -2550,9 +2549,14 @@ void RenderDevice::Present ( bool withVsync )
     }
 }
 
+void RenderDevice::Flush()
+{
+    Context->Flush();
+}
+
 void RenderDevice::WaitUntilGpuIdle()
 {
-#if 1
+#if 0
 	// If enabling this option and using an NVIDIA GPU,
 	// then make sure your "max pre-rendered frames" is set to 1 under the NVIDIA GPU settings.
 

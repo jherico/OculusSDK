@@ -50,14 +50,15 @@ public:
     DistortionRenderer(ovrRenderAPIType api, ovrHmd hmd,
                        FrameTimeManager& timeManager,              
                        const HMDRenderState& renderState) :
+		LastUsedOverdriveTextureIndex(-1),
+        LatencyTestActive(false),
+        LatencyTest2Active(false),
         RenderAPI(api),
         HMD(hmd),
         TimeManager(timeManager),
         RState(renderState),
-        RegisteredPostDistortionCallback(NULL),
-		LastUsedOverdriveTextureIndex(-1),
-        LatencyTestActive(false),
-        LatencyTest2Active(false)
+        GfxState(),
+        RegisteredPostDistortionCallback(NULL)
     {
 #ifdef OVR_OS_WIN32
         timer = CreateWaitableTimer(NULL, TRUE, NULL);

@@ -26,8 +26,6 @@ limitations under the License.
 
 #include "../../Kernel/OVR_Types.h"
 
-#undef new
-
 #if defined (OVR_OS_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #if _MSC_VER < 1700

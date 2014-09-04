@@ -111,7 +111,7 @@ template<class T> OVR::AtomicPtr<T> OVR::SystemSingletonBase<T>::SingletonInstan
     friend class OVR::SystemSingletonBase<T>; \
 private: \
     T(); \
-    ~T(); \
+    virtual ~T(); \
     virtual void OnSystemDestroy();
 
 // Place this in the singleton class source file

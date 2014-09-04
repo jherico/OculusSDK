@@ -75,6 +75,4 @@ void RenderFocusReader::OnSystemDestroy()
 }
 
 
-
-
 }} // namespace OVR::Win32
