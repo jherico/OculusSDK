@@ -6,16 +6,16 @@ Content     :   String UTF8 string implementation with copy-on-write semantics
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -284,8 +284,10 @@ void    String::operator = (const char* pstr)
 
 void    String::operator = (const wchar_t* pwstr)
 {
+    pwstr = pwstr ? pwstr : L"";
+
     DataDesc*   poldData = GetData();
-    size_t      size = pwstr ? (size_t)UTF8Util::GetEncodeStringSize(pwstr) : 0;
+    size_t      size = (size_t)UTF8Util::GetEncodeStringSize(pwstr);
 
     DataDesc*   pnewData = AllocData(size, 0);
     UTF8Util::EncodeString(pnewData->Data, pwstr);
@@ -673,13 +675,14 @@ void     StringBuffer::AppendChar(uint32_t ch)
     
     size_t size = origSize + srcSize;
     Resize(size);
+    OVR_ASSERT(pData != NULL);
     memcpy(pData + origSize, buff, srcSize);
 }
 
 // Append a string
 void     StringBuffer::AppendString(const wchar_t* pstr, intptr_t len)
 {
-    if (!pstr)
+    if (!pstr || !len)
         return;
 
     intptr_t srcSize  = UTF8Util::GetEncodeStringSize(pstr, len);
@@ -687,6 +690,7 @@ void     StringBuffer::AppendString(const wchar_t* pstr, intptr_t len)
     size_t   size     = srcSize + origSize;
 
     Resize(size);
+    OVR_ASSERT(pData != NULL);
     UTF8Util::EncodeString(pData + origSize,  pstr, len);
 }
 
@@ -701,30 +705,36 @@ void      StringBuffer::AppendString(const char* putf8str, intptr_t utf8StrSz)
     size_t  size     = utf8StrSz + origSize;
 
     Resize(size);
+    OVR_ASSERT(pData != NULL);
     memcpy(pData + origSize, putf8str, utf8StrSz);
 }
 
-
+// If pstr is NULL then the StringBuffer is cleared.
 void      StringBuffer::operator = (const char* pstr)
 {
     pstr = pstr ? pstr : "";
     size_t size = OVR_strlen(pstr);
     Resize(size);
+    OVR_ASSERT((pData != NULL) || (size == 0));
     memcpy(pData, pstr, size);
 }
 
+// If pstr is NULL then the StringBuffer is cleared.
 void      StringBuffer::operator = (const wchar_t* pstr)
 {
     pstr = pstr ? pstr : L"";
     size_t size = (size_t)UTF8Util::GetEncodeStringSize(pstr);
     Resize(size);
+    OVR_ASSERT((pData != NULL) || (size == 0));
     UTF8Util::EncodeString(pData, pstr);
 }
 
 void      StringBuffer::operator = (const String& src)
 {
-    Resize(src.GetSize());
-    memcpy(pData, src.ToCStr(), src.GetSize());
+    const size_t size = src.GetSize();
+    Resize(size);
+    OVR_ASSERT((pData != NULL) || (size == 0));
+    memcpy(pData, src.ToCStr(), size);
 }
 
 void      StringBuffer::operator = (const StringBuffer& src)
@@ -745,6 +755,7 @@ void      StringBuffer::Insert(const char* substr, size_t posAt, intptr_t len)
     OVR_ASSERT(byteIndex <= oldSize);
     Reserve(oldSize + insertSize);
 
+    OVR_ASSERT(pData != NULL); // pData is unilaterally written to below.
     memmove(pData + byteIndex + insertSize, pData + byteIndex, oldSize - byteIndex + 1);
     memcpy (pData + byteIndex, substr, insertSize);
     LengthIsSize = false;

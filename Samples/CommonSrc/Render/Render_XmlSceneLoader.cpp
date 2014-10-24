@@ -5,7 +5,7 @@ Content     :   Imports and exports XML files - implementation
 Created     :   January 21, 2013
 Authors     :   Robotic Arm Software - Peter Hoff, Dan Goodman, Bryan Croteau
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,12 @@ limitations under the License.
 
 namespace OVR { namespace Render {
 
-XmlHandler::XmlHandler() : pXmlDocument(NULL)
+XmlHandler::XmlHandler() :
+    pXmlDocument(NULL),
+    textureCount(0),
+    modelCount(0),
+    collisionModelCount(0),
+    groundCollisionModelCount(0)
 {
     pXmlDocument = new tinyxml2::XMLDocument();
 }
@@ -63,6 +68,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     // Load the textures
 	OVR_DEBUG_LOG_TEXT(("Loading textures..."));
     XMLElement* pXmlTexture = pXmlDocument->FirstChildElement("scene")->FirstChildElement("textures");
+    OVR_ASSERT(pXmlTexture);
     if (pXmlTexture)
     {
         pXmlTexture->QueryIntAttribute("count", &textureCount);
@@ -299,61 +305,68 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     {
         Ptr<CollisionModel> cm = *new CollisionModel();
         int planeCount = 0;
-        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
-
-        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-        for(int j = 0; j < planeCount; ++j)
+        
+        OVR_ASSERT(pXmlCollisionModel != NULL); // collisionModelCount should guarantee this.
+        if (pXmlCollisionModel)
         {
-            Vector3f norm;
-            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
-            float D;
-            pXmlPlane->QueryFloatAttribute("d", &D);
-            D -= 0.5f;
-            if (i == 26)
-                D += 0.5f;  // tighten the terrace collision so player can move right up to rail
-            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-            cm->Add(p);
-            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-        }
+            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pCollisions->PushBack(cm);
-        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+            for(int j = 0; j < planeCount; ++j)
+            {
+                Vector3f norm;
+                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+                float D;
+                pXmlPlane->QueryFloatAttribute("d", &D);
+                D -= 0.5f;
+                if (i == 26)
+                    D += 0.5f;  // tighten the terrace collision so player can move right up to rail
+                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+                cm->Add(p);
+                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
+            }
+
+            pCollisions->PushBack(cm);
+            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+        }
     }
 	OVR_DEBUG_LOG(("done."));
 
     //load the ground collision models
 	OVR_DEBUG_LOG(("Loading ground collision models..."));
     pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("groundCollisionModels");
+    OVR_ASSERT(pXmlCollisionModel);
     if (pXmlCollisionModel)
     {
 		pXmlCollisionModel->QueryIntAttribute("count", &groundCollisionModelCount);
         pXmlCollisionModel = pXmlCollisionModel->FirstChildElement("collisionModel");
-    }
-    pXmlPlane = NULL;
-    for(int i = 0; i < groundCollisionModelCount; ++i)
-    {
-        Ptr<CollisionModel> cm = *new CollisionModel();
-        int planeCount = 0;
-        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-        for(int j = 0; j < planeCount; ++j)
+        pXmlPlane = NULL;
+        for (int i = 0; i < groundCollisionModelCount; ++i)
         {
-            Vector3f norm;
-            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
-            float D;
-            pXmlPlane->QueryFloatAttribute("d", &D);
-            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-            cm->Add(p);
-            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-        }
+            Ptr<CollisionModel> cm = *new CollisionModel();
+            int planeCount = 0;
+            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pGroundCollisions->PushBack(cm);
-        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+            for (int j = 0; j < planeCount; ++j)
+            {
+                Vector3f norm;
+                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+                float D = 0.f;
+                pXmlPlane->QueryFloatAttribute("d", &D);
+                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+                cm->Add(p);
+                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
+            }
+
+            pGroundCollisions->PushBack(cm);
+            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+        }
     }
 	OVR_DEBUG_LOG(("done."));
 	return true;

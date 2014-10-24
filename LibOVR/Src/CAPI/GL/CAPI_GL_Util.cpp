@@ -1,19 +1,22 @@
 /************************************************************************************
 
-Filename    :   Render_GL_Device.cpp
+Filename    :   CAPI_GL_Util.cpp
 Content     :   RenderDevice implementation for OpenGL
 Created     :   September 10, 2012
 Authors     :   David Borel, Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
+otherwise accompanies this software in either electronic or hard copy form.
+
 You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
-Unless required by applicable law or agreed to in writing, software
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -24,6 +27,21 @@ limitations under the License.
 #include "CAPI_GL_Util.h"
 #include "../../Kernel/OVR_Log.h"
 #include <string.h>
+
+#if defined(OVR_OS_LINUX)
+ #include "../../Displays/OVR_Linux_SDKWindow.h"
+#endif
+
+#if defined(OVR_OS_MAC)
+
+typedef void *CGSConnectionID;
+typedef int32_t CGSWindowID;
+typedef int32_t CGSSurfaceID;
+
+extern "C" CGLError CGLGetSurface(CGLContextObj ctx, CGSConnectionID *cid, CGSWindowID *wid, CGSSurfaceID *sid);
+extern "C" CGLError CGLSetSurface(CGLContextObj ctx, CGSConnectionID cid, CGSWindowID wid, CGSSurfaceID sid);
+
+#endif
 
 namespace OVR { namespace CAPI { namespace GL {
 
@@ -66,6 +84,12 @@ PFNGLPOLYGONMODEPROC                     glPolygonMode;
 
 PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
 PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
+PFNWGLGETCURRENTDCPROC                   wglGetCurrentDC;
+PFNWGLGETCURRENTCONTEXTPROC              wglGetCurrentContext;
+PFNWGLCREATECONTEXTPROC                  wglCreateContext;
+PFNWGLDELETECONTEXTPROC                  wglDeleteContext;
+PFNWGLSHARELISTSPROC                     wglShareLists;
+PFNWGLMAKECURRENTPROC                    wglMakeCurrent;
 
 #elif defined(OVR_OS_LINUX)
 
@@ -125,6 +149,8 @@ PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
 PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
 PFNGLBLENDFUNCSEPARATEPROC               glBlendFuncSeparate;
+PFNGLBLITFRAMEBUFFEREXTPROC              glBlitFramebuffer;
+PFNGLDRAWBUFFERSPROC                     glDrawBuffers;
 
 
 #if defined(OVR_OS_WIN32)
@@ -183,6 +209,12 @@ void InitGLExtensions()
 	glPolygonMode =                     (PFNGLPOLYGONMODEPROC)                     GetProcAddress(hInst, "glPolygonMode");
 
     wglGetProcAddress =                 (PFNWGLGETPROCADDRESS)                     GetProcAddress(hInst, "wglGetProcAddress");
+	wglGetCurrentDC =                   (PFNWGLGETCURRENTDCPROC)                   GetProcAddress(hInst, "wglGetCurrentDC");
+	wglGetCurrentContext =              (PFNWGLGETCURRENTCONTEXTPROC)              GetProcAddress(hInst, "wglGetCurrentContext");
+	wglCreateContext =                  (PFNWGLCREATECONTEXTPROC)                  GetProcAddress(hInst, "wglCreateContext");
+	wglDeleteContext =                  (PFNWGLDELETECONTEXTPROC)                  GetProcAddress(hInst, "wglDeleteContext");
+	wglShareLists =                     (PFNWGLSHARELISTSPROC)                     GetProcAddress(hInst, "wglShareLists");
+	wglMakeCurrent =                    (PFNWGLMAKECURRENTPROC)                    GetProcAddress(hInst, "wglMakeCurrent");
 
     wglGetSwapIntervalEXT =             (PFNWGLGETSWAPINTERVALEXTPROC)             GetFunction("wglGetSwapIntervalEXT");
     wglSwapIntervalEXT =                (PFNWGLSWAPINTERVALEXTPROC)                GetFunction("wglSwapIntervalEXT");
@@ -244,6 +276,8 @@ void InitGLExtensions()
     glBindAttribLocation =              (PFNGLBINDATTRIBLOCATIONPROC)              GetFunction("glBindAttribLocation");
     glGetAttribLocation =               (PFNGLGETATTRIBLOCATIONPROC)               GetFunction("glGetAttribLocation");
     glBlendFuncSeparate =               (PFNGLBLENDFUNCSEPARATEPROC)               GetFunction("glBlendFuncSeparate");
+    glBlitFramebuffer =                 (PFNGLBLITFRAMEBUFFEREXTPROC)              GetFunction("glBlitFramebufferEXT");
+    glDrawBuffers =                     (PFNGLDRAWBUFFERSPROC)                     GetFunction("glDrawBuffers");
 }
     
 #endif
@@ -729,5 +763,158 @@ void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo)
     // To consider: Call to glGetStringi(GL_SHADING_LANGUAGE_VERSION, ...) check/validate the GLSL support.
 }
 
+
+Context::Context() : initialized(false), ownsContext(true), incarnation(0)
+{
+#if defined(OVR_OS_MAC)
+    systemContext = 0;
+#elif defined(OVR_OS_WIN32)
+    hdc = 0;
+    systemContext = 0;
+#elif defined(OVR_OS_LINUX)
+    x11Display = 0;
+    x11Drawable = 0;
+    systemContext = 0;
+#endif
+
+}
+
+void Context::InitFromCurrent()
+{
+    Destroy();
+
+    initialized = true;
+    ownsContext = false;
+    incarnation++;
+    
+#if defined(OVR_OS_MAC)
+    systemContext = CGLGetCurrentContext();
+        {
+        CGSConnectionID cid;
+        CGSWindowID wid;
+        CGSSurfaceID sid;
+        CGLError e  = kCGLNoError;
+        e = CGLGetSurface(systemContext, &cid, &wid, &sid);
+        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    }
+
+#elif defined(OVR_OS_WIN32)
+    hdc = wglGetCurrentDC();
+    systemContext = wglGetCurrentContext();
+#elif defined(OVR_OS_LINUX)
+    x11Display = glXGetCurrentDisplay();
+    x11Drawable = glXGetCurrentDrawable();
+    systemContext = glXGetCurrentContext();
+    if (!SDKWindow::getVisualFromDrawable(x11Drawable, &x11Visual))
+    {
+        OVR::LogError("[Context] Unable to obtain x11 visual from context");
+    }
+#endif
+}
+
+
+void Context::CreateShared( Context & ctx )
+{
+    Destroy();
+    OVR_ASSERT( ctx.initialized == true );
+    if( ctx.initialized == false )
+    {
+        return;
+    }
+
+    initialized = true;
+    ownsContext = true;
+    incarnation++;
+    
+#if defined(OVR_OS_MAC)
+    CGLPixelFormatObj pixelFormat = CGLGetPixelFormat( ctx.systemContext );
+    CGLError e = CGLCreateContext( pixelFormat, ctx.systemContext, &systemContext );
+    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    SetSurface(ctx);
+#elif defined(OVR_OS_WIN32)
+    hdc = ctx.hdc;
+    systemContext = wglCreateContext( ctx.hdc );
+    BOOL success = wglShareLists(ctx.systemContext, systemContext );
+    OVR_ASSERT( success == TRUE );
+    OVR_UNUSED(success);
+#elif defined(OVR_OS_LINUX)
+    x11Display = ctx.x11Display;
+    x11Drawable = ctx.x11Drawable;
+    x11Visual = ctx.x11Visual;
+    systemContext = glXCreateContext( ctx.x11Display, &x11Visual, ctx.systemContext, True );
+    OVR_ASSERT( systemContext != NULL );
+#endif
+}
+
+#if defined(OVR_OS_MAC)
+void Context::SetSurface( Context & ctx ) {
+    CGLError e = kCGLNoError;
+    CGSConnectionID cid, cid2;
+    CGSWindowID wid, wid2;
+    CGSSurfaceID sid, sid2;
+    
+
+    
+    e = CGLGetSurface(ctx.systemContext, &cid, &wid, &sid);
+    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    e = CGLGetSurface(systemContext, &cid2, &wid2, &sid2);
+    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    if( sid && sid != sid2 ) {
+        e = CGLSetSurface(systemContext, cid, wid, sid);
+        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    }
+}
+#endif
+
+void Context::Destroy()
+{
+    if( initialized == false )
+    {
+        return;
+    }
+  
+    if( ownsContext )
+    {
+#if defined(OVR_OS_MAC)
+        CGLDestroyContext( systemContext );
+#elif defined(OVR_OS_WIN32)
+        BOOL success = wglDeleteContext( systemContext );
+		OVR_ASSERT( success == TRUE );
+        OVR_UNUSED( success );
+#elif defined(OVR_OS_LINUX)
+        glXDestroyContext( x11Display, systemContext );
+#endif
+        systemContext = NULL;
+    }
+  
+  initialized = false;
+  ownsContext = true;
+  
+  
+}
+
+void Context::Bind()
+{
+#if defined(OVR_OS_MAC)
+    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
+    CGLSetCurrentContext( systemContext );
+#elif defined(OVR_OS_WIN32)
+    wglMakeCurrent( hdc, systemContext );
+#elif defined(OVR_OS_LINUX)
+    glXMakeCurrent( x11Display, x11Drawable, systemContext );
+#endif
+}
+
+void Context::Unbind()
+{
+#if defined(OVR_OS_MAC)
+    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
+    CGLSetCurrentContext( NULL );
+#elif defined(OVR_OS_WIN32)
+    wglMakeCurrent( hdc, NULL );
+#elif defined(OVR_OS_LINUX)
+    glXMakeCurrent( x11Display, None, NULL );
+#endif
+}
 
 }}} // namespace OVR::CAPI::GL

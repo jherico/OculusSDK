@@ -5,7 +5,7 @@ Content     :   Win32 implementation of Platform app infrastructure
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,9 +39,11 @@ namespace OVR { namespace OvrPlatform { namespace Win32 {
 
 
 PlatformCore::PlatformCore(Application* app, HINSTANCE hinst)
-  : OvrPlatform::PlatformCore(app), hWnd(NULL), hInstance(hinst), Quit(0), MMode(Mouse_Normal),
-    Cursor(0), Modifiers(0), WindowTitle("App")
+  : OvrPlatform::PlatformCore(app), hWnd(NULL), hInstance(hinst), Quit(false), ExitCode(0), Width(0), Height(0), MMode(Mouse_Normal),
+    /*WindowCenter,*/ Cursor(NULL), Modifiers(0), WindowTitle("App")
 {
+    WindowCenter.x = 0;
+    WindowCenter.y = 0;
     pGamepadManager = *new Win32::GamepadManager();
 }
 
@@ -49,17 +51,24 @@ PlatformCore::~PlatformCore()
 {
 }
 
+static LPCWSTR WindowClassName = L"OVRPlatAppWindow";
+
 void* PlatformCore::SetupWindow(int w, int h)
 {
-    WNDCLASS wc;
+    WNDCLASSW wc;
     memset(&wc, 0, sizeof(wc));
-    wc.lpszClassName = L"OVRAppWindow";
+    wc.lpszClassName = WindowClassName;
     wc.style         = CS_OWNDC;
     wc.lpfnWndProc   = systemWindowProc;
     wc.cbWndExtra    = sizeof(PlatformCore*);
     wc.hbrBackground = (HBRUSH)::GetStockObject(BLACK_BRUSH);
 
-    RegisterClass(&wc);
+    RegisterClassW(&wc);
+
+    Array<wchar_t> buffer;
+    intptr_t       textLength = UTF8Util::GetLength(WindowTitle);
+    buffer.Resize(textLength + 1);
+    UTF8Util::DecodeString(&buffer[0], WindowTitle);
 
     Width = w;
     Height = h;
@@ -69,7 +78,7 @@ void* PlatformCore::SetupWindow(int w, int h)
     winSize.bottom = Height;
     AdjustWindowRect(&winSize, WS_OVERLAPPEDWINDOW, false);
     // WS_CLIPCHILDREN is needed to support NotificationOverlay.
-    hWnd = CreateWindowA("OVRAppWindow", WindowTitle.ToCStr(), WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,
+    hWnd = CreateWindowW(WindowClassName, &buffer[0], WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                           CW_USEDEFAULT, CW_USEDEFAULT,
                         //  1950, 10,
                           winSize.right-winSize.left, winSize.bottom-winSize.top,
@@ -103,7 +112,7 @@ void PlatformCore::DestroyWindow()
 
     // Release window resources.
     ::DestroyWindow(hWnd);
-    UnregisterClass(L"OVRAppWindow", hInstance);
+    UnregisterClassW(WindowClassName, hInstance);
     hWnd = 0;
     Width = Height = 0;
 
@@ -477,7 +486,7 @@ struct MonitorSet
 BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 {
     MonitorSet* monitorSet = (MonitorSet*)dwData;
-    if (monitorSet->MonitorCount > MonitorSet::MaxMonitors)
+    if (monitorSet->MonitorCount >= MonitorSet::MaxMonitors)
         return FALSE;
 
     monitorSet->Monitors[monitorSet->MonitorCount] = hMonitor;
@@ -594,19 +603,19 @@ NotificationOverlay::NotificationOverlay(PlatformCore* core, int fontHeightPixel
 
     // Create a static, centered TextField of specified font size.
 
-    hFont= CreateFont(fontHeightPixels, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET,
+    hFont= CreateFontA(fontHeightPixels, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET,
                       OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                      DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
+                      DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, "Arial");
 
     HDC   dc = ::CreateCompatibleDC(0);
     ::SelectObject(dc, hFont);
     TextSize.cx = TextSize.cy = 0;
-    ::GetTextExtentPoint32(dc, &buffer[0], (int)textLength, &TextSize);
+    ::GetTextExtentPoint32W(dc, &buffer[0], (int)textLength, &TextSize);
     ::DeleteDC(dc);
 
     int vpos = (YOffest > 0) ? YOffest : (pCore->Height + YOffest - (TextSize.cy + 7));
 
-    hWnd = CreateWindowEx(WS_EX_CLIENTEDGE, TEXT("STATIC"),
+    hWnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"STATIC",
                           &buffer[0], WS_CHILD|WS_VISIBLE|SS_CENTER|WS_CLIPSIBLINGS,
                           (core->Width-TextSize.cx+20)/2, vpos,
                           TextSize.cx+20, TextSize.cy + 7,

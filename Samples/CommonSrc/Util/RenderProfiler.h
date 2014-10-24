@@ -5,7 +5,7 @@ Content     :   Profiling for render.
 Created     :   March 10, 2014
 Authors     :   Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,10 +43,10 @@ public:
         Sample_FrameStart            ,
         Sample_AfterGameProcessing   ,
         Sample_AfterEyeRender        ,
-     //   Sample_BeforeDistortion      ,
-     //   Sample_AfterDistortion       ,
+      //Sample_BeforeDistortion      ,
+      //Sample_AfterDistortion       ,
         Sample_AfterPresent          ,
-     //   Sample_AfterFlush            ,
+      //Sample_AfterFlush            ,
 
         Sample_LAST
     };

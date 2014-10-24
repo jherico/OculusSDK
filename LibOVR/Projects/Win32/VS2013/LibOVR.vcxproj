@@ -24,15 +24,17 @@
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.h" />
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDState.h" />
     <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_LatencyStatistics.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_DistortionRenderer.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_HSWDisplay.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_HSWDisplay.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_DistortionRenderer.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_Util.h" />
-    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_DistortionRenderer.h" />
-    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.h" />
     <ClInclude Include="..\..\..\Src\CAPI\Textures\healthAndSafety.tga.h" />
@@ -97,6 +99,7 @@
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_SystemInfo.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.cpp" />
@@ -104,6 +107,7 @@
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDState.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_LatencyStatistics.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_DistortionRenderer.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_HSWDisplay.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.cpp" />
@@ -120,9 +124,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_DistortionRenderer.cpp" />
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_HSWDisplay.cpp" />
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp" />
@@ -170,88 +174,32 @@
     <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp" />
+    <ClCompile Include="..\..\..\Src\Util\Util_SystemInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_ps.psh">
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_ps.psh">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_vs.vsh">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionTimewarpChroma_vs.vsh">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionTimewarp_vs.vsh">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\Distortion_ps.psh">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\Distortion_vs.vsh">
-      <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
-    </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleQuad_ps.psh">
-      <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_vs.vsh">
+      <FileType>Document</FileType>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
     </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleQuad_vs.vsh">
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarpChroma_vs.vsh">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
@@ -262,29 +210,82 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh">
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarp_vs.vsh">
       <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_ps.psh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_vs.vsh">
+      <FileType>Document</FileType>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh">
-      <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_ps.psh">
+      <FileType>Document</FileType>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_ps.psh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
     </CustomBuild>
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -5,16 +5,16 @@ Content     :   Implements Health and Safety Warning system.
 Created     :   July 3, 2014
 Authors     :   Paul Pedriana
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -160,9 +160,11 @@ public:
     void Display();
 
     // This function should be called per HMD every frame in order to give this class processing time. 
-    // Returns the new state if newHSWDisplayState is non-NULL. Returns true if the new state results
-    // in a required warning display (ovrHSWDisplayState::Displayed became true).
-    bool TickState(ovrHSWDisplayState *newHSWDisplayState = NULL);
+    // Writes the new state to newHSWDisplayState if it's non-NULL.
+    // The graphicsContext argument indicates if the Tick is occurring within a graphics context and
+    // thus if graphics operations are allowed during the TickState call.
+    // Returns true if the new state results in a required warning display (ovrHSWDisplayState::Displayed became true).
+    bool TickState(ovrHSWDisplayState *newHSWDisplayState = NULL, bool graphicsContext = false);
 
     // Gets the current state of the HSW display. 
     // Corresponds to ovrhmd_GetHSWDisplayState.
@@ -204,6 +206,8 @@ protected:
     virtual void DisplayInternal() {}
     virtual void DismissInternal() {}
     virtual void RenderInternal(ovrEyeType, const ovrTexture*) {}
+    virtual void UnloadGraphics() {}
+    virtual void LoadGraphics() {}
 
     // Profile functionality
     time_t GetCurrentProfileLastHSWTime() const;
@@ -216,20 +220,20 @@ protected:
     static const uint8_t* GetDefaultTexture(size_t& TextureSize);
 
 protected:
-    bool                   Enabled;            // If true then the HSW display system is enabled. True by default. 
-    bool                   Displayed;          // If true then the warning is currently visible and the following variables have meaning. Else there is no warning being displayed for this application on the given HMD.
-    bool                   SDKRendered;        // If true then the display is being rendered by the SDK as opposed to the application. 
-    bool                   DismissRequested;   // If true then the warning has been requested to be hidden.
-    bool                   RenderEnabled;      // If true then we handle rendering when Render is called. Else we skip it and assume the application is otherwise handling it itself.
-    double                 StartTime;          // Absolute time when the warning was first displayed. See ovr_GetTimeInSeconds().
-    double                 DismissibleTime;    // Absolute time when the warning can be dismissed.
-    double                 LastPollTime;       // Used to prevent us from polling the required display state every frame but rather more like every 200 milliseconds.
-    const ovrHmd           HMD;                // The HMDState this HSWDisplay instance corresponds to.
-    mutable bool           HMDMounted;         // True if the HMD was most recently found to be mounted. We need this in order to maintain HMDNewlyMounted.
-    mutable bool           HMDNewlyMounted;    // True if HMDMounted has transitioned from false to true. We need this in order to tell if the HMD was recently mounted so we can display the HSW display.
-    bool                   EventMode;          // True if the application is being run in Event Mode, which means it's running at a trade show or similar public demo.
-    const ovrRenderAPIType RenderAPIType;      // e.g. ovrRenderAPI_D3D11
-    const HMDRenderState&  RenderState;        // Information about the rendering setup.
+    bool                   Enabled;                 // If true then the HSW display system is enabled. True by default.
+    bool                   Displayed;               // If true then the warning is currently visible and the following variables have meaning. Else there is no warning being displayed for this application on the given HMD.
+    bool                   SDKRendered;             // If true then the display is being rendered by the SDK as opposed to the application.
+    bool                   DismissRequested;        // If true then the warning has been requested to be hidden.
+    bool                   RenderEnabled;           // If true then we handle rendering when Render is called. Else we skip it and assume the application is otherwise handling it itself.
+    bool                   UnloadGraphicsRequested; // If true then an unload of graphics was requested. This acts as a message from the main thread to the drawing thread so that the unload happens in the expected thread.
+    double                 StartTime;               // Absolute time when the warning was first displayed. See ovr_GetTimeInSeconds().
+    double                 DismissibleTime;         // Absolute time when the warning can be dismissed.
+    double                 LastPollTime;            // Used to prevent us from polling the required display state every frame but rather more like every 200 milliseconds.
+    const ovrHmd           HMD;                     // The HMDState this HSWDisplay instance corresponds to.
+    mutable bool           HMDMounted;              // True if the HMD was most recently found to be mounted. We need this in order to maintain HMDNewlyMounted.
+    mutable bool           HMDNewlyMounted;         // True if HMDMounted has transitioned from false to true. We need this in order to tell if the HMD was recently mounted so we can display the HSW display.
+    const ovrRenderAPIType RenderAPIType;           // e.g. ovrRenderAPI_D3D11
+    const HMDRenderState&  RenderState;             // Information about the rendering setup.
 
     // Settings cache
     mutable String         LastProfileName;

@@ -30,9 +30,6 @@
     <ClInclude Include="..\..\..\RenderTiny_D3D11_Device.h">
       <Filter>Util</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\HSWDisplay_Util.h">
-      <Filter>Util</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h">
       <Filter>CommonSrc</Filter>
     </ClInclude>

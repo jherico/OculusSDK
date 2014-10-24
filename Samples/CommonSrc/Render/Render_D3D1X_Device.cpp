@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation  for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ limitations under the License.
 
 #include "Render_D3D1X_Device.h"
 #include "Util/Util_ImageWindow.h"
+#include "Kernel/OVR_Log.h"
 
 #include "OVR_CAPI_D3D.h"
 
@@ -711,6 +712,7 @@ static void ReportCOMError(HRESULT hr, const char* file, int line)
         }
         else
         {
+#ifdef _UNICODE
             size_t len = wcslen(errMsg);
             char* data = new char[len + 1];
             size_t count = len;
@@ -720,8 +722,13 @@ static void ReportCOMError(HRESULT hr, const char* file, int line)
                 len = count;
             }
             data[len] = '\0';
+#else
+            const char* data = errMsg;
+#endif
             LogError("{ERR-018w} [D3D] Error in %s on line %d : %s", file, line, data);
+#ifdef _UNICODE
             delete[] data;
+#endif
         }
 
         OVR_ASSERT(false);
@@ -737,15 +744,55 @@ static void ReportCOMError(HRESULT hr, const char* file, int line)
 
 #endif
 
-RenderDevice::RenderDevice(const RendererParams& p, HWND window)
+
+RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
+    DXGIFactory(),
+    Window(window),
+    Device(),
+    Context(),
+    SwapChain(),
+    Adapter(),
+    FullscreenOutput(),
+    FSDesktopX(-1),
+    FSDesktopY(-1),
+    PreFullscreenX(0),
+    PreFullscreenY(0),
+    PreFullscreenW(0),
+    PreFullscreenH(0),
+    BackBuffer(),
+    BackBufferRT(),
+    CurRenderTarget(),
+    CurDepthBuffer(),
+    Rasterizer(),
+    BlendState(),
+  //DepthStates[]
+    CurDepthState(),
+    ModelVertexIL(),
+    DistortionVertexIL(),
+    HeightmapVertexIL(),
+  //SamplerStates[]
+    StdUniforms(),
+  //UniformBuffers[];
+  //MaxTextureSet[];
+  //VertexShaders[];
+  //PixelShaders[];
+  //pStereoShaders[];
+  //CommonUniforms[];
+    ExtraShaders(),
+    DefaultFill(),
+    QuadVertexBuffer(),
+    DepthBuffers()
 {
+    memset(&D3DViewport, 0, sizeof(D3DViewport));
+    memset(MaxTextureSet, 0, sizeof(MaxTextureSet));
+
     HRESULT hr;
 
     RECT rc;
     if (p.Resolution == Sizei(0))
     {
         GetClientRect(window, &rc);
-        UINT width = rc.right - rc.left;
+        UINT width  = rc.right - rc.left;
         UINT height = rc.bottom - rc.top;
         ::OVR::Render::RenderDevice::SetWindowSize(width, height);
     }
@@ -755,8 +802,6 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
         ::OVR::Render::RenderDevice::SetWindowSize(p.Resolution.w, p.Resolution.h);
     }
     
-    Window = window;
-
     Params = p;
     DXGIFactory = NULL;
     hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
@@ -820,7 +865,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
     Context = NULL;
     D3D_FEATURE_LEVEL featureLevel; // TODO: Limit certain features based on D3D feature level
     hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
-                           NULL, flags, NULL, 0, D3D1x_(SDK_VERSION),
+                           NULL, flags /*| D3D11_CREATE_DEVICE_DEBUG*/, NULL, 0, D3D1x_(SDK_VERSION),
                            &Device.GetRawRef(), &featureLevel, &Context.GetRawRef());
 #endif
 	if (FAILED(hr))
@@ -1126,7 +1171,7 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.BufferCount = 1;
     scDesc.BufferDesc.Width  = WindowWidth;
     scDesc.BufferDesc.Height = WindowHeight;
-    scDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    scDesc.BufferDesc.Format = Params.SrgbBackBuffer ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
     // Use default refresh rate; switching rate on CC prototype can cause screen lockup.
     scDesc.BufferDesc.RefreshRate.Numerator = 0;
     scDesc.BufferDesc.RefreshRate.Denominator = 1;
@@ -1526,7 +1571,7 @@ void*  Buffer::Map(size_t start, size_t size, int flags)
 #endif
 }
 
-bool   Buffer::Unmap(void *m)
+bool   Buffer::Unmap(void* m)
 {
     OVR_UNUSED(m);
 
@@ -1661,27 +1706,35 @@ ID3D10Blob* RenderDevice::CompileShader(const char* profile, const char* src, co
 }
 
 
-ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage)
-    : Render::Shader(stage), Ren(r), UniformData(0)
+ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage) :
+    Render::Shader(stage),
+    Ren(r),
+    UniformData(NULL),
+    UniformsSize(-1)
 {
 }
+
 ShaderBase::~ShaderBase()
 {
     if (UniformData)
     {
         OVR_FREE(UniformData);
+        UniformData = NULL;
     }
 }
 
 bool ShaderBase::SetUniform(const char* name, int n, const float* v)
 {
-    for(unsigned i = 0; i < UniformInfo.GetSize(); i++)
-        if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
+    for (int i = 0; i < UniformInfo.GetSizeI(); i++)
+    {
+        if (UniformInfo[i].Name == name)
         {
             memcpy(UniformData + UniformInfo[i].Offset, v, n * sizeof(float));
-            return 1;
+            return true;
         }
-    return 0;
+    }
+
+    return false;
 }
 
 void ShaderBase::InitUniforms(ID3D10Blob* s)
@@ -1887,9 +1940,19 @@ ID3D1xSamplerState* RenderDevice::GetSamplerState(int sm)
     return SamplerStates[sm];
 }
 
-Texture::Texture(RenderDevice* ren, int fmt, int w, int h) : Ren(ren), Tex(NULL), TexSv(NULL), TexRtv(NULL), TexDsv(NULL), Width(w), Height(h)
+Texture::Texture(RenderDevice* ren, int fmt, int w, int h) :
+    Ren(ren),
+    Tex(NULL),
+    TexSv(NULL),
+    TexRtv(NULL),
+    TexDsv(NULL),
+    TexStaging(NULL),
+    Sampler(NULL),
+    Format(fmt),
+    Width(w),
+    Height(h),
+    Samples(0)
 {
-    OVR_UNUSED(fmt);
     Sampler = Ren->GetSamplerState(0);
 }
 
@@ -1956,21 +2019,23 @@ void RenderDevice::GenerateSubresourceData(
     unsigned subresHeight = imageHeight;
     unsigned numMips      = effectiveMipCount;
 
+    unsigned bytesPerBlock = 0;
+    switch(format)
+    {
+    case DXGI_FORMAT_BC1_UNORM_SRGB: // fall thru
+    case DXGI_FORMAT_BC1_UNORM: bytesPerBlock = 8;  break;
+
+    case DXGI_FORMAT_BC2_UNORM_SRGB: // fall thru
+    case DXGI_FORMAT_BC2_UNORM: bytesPerBlock = 16;  break;
+
+    case DXGI_FORMAT_BC3_UNORM_SRGB: // fall thru
+    case DXGI_FORMAT_BC3_UNORM: bytesPerBlock = 16;  break;
+
+    default:    OVR_ASSERT(false);
+    }
+
     for(unsigned i = 0; i < numMips; i++)
     {
-        unsigned bytesPerBlock = 0;
-        if (format == DXGI_FORMAT_BC1_UNORM)
-        {
-            bytesPerBlock = 8;
-        }
-		else if (format == DXGI_FORMAT_BC2_UNORM)
-		{
-			bytesPerBlock = 16;
-		}
-		else if (format == DXGI_FORMAT_BC3_UNORM)
-		{
-			bytesPerBlock = 16;
-		}
 
         unsigned blockWidth = 0;
         blockWidth = (subresWidth + 3) / 4;
@@ -2067,21 +2132,28 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         imageDimUpperLimit = 1024;
     } 
 
-	if (format == Texture_DXT1 || format == Texture_DXT3 || format == Texture_DXT5)
+	if ((format & Texture_TypeMask) == Texture_DXT1 ||
+        (format & Texture_TypeMask) == Texture_DXT3 ||
+        (format & Texture_TypeMask) == Texture_DXT5)
     {
 		int convertedFormat;
-		switch (format) {
-		case Texture_DXT1:
-			convertedFormat = DXGI_FORMAT_BC1_UNORM;
-			break;
-		case Texture_DXT3:
-			convertedFormat = DXGI_FORMAT_BC2_UNORM;
-			break;
-		case Texture_DXT5:
-		default:
-			convertedFormat = DXGI_FORMAT_BC3_UNORM;
-			break;
-		}
+        if((format & Texture_TypeMask) == Texture_DXT1)
+        {
+            convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+        }
+        else if((format & Texture_TypeMask) == Texture_DXT3)
+        {
+            convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC2_UNORM_SRGB : DXGI_FORMAT_BC2_UNORM;
+        }
+		else if((format & Texture_TypeMask) == Texture_DXT5)
+        {
+            convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+        }
+        else
+        {
+            OVR_ASSERT(false);  return NULL;
+        }
+
         unsigned largestMipWidth   = 0;
         unsigned largestMipHeight  = 0;
         unsigned effectiveMipCount = mipcount;
@@ -2181,6 +2253,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             d3dformat = createDepthSrv ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_D32_FLOAT;
             break;
         default:
+            OVR_ASSERT(false);
             return NULL;
         }
 
@@ -2319,6 +2392,13 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
 }
 
 // Rendering
+
+void RenderDevice::ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Texture* outputTex)
+{
+    int isSrgb = ((Texture*)msaaTex)->Format & Texture_SRGB;
+
+    Context->ResolveSubresource(((Texture*)outputTex)->Tex, 0, ((Texture*)msaaTex)->Tex, 0, isSrgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM);
+}
 
 void RenderDevice::BeginRendering()
 {

@@ -5,16 +5,16 @@ Content     :   Separate reader component that is able to recover sensor pose
 Created     :   June 4, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -136,7 +136,7 @@ bool SensorStateReader::GetSensorStateAtTime(double absoluteTime, TrackingState&
 	{
         return false;
 	}
-
+    
     // Delta time from the last available data
 	double pdt = absoluteTime - lstate.WorldFromImu.TimeInSeconds;
 	static const double maxPdt = 0.1;
@@ -167,6 +167,7 @@ bool SensorStateReader::GetSensorStateAtTime(double absoluteTime, TrackingState&
 
     ss.RawSensorData = lstate.RawSensorData;
     ss.LastVisionProcessingTime = lstate.LastVisionProcessingTime;
+    ss.LastVisionFrameLatency = lstate.LastVisionFrameLatency;
 
 	return true;
 }
@@ -201,30 +202,6 @@ uint32_t SensorStateReader::GetStatus() const
 	}
 
 	return lstate.StatusFlags;
-}
-
-void SensorStateReader::LoadProfileCenteredFromWorld(Profile* profile)
-{
-    double camerastate[7];
-    if (profile->GetDoubleValues(OVR_KEY_CAMERA_POSITION, camerastate, 7) == 0)
-    {
-        for (int i = 0; i < 7; i++) camerastate[i] = 0;
-        camerastate[3] = 1;//no offset. by default, give the quaternion w component value 1
-    }
-
-    OVR::Quatd orientation = OVR::Quatd(camerastate[0], camerastate[1], camerastate[2], camerastate[3]);
-    OVR::Vector3d position = OVR::Vector3d(camerastate[4], camerastate[5], camerastate[6]);
-
-    CenteredFromWorld = OVR::Posed(orientation, position);
-
-}
-
-void SensorStateReader::SaveProfileCenteredFromWorld(Profile* profile)
-{
-    OVR::Quatd rot = CenteredFromWorld.Rotation;
-    OVR::Vector3d trans = CenteredFromWorld.Translation;
-    double vals[7] = { rot.x, rot.y, rot.z, rot.w, trans.x, trans.y, trans.z };
-    profile->SetDoubleValues(OVR_KEY_CAMERA_POSITION, vals, 7);
 }
 
 }} // namespace OVR::Tracking

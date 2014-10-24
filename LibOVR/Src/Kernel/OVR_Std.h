@@ -6,16 +6,16 @@ Content     :   Standard C function interface
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,7 +35,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <ctype.h>
 
-#if !defined(OVR_OS_WINCE) && defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
+#if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
 #define OVR_MSVC_SAFESTRING
 #include <errno.h>
 #endif
@@ -46,7 +46,9 @@ limitations under the License.
 
 namespace OVR {
 
-#if defined(OVR_OS_WIN32)
+// Has the same behavior as itoa aside from also having a dest size argument.
+// Return value: Pointer to the resulting null-terminated string, same as parameter str.
+#if defined(OVR_OS_MS)
 inline char* OVR_CDECL OVR_itoa(int val, char *dest, size_t destsize, int radix)
 {
 #if defined(OVR_MSVC_SAFESTRING)
@@ -57,8 +59,8 @@ inline char* OVR_CDECL OVR_itoa(int val, char *dest, size_t destsize, int radix)
     return itoa(val, dest, radix);
 #endif
 }
-#else // OVR_OS_WIN32
-inline char* OVR_itoa(int val, char* dest, unsigned int len, int radix)
+#else // OVR_OS_MS
+inline char* OVR_itoa(int val, char* dest, size_t len, int radix)
 {
     if (val == 0)
     {
@@ -67,12 +69,15 @@ inline char* OVR_itoa(int val, char* dest, unsigned int len, int radix)
             dest[0] = '0';
             dest[1] = '\0';  
         }
+        else if(len > 0)
+            dest[0] = '\0';  
         return dest;
     }
 
+    // FIXME: Fix the following code to avoid memory write overruns when len is in sufficient.
     int cur = val;
-    unsigned int i    = 0; 
-    unsigned int sign = 0;
+    size_t i    = 0; 
+    size_t sign = 0;
 
     if (val < 0)
     {
@@ -124,7 +129,7 @@ inline char* OVR_itoa(int val, char* dest, unsigned int len, int radix)
         dest[i++] = '-';
     }
 
-    for (unsigned int j = 0; j < i / 2; ++j)
+    for (size_t j = 0; j < i / 2; ++j)
     {
         char tmp        = dest[j];
         dest[j]         = dest[i - 1 - j];
@@ -151,6 +156,7 @@ inline char* OVR_CDECL OVR_strcpy(char* dest, size_t destsize, const char* src)
     strcpy_s(dest, destsize, src);
     return dest;
 #else
+    // FIXME: This should be a safer implementation
     OVR_UNUSED(destsize);
     return strcpy(dest, src);
 #endif
@@ -162,6 +168,7 @@ inline char* OVR_CDECL OVR_strncpy(char* dest, size_t destsize, const char* src,
     strncpy_s(dest, destsize, src, count);
     return dest;
 #else
+    // FIXME: This should be a safer implementation
     OVR_UNUSED(destsize);
     return strncpy(dest, src, count);
 #endif
@@ -173,6 +180,7 @@ inline char * OVR_CDECL OVR_strcat(char* dest, size_t destsize, const char* src)
     strcat_s(dest, destsize, src);
     return dest;
 #else
+    // FIXME: This should be a safer implementation
     OVR_UNUSED(destsize);
     return strcat(dest, src);
 #endif
@@ -241,7 +249,7 @@ inline int OVR_CDECL OVR_strncmp(const char* ws1, const char* ws2, size_t size)
 
 inline uint64_t OVR_CDECL OVR_strtouq(const char *nptr, char **endptr, int base)
 {
-#if defined(OVR_CC_MSVC) && !defined(OVR_OS_WINCE)
+#if defined(OVR_CC_MSVC)
     return _strtoui64(nptr, endptr, base);
 #else
     return strtoull(nptr, endptr, base);
@@ -250,7 +258,7 @@ inline uint64_t OVR_CDECL OVR_strtouq(const char *nptr, char **endptr, int base)
 
 inline int64_t OVR_CDECL OVR_strtoq(const char *nptr, char **endptr, int base)
 {
-#if defined(OVR_CC_MSVC) && !defined(OVR_OS_WINCE)
+#if defined(OVR_CC_MSVC)
     return _strtoi64(nptr, endptr, base);
 #else
     return strtoll(nptr, endptr, base);
@@ -260,7 +268,7 @@ inline int64_t OVR_CDECL OVR_strtoq(const char *nptr, char **endptr, int base)
 
 inline int64_t OVR_CDECL OVR_atoq(const char* string)
 {
-#if defined(OVR_CC_MSVC) && !defined(OVR_OS_WINCE)
+#if defined(OVR_CC_MSVC)
     return _atoi64(string);
 #else
     return atoll(string);
@@ -273,10 +281,14 @@ inline uint64_t OVR_CDECL OVR_atouq(const char* string)
 }
 
 
-// Implemented in GStd.cpp in platform-specific manner.
+// Implemented in OVR_Std.cpp in platform-specific manner.
 int OVR_CDECL OVR_stricmp(const char* dest, const char* src);
 int OVR_CDECL OVR_strnicmp(const char* dest, const char* src, size_t count);
 
+
+// This is like sprintf but with a destination buffer size argument. However, the behavior is different
+// from vsnprintf in that the return value semantics are like sprintf (which returns -1 on capacity overflow) and 
+// not like snprintf (which returns intended strlen on capacity overflow).
 inline size_t OVR_CDECL OVR_sprintf(char *dest, size_t destsize, const char* format, ...)
 {
     va_list argList;
@@ -301,6 +313,13 @@ inline size_t OVR_CDECL OVR_sprintf(char *dest, size_t destsize, const char* for
     return ret;
 }
 
+
+// This is like vsprintf but with a destination buffer size argument. However, the behavior is different
+// from vsnprintf in that the return value semantics are like vsprintf (which returns -1 on capacity overflow) and 
+// not like vsnprintf (which returns intended strlen on capacity overflow).
+// Return value:
+//    On success, the total number of characters written is returned.
+//    On failure, a negative number is returned.
 inline size_t OVR_CDECL OVR_vsprintf(char *dest, size_t destsize, const char * format, va_list argList)
 {
     size_t ret;
@@ -323,6 +342,7 @@ inline size_t OVR_CDECL OVR_vsprintf(char *dest, size_t destsize, const char * f
         dest[destsize-1] = 0;
     #endif
 #else
+    // FIXME: This should be a safer implementation
     OVR_UNUSED(destsize);
     ret = (size_t)vsprintf(dest, format, argList);
     OVR_ASSERT(ret < destsize);
@@ -330,14 +350,82 @@ inline size_t OVR_CDECL OVR_vsprintf(char *dest, size_t destsize, const char * f
     return ret;
 }
 
-// Returns the number of characters in the formatted string.
-inline size_t OVR_CDECL OVR_vscprintf(const char * format, va_list argList)
+// Same behavior as ISO C99 vsnprintf.
+// Returns the strlen of the resulting formatted string, or a negative value if the format is invalid.
+// destsize specifies the capacity of the input buffer.
+//
+// Example usage:
+//     void Log(char *dest, size_t destsize, const char * format, ...)
+//     {
+//         char buffer[1024];
+//         va_list argList;
+//         va_start(argList,format);
+//         int result = OVR_vsnprintf(dest, destsize, format, argList);
+//         assert(result < destsize); // Else we'd have to retry with a dynamically allocated buffer (of size=result+1) and new argList copy.
+//         va_end(argList);
+//     }
+
+inline int OVR_CDECL OVR_vsnprintf(char *dest, size_t destsize, const char * format, va_list argList)
 {
-    size_t ret;
+    int ret;
 #if defined(OVR_CC_MSVC)
-    ret = (size_t) _vscprintf(format, argList);
+    OVR_DISABLE_MSVC_WARNING(4996) // 'vsnprintf': This function or variable may be unsafe.
+    ret = vsnprintf(dest, destsize, format, argList); // Microsoft vsnprintf is non-conforming; it returns -1 if destsize is insufficient.
+    if (ret < 0) // If there was a format error or if destsize was insufficient...
+    {
+        ret = _vscprintf(format, argList); // Get the expected dest strlen. If the return value is still -1 then there was a format error.
+
+        if (destsize) // If we can 0-terminate the output...
+        {
+            if (ret < 0)
+                dest[0] = 0;
+            else
+                dest[destsize-1] = 0;
+        }
+    }
+    // Else the string was written OK and ret is its strlen.
+    OVR_RESTORE_MSVC_WARNING()
+#else
+    ret = vsnprintf(dest, destsize, format, argList);
+#endif
+    return ret;
+}
+
+
+// Same behavior as ISO C99 snprintf.
+// Returns the strlen of the resulting formatted string, or a negative value if the format is invalid.
+// destsize specifies the capacity of the input buffer.
+//
+// Example usage:
+//     char buffer[16];
+//     int result = OVR_snprintf(buffer, sizeof(buffer), "%d", 37);
+//     if (result >= sizeof(buffer)) // If there was insufficient capacity...
+//     {
+//         char* p = new char[result + 1]; // Or char* p = (char*)OVR_ALLOC(result + 1);
+//         OVR_snprintf(p, (size_t)result, "%d", 37);
+//         delete[] p;
+//     }
+//
+inline int OVR_CDECL OVR_snprintf(char *dest, size_t destsize, const char * format, ...)
+{
+    va_list argList;
+    va_start(argList,format);
+    int ret = OVR_vsnprintf(dest, destsize, format, argList);
+    va_end(argList);
+    return ret;
+}
+
+
+// Returns the strlen of the resulting formatted string, or a negative value if the format is invalid.
+// Note: If you are planning on printing a string then it's more efficient to just use OVR_vsnprintf and 
+// look at the return value and handle the uncommon case that there wasn't enough space.
+inline int OVR_CDECL OVR_vscprintf(const char * format, va_list argList)
+{
+    int ret;
+#if defined(OVR_CC_MSVC)
+    ret = _vscprintf(format, argList);
 #else    
-    ret = (size_t) vsnprintf(NULL, 0, format, argList);
+    ret = vsnprintf(NULL, 0, format, argList);
 #endif
     return ret;       
 }
@@ -352,12 +440,12 @@ int      OVR_CDECL OVR_wcsicmp(const wchar_t* a, const wchar_t* b);
 
 inline int OVR_CDECL OVR_wcsicoll(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32)
-#if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
-    return ::_wcsicoll(a, b);
-#else
-    return ::wcsicoll(a, b);
-#endif
+#if defined(OVR_OS_MS)
+    #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
+        return ::_wcsicoll(a, b);
+    #else
+        return ::wcsicoll(a, b);
+    #endif
 #else
     // not supported, use regular wcsicmp
     return OVR_wcsicmp(a, b);
@@ -366,7 +454,7 @@ inline int OVR_CDECL OVR_wcsicoll(const wchar_t* a, const wchar_t* b)
 
 inline int OVR_CDECL OVR_wcscoll(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32) || defined(OVR_OS_LINUX)
+#if defined(OVR_OS_MS) || defined(OVR_OS_LINUX)
     return wcscoll(a, b);
 #else
     // not supported, use regular wcscmp

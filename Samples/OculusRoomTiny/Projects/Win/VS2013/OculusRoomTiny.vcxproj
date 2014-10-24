@@ -201,7 +201,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h" />
-    <ClInclude Include="..\..\..\HSWDisplay_Util.h" />
     <ClInclude Include="..\..\..\RenderTiny_D3D11_Device.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

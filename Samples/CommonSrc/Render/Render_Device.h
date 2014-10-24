@@ -5,7 +5,7 @@ Content     :   Platform renderer for simple scene graph
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -517,7 +517,7 @@ public:
     Ptr<Buffer>       VertexBuffer;
     Ptr<Buffer>       IndexBuffer;
 
-    Model(PrimitiveType t = Prim_Triangles) : Type(t), Fill(NULL), Visible(true) { }
+    Model(PrimitiveType t = Prim_Triangles) : Type(t), Fill(NULL), Visible(true), IsCollisionModel(false) { }
     ~Model() { }
 
     virtual NodeType GetType() const { return Node_Model; }
@@ -753,13 +753,14 @@ struct DisplayId
 struct RendererParams
 {
     int         Multisample;
+    bool        SrgbBackBuffer;
     int         Fullscreen;
     DisplayId   Display;
     // Resolution of the rendering buffer used during creation.
     // Allows buffer of different size then the widow if not zero.
     Sizei       Resolution;
 
-    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0), Resolution(0) {}
+    RendererParams(int ms = 1) : Multisample(ms), SrgbBackBuffer(false), Fullscreen(0), Resolution(0) {}
     
     bool IsDisplaySet() const
     {
@@ -913,6 +914,9 @@ public:
     // Finish scene.
     virtual void FinishScene();
 
+    virtual void ResolveMsaa(Texture* msaaTex, Texture* outputTex)
+    { OVR_UNUSED2(msaaTex, outputTex); };
+
     // Texture must have been created with Texture_RenderTarget. Use NULL for the default render target.
     // NULL depth buffer means use an internal, temporary one.
     virtual void SetRenderTarget(Texture* color, Texture* depth = NULL, Texture* stencil = NULL)
@@ -946,7 +950,7 @@ public:
 
     // Returns width of text in same units as drawing. If strsize is not null, stores width and height.
     // Can optionally return char-range selection rectangle.
-    float        MeasureText(const Font* font, const char* str, float size, float strsize[2] = NULL,
+    static float MeasureText(const Font* font, const char* str, float size, float strsize[2] = NULL,
                              const size_t charRange[2] = 0, Vector2f charRangeRect[2] = 0);
     virtual void RenderText(const Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view = NULL);
 

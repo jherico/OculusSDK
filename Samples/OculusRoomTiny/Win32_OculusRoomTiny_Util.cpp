@@ -134,7 +134,7 @@ bool Util_RespondToControls(float & EyeYaw, Vector3f & EyePos, Quatf PoseOrienta
     if (localMoveVector.y > 1) localMoveVector.y = 1;
 
     //rotate according to gamepad input
-    const float gamepad_sensitivity = .025;
+    const float gamepad_sensitivity = .025f;
     GamepadYaw = -gamepad_sensitivity * LastGamepadState.RX;
 
     EyeYaw += GamepadYaw;
@@ -186,7 +186,7 @@ LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
         case WM_KEYDOWN:    OnKey((unsigned)wp, true);    break;
         case WM_KEYUP:      OnKey((unsigned)wp, false);   break;
         case WM_CREATE:     SetTimer(hWnd, 0, 100, NULL); break;
-        case WM_TIMER:      KillTimer(hWnd, 0);
+        case WM_TIMER:      KillTimer(hWnd, 0);           break;
 
         case WM_SETFOCUS:   
                             SetCursorPos(WindowCenter.x, WindowCenter.y);
@@ -207,18 +207,20 @@ LRESULT CALLBACK systemWindowProc(HWND arg_hwnd, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 
+static LPCWSTR WindowClassName = L"OVRAppWindow";
+
 HWND Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount, bool UseAppWindowFrame, RenderDevice ** returnedDevice)
 {
     RendererParams  renderParams;
 
     // Window
-    WNDCLASS wc;
+    WNDCLASSW wc;
     memset(&wc, 0, sizeof(wc));
-    wc.lpszClassName = L"OVRAppWindow";
+    wc.lpszClassName = WindowClassName;
     wc.style         = CS_OWNDC;
     wc.lpfnWndProc   = systemWindowProc;
     wc.cbWndExtra    = NULL;
-    RegisterClass(&wc);
+    RegisterClassW(&wc);
 
     DWORD wsStyle = WS_POPUP;
     DWORD sizeDivisor = 1;
@@ -234,7 +236,7 @@ HWND Util_InitWindowAndGraphics(Recti vp, int fullscreen, int multiSampleCount, 
 
     RECT winSize = { 0, 0, vp.w / sizeDivisor, vp.h / sizeDivisor};
     AdjustWindowRect(&winSize, wsStyle, false);
-    hWnd = CreateWindowA("OVRAppWindow", "OculusRoomTiny",
+    hWnd = CreateWindowW(WindowClassName, L"OculusRoomTiny",
                          wsStyle |WS_VISIBLE,
                          vp.x, vp.y,
                          winSize.right-winSize.left, winSize.bottom-winSize.top,
@@ -265,7 +267,7 @@ void Util_ReleaseWindowAndGraphics(RenderDevice * prender)
     {
         // Release window resources.
         ::DestroyWindow(hWnd);
-        UnregisterClass(L"OVRAppWindow", hInstance);
+        UnregisterClassW(WindowClassName, hInstance);
     }
 }
 

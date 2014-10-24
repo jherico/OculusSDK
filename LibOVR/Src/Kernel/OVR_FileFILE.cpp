@@ -6,16 +6,16 @@ Content     :   File wrapper class implementation (Win32)
 Created     :   April 5, 1999
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,16 +74,20 @@ public:
     {
         if (pfileName && (pfileName[0]!=0) && pfileName[1]==':')
         {
-            Disabled = 1;
+            Disabled = TRUE;
             OldMode = ::SetErrorMode(SEM_FAILCRITICALERRORS);
         }
         else
+        {
             Disabled = 0;
+            OldMode = 0;
+        }
     }
 
     ~SysErrorModeDisabler()
     {
-        if (Disabled) ::SetErrorMode(OldMode);
+        if (Disabled) 
+            ::SetErrorMode(OldMode);
     }
 };
 #else
@@ -129,18 +133,24 @@ protected:
 
 public:
 
-    FILEFile()
+    FILEFile() :
+        FileName(),
+        Opened(false),
+        fs(NULL),
+        OpenFlags(0),
+        ErrorCode(0),
+        LastOp(0)
+    #ifdef OVR_FILE_VERIFY_SEEK_ERRORS
+       ,pFileTestBuffer(NULL)
+       ,FileTestLength(0)
+       ,TestPos(0)
+    #endif
     {
-        Opened = 0; FileName = "";
-
-#ifdef OVR_FILE_VERIFY_SEEK_ERRORS
-        pFileTestBuffer =0;
-        FileTestLength  =0;
-        TestPos         =0;
-#endif
     }
+
     // Initialize file by opening it
     FILEFile(const String& fileName, int flags, int Mode);
+
     // The 'pfileName' should be encoded as UTF-8 to support international file names.
     FILEFile(const char* pfileName, int flags, int Mode);
 
@@ -219,7 +229,7 @@ void FILEFile::init()
     else if (OpenFlags & Open_Write)
         omode = "r+b";
 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     SysErrorModeDisabler disabler(FileName.ToCStr());
 #endif
 
@@ -574,7 +584,7 @@ Ptr<File> FileFILEOpen(const String& path, int flags, int mode)
 // Helper function: obtain file information time.
 bool    SysFile::GetFileStat(FileStat* pfileStat, const String& path)
 {
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     // 64-bit implementation on Windows.
     struct __stat64 fileStat;
     // Stat returns 0 for success.

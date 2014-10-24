@@ -5,7 +5,7 @@ Content     :   Win32 OpenGL Device implementation
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse, Michael Antonov, David Borel
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,12 +55,16 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
     
     if (!DwmEnableComposition)
     {
-	    HINSTANCE hInst = LoadLibrary( L"dwmapi.dll" );
+	    HINSTANCE hInst = LoadLibraryA( "dwmapi.dll" );
 	    OVR_ASSERT(hInst);
         DwmEnableComposition = (PFNDWMENABLECOMPOSITIONPROC)GetProcAddress( hInst, "DwmEnableComposition" );
         OVR_ASSERT(DwmEnableComposition);
     }
 
+    // Why do we need to disable composition for OpenGL rendering?
+    // "Enabling DWM in extended mode causes 60Hz judder on NVIDIA cards unless the Rift is the main display. "
+    // "Maybe the confusion is that GL goes through the same compositional pipeline as DX. To the kernel and DWM there is no difference between the two."
+    // "The judder does not occur with DX. My understanding is that for DWM, GL actually requires an additional blt whose timing is dependent on the main monitor."
     DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
     {
 		PIXELFORMATDESCRIPTOR pfd;

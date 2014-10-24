@@ -5,14 +5,14 @@ Content     :
 
 Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License");
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
 you may not use the Oculus VR Rift SDK except in compliance with the License,
 which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,7 +27,9 @@ limitations under the License.
 
 #define OVR_MAJOR_VERSION 0
 #define OVR_MINOR_VERSION 4
-#define OVR_BUILD_VERSION 2
-#define OVR_VERSION_STRING "0.4.2"
+#define OVR_BUILD_VERSION 3
+#define OVR_VERSION_STRING "0.4.3"
 
+#define OVR_DK2_LATEST_FIRMWARE_MAJOR_VERSION 2
+#define OVR_DK2_LATEST_FIRMWARE_MINOR_VERSION 12
 #endif

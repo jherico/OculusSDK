@@ -6,16 +6,16 @@ Content     :   Template hash-table/set implementation
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -88,18 +88,19 @@ public:
     {
         const uint8_t* data = (const uint8_t*) data_in;
         size_t       h = seed;
-        while (size > 0)
+        while (size-- > 0)
         {
-            size--;
+            #ifndef __clang_analyzer__ // It mistakenly thinks data is garbage.
             h = (h << 16) + (h << 6) - h + (size_t)data[size];
+            #endif
         }   
         return h;
     }
 
     size_t operator()(const C& data) const
     {
-        unsigned char*  p = (unsigned char*) &data;
-        int size = sizeof(C);
+        const unsigned char*  p = (const unsigned char*) &data;
+        const size_t size = sizeof(C);
 
         return SDBM_Hash(p, size);
     }
@@ -552,7 +553,7 @@ public:
         // Allow non-const access to entries.
         C&  operator*() const
         {            
-            OVR_ASSERT(ConstIterator::Index >= 0 && ConstIterator::Index <= (intptr_t)ConstIterator::pHash->pTable->SizeMask);
+            OVR_ASSERT((ConstIterator::pHash) && ConstIterator::pHash->pTable && (ConstIterator::Index >= 0) && (ConstIterator::Index <= (intptr_t)ConstIterator::pHash->pTable->SizeMask));
             return const_cast<SelfType*>(ConstIterator::pHash)->E(ConstIterator::Index).Value;
         }    
 

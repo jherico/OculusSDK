@@ -5,7 +5,7 @@ Content     :   Platform renderer for simple scene graph - implementation
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1033,7 +1033,7 @@ namespace OVR { namespace Render {
 					pCurVert->TexG = pCurRawVert->TanEyeAnglesG;
 					pCurVert->TexB = pCurRawVert->TanEyeAnglesB;
 					// Convert [0.0f,1.0f] to [0,255]
-					pCurVert->Col.R = (uint8_t)( floorf ( pCurRawVert->Shade * 255.999f ) );
+					pCurVert->Col.R = (uint8_t)( floorf ( Alg::Max ( pCurRawVert->Shade, 0.0f ) * 255.999f ) );
 					pCurVert->Col.G = pCurVert->Col.R;
 					pCurVert->Col.B = pCurVert->Col.R;
 					pCurVert->Col.A = (uint8_t)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
@@ -1171,8 +1171,8 @@ namespace OVR { namespace Render {
 				    Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
 				    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
 
-				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
 				    pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
 				    pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
@@ -1209,8 +1209,8 @@ namespace OVR { namespace Render {
                     Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
                     const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
 
-                    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-                    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+                    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+                    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
                     pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
                     pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
@@ -1313,8 +1313,8 @@ namespace OVR { namespace Render {
 
                         Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
 
-                        Matrix4f matRenderFromNowStart = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-                        Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+                        Matrix4f matRenderFromNowStart = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+                        Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
                         pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
                         pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );

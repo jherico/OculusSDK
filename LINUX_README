@@ -1,0 +1,57 @@
+This documentation assumes you have an nvidia graphics card. We have tested
+on Ubuntu 14.04, Debian Stable 7.6, and Fedora 20.
+
+WHAT SETUP IS REQUIRED?
+
+  * Appropriate permissions for Oculus hidraw devices. See
+    LibOVR/90-oculus.rules and ConfigurePermissionsAndPackages.sh .
+  * Use a non-rotated twinview setup or place the rift on a separate 
+    non-rotated X screen.
+  * Ensure oculusd is running when using the rift.
+
+BUILD INSTRUCTIONS
+
+  After installing the appropriate packages simply issue 'make' in the root of
+  the SDK directory. This will build a release version of Oculus World Demo
+  (OWD). To generate debug symbols use 'make DEBUG=1'.
+
+HOW DO I RUN OCULUS WORLD DEMO (OWD)?
+
+  Either run the binary directly from the output directory, or use 'make run'.
+
+SHOULD I ROTATE MY DEVICE'S SCREEN?
+
+  Manual screen rotation is not recommend. If your window is fullscreen on a
+  rift device, set the ovrDistortionCap_LinuxDevFullscreen distortion cap to
+  have the SDK automatically rotate the distortion mesh on appropriate devices.
+  Be aware you will have to account for window size. You can use
+  OVR::SDKWindow::findDevScreenForHMD (Displays/OVR_Linux_SDKWindow.h) to
+  return the screen offset and dimensions necessary to size your Linux window.
+  See Samples/CommonSrc/Platform/Linux_Platform.cpp for an example.
+
+SEPARATE X SCREEN
+
+  ConfigUtil will not currently work across X screens. You will need
+  to use TwinView to use ConfigUtil.
+
+TWINVIEW
+
+  You must sync to the Rift's display device for a smooth experience when using
+  twinview. To consistently sync to the rift with Twinview setups, set the
+  __GL_SYNC_DISPLAY_DEVICE environment variable to the appropriate display
+  device before X starts. For example in your /etc/profile you could place the
+  following:
+
+    export __GL_SYNC_DISPLAY_DEVICE="DFP-1"
+
+  if you're rift corresponds to DFP-1.
+
+STARTING THE TRACKING SERVICE AUTOMATICALLY
+
+  Start the tracking service when a user is logged in using Xsession files.
+
+UBUNTU USERS
+
+  There was a kernel bug which affected HID devices in 14.04. If you find you
+  are receiving feature report failures, please upgrade your distro as the
+  bug is now fixed.

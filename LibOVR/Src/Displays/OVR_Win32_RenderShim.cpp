@@ -6,13 +6,17 @@ Content     :   Shared static functions for inclusion that allow for an applicat
 Created     :   March 21, 2014
 Authors     :   Dean Beeler
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
 Use of this software is subject to the terms of the Oculus Inc license
 agreement provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 ************************************************************************************/
+
+#ifndef AVOID_LIB_OVR
+#include "../Kernel/OVR_Types.h" // Without this we can get warnings (due to VC++ bugs) about _malloca being redefined, and miss LibOVR overrides.
+#endif
 
 #include <windows.h>
 #include <DbgHelp.h>
@@ -641,7 +645,12 @@ static PROC SetProcAddressA(
 	__in  PROC  newFunction
 	)
 {
-	PROC pfnHookAPIAddr = GetProcAddress( LoadLibraryA( lpLibFileName ), lpProcName );
+    HMODULE hModule = LoadLibraryA( lpLibFileName );
+    if(hModule == NULL)
+        return NULL;
+
+    // To do: call FreeLibrary(hModule) at the appropriate time.
+	PROC pfnHookAPIAddr = GetProcAddress(hModule, lpProcName );
 
 	HINSTANCE hInstance = targetModule; 
 
@@ -795,7 +804,7 @@ void checkUMDriverOverrides(void* context)
 			}
 		}
 
-		rtFilterModule = (*oldProcA)( RTFilter );
+        rtFilterModule = oldProcA ? (*oldProcA)(RTFilter) : NULL;
 
         IsCreatingBackBuffer backBufferFunc = NULL;
         ShouldVSync	shouldVSyncFunc = NULL;

@@ -5,7 +5,7 @@ Content     :   Option selection and editing for OculusWorldDemo
 Created     :   March 7, 2014
 Authors     :   Michael Antonov, Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

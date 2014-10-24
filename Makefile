@@ -5,9 +5,7 @@
 # Created     : 2013
 # Authors     : Simon Hallam and Peter Giokaris
 # Copyright   : Copyright 2013 OculusVR, Inc. All Rights Reserved
-# Instruction : The g++ compiler and stdndard lib packages need to be 
-#               installed on the system.  Navigate in a shell to the 
-#               directory where this Makefile is located and enter:
+# Instruction : See 'make help'
 #
 #               make                builds the release versions for the 
 #                                   current architechture
@@ -34,6 +32,10 @@
 #
 #############################################################################
 
+####### Include makefiles in current directory
+RELEASESUFFIX =
+-include Makefile.*[^~]
+
 ####### Detect system architecture
 
 SYSARCH       = i386
@@ -51,32 +53,52 @@ DELETEFILE    = rm -f
 
 DEBUG         = 0
 ifeq ($(DEBUG), 1)
-	RELEASETYPE   = Debug
+	RELEASETYPE   = Debug$(RELEASESUFFIX)
 else
-	RELEASETYPE   = Release
+	RELEASETYPE   = Release$(RELEASESUFFIX)
 endif
 
-####### Paths
+# Override release types and DEBUG settings in child makefiles.
+export RELEASETYPE
+export DEBUG
 
+####### Target settings
 LIBOVRPATH    = ./LibOVR
-DEMOPATH      = ./Samples/OculusWorldDemo
-
-####### Files
+OWDPATH       = ./Samples/OculusWorldDemo
 
 LIBOVRTARGET  = $(LIBOVRPATH)/Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
-DEMOTARGET    = $(DEMOPATH)/Release/OculusWorldDemo_$(RELEASETYPE)/$(SYSARCH)
+OWDTARGET     = $(OWDPATH)/Release/OculusWorldDemo_$(SYSARCH)_$(RELEASETYPE)
 
-####### Rules
+####### Targets
 
-all:    $(LIBOVRTARGET) $(DEMOTARGET)
+all:    $(LIBOVRTARGET) $(OWDTARGET)
 
-$(DEMOTARGET): $(DEMOPATH)/Makefile
-	$(MAKE) -C $(DEMOPATH) DEBUG=$(DEBUG)
+$(OWDTARGET): force_look $(LIBOVRTARGET)
+	$(MAKE) -C $(OWDPATH)
 
-$(LIBOVRTARGET): $(LIBOVRPATH)/Makefile
-	$(MAKE) -C $(LIBOVRPATH) DEBUG=$(DEBUG)
+$(LIBOVRTARGET): force_look
+	$(MAKE) -C $(LIBOVRPATH)
+
+run: $(OWDTARGET)
+	$(MAKE) -C $(OWDPATH) run
 
 clean:
-	$(MAKE) -C $(LIBOVRPATH) clean DEBUG=$(DEBUG)
-	$(MAKE) -C $(DEMOPATH) clean DEBUG=$(DEBUG)
+	$(MAKE) -C $(LIBOVRPATH) clean
+	$(MAKE) -C $(OWDPATH) clean
 
+force_look:
+	true
+
+# Generate help based on descriptions of targets given in this Makefile.
+help: 		##- Show this help
+	@echo "Targets:"
+	@echo "  all      : Build LibOVR and Oculus World Demo"
+	@echo "  run      : Run Oculus World Demo"
+	@echo "  clean    : Clean selected release (DEBUG=[0,1])"
+	@echo "  cleanall : Clean all possible release targets"
+	@echo ""
+	@echo "Options:"
+	@echo "  DEBUG    : 'make DEBUG=1' will build the current target in DEBUG mode"
+
+# Experimental method of automatically generating help from target names.
+#@grep -h "##-" $(MAKEFILE_LIST) | grep -v grep | sed -e 's/^/ /' | sed -e 's/\:\s*##-/:/' | awk '{printf "%+6s\n", $$0}'

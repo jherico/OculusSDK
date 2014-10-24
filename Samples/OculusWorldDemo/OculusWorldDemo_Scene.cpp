@@ -7,7 +7,7 @@ Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
 				Peter Hoff, Dan Goodman, Bryan Croteau                
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,25 +31,27 @@ limitations under the License.
 
 void OculusWorldDemoApp::InitMainFilePath()
 {
+    // We try alternative relative locations for the file.
+    const String contentBase = pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1;
+    const char* baseDirectories[] = { "", contentBase.ToCStr(), WORLDDEMO_ASSET_PATH2, WORLDDEMO_ASSET_PATH3, WORLDDEMO_ASSET_PATH4 };
+    String newPath;
 
-    MainFilePath = WORLDDEMO_ASSET_FILE;	
-
-    // Try to modify path for correctness in case specified file is not found.
-    if (!SysFile(MainFilePath).IsValid())
+    for(size_t i = 0; i < OVR_ARRAY_COUNT(baseDirectories); ++i)
     {
-        String prefixPath1(pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH1),
-            prefixPath2(WORLDDEMO_ASSET_PATH2),
-            prefixPath3(WORLDDEMO_ASSET_PATH3),
-            prefixPath4(WORLDDEMO_ASSET_PATH4);
-        if (SysFile(prefixPath1 + MainFilePath).IsValid())
-            MainFilePath = prefixPath1 + MainFilePath;
-        else if (SysFile(prefixPath2 + MainFilePath).IsValid())
-            MainFilePath = prefixPath2 + MainFilePath;
-        else if (SysFile(prefixPath3 + MainFilePath).IsValid())
-            MainFilePath = prefixPath3 + MainFilePath;
-        else if (SysFile(prefixPath4 + MainFilePath).IsValid())
-            MainFilePath = prefixPath4 + MainFilePath;
+        newPath  = baseDirectories[i];	
+        newPath += WORLDDEMO_ASSET_FILE;	
+
+        OVR_DEBUG_LOG(("Trying to load the scene at: %s...", newPath.ToCStr()));
+
+        if (SysFile(newPath).IsValid())
+        {
+            OVR_DEBUG_LOG(("Success loading %s", newPath.ToCStr()));
+            MainFilePath = newPath;
+            return;
+        }
     }
+
+    OVR_DEBUG_LOG(("Unable to find any version of %s. Do you have your working directory set right?", WORLDDEMO_ASSET_FILE));
 }
 
 // Creates a grid of cubes.
@@ -203,86 +205,93 @@ void OculusWorldDemoApp::ClearScene()
 
 void OculusWorldDemoApp::RenderAnimatedBlocks(ovrEyeType eye, double appTime)
 {
-    Matrix4f viewAdjust = Matrix4f::Translation(Vector3f(EyeRenderDesc[eye].ViewAdjust));
+    Matrix4f hmdToEyeViewOffset = Matrix4f::Translation(Vector3f(EyeRenderDesc[eye].HmdToEyeViewOffset));
 
-    switch ( BlocksShowType )
+    switch (BlocksShowType)
     {
     case 0:
         // No blocks;
         break;
-    case 1: {
-        // Horizontal circle around your head.
-        int const   numBlocks = 10;
-        float const radius = 1.0f;
-        Matrix4f    scaleUp = Matrix4f::Scaling ( 20.0f );
-        double      scaledTime = appTime * 0.1;
-        float       fracTime = (float)( scaledTime - floor ( scaledTime ) );
 
-        for ( int j = 0; j < 2; j++ )
+    case 1:
         {
-            for ( int i = 0; i < numBlocks; i++ )
+            // Horizontal circle around your head.
+            const int   numBlocks = 10;
+            const float radius = 1.0f;
+            Matrix4f    scaleUp = Matrix4f::Scaling(20.0f);
+            double      scaledTime = appTime * 0.1;
+            float       fracTime = (float)(scaledTime - floor(scaledTime));
+
+            for (int j = 0; j < 2; j++)
             {
-                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( MATH_FLOAT_PI * 2.0f );
-                Vector3f pos;
-                pos.x = BlocksCenter.x + radius * cosf ( angle );
-                pos.y = BlocksCenter.y;
-                pos.z = BlocksCenter.z + radius * sinf ( angle );
-                if ( j == 0 )
+                for (int i = 0; i < numBlocks; i++)
                 {
-                    pos.x = BlocksCenter.x - radius * cosf ( angle );
-                    pos.y = BlocksCenter.y - 0.5f;
+                    float angle = (((float)i / numBlocks) + fracTime) * (MATH_FLOAT_PI * 2.0f);
+                    Vector3f pos;
+                    pos.x = BlocksCenter.x + radius * cosf(angle);
+                    pos.y = BlocksCenter.y;
+                    pos.z = BlocksCenter.z + radius * sinf(angle);
+                    if (j == 0)
+                    {
+                        pos.x = BlocksCenter.x - radius * cosf(angle);
+                        pos.y = BlocksCenter.y - 0.5f;
+                    }
+                    Matrix4f mat = Matrix4f::Translation(pos);
+                    SmallGreenCube.Render(pRender, hmdToEyeViewOffset * View * mat * scaleUp);
                 }
-                Matrix4f mat = Matrix4f::Translation ( pos );
-                SmallGreenCube.Render(pRender, viewAdjust * View * mat * scaleUp);
             }
         }
-            }break;
+        break;
 
-    case 2: {
-        // Vertical circle around your head.
-        int const   numBlocks = 10;
-        float const radius = 1.0f;
-        Matrix4f    scaleUp = Matrix4f::Scaling ( 20.0f );
-        double      scaledTime = appTime * 0.1;
-        float       fracTime = (float)( scaledTime - floor ( scaledTime ) );
-
-        for ( int j = 0; j < 2; j++ )
+    case 2:
         {
-            for ( int i = 0; i < numBlocks; i++ )
+            // Vertical circle around your head.
+            const int   numBlocks = 10;
+            const float radius = 1.0f;
+            Matrix4f    scaleUp = Matrix4f::Scaling(20.0f);
+            double      scaledTime = appTime * 0.1;
+            float       fracTime = (float)(scaledTime - floor(scaledTime));
+
+            for (int j = 0; j < 2; j++)
             {
-                float angle = ( ( (float)i / numBlocks ) + fracTime ) * ( MATH_FLOAT_PI * 2.0f );
-                Vector3f pos;
-                pos.x = BlocksCenter.x;
-                pos.y = BlocksCenter.y + radius * cosf ( angle );
-                pos.z = BlocksCenter.z + radius * sinf ( angle );
-                if ( j == 0 )
+                for (int i = 0; i < numBlocks; i++)
                 {
-                    pos.x = BlocksCenter.x - 0.5f;
-                    pos.y = BlocksCenter.y - radius * cosf ( angle );
+                    float angle = (((float)i / numBlocks) + fracTime) * (MATH_FLOAT_PI * 2.0f);
+                    Vector3f pos;
+                    pos.x = BlocksCenter.x;
+                    pos.y = BlocksCenter.y + radius * cosf(angle);
+                    pos.z = BlocksCenter.z + radius * sinf(angle);
+                    if (j == 0)
+                    {
+                        pos.x = BlocksCenter.x - 0.5f;
+                        pos.y = BlocksCenter.y - radius * cosf(angle);
+                    }
+                    Matrix4f mat = Matrix4f::Translation(pos);
+                    SmallGreenCube.Render(pRender, hmdToEyeViewOffset * View * mat * scaleUp);
                 }
-                Matrix4f mat = Matrix4f::Translation ( pos );
-                SmallGreenCube.Render(pRender, viewAdjust * View * mat * scaleUp);
             }
         }
-            }break;
+        break;
 
-    case 3:{
-        // Bouncing.
-        int const   numBlocks = 10;
-        Matrix4f    scaleUp = Matrix4f::Scaling ( 20.0f );
-
-        for ( int i = 0; i < numBlocks; i++ )
+    case 3:
         {
-            double scaledTime = 4.0f * appTime / (double)i;
-            float fracTime = (float)( scaledTime - floor ( scaledTime ) );
+            // Bouncing.
+            const int   numBlocks = 10;
+            Matrix4f    scaleUp = Matrix4f::Scaling(20.0f);
 
-            Vector3f pos = BlocksCenter;
-            pos.z += (float)i;
-            pos.y += -1.5f + 4.0f * ( 2.0f * fracTime * ( 1.0f - fracTime ) );
-            Matrix4f mat = Matrix4f::Translation ( pos );
-            SmallGreenCube.Render(pRender, viewAdjust * View * mat * scaleUp);
+            for (int i = 1; i <= numBlocks; i++)
+            {
+                double scaledTime = 4.0f * appTime / (double)i;
+                float fracTime = (float)(scaledTime - floor(scaledTime));
+
+                Vector3f pos = BlocksCenter;
+                pos.z += (float)i;
+                pos.y += -1.5f + 4.0f * (2.0f * fracTime * (1.0f - fracTime));
+                Matrix4f mat = Matrix4f::Translation(pos);
+                SmallGreenCube.Render(pRender, hmdToEyeViewOffset * View * mat * scaleUp);
+            }
         }
-           }break;
+        break;
 
     default:
         BlocksShowType = 0;

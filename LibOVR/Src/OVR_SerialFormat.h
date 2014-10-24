@@ -5,16 +5,16 @@ Filename    :   OVR_SerialFormat.h
 Content     :   Serial Number format tools
 Created     :   June 12, 2014
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,22 +115,6 @@ public:
 	// Returns a long human-readable base32 string (20 characters), NOT a printed serial number
 	String ToBase32();
 };
-
-
-// Generates a Human-readable labels with built-in checksums
-// Returns false on error
-bool GenerateHumanString(int dataBits,               // Number of bits to store
-                         int checkBits,              // Number of extra bits of checksum data
-                         const unsigned char* input, // Bytes stored LSB-first
-                         int dataBytes,              // Size of data buffer in bytes
-                         String& resultStr);         // Output string
-
-// Returns number of bytes written to result, or zero on failure
-int ProcessHumanString(int dataBits,               // Number of bits to expect
-                       int checkBits,              // Number of extra bits of checksum data
-                       String humanStr,            // Human readable input string
-                       unsigned char* result,      // Output data buffer stored LSB-first
-                       int resultBytes);           // Size of result buffer in bytes
 
 
 //#define SERIAL_FORMAT_UNIT_TEST

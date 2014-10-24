@@ -5,16 +5,16 @@ Content     :   Implements Health and Safety Warning system.
 Created     :   July 7, 2014
 Authors     :   Paul Pedriana
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,7 @@ limitations under the License.
 #if defined(OVR_D3D_VERSION) && ((OVR_D3D_VERSION == 10) || (OVR_D3D_VERSION == 11))
 
 #define _WINSOCKAPI_             // Prevents <Windows.h> from #including <Winsock.h>, as we need the app to use <Winsock2.h> instead.
+#include "../../Kernel/OVR_Types.h"
 #include "../../OVR_CAPI_D3D.h"  // OVR_D3D_VERSION will have been defined by who included us.
 #include "CAPI_D3D1X_HSWDisplay.h"
 #include "../../Kernel/OVR_File.h"
@@ -38,10 +39,10 @@ limitations under the License.
 #include "../../Kernel/OVR_Color.h"
 
 // We currently borrow the SimpleQuad shaders
-#include "../Shaders/SimpleTexturedQuad_vs.h"
-#include "../Shaders/SimpleTexturedQuad_vs_refl.h"
-#include "../Shaders/SimpleTexturedQuad_ps.h"
-#include "../Shaders/SimpleTexturedQuad_ps_refl.h"
+#include "Shaders/SimpleTexturedQuad_vs.h"
+#include "Shaders/SimpleTexturedQuad_vs_refl.h"
+#include "Shaders/SimpleTexturedQuad_ps.h"
+#include "Shaders/SimpleTexturedQuad_ps_refl.h"
 
 
 /*

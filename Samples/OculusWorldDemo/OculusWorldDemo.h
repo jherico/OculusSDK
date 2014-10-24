@@ -6,7 +6,7 @@ Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
 				Peter Hoff, Dan Goodman, Bryan Croteau                
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -156,13 +156,18 @@ public:
     { HmdSettingsChanged = true; NotificationTimeout = ovr_GetTimeInSeconds() + 10.0f;}
     
     void BlockShowChange(OptionVar* = 0)    { BlocksCenter = ThePlayer.BodyPos; }
-    void EyeHeightChange(OptionVar* = 0)    { ThePlayer.BodyPos.y = ThePlayer.UserEyeHeight; }    
+    void EyeHeightChange(OptionVar* = 0)
+    {
+        ThePlayer.HeightScale = ScaleAffectsEyeHeight ? PositionTrackingScale : 1.0f;
+        ThePlayer.BodyPos.y = ThePlayer.GetScaledEyeHeight();
+    }
 
 	void HmdSensorToggle(OptionVar* = 0);
     void HmdSettingChangeFreeRTs(OptionVar* = 0);
     void MultisampleChange(OptionVar* = 0);
     void CenterPupilDepthChange(OptionVar* = 0);
     void DistortionClearColorChange(OptionVar* = 0);
+    void ToggleLogging(OptionVar* = 0);
 
     void ResetHmdPose(OptionVar* = 0);
 
@@ -183,7 +188,7 @@ protected:
     struct RenderTarget
     {
         Ptr<Texture>     pTex;
-        ovrTexture       Tex;
+        ovrTexture       OvrTex;
     };
     enum RendertargetsEnum
     {
@@ -193,7 +198,8 @@ protected:
         Rendertarget_LAST
     };
     RenderTarget        RenderTargets[Rendertarget_LAST];
-
+    RenderTarget        MsaaRenderTargets[Rendertarget_LAST];
+    RenderTarget*       DrawEyeTargets; // the buffers we'll actually render to (could be MSAA)
 
     // ***** Oculus HMD Variables
 
@@ -212,7 +218,6 @@ protected:
     enum { SecondsOfFpsMeasurement = 1 };
     int                 FrameCounter;
 	int					TotalFrameCounter;
-    double              NextFPSUpdate;	
     float               SecondsPerFrame;
     float               FPS;
     double              LastFpsUpdate;
@@ -267,10 +272,13 @@ protected:
     bool                RendertargetIsSharedByBothEyes;
     bool                DynamicRezScalingEnabled;
 	bool                EnableSensor;
-    bool                ForceZeroIpd;
+    bool                MonoscopicRender;
+    float               PositionTrackingScale;
+    bool                ScaleAffectsEyeHeight;
     float               DesiredPixelDensity;    
     float               FovSideTanMax;
-    float               FovSideTanLimit; // Limit value for Fov.    
+    float               FovSideTanLimit; // Limit value for Fov.   
+
     // Time-warp.
     bool                TimewarpEnabled;
     bool                TimewarpNoJitEnabled;
@@ -280,11 +288,13 @@ protected:
 
     // Other global settings.
     float               CenterPupilDepthMeters;
-    // float               IPD;
     bool                ForceZeroHeadMovement;
     bool                VsyncEnabled;
     bool                MultisampleEnabled;
-    // DK2 only
+#if defined(OVR_OS_LINUX)
+    bool                LinuxFullscreenOnDevice;
+#endif
+    // DK2 only:
     bool                IsLowPersistence;
     bool                DynamicPrediction;
     bool                DisplaySleep;
@@ -301,6 +311,8 @@ protected:
     bool                ShiftDown;
     bool                CtrlDown;
 
+    // Logging
+    bool                IsLogging;
 
     // ***** Scene Rendering Modes
 

@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,6 +117,7 @@ typedef D3D11_QUERY_DESC        D3D1x_QUERY_DESC;
 
 class Buffer;
 
+
 class ShaderBase : public Render::Shader
 {
 public:
@@ -127,7 +128,8 @@ public:
     struct Uniform
     {
         String Name;
-        int    Offset, Size;
+        int    Offset;
+        int    Size;
     };
     Array<Uniform> UniformInfo;
 
@@ -140,6 +142,7 @@ public:
 
     void UpdateBuffer(Buffer* b);
 };
+
 
 template<Render::ShaderStage SStage, class D3DShaderType>
 class Shader : public ShaderBase
@@ -186,7 +189,13 @@ public:
     bool              Dynamic;
 
 public:
-    Buffer(RenderDevice* r) : Ren(r), Size(0), Use(0) {}
+    Buffer(RenderDevice* r) :
+        Ren(r),
+        Size(0),
+        Use(0),
+        Dynamic(false)
+    {
+    }
     ~Buffer();
 
     ID3D1xBuffer* GetBuffer()
@@ -199,9 +208,10 @@ public:
         return Size;
     }
     virtual void*  Map(size_t start, size_t size, int flags = 0);
-    virtual bool   Unmap(void *m);
+    virtual bool   Unmap(void* m);
     virtual bool   Data(int use, const void* buffer, size_t size);
 };
+
 
 class Texture : public Render::Texture
 {
@@ -215,6 +225,7 @@ public:
     mutable Ptr<ID3D1xSamplerState> Sampler;
     int                             Width, Height;
     int                             Samples;
+    int                             Format;
 
     Texture(RenderDevice* r, int fmt, int w, int h);
     ~Texture();
@@ -239,8 +250,8 @@ public:
 	virtual ovrTexture Get_ovrTexture();
 
 	virtual void* GetInternalImplementation();
-
 };
+
 
 class RenderDevice : public Render::RenderDevice
 {
@@ -302,7 +313,7 @@ public:
     // to get the latest info about monitors (including just connected/
     // disconnected ones). Note, SwapChain will be released in this case
     // and it should be recreated.
-    void        UpdateMonitorOutputs(bool needRecreate = false);
+    void         UpdateMonitorOutputs(bool needRecreate = false);
 
     virtual void SetViewport(const Recti& vp);
     virtual void SetWindowSize(int w, int h);
@@ -337,6 +348,8 @@ public:
 
     Texture* GetDepthBuffer(int w, int h, int ms);
 
+    virtual void ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Texture* outputTex) OVR_OVERRIDE;
+
     virtual void BeginRendering();
     virtual void SetRenderTarget(Render::Texture* color,
                                  Render::Texture* depth = NULL, Render::Texture* stencil = NULL);
@@ -348,7 +361,7 @@ public:
         ExtraShaders = s;
     }
 
-    // Overrident to apply proper blend state.
+    // Overridden to apply proper blend state.
     virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view=NULL);
     virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view);
 	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view=NULL);
@@ -377,6 +390,7 @@ public:
     virtual void EndGpuEvent();
 };
 
-}}}
+
+}}} // namespace OVR::Render::D3D1?
 
 #endif

@@ -12,16 +12,16 @@ Notes       :
    can be accomplished in game via the Profile API or by the official Oculus Configuration
    Utility.
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,6 +41,8 @@ limitations under the License.
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Shlobj.h>
+#elif defined(OVR_OS_MS) // Other Microsoft OSs
+// Nothing, thanks.
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -77,6 +79,11 @@ ProfileDeviceKey::ProfileDeviceKey(const HMDInfo* info) :
         {
             Valid = true;
         }
+    }
+    else
+    {
+        ProductId = 0;
+        HmdType = HmdType_None;
     }
 }
 
@@ -137,6 +144,12 @@ String GetBaseOVRPath(bool create_dir)
         }
     }
 
+#elif defined(OVR_OS_OS) // Other Microsoft OSs
+
+    // TODO: figure this out.
+    OVR_UNUSED ( create_dir );
+    path = "";
+        
 #elif defined(OVR_OS_MAC)
 
     const char* home = getenv("HOME");
@@ -432,7 +445,7 @@ void ProfileManager::LoadCache(bool create)
     {
         // Verify the file format and version
         JSON* version_item = root->GetFirstItem();
-        if (version_item->Name == "Oculus Profile Version")
+        if (version_item && version_item->Name == "Oculus Profile Version")
         {
             int major = atoi(version_item->Value.ToCStr());
             if (major != 2)
@@ -452,6 +465,10 @@ void ProfileManager::LoadV1Profiles(JSON* v1)
     JSON* item0 = v1->GetFirstItem();
     JSON* item1 = v1->GetNextItem(item0);
     JSON* item2 = v1->GetNextItem(item1);
+
+    OVR_ASSERT(item1 && item2);
+    if(!item1 || !item2)
+        return;
 
     // Create the new profile database
     Ptr<JSON> root = *JSON::CreateObject();
@@ -655,6 +672,37 @@ bool ProfileManager::CreateUser(const char* user, const char* name)
 
     Changed = true;
     return true;
+}
+
+bool ProfileManager::HasUser(const char* user)
+{
+	Lock::Locker lockScope(&ProfileLock);
+
+	if (ProfileCache == NULL)
+	{   // Load the cache
+		LoadCache(false);
+		if (ProfileCache == NULL)
+			return false;
+	}
+
+	JSON* users = ProfileCache->GetItemByName("Users");
+	if (users == NULL)
+		return false;
+
+	// Remove this user from the User table
+	JSON* user_item = users->GetFirstItem();
+	while (user_item)
+	{
+		JSON* userid = user_item->GetItemByName("User");
+		if (OVR_strcmp(user, userid->Value) == 0)
+		{   
+			return true;
+		}
+
+		user_item = users->GetNextItem(user_item);
+	}
+
+	return false;
 }
 
 // Returns the user id of a specific user in the list.  The returned 
@@ -1395,6 +1443,9 @@ int Profile::GetDoubleValues(const char* key, double* values, int num_vals) cons
 //-----------------------------------------------------------------------------
 void Profile::SetValue(JSON* val)
 {
+    if (val == NULL)
+        return;
+
     if (val->Type == JSON_Number)
         SetDoubleValue(val->Name, val->dValue);
     else if (val->Type == JSON_Bool)
@@ -1403,9 +1454,6 @@ void Profile::SetValue(JSON* val)
         SetValue(val->Name, val->Value);
     else if (val->Type == JSON_Array)
     {
-        if (val == NULL)
-            return;
-
         // Create a copy of the array
         JSON* value = val->Copy();
         Values.PushBack(value);

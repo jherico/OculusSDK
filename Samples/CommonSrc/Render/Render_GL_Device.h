@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for OpenGL
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse, David Borel
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,6 +62,7 @@ extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
 
 #endif
 
+extern PFNGLGETSTRINGIPROC                      glGetStringi;
 extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
 extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 extern PFNGLDELETESHADERPROC                    glDeleteShader;
@@ -102,6 +103,7 @@ extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
 extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
 extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
 extern PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
+extern PFNGLTEXIMAGE2DMULTISAMPLEPROC           glTexImage2DMultisample;
 extern PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
 extern PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
 extern PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
@@ -109,6 +111,7 @@ extern PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
 extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
 extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
+extern PFNGLBLITFRAMEBUFFEREXTPROC              glBlitFramebuffer;
 
 extern void InitGLExtensions();
 
@@ -116,22 +119,26 @@ extern void InitGLExtensions();
 
 
 
-//// GLVersion
-
-/*
-    FIXME: CODE DUPLICATION WARNING
-
-    Right now we have this same code in CommonSrc and in CAPI::GL.
-    At some point we need to consolidate these, in Kernel or Util.
-    Be sure to update both locations for now!
-*/
-
-struct GLVersionAndExtensions
+//// GLVersionAndExtensions
+//
+// FIXME: CODE DUPLICATION WARNING
+// Right now we have this same code in CommonSrc and in CAPI::GL.
+// At some point we need to consolidate these, in Kernel or Util.
+// Be sure to update both locations for now!
+//
+// This class needs to be initialized at runtime with GetGLVersionAndExtensions,
+// after an OpenGL context has been created. It must be re-initialized any time
+// a new OpenGL context is created, as the new context may differ in version or
+// supported functionality.
+class GLVersionAndExtensions
 {
+public:
     // Version information
     int         MajorVersion;        // Best guess at major version
     int         MinorVersion;        // Best guess at minor version
+    int         WholeVersion;        // Equals ((MajorVersion * 100) + MinorVersion). Example usage: if(glv.WholeVersion >= 302) // If OpenGL v3.02+ ...
     bool        IsGLES;              // Open GL ES?
+    bool        IsCoreProfile;       // Is the current OpenGL context a core profile context? Its trueness may be a false positive but will never be a false negative.
 
     // Extension information
     bool        SupportsVAO;         // Supports Vertex Array Objects?
@@ -139,17 +146,183 @@ struct GLVersionAndExtensions
     const char* Extensions;          // Other extensions string (will not be null)
 
     GLVersionAndExtensions()
+      : MajorVersion(0),
+        MinorVersion(0),
+        WholeVersion(0),
+        IsGLES(false),
+        IsCoreProfile(false),
+        SupportsDrawBuffers(false),
+        SupportsVAO(false),
+        Extensions("")
     {
-        IsGLES = false;
-        MajorVersion = 0;
-        MinorVersion = 0;
-        SupportsDrawBuffers = false;
-        SupportsVAO = false;
-        Extensions = "";
     }
+
+    bool HasGLExtension(const char* searchKey) const;
+
+protected:
+    friend void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
+
+    void ParseGLVersion();
+    void ParseGLExtensions();
 };
 
 void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
+
+
+
+//// DebugCallback
+//
+// Used for high level usage and control of the various OpenGL debug output extensions. This is useful for 
+// intercepting all OpenGL errors in a single place.
+// This functionality is specific to OpenGL and no analog exists in DirectX, as DirectX doesn't support
+// debug callbacks.
+//
+// Example basic usage:
+//     DebugCallback glDebug;
+//
+//     <initialize OpenGL context>
+//     glDebug.Initialize();
+//     glDebug.SetMinSeverity(SeverityMedium, SeverityHigh);
+//     <use OpenGL. Debug output will be logged by default.>
+//     glDebug.Shutdown();
+//     <destroy OpenGL context>
+//
+// There are three OpenGL API debug interfaces, each being an evolution of its predecessor:
+//     AMD_debug_output - https://www.opengl.org/registry/specs/AMD/debug_output.txt
+//     ARB_debug_output - https://www.opengl.org/registry/specs/ARB/debug_output.txt
+//     KHR_debug        - https://www.opengl.org/registry/specs/KHR/debug.txt
+//
+// If the AMD_debug_output functionality is present in the OpenGL headers, GL_AMD_debug_output will be defined by glext.h.
+// If the ARB_debug_output functionality is present in the OpenGL headers, GL_ARB_debug_output will be defined by glext.h.
+// If the KHR_debug functionality is present in the OpenGL headers, GL_KHR_debug will be defined.
+//
+// As of at least XCode 5.1, debug functionality isn't yet supported by Macintosh OS X.
+// KHR_debug is part of the OpenGL 4.3 core profile. It uses the same interface as the ARB extension along with some additions.
+// The KHR_debug functionality doesn't include an API suffix (e.g. you would call glDebugMessageCallback).
+// OpenGL ES supports KHR debug callbacks as of v3.1. However, for OpenGL ES entry points use the "KHR" suffix (e.g. glDebugMessageCallbackKHR).
+// With the KHR version you can control debug messages at runtime with glEnable/glDisable(DEBUG_OUTPUT).
+// The KHR_debug functionality requires that the OpenGL context be created with the CONTEXT_FLAG_DEBUG_BIT.
+//     Windows wglCreateContextAttribsARB should be done with WGL_CONTEXT_DEBUG_BIT_ARB with in WGL_CONTEXT_FLAGS.
+//     Linux glXCreateContext should be done with GLX_CONTEXT_DEBUG_BIT_ARB set in GLX_CONTEXT_FLAGS.
+
+// We manually declare types and define values that aren't already declared and defined. This is because this functionality
+// is fairly recent (2010 through 2014) and isn't present in all OpenGL headers and implementations.
+#ifndef GL_AMD_debug_output
+    typedef void   (APIENTRY *GLDEBUGPROCAMD)(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGEENABLEAMDPROC)  (GLenum category, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKAMDPROC)(GLDEBUGPROCAMD callback, GLvoid *userParam);
+
+    #define GL_DEBUG_CATEGORY_API_ERROR_AMD 0x9149
+    #define GL_DEBUG_CATEGORY_OTHER_AMD     0x9150
+    #define GL_DEBUG_SEVERITY_LOW_AMD       0x9148
+#endif
+
+#ifndef GL_ARB_debug_output
+    typedef void   (APIENTRY *GLDEBUGPROCARB)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECONTROLARBPROC) (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKARBPROC)(GLDEBUGPROCARB callback, const void *userParam);
+
+    // We don't define anything here because the defines are the same as the KHR defines below (aside from the _ARB suffix).
+#endif
+
+#ifndef GL_KHR_debug // The following defines were added to OpenGL 4.3+ headers.
+    typedef void   (APIENTRY *GLDEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECONTROLPROC) (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
+    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKPROC)(GLDEBUGPROC callback, const void *userParam);
+
+    #define GL_DEBUG_CALLBACK_FUNCTION          0x8244
+    #define GL_DEBUG_CALLBACK_USER_PARAM        0x8245
+    #define GL_DEBUG_TYPE_MARKER                0x8268
+    #define GL_DEBUG_TYPE_PUSH_GROUP            0x8269
+    #define GL_DEBUG_TYPE_POP_GROUP             0x826A
+    #define GL_DEBUG_OUTPUT_SYNCHRONOUS         0x8242
+    #define GL_DEBUG_SEVERITY_NOTIFICATION      0x826b
+    #define GL_DEBUG_SEVERITY_LOW               0x9148
+    #define GL_DEBUG_SEVERITY_MEDIUM            0x9147
+    #define GL_DEBUG_SEVERITY_HIGH              0x9146
+    #define GL_DEBUG_SOURCE_APPLICATION         0x824A
+    #define GL_DEBUG_SOURCE_OTHER               0x824b
+    #define GL_DEBUG_SOURCE_API                 0x8246
+    #define GL_DEBUG_TYPE_ERROR                 0x824C
+    #define GL_DEBUG_TYPE_OTHER                 0x8251
+    #define GL_DEBUG_OUTPUT                     0x92E0
+#endif
+
+
+class DebugCallback
+{
+public:
+    DebugCallback();
+   ~DebugCallback();
+
+    // Initialize must be called after the OpenGL context is created.
+    void Initialize();
+
+    // Shutdown must be called before the OpenGL context is destroyed.
+    void Shutdown();
+
+    enum Implementation
+    {
+        ImplementationNone,
+        ImplementationAMD,      // Oldest version, deprecated by later versions.
+        ImplementationARB,      // ARB version, deprecated by KHR version.
+        ImplementationKHR       // OpenGL 4.3+ core profile version.
+    };
+
+    // Will return ImplementationNone until Initialize has been called, at which point it will return the version used.
+    Implementation GetImplementation() const;
+
+    // Maps to glEnable(GL_DEBUG_OUTPUT) when it is available, else does nothing. This controls debug output at the driver
+    // level and can be used, for example, to temporarily disable debug output that some other application entity enabled
+    // via glDebugMessageCallback. In practice this is available only when KHR_debug is available
+    void EnableGLDebug(bool enabled);
+
+    enum Severity // These are a mirror of the OpenGL types.
+    {
+        SeverityNone = 0,
+        SeverityNotification,
+        SeverityLow,
+        SeverityMedium,
+        SeverityHigh,
+        SeverityDisabled        // When min severity is set to this level, it is never logged or assertion-failed.
+    };
+
+    // Set the severity required before we log or assert on a debug message. Default is SeverityHigh/SeverityHigh.
+    void SetMinSeverity(Severity minLogSeverity, Severity minAssertSeverity);
+
+    // Returns the debug callback currently used by OpenGL.
+    // This works for both ARB and KHR implementations. The same debug callback is used by OpenGL implementations for both.
+    // However, you can call GetImplementation to see which of the two we are using. This functionality is not available 
+    // with the AMD implementation. Returns false and sets debugCallback and userParam to NULL if there is no existing callback.
+    bool GetGLDebugCallback(PFNGLDEBUGMESSAGECALLBACKPROC* debugCallback, const void** userParam) const;
+
+protected:
+    void DebugCallbackInternal(Severity s, const char* pSource, const char* pType, GLuint id, const char* pSeverity, const char* message);
+
+    // ARB and KHR debug handler
+    static void APIENTRY DebugMessageCallback(GLenum Source, GLenum Type, GLuint Id, GLenum Severity, GLsizei Length, const GLchar* Message, GLvoid* UserParam);
+    static const char*   GetSource(GLenum Source);
+    static const char*   GetType(GLenum Type);
+    static const char*   GetSeverity(GLenum Severity);
+
+    // AMD handler 
+    static void APIENTRY DebugMessageCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
+    static const char*   GetCategoryAMD(GLenum Category);
+
+protected:
+    bool                             Initialized;
+    int                              MinLogSeverity;                // Minimum severity for us to log the event.
+    int                              MinAssertSeverity;             // Minimum severity for us to assertion-fail the event.
+    PFNGLDEBUGMESSAGECALLBACKPROC    glDebugMessageCallback;
+    PFNGLDEBUGMESSAGECONTROLPROC     glDebugMessageControl;
+    PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB;     // glDebugMessageCallbackARB is the same as glDebugMessageCallback and may not need to be a separate variable.
+    PFNGLDEBUGMESSAGECONTROLARBPROC  glDebugMessageControlARB;
+    PFNGLDEBUGMESSAGECALLBACKAMDPROC glDebugMessageCallbackAMD;
+    PFNGLDEBUGMESSAGEENABLEAMDPROC   glDebugMessageControlAMD;
+};
+
+
+
 
 
 class RenderDevice;
@@ -179,16 +352,17 @@ class Texture : public Render::Texture
 public:
     RenderDevice* Ren;
     GLuint        TexId;
-    int           Width, Height;
+    int           Width, Height, Samples;
 
-    Texture(RenderDevice* r, int w, int h);
+    Texture(RenderDevice* r, int w, int h, int samples);
     ~Texture();
 
     virtual int GetWidth() const { return Width; }
     virtual int GetHeight() const { return Height; }
+    virtual int GetSamples() const { return Samples; }
 
     virtual void SetSampleMode(int);
-	virtual ovrTexture Get_ovrTexture();
+    virtual ovrTexture Get_ovrTexture();
 
     virtual void Set(int slot, ShaderStage stage = Shader_Fragment) const;
 };
@@ -204,7 +378,7 @@ public:
         Compile(src);
     }
 
-	~Shader();
+    ~Shader();
     bool Compile(const char* src);
 
     GLenum GLStage() const
@@ -231,6 +405,8 @@ public:
         String Name;
         int    Location, Size;
         int    Type; // currently number of floats in vector
+
+        Uniform() : Name(), Location(0), Size(0), Type(0){}
     };
     Array<Uniform> UniformInfo;
 
@@ -243,7 +419,7 @@ public:
     ~ShaderSet();
 
     virtual void SetShader(Render::Shader *s);
-	virtual void UnsetShader(int stage);
+    virtual void UnsetShader(int stage);
 
     virtual void Set(PrimitiveType prim) const;
 
@@ -275,14 +451,15 @@ class RenderDevice : public Render::RenderDevice
 
     Matrix4f    Proj;
 
-	GLuint Vao;
+    GLuint Vao;
 
 protected:
     Ptr<Texture>             CurRenderTarget;
     Array<Ptr<Texture> >     DepthBuffers;
     GLuint                   CurrentFbo;
+    GLuint                   MsaaFbo;
     GLVersionAndExtensions   GLVersionInfo;
-
+    DebugCallback            DebugCallbackControl;
     const LightingParams*    Lighting;
 
 public:
@@ -290,11 +467,11 @@ public:
     virtual ~RenderDevice();
 
     virtual void Shutdown();
-	
+    
     virtual void FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex);
 
     virtual void SetViewport(const Recti& vp);
-		
+        
     virtual void WaitUntilGpuIdle();
     virtual void Flush();
 
@@ -307,6 +484,8 @@ public:
     virtual void SetWorldUniforms(const Matrix4f& proj);
 
     Texture* GetDepthBuffer(int w, int h, int ms);
+
+    virtual void ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Texture* outputTex) OVR_OVERRIDE;
 
     virtual void Present (bool withVsync){OVR_UNUSED(withVsync);};
     virtual void SetRenderTarget(Render::Texture* color,
@@ -330,6 +509,7 @@ public:
 
     void SetTexture(Render::ShaderStage, int slot, const Texture* t);
 };
+
 
 
 }}}

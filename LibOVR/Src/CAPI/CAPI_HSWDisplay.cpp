@@ -5,16 +5,16 @@ Content     :   Implements Health and Safety Warning system.
 Created     :   July 3, 2014
 Authors     :   Paul Pedriana
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,7 +29,7 @@ limitations under the License.
 #include "../Kernel/OVR_Log.h"
 #include "../Kernel/OVR_String.h"
 #include "Textures/healthAndSafety.tga.h" // TGA file as a C array declaration.
-
+#include <stdlib.h>
 
 //-------------------------------------------------------------------------------------
 // ***** HSWDISPLAY_DEBUGGING
@@ -88,6 +88,7 @@ extern "C"
 
 
 
+
 //-------------------------------------------------------------------------------------
 // ***** HSWDisplay implementation
 //
@@ -116,6 +117,7 @@ HSWDisplay::HSWDisplay(ovrRenderAPIType renderAPIType, ovrHmd hmd, const HMDRend
     SDKRendered(false),
     DismissRequested(false),
     RenderEnabled(true),
+    UnloadGraphicsRequested(false),
     StartTime(0.0),
     DismissibleTime(0.0),
     LastPollTime(0.0),
@@ -123,7 +125,9 @@ HSWDisplay::HSWDisplay(ovrRenderAPIType renderAPIType, ovrHmd hmd, const HMDRend
     HMDMounted(false),
     HMDNewlyMounted(false),
     RenderAPIType(renderAPIType), 
-    RenderState(hmdRenderState)
+    RenderState(hmdRenderState),
+    LastProfileName(),
+    LastHSWTime(0)
 {
 }
 
@@ -211,7 +215,7 @@ bool HSWDisplay::Dismiss()
 }
 
 
-bool HSWDisplay::TickState(ovrHSWDisplayState *hswDisplayState)
+bool HSWDisplay::TickState(ovrHSWDisplayState *hswDisplayState, bool graphicsContext)
 {
     bool newlyDisplayed = false;
     const double currentTime = ovr_GetTimeInSeconds();
@@ -249,40 +253,42 @@ bool HSWDisplay::TickState(ovrHSWDisplayState *hswDisplayState)
             }
         }
     }
-    else
+    else if (Enabled && (currentTime >= (LastPollTime + HSWDISPLAY_POLL_INTERVAL)))
     {
-        if (Enabled && (currentTime >= (LastPollTime + HSWDISPLAY_POLL_INTERVAL)))
+        LastPollTime = currentTime;
+
+        // We need to display if any of the following are true:
+        //     - The application is just started in Event Mode while the HMD is mounted (warning display would be viewable) and this app was not spawned from a launcher.
+        //     - The current user has never seen the display yet while the HMD is mounted (warning display would be viewable).
+        //     - The HMD is newly mounted (or the warning display is otherwise newly viewable).
+        //     - The warning display hasn't shown in 24 hours (need to verify this as a requirement).
+        // Event Mode refers to when the app is being run in a public demo event such as a trade show.
+
+        OVR::CAPI::HMDState* pHMDState = (OVR::CAPI::HMDState*)HMD->Handle;
+
+        if(pHMDState)
         {
-            LastPollTime = currentTime;
+            const time_t lastDisplayedTime = HSWDisplay::GetCurrentProfileLastHSWTime();
 
-            // We need to display if any of the following are true:
-            //     - The application is just started in Event Mode while the HMD is mounted (warning display would be viewable) and this app was not spawned from a launcher.
-            //     - The current user has never seen the display yet while the HMD is mounted (warning display would be viewable).
-            //     - The HMD is newly mounted (or the warning display is otherwise newly viewable).
-            //     - The warning display hasn't shown in 24 hours (need to verify this as a requirement).
-            // Event Mode refers to when the app is being run in a public demo event such as a trade show.
+            // We currently unilaterally set HMDMounted to true because we don't yet have the ability to detect this. To do: Implement this when possible.
+            const bool previouslyMounted = HMDMounted;
+            HMDMounted = true;
+            HMDNewlyMounted = (!previouslyMounted && HMDMounted); // We set this back to false in the Display function or if the HMD is unmounted before then.
 
-            OVR::CAPI::HMDState* pHMDState = (OVR::CAPI::HMDState*)HMD->Handle;
-
-            if(pHMDState)
+            if((lastDisplayedTime == HSWDisplayTimeNever) || HMDNewlyMounted)
             {
-                const time_t lastDisplayedTime = HSWDisplay::GetCurrentProfileLastHSWTime();
-
-                // We currently unilaterally set HMDMounted to true because we don't yet have the ability to detect this. To do: Implement this when possible.
-                const bool previouslyMounted = HMDMounted;
-                HMDMounted = true;
-                HMDNewlyMounted = (!previouslyMounted && HMDMounted); // We set this back to false in the Display function or if the HMD is unmounted before then.
-
-                if((lastDisplayedTime == HSWDisplayTimeNever) || HMDNewlyMounted)
+                if(IsDisplayViewable()) // If the HMD is mounted and otherwise being viewed by the user...
                 {
-                    if(IsDisplayViewable()) // If the HMD is mounted and otherwise being viewed by the user...
-                    {
-                        Display();
-                        newlyDisplayed = true;
-                    }
+                    Display();
+                    newlyDisplayed = true;
                 }
             }
         }
+    }
+    else if(graphicsContext && UnloadGraphicsRequested)
+    {
+        UnloadGraphics();
+        UnloadGraphicsRequested = false;
     }
 
     if(hswDisplayState)
@@ -296,9 +302,12 @@ void HSWDisplay::GetState(ovrHSWDisplayState *hswDisplayState) const
 {
     // Return the state to the caller.
     OVR_ASSERT(hswDisplayState != NULL);
-    hswDisplayState->Displayed = Displayed;
-    hswDisplayState->StartTime = StartTime;
-    hswDisplayState->DismissibleTime = DismissibleTime;
+    if(hswDisplayState)
+    {
+        hswDisplayState->Displayed = Displayed;
+        hswDisplayState->StartTime = StartTime;
+        hswDisplayState->DismissibleTime = DismissibleTime;
+    }
 }
 
 
@@ -386,8 +395,8 @@ void HSWDisplay::GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f 
     const Vector2f orthoScale0   = Vector2f(1.f) / Vector2f(RenderState.EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
     const Vector2f orthoScale1   = Vector2f(1.f) / Vector2f(RenderState.EyeRenderDesc[1].PixelsPerTanAngleAtCenter);
     
-    OrthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, RenderState.EyeRenderDesc[0].ViewAdjust.x);
-    OrthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, RenderState.EyeRenderDesc[1].ViewAdjust.x);
+    OrthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, RenderState.EyeRenderDesc[0].HmdToEyeViewOffset.x);
+    OrthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, RenderState.EyeRenderDesc[1].HmdToEyeViewOffset.x);
 }
 
 
@@ -410,7 +419,7 @@ const uint8_t* HSWDisplay::GetDefaultTexture(size_t& TextureSize)
 
 #if defined (OVR_OS_WIN32)
     #define OVR_D3D_VERSION 9
-    #include "D3D1X/CAPI_D3D9_HSWDisplay.h"
+    #include "D3D9/CAPI_D3D9_HSWDisplay.h"
     #undef  OVR_D3D_VERSION
 
     #define OVR_D3D_VERSION 10

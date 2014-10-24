@@ -7,12 +7,6 @@
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_Util.cpp">
       <Filter>CAPI\D3D1X</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_DistortionRenderer.cpp">
-      <Filter>CAPI\D3D1X</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_Util.cpp">
-      <Filter>CAPI\D3D1X</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_DistortionRenderer.cpp">
       <Filter>CAPI\D3D1X</Filter>
     </ClCompile>
@@ -162,9 +156,6 @@
     <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp">
       <Filter>CAPI</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_HSWDisplay.cpp">
-      <Filter>CAPI\D3D1X</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_HSWDisplay.cpp">
       <Filter>CAPI\D3D1X</Filter>
     </ClCompile>
@@ -174,15 +165,27 @@
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.cpp">
       <Filter>CAPI\GL</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_LatencyStatistics.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Util\Util_SystemInfo.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_DistortionRenderer.h">
       <Filter>CAPI\D3D1X</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_Util.h">
-      <Filter>CAPI\D3D1X</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_DistortionRenderer.h">
       <Filter>CAPI\D3D1X</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_DistortionRenderer.h">
@@ -384,9 +387,6 @@
     <ClInclude Include="..\..\..\Src\CAPI\Textures\healthAndSafety.tga.h">
       <Filter>CAPI\Textures</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D9_HSWDisplay.h">
-      <Filter>CAPI\D3D1X</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D10_HSWDisplay.h">
       <Filter>CAPI\D3D1X</Filter>
     </ClInclude>
@@ -396,45 +396,25 @@
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.h">
       <Filter>CAPI\GL</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionTimewarpChroma_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionTimewarp_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\DistortionChroma_ps.psh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\Distortion_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\Distortion_ps.psh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleQuad_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleQuad_ps.psh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_ps.psh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\..\..\Src\CAPI\Shaders\SimpleTexturedQuad_vs.vsh">
-      <Filter>CAPI\Shaders</Filter>
-    </CustomBuild>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_LatencyStatistics.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_SystemInfo.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.h">
+      <Filter>CAPI\D3D9</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.h">
+      <Filter>CAPI\D3D9</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="CAPI">
       <UniqueIdentifier>{42ff86e1-b618-4432-99ce-e6b92c7460eb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="CAPI\Shaders">
-      <UniqueIdentifier>{a65a3889-6d00-4a76-acfe-6db1249f104d}</UniqueIdentifier>
     </Filter>
     <Filter Include="CAPI\D3D1X">
       <UniqueIdentifier>{77e1d16e-00a1-4130-8ee6-f81d1e850859}</UniqueIdentifier>
@@ -466,5 +446,27 @@
     <Filter Include="CAPI\Textures">
       <UniqueIdentifier>{4133d45b-be4b-4813-afea-9ad61ce3fe11}</UniqueIdentifier>
     </Filter>
+    <Filter Include="CAPI\D3D9">
+      <UniqueIdentifier>{723b8d80-1ae0-4e67-9dec-9b3397726d86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CAPI\D3D1X\Shaders">
+      <UniqueIdentifier>{c6fb4a59-0089-41c0-b5c8-5e429addacfe}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_ps.psh">
+      <Filter>CAPI\D3D1X\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_vs.vsh">
+      <Filter>CAPI\D3D1X\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_ps.psh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_vs.vsh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarpChroma_vs.vsh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarp_vs.vsh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_ps.psh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_vs.vsh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_ps.psh" />
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_vs.vsh" />
   </ItemGroup>
 </Project>

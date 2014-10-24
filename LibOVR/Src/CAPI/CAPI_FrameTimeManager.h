@@ -5,16 +5,16 @@ Content     :   Manage frame timing and pose prediction for rendering
 Created     :   November 30, 2013
 Authors     :   Volga Aksoy, Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,7 +34,9 @@ limitations under the License.
 
 namespace OVR { namespace CAPI {
 
+
 //-------------------------------------------------------------------------------------
+// ***** TimeDeltaCollector
 
 // Helper class to collect median times between frames, so that we know
 // how long to wait. 
@@ -42,18 +44,19 @@ struct TimeDeltaCollector
 {
     TimeDeltaCollector() : Median(-1.0), Count(0), ReCalcMedian(true) { }
 
-    void    AddTimeDelta(double timeSeconds);    
-    void    Clear() { Count = 0; }    
+    void    AddTimeDelta(double timeSeconds);
+    void    Clear() { Count = 0; }
 
     double  GetMedianTimeDelta() const;
+    double  GetMedianTimeDeltaNoFirmwareHack() const;
 
     double  GetCount() const { return Count; }
 
     enum { Capacity = 12 };
 private:
-	double  TimeBufferSeconds[Capacity];
-	mutable double  Median;
-	int     Count;
+    double  TimeBufferSeconds[Capacity];
+    mutable double  Median;
+    int     Count;
     mutable bool    ReCalcMedian;
 };
 
@@ -87,7 +90,7 @@ public:
     void MatchRecord(const Util::FrameTimeRecordSet &r);   
 
     bool IsLatencyTimingAvailable();
-    void GetLatencyTimings(float latencies[3]);
+    void GetLatencyTimings(float& latencyRender, float& latencyTimewarp, float& latencyPostPresent);
 
     void Reset();
 
@@ -193,8 +196,10 @@ public:
     // Thread-safe function to query timing for a future frame
     Timing  GetFrameTiming(unsigned frameIndex);
  
-    double  GetEyePredictionTime(ovrEyeType eye);
-    Posef   GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
+    // if eye == ovrEye_Count, timing is for MidpointTime as opposed to any specific eye
+    double           GetEyePredictionTime(ovrEyeType eye, unsigned int frameIndex);
+    ovrTrackingState GetEyePredictionTracking(ovrHmd hmd, ovrEyeType eye, unsigned int frameIndex);
+    Posef            GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
 
     void    GetTimewarpPredictions(ovrEyeType eye, double timewarpStartEnd[2]); 
     void    GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2]);
@@ -219,15 +224,12 @@ public:
     void    UpdateFrameLatencyTrackingAfterEndFrame(unsigned char frameLatencyTestColor[3],
                                                     const Util::FrameTimeRecordSet& rs);
 
-    void    GetLatencyTimings(float latencies[3])
-    { return ScreenLatencyTracker.GetLatencyTimings(latencies); }
+    void    GetLatencyTimings(float& latencyRender, float& latencyTimewarp, float& latencyPostPresent)
+    {
+        return ScreenLatencyTracker.GetLatencyTimings(latencyRender, latencyTimewarp, latencyPostPresent);
+    }
 
     const Timing& GetFrameTiming() const { return FrameTiming; }
-
-#ifndef NO_SCREEN_TEAR_HEALING
-    bool    IsScreenTearing() const { return ScreenTearing; };
-    bool    ScreenTearingReaction();
-#endif // NO_SCREEN_TEAR_HEALING
 
 private:
     double  calcFrameDelta() const;
@@ -299,14 +301,6 @@ private:
     bool                SdkRender;
     // Direct to rift.
     bool                DirectToRift;
-#ifndef NO_SCREEN_TEAR_HEALING
-    // Screen tearing detection
-    mutable bool        ScreenTearing;
-    // Number of frames tearing has been observed
-    mutable int         TearingFrameCount;
-    // Number of frames of reaction
-    mutable int         HealingFrameCount;
-#endif // NO_SCREEN_TEAR_HEALING
 
     // Total frame delay due to VsyncToFirstScanline, persistence and settle time.
     // Computed from RenderInfor.Shutter.
@@ -322,7 +316,6 @@ private:
     // TBD: Don't we need NextFrame here as well?
     LocklessUpdater<Timing, Timing> LocklessTiming;
 
-
     // IMU Read timings
     double              RenderIMUTimeSeconds;
     double              TimewarpIMUTimeSeconds;
@@ -332,5 +325,3 @@ private:
 }} // namespace OVR::CAPI
 
 #endif // OVR_CAPI_FrameTimeManager_h
-
-

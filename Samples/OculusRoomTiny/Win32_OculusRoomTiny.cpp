@@ -33,7 +33,7 @@ limitations under the License.
 // Choose whether the SDK performs rendering/distortion, or the application. 
 #define          SDK_RENDER 1  //Do NOT switch until you have viewed and understood the Health and Safety message.
                                //Disabling this makes it a non-compliant app, and not suitable for demonstration. In place for development only.
-const bool       FullScreen = true; //Should be true for correct timing.  Use false for debug only.
+const bool       FullScreen = true; // Set to false for direct mode (recommended), true for extended mode operation.
 
 
 // Include Non-SDK supporting Utilities from other files
@@ -44,7 +44,7 @@ bool Util_RespondToControls        (float & EyeYaw, Vector3f & EyePos, Quatf Pos
 void PopulateRoomScene             (Scene* scene, RenderDevice* render);
 
 //Structures for the application
-ovrHmd             HMD;
+ovrHmd             HMD = 0;
 ovrEyeRenderDesc   EyeRenderDesc[2];
 ovrRecti           EyeRenderViewport[2];
 RenderDevice*      pRender = 0;
@@ -69,14 +69,17 @@ int Init()
 {
     // Initializes LibOVR, and the Rift
     ovr_Initialize();
-	HMD = ovrHmd_Create(0);
     if (!HMD)
     {
-        MessageBoxA(NULL,"Oculus Rift not detected.","", MB_OK);
-        return(1);
+        HMD = ovrHmd_Create(0);
+        if (!HMD)
+        {
+            MessageBoxA(NULL, "Oculus Rift not detected.", "", MB_OK);
+            return(1);
+        }
+        if (HMD->ProductName[0] == '\0')
+            MessageBoxA(NULL, "Rift detected, display not enabled.", "", MB_OK);
     }
-	if (HMD->ProductName[0] == '\0') 
-        MessageBoxA(NULL,"Rift detected, display not enabled.","", MB_OK);
 
 	//Setup Window and Graphics - use window frame if relying on Oculus driver
 	const int backBufferMultisample = 1;
@@ -244,10 +247,15 @@ void ProcessAndRender()
 	// Adjust eye position and rotation from controls, maintaining y position from HMD.
 	static float    BodyYaw(3.141592f);
 	static Vector3f HeadPos(0.0f, 1.6f, -5.0f);
-	HeadPos.y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, HeadPos.y);
-	bool freezeEyeRender = Util_RespondToControls(BodyYaw, HeadPos, eyeRenderPose[1].Orientation);
+    static ovrTrackingState HmdState;
 
-     pRender->BeginScene();
+    ovrVector3f hmdToEyeViewOffset[2] = { EyeRenderDesc[0].HmdToEyeViewOffset, EyeRenderDesc[1].HmdToEyeViewOffset };
+    ovrHmd_GetEyePoses(HMD, 0, hmdToEyeViewOffset, eyeRenderPose, &HmdState);
+
+	HeadPos.y = ovrHmd_GetFloat(HMD, OVR_KEY_EYE_HEIGHT, HeadPos.y);
+	bool freezeEyeRender = Util_RespondToControls(BodyYaw, HeadPos, HmdState.HeadPose.ThePose.Orientation);
+
+    pRender->BeginScene();
     
 	// Render the two undistorted eye views into their render buffers.
     if (!freezeEyeRender) // freeze to debug for time warp
@@ -259,21 +267,20 @@ void ProcessAndRender()
 		for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++)
 		{
             ovrEyeType eye = HMD->EyeRenderOrder[eyeIndex];
-            eyeRenderPose[eye] = ovrHmd_GetEyePose(HMD, eye);
 
             // Get view and projection matrices
-			Matrix4f rollPitchYaw       = Matrix4f::RotationY(BodyYaw);
-			Matrix4f finalRollPitchYaw  = rollPitchYaw * Matrix4f(eyeRenderPose[eye].Orientation);
-			Vector3f finalUp            = finalRollPitchYaw.Transform(Vector3f(0,1,0));
-			Vector3f finalForward       = finalRollPitchYaw.Transform(Vector3f(0,0,-1));
-			Vector3f shiftedEyePos      = HeadPos + rollPitchYaw.Transform(eyeRenderPose[eye].Position);
+            Matrix4f rollPitchYaw       = Matrix4f::RotationY(BodyYaw);
+            Matrix4f finalRollPitchYaw  = rollPitchYaw * Matrix4f(eyeRenderPose[eye].Orientation);
+            Vector3f finalUp            = finalRollPitchYaw.Transform(Vector3f(0,1,0));
+            Vector3f finalForward       = finalRollPitchYaw.Transform(Vector3f(0,0,-1));
+            Vector3f shiftedEyePos      = HeadPos + rollPitchYaw.Transform(eyeRenderPose[eye].Position);
             Matrix4f view = Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + finalForward, finalUp); 
 			Matrix4f proj = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, 0.01f, 10000.0f, true);
 
 			pRender->SetViewport(Recti(EyeRenderViewport[eye]));
 			pRender->SetProjection(proj);
 			pRender->SetDepthMode(true, true);
-			pRoomScene->Render(pRender, Matrix4f::Translation(EyeRenderDesc[eye].ViewAdjust) * view);
+			pRoomScene->Render(pRender, view);
 		}
     }
     pRender->FinishScene();
@@ -365,6 +372,7 @@ void Release(void)
     #endif
 
     ovrHmd_Destroy(HMD);
+    HMD = 0;
     Util_ReleaseWindowAndGraphics(pRender);
     if (pRoomScene) delete pRoomScene;
 

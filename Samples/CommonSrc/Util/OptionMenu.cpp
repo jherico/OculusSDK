@@ -5,7 +5,7 @@ Content     :   Option selection and editing for OculusWorldDemo
 Created     :   March 7, 2014
 Authors     :   Michael Antonov, Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -150,6 +150,7 @@ OptionVar::OptionVar(const char* name, void* pvar, VarType type,
     ShortcutDown.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::PrevValue);
 }
 
+
 OptionVar::OptionVar(const char* name, int32_t* pvar,
                      int32_t min, int32_t max, int32_t stepSize,
                      const char* formatString,
@@ -163,6 +164,11 @@ OptionVar::OptionVar(const char* name, int32_t* pvar,
     fUpdate     = updateFunction;
     pNotify     = 0;
     FormatString= formatString;
+
+    MaxFloat    = MATH_FLOAT_MAXVALUE;
+    MinFloat    = -MATH_FLOAT_MAXVALUE;
+    StepFloat   = 1.0f;
+    FormatScale = 1.0f;
 
     MinInt      = min;
     MaxInt      = max;
@@ -193,6 +199,10 @@ OptionVar::OptionVar(const char* name, float* pvar,
     MaxFloat    = maxf;
     StepFloat   = stepSize;
     FormatScale = formatScale;
+
+    MaxInt      = 0x7FFFFFFF;
+    MinInt      = -(MaxInt) - 1;
+    StepInt     = 1;
 
     SelectedIndex = 0;
 
@@ -243,9 +253,12 @@ void OptionVar::PrevValue(bool* pFastStep)
     switch (Type)
     {
     case Type_Enum:
-        *AsInt() = ((GetEnumIndex() + (uint32_t)EnumValues.GetSize() - 1) % EnumValues.GetSize());
+    {
+        uint32_t size = (uint32_t)(EnumValues.GetSize() ? EnumValues.GetSize() : 1);
+        *AsInt() = ((GetEnumIndex() + (size - 1)) % size);
         break;
-
+    }
+    
     case Type_Int:
         *AsInt() = Alg::Max<int32_t>(*AsInt() - StepInt * (fastStep ? 5 : 1), MinInt);
         break;

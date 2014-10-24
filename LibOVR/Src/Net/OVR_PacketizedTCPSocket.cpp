@@ -5,16 +5,16 @@ Content     :   TCP with automated message framing.
 Created     :   June 10, 2014
 Authors     :   Kevin Jenkins
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -120,8 +120,8 @@ int PacketizedTCPSocket::SendAndConcatenate(const void** pDataArray, int* dataLe
 
 void PacketizedTCPSocket::OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, int bytesRead)
 {
-	uint8_t* dataSource;
-	int dataSourceSize;
+	uint8_t* dataSource = NULL;
+	int dataSourceSize = 0;
 
 	recvBuffLock.DoLock();
 
@@ -132,11 +132,24 @@ void PacketizedTCPSocket::OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, 
 	}
 	else
 	{
-		pRecvBuff = (uint8_t*)OVR_REALLOC(pRecvBuff, bytesRead + pRecvBuffSize);
-		memcpy(pRecvBuff + pRecvBuffSize, pData, bytesRead);
+		uint8_t* pRecvBuffNew = (uint8_t*)OVR_REALLOC(pRecvBuff, bytesRead + pRecvBuffSize);
+		if (!pRecvBuffNew)
+		{
+			OVR_FREE(pRecvBuff);
+			pRecvBuff = NULL;
+			pRecvBuffSize = 0;
+			recvBuffLock.Unlock();
+			return;
+		}
+		else
+		{
+			pRecvBuff = pRecvBuffNew;
 
-		dataSourceSize = pRecvBuffSize + bytesRead;
-		dataSource = pRecvBuff;
+			memcpy(pRecvBuff + pRecvBuffSize, pData, bytesRead);
+
+			dataSourceSize = pRecvBuffSize + bytesRead;
+			dataSource = pRecvBuff;
+		}
 	}
 
 	int bytesReadFromStream;
@@ -154,15 +167,27 @@ void PacketizedTCPSocket::OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, 
 
 	if (dataSourceSize > 0)
 	{
-		if (pRecvBuff == NULL)
-		{
-			pRecvBuff = (uint8_t*)OVR_ALLOC(dataSourceSize);
-			memcpy(pRecvBuff, dataSource, dataSourceSize);
-		}
-		else
-		{
-			memmove(pRecvBuff, dataSource, dataSourceSize);
-		}
+        if (dataSource != NULL)
+        {
+            if (pRecvBuff == NULL)
+            {
+                pRecvBuff = (uint8_t*)OVR_ALLOC(dataSourceSize);
+                if (!pRecvBuff)
+                {
+                    pRecvBuffSize = 0;
+                    recvBuffLock.Unlock();
+                    return;
+                }
+                else
+                {
+                    memcpy(pRecvBuff, dataSource, dataSourceSize);
+                }
+            }
+            else
+            {
+                memmove(pRecvBuff, dataSource, dataSourceSize);
+            }
+        }
 	}
 	else
 	{

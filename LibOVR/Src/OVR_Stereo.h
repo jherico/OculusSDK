@@ -5,16 +5,16 @@ Content     :   Stereo rendering functions
 Created     :   November 30, 2013
 Authors     :   Tom Fosyth
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -175,6 +175,20 @@ bool FitCubicPolynomial ( float *pResult, const float *pFitX, const float *pFitY
 //   caused by the Rift lenses.
 struct LensConfig
 {
+    LensConfig()
+      : Eqn(Distortion_CatmullRom10)
+      //K()
+      , MaxR(0.0f)
+      , MetersPerTanAngleAtCenter(0.0f)
+      //ChromaticAberration()
+      //InvK()
+      , MaxInvR(0.0f)
+    {
+        memset(&K, 0, sizeof(K));
+        memset(&ChromaticAberration, 0, sizeof(ChromaticAberration));
+        memset(&InvK, 0, sizeof(InvK));
+    }
+    
     // The result is a scaling applied to the distance from the center of the lens.
     float    DistortionFnScaleRadiusSquared (float rsq) const;
     // x,y,z components map to r,g,b scales.
@@ -349,29 +363,38 @@ public:
 	// Constructor initializes all values to 0s.
 	// To create a "virtualized" HMDInfo, use CreateDebugHMDInfo instead.
 	HMDInfo() :
-		Version(0),
+		ProductName(),
+        Manufacturer(),
+        Version(0),
 		HmdType(HmdType_None),
 		ResolutionInPixels(0),
 		ScreenSizeInMeters(0.0f),
 		ScreenGapSizeInMeters(0.0f),
 		CenterFromTopInMeters(0),
 		LensSeparationInMeters(0),
+      //Shutter (initialized below)
+		DesktopX(0),
+		DesktopY(0),
+        DisplayDeviceName(),
+        ShimInfo(),
 		DisplayId(-1),
-		InCompatibilityMode(false)
+		InCompatibilityMode(false),
+        PrintedSerial(),
+        VendorId(-1),
+        ProductId(-1),
+        FirmwareMajor(-1),
+        FirmwareMinor(-1),
+        CameraFrustumHFovInRadians(0.0f),
+        CameraFrustumVFovInRadians(0.0f),
+        CameraFrustumNearZInMeters(0.0f),
+        CameraFrustumFarZInMeters(0.0f)
 	{
-		DesktopX = 0;
-		DesktopY = 0;
 		Shutter.Type = HmdShutter_LAST;
 		Shutter.VsyncToNextVsync = 0.0f;
 		Shutter.VsyncToFirstScanline = 0.0f;
 		Shutter.FirstScanlineToLastScanline = 0.0f;
 		Shutter.PixelSettleTime = 0.0f;
 		Shutter.PixelPersistence = 0.0f;
-
-        CameraFrustumHFovInRadians = 0;
-        CameraFrustumVFovInRadians = 0;
-        CameraFrustumNearZInMeters = 0;
-        CameraFrustumFarZInMeters = 0;
     }
 
 	// Operator = copies local fields only (base class must be correct already)
@@ -584,7 +607,7 @@ ScaleAndOffset2D    CreateUVScaleAndOffsetfromNDCScaleandOffset ( ScaleAndOffset
 struct StereoEyeParams
 {
     StereoEye               Eye;
-    Matrix4f                ViewAdjust;             // Translation to be applied to view matrix.
+    Matrix4f                HmdToEyeViewOffset;         // Translation to be applied to view matrix.
 
     // Distortion and the VP on the physical display - the thing to run the distortion shader on.
     DistortionRenderDesc    Distortion;

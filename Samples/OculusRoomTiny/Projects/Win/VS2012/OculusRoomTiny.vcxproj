@@ -191,7 +191,6 @@
   <ItemGroup>
     <ClInclude Include="../../../RenderTiny_D3D11_Device.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h" />
-    <ClInclude Include="..\..\..\HSWDisplay_Util.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

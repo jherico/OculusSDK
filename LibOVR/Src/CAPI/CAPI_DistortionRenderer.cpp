@@ -5,16 +5,16 @@ Content     :   Combines all of the rendering state associated with the HMD
 Created     :   February 2, 2014
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,7 +38,7 @@ limitations under the License.
 #undef OVR_D3D_VERSION
 
 #define OVR_D3D_VERSION 9
-#include "D3D1X/CAPI_D3D9_DistortionRenderer.h"
+#include "D3D9/CAPI_D3D9_DistortionRenderer.h"
 #undef OVR_D3D_VERSION
 
 #endif
@@ -92,6 +92,12 @@ void DistortionRenderer::SetLatencyTest2Color(unsigned char* color)
     LatencyTest2Active = color != NULL;
 }
 
+void DistortionRenderer::GetOverdriveScales(float& outRiseScale, float& outFallScale)
+{
+    outRiseScale = 0.1f;
+    outFallScale = 0.05f;	// falling issues are hardly visible
+}
+
 double DistortionRenderer::WaitTillTime(double absTime)
 {
     double initialTime = ovr_GetTimeInSeconds();
@@ -117,10 +123,12 @@ double DistortionRenderer::WaitTillTime(double absTime)
 
             SetWaitableTimer(timer, &waitableTimerInterval, 0, NULL, NULL, TRUE);
             DWORD waitResult = WaitForSingleObject(timer, roundedWaitTime + 3);   // give 3 ms extra time
+            OVR_UNUSED(waitResult);
 
+#ifdef OVR_BUILD_DEBUG
             double sleptTime = ovr_GetTimeInSeconds() - newTime;
-            // Make sure this is reliable (should be waiting for 1ms, make sure it's <2ms)
-            if (sleptTime > remainingWaitTime)
+            // Make sure we didn't sleep too long and it is reliable, otherwise we might miss v-sync causing a stutter
+            if (sleptTime > (roundedWaitTime + 2) * 0.001) 
             {
                 OVR_DEBUG_LOG_TEXT(
                     ("[DistortionRenderer::WaitTillTime] Sleep interval too long: %f\n", sleptTime));
@@ -128,8 +136,8 @@ double DistortionRenderer::WaitTillTime(double absTime)
             else
             {
                 OVR_ASSERT(WAIT_OBJECT_0 == waitResult);
-                OVR_UNUSED(waitResult);
             }
+#endif
         }
         else
 #endif

@@ -5,16 +5,16 @@ Content     :   Abstract interface for platform-specific rendering of distortion
 Created     :   February 2, 2014
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,8 +74,7 @@ public:
     // called before use.
     // Under D3D, apiConfig includes D3D Device pointer, back buffer and other
     // needed structures.
-    virtual bool Initialize(const ovrRenderAPIConfig* apiConfig,
-                            unsigned distortionCaps) = 0;
+    virtual bool Initialize(const ovrRenderAPIConfig* apiConfig) = 0;
 
     // Submits one eye texture for rendering. This is in the separate method to
     // allow "submit as you render" scenarios on horizontal screens where one
@@ -128,8 +127,12 @@ protected:
 	{
 		// doesn't make sense to use overdrive when vsync is disabled as we cannot guarantee
 		// when the rendered frame will be displayed
-		return LastUsedOverdriveTextureIndex >= 0 && !((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) > 0);
+		return LastUsedOverdriveTextureIndex >= 0 &&
+                !((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) > 0) &&
+                (RState.DistortionCaps & ovrDistortionCap_Chromatic);
 	}
+
+    void GetOverdriveScales(float& outRiseScale, float& outFallScale);
 
     double WaitTillTime(double absTime);
 

@@ -5,7 +5,7 @@ Content     :   Profiling for render.
 Created     :   March 10, 2014
 Authors     :   Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,18 +76,19 @@ void RenderProfiler::DrawOverlay(RenderDevice* prender)
     const double* averages = GetAverages();
     const double* lastSampleSet = GetLastSampleSet();
 
-    for ( int timerNum = 1; timerNum < Sample_LAST; timerNum++ )
+    static_assert((Sample_FrameStart == 0) && (Sample_AfterGameProcessing == 1) && (Sample_AfterPresent + 1 == Sample_LAST), "The following code depends on SampleType enum values.");
+
+    for ( int timerNum = Sample_AfterGameProcessing; timerNum < Sample_LAST; timerNum++ )
     {
         char const *pName = "";
         switch ( timerNum )
         {
         case Sample_AfterGameProcessing:     pName = "AfterGameProcessing"; break;
         case Sample_AfterEyeRender     :     pName = "AfterEyeRender     "; break;
-//        case Sample_BeforeDistortion   :     pName = "BeforeDistortion   "; break;
-//        case Sample_AfterDistortion    :     pName = "AfterDistortion    "; break;
+      //case Sample_BeforeDistortion   :     pName = "BeforeDistortion   "; break;  This enumerant is currently disabled in the enumeration declaration.
+      //case Sample_AfterDistortion    :     pName = "AfterDistortion    "; break;
         case Sample_AfterPresent       :     pName = "AfterPresent       "; break;
-//        case Sample_AfterFlush         :     pName = "AfterFlush         "; break;
-        default: OVR_ASSERT ( false );
+      //case Sample_AfterFlush         :     pName = "AfterFlush         "; break;
         }
         char bufTemp[256];
         OVR_sprintf ( bufTemp, sizeof(bufTemp), "\nRaw: %.2lfms\t400Ave: %.2lfms\t800%s",

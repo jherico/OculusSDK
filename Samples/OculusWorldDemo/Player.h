@@ -52,40 +52,45 @@ const float		RailHeight	= 0.8f;
 class Player
 {
 public:
-
-	float				UserEyeHeight;
-
-	// Where the avatar coordinate system (and body) is positioned and oriented in the virtual world
-    // Modified by gamepad/mouse input
-	Vector3f			BodyPos;
-	Anglef				BodyYaw;
-
-    // Where the player head is positioned and oriented in the real world
-    Posef          HeadPose;
-
     // Where the avatar head is positioned and oriented in the virtual world
     Vector3f            GetPosition();
     Quatf               GetOrientation(bool baseOnly = false);
 
     // Returns virtual world position based on a real world head pose.
     // Allows predicting eyes separately based on scanout time.
-    Posef          VirtualWorldTransformfromRealPose(const Posef &sensorHeadPose);
+    Posef               VirtualWorldTransformfromRealPose(const Posef &sensorHeadPose);
 
     // Handle directional movement. Returns 'true' if movement was processed.
     bool                HandleMoveKey(OVR::KeyCode key, bool down);
 
-    // Movement state; different bits may be set based on the state of keys.
-    uint8_t             MoveForward;
-    uint8_t             MoveBack;
-    uint8_t             MoveLeft;
-    uint8_t             MoveRight;
-    Vector3f            GamepadMove, GamepadRotate;
-    bool                bMotionRelativeToBody;
+    void                HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
+                                       Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
 
-	Player();
-	~Player();
-	void HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-		                Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
+    float               GetScaledEyeHeight() { return UserEyeHeight * HeightScale; }
+
+    Player();
+    ~Player();
+
+public:
+    // User parameters
+    float       UserEyeHeight;
+    float       HeightScale;
+
+    // Where the avatar coordinate system (and body) is positioned and oriented in the virtual world
+    // Modified by gamepad/mouse input
+    Vector3f    BodyPos;
+    Anglef      BodyYaw;
+
+    // Where the player head is positioned and oriented in the real world
+    Posef       HeadPose;
+
+    // Movement state; different bits may be set based on the state of keys.
+    uint8_t     MoveForward;
+    uint8_t     MoveBack;
+    uint8_t     MoveLeft;
+    uint8_t     MoveRight;
+    Vector3f    GamepadMove, GamepadRotate;
+    bool        bMotionRelativeToBody;
 };
 
 #endif

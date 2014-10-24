@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation for OpenGL
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ void (*GetFunction(const char *functionName))( void )
 
 #endif
 
+PFNGLGETSTRINGIPROC                      glGetStringi;
 PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
 PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
 PFNGLDELETESHADERPROC                    glDeleteShader;
@@ -95,6 +96,7 @@ PFNGLUNIFORM3FVPROC                      glUniform3fv;
 PFNGLUNIFORM2FVPROC                      glUniform2fv;
 PFNGLUNIFORM1FVPROC                      glUniform1fv;
 PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
+PFNGLTEXIMAGE2DMULTISAMPLEPROC           glTexImage2DMultisample;
 PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
 PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
 PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
@@ -102,6 +104,7 @@ PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
 PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
 PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
 PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
+PFNGLBLITFRAMEBUFFEREXTPROC              glBlitFramebuffer;
 
 void InitGLExtensions()
 {
@@ -115,6 +118,7 @@ void InitGLExtensions()
     glXSwapIntervalEXT =                (PFNGLXSWAPINTERVALEXTPROC)                GetFunction("glXSwapIntervalEXT");
 #endif
 
+    glGetStringi =                      (PFNGLGETSTRINGIPROC)                      GetFunction("glGetStringi");
     glGenFramebuffers =                 (PFNGLGENFRAMEBUFFERSPROC)                 GetFunction("glGenFramebuffersEXT");
     glDeleteFramebuffers =              (PFNGLDELETEFRAMEBUFFERSPROC)              GetFunction("glDeleteFramebuffersEXT");
     glDeleteShader =                    (PFNGLDELETESHADERPROC)                    GetFunction("glDeleteShader");
@@ -156,6 +160,7 @@ void InitGLExtensions()
     glUniform2fv =                      (PFNGLUNIFORM2FVPROC)                      GetFunction("glUniform2fv");
     glUniform1fv =                      (PFNGLUNIFORM1FVPROC)                      GetFunction("glUniform1fv");
     glCompressedTexImage2D =            (PFNGLCOMPRESSEDTEXIMAGE2DPROC)            GetFunction("glCompressedTexImage2D");
+    glTexImage2DMultisample =           (PFNGLTEXIMAGE2DMULTISAMPLEPROC)           GetFunction("glTexImage2DMultisample");
     glRenderbufferStorage =             (PFNGLRENDERBUFFERSTORAGEPROC)             GetFunction("glRenderbufferStorageEXT");
     glBindRenderbuffer =                (PFNGLBINDRENDERBUFFERPROC)                GetFunction("glBindRenderbufferEXT");
     glGenRenderbuffers =                (PFNGLGENRENDERBUFFERSPROC)                GetFunction("glGenRenderbuffersEXT");
@@ -163,13 +168,14 @@ void InitGLExtensions()
     glGenVertexArrays =                 (PFNGLGENVERTEXARRAYSPROC)                 GetFunction("glGenVertexArrays");
     glDeleteVertexArrays =              (PFNGLDELETEVERTEXARRAYSPROC)              GetFunction("glDeleteVertexArrays");
     glBindVertexArray =                 (PFNGLBINDVERTEXARRAYPROC)                 GetFunction("glBindVertexArray");
+    glBlitFramebuffer =                 (PFNGLBLITFRAMEBUFFEREXTPROC)              GetFunction("glBlitFramebufferEXT");
 }
 
 #endif
 
 static const char* StdVertexShaderSrc =
-    "#version 110\n"
-    
+"#version 110\n"
+
     "uniform mat4 Proj;\n"
     "uniform mat4 View;\n"
     
@@ -252,28 +258,28 @@ static const char* TextureFragShaderSrc =
     "       discard;\n"
     "}\n";
 
-#define LIGHTING_COMMON                                                 \
+#define LIGHTING_COMMON                                                          \
     "#version 110\n"                                                    \
-    "uniform   vec3 Ambient;\n"                                               \
-    "uniform   vec4 LightPos[8];\n"                                           \
-    "uniform   vec4 LightColor[8];\n"                                         \
-    "uniform   float LightCount;\n"                                          \
+    "uniform   vec3 Ambient;\n"                                                   \
+    "uniform   vec4 LightPos[8];\n"                                                \
+    "uniform   vec4 LightColor[8];\n"                                               \
+    "uniform   float LightCount;\n"                                                  \
     "varying   vec4 oColor;\n"                                                  \
     "varying   vec2 oTexCoord;\n"                                               \
     "varying   vec3 oNormal;\n"                                                 \
     "varying   vec3 oVPos;\n"                                                   \
-    "vec4 DoLight()\n"                                        \
-    "{\n"                                                               \
-    "   vec3 norm = normalize(oNormal);\n"                             \
-    "   vec3 light = Ambient;\n"                                        \
-    "   for (int i = 0; i < int(LightCount); i++)\n"                \
-    "   {\n"                                                            \
-    "       vec3 ltp = (LightPos[i].xyz - oVPos);\n"              \
-    "       float  ldist = length(ltp);\n"                             \
-    "       ltp = normalize(ltp);\n"                             \
+    "vec4 DoLight()\n"                                                                    \
+    "{\n"                                                                                  \
+    "   vec3 norm = normalize(oNormal);\n"                                                  \
+    "   vec3 light = Ambient;\n"                                                             \
+    "   for (int i = 0; i < int(LightCount); i++)\n"                                          \
+    "   {\n"                                                                                   \
+    "       vec3 ltp = (LightPos[i].xyz - oVPos);\n"                                            \
+    "       float  ldist = length(ltp);\n"                                                       \
+    "       ltp = normalize(ltp);\n"                                                              \
     "       light += clamp(LightColor[i].rgb * oColor.rgb * (dot(norm, ltp) / ldist), 0.0,1.0);\n" \
-    "   }\n"                                                            \
-    "   return vec4(light, oColor.a);\n"                               \
+    "   }\n"                                                                                        \
+    "   return vec4(light, oColor.a);\n"                                                             \
     "}\n"
 
 static const char* LitSolidFragShaderSrc =
@@ -308,21 +314,21 @@ static const char* AlphaTextureFragShaderSrc =
     "}\n";
 
 static const char* AlphaBlendedTextureFragShaderSrc =
-	"#version 110\n"
+    "#version 110\n"
 
-	"uniform sampler2D Texture0;\n"
+    "uniform sampler2D Texture0;\n"
 
-	"varying vec4 oColor;\n"
-	"varying vec2 oTexCoord;\n"
-
-	"void main()\n"
-	"{\n"
+    "varying vec4 oColor;\n"
+    "varying vec2 oTexCoord;\n"
+    
+    "void main()\n"
+    "{\n"
     "   vec4 finalColor = oColor;\n"
     "   finalColor *= texture2D(Texture0, oTexCoord);\n"
     // Blend state expects premultiplied alpha
     "   finalColor.rgb *= finalColor.a;\n"
-	"   gl_FragColor = finalColor;\n"
-	"}\n";
+    "   gl_FragColor = finalColor;\n"
+    "}\n";
 
 static const char* MultiTextureFragShaderSrc =
     "#version 110\n"
@@ -336,15 +342,15 @@ static const char* MultiTextureFragShaderSrc =
     
     "void main()\n"
     "{\n"
-	"	vec4 color = texture2D(Texture0, oTexCoord);\n"
+    "    vec4 color = texture2D(Texture0, oTexCoord);\n"
     
-	"	gl_FragColor = texture2D(Texture1, oTexCoord1);\n"
-	"	gl_FragColor.rgb = gl_FragColor.rgb * mix(1.9, 1.2, clamp(length(gl_FragColor.rgb),0.0,1.0));\n"
+    "    gl_FragColor = texture2D(Texture1, oTexCoord1);\n"
+    "    gl_FragColor.rgb = gl_FragColor.rgb * mix(1.9, 1.2, clamp(length(gl_FragColor.rgb),0.0,1.0));\n"
     
-	"	gl_FragColor = color * gl_FragColor;\n"
+    "    gl_FragColor = color * gl_FragColor;\n"
     
-	"   if (gl_FragColor.a <= 0.6)\n"
-	"		discard;\n"
+    "   if (gl_FragColor.a <= 0.6)\n"
+    "        discard;\n"
     "}\n";
 
 static const char* PostProcessMeshFragShaderSrc =
@@ -455,12 +461,12 @@ static const char* PostProcessMeshTimewarpVertexShaderSrc =
     // Accurate time warp lerp vs. faster
 #if 0
     // Apply the two 3x3 timewarp rotations to these vectors.
-	"   vec3 TransformedRStart = (EyeRotationStart * vec4(TanEyeAngleR, 0)).xyz;\n"
-	"   vec3 TransformedGStart = (EyeRotationStart * vec4(TanEyeAngleG, 0)).xyz;\n"
-	"   vec3 TransformedBStart = (EyeRotationStart * vec4(TanEyeAngleB, 0)).xyz;\n"
-	"   vec3 TransformedREnd   = (EyeRotationEnd * vec4(TanEyeAngleR, 0)).xyz;\n"
-	"   vec3 TransformedGEnd   = (EyeRotationEnd * vec4(TanEyeAngleG, 0)).xyz;\n"
-	"   vec3 TransformedBEnd   = (EyeRotationEnd * vec4(TanEyeAngleB, 0)).xyz;\n"
+    "   vec3 TransformedRStart = (EyeRotationStart * vec4(TanEyeAngleR, 0)).xyz;\n"
+    "   vec3 TransformedGStart = (EyeRotationStart * vec4(TanEyeAngleG, 0)).xyz;\n"
+    "   vec3 TransformedBStart = (EyeRotationStart * vec4(TanEyeAngleB, 0)).xyz;\n"
+    "   vec3 TransformedREnd   = (EyeRotationEnd * vec4(TanEyeAngleR, 0)).xyz;\n"
+    "   vec3 TransformedGEnd   = (EyeRotationEnd * vec4(TanEyeAngleG, 0)).xyz;\n"
+    "   vec3 TransformedBEnd   = (EyeRotationEnd * vec4(TanEyeAngleB, 0)).xyz;\n"
     // And blend between them.
     "   vec3 TransformedR = mix ( TransformedRStart, TransformedREnd, Color.a );\n"
     "   vec3 TransformedG = mix ( TransformedGStart, TransformedGEnd, Color.a );\n"
@@ -526,7 +532,7 @@ PostProcessMeshTimewarpVertexShaderSrc;
     "{\n"
     "   vec2 eyeToSourceTexCoord = inTexCoord * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
     "   eyeToSourceTexCoord.y = 1.0 - eyeToSourceTexCoord.y;\n"
-	"   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use Texture2DLod for #version 110 support.
+    "   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use Texture2DLod for #version 110 support.
     "   float linearDepth = DepthProjector.y / (depth - DepthProjector.x);\n"
     "   vec4 retVal = vec4(inTexCoord, 1, 1);\n"
     "   retVal.xyz *= linearDepth;\n"
@@ -616,7 +622,7 @@ PostProcessMeshTimewarpVertexShaderSrc;
     "   lerpedEyeRot[1] = mix(EyeXformStart[1], EyeXformEnd[1], timewarpLerpFactor);\n"
     "   lerpedEyeRot[2] = mix(EyeXformStart[2], EyeXformEnd[2], timewarpLerpFactor);\n"
     "   lerpedEyeRot[3] = mix(EyeXformStart[3], EyeXformEnd[3], timewarpLerpFactor);\n"
-    //"	float4x4 lerpedEyeRot = EyeXformStart;\n"
+    //"    float4x4 lerpedEyeRot = EyeXformStart;\n"
 
     // warped positions are a bit more involved, hence a separate function
     "   gl_Position = TimewarpPos(Position.xy, oTexCoord0, lerpedEyeRot);\n"
@@ -641,8 +647,8 @@ static const char* PostProcessFragShaderWithChromAbSrc =
 
     "varying vec4 oPosition;\n"
     "varying vec2 oTexCoord;\n"
-
-	"void main()\n"
+    
+    "void main()\n"
     "{\n"
     // Input oTexCoord is [-1,1] across the half of the screen used for a single eye.
     "   vec2 TanEyeAngleDistorted = oTexCoord * TanEyeAngleScale + TanEyeAngleOffset;\n" // Scales to tan(thetaX),tan(thetaY), but still distorted (i.e. only the center is correct)
@@ -661,15 +667,15 @@ static const char* PostProcessFragShaderWithChromAbSrc =
 
     // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
     "   vec2 SourceCoordR = TanEyeAngleR * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-	"	SourceCoordR.y = 1.0 - SourceCoordR.y;\n"
+    "    SourceCoordR.y = 1.0 - SourceCoordR.y;\n"
     "   vec2 SourceCoordG = TanEyeAngleG * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-	"	SourceCoordG.y = 1.0 - SourceCoordG.y;\n"
+    "    SourceCoordG.y = 1.0 - SourceCoordG.y;\n"
     "   vec2 SourceCoordB = TanEyeAngleB * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-	"	SourceCoordB.y = 1.0 - SourceCoordB.y;\n"
+    "    SourceCoordB.y = 1.0 - SourceCoordB.y;\n"
 
     // Find the distance to the nearest edge.
     "   vec2 NDCCoord = TanEyeAngleG * EyeToSourceNDCScale + EyeToSourceNDCOffset;\n"
-	"   float EdgeFadeIn = clamp ( EdgeFadeScale, 0.0, 1e5 ) * ( 1.0 - max ( abs ( NDCCoord.x ), abs ( NDCCoord.y ) ) );\n"
+    "   float EdgeFadeIn = clamp ( EdgeFadeScale, 0.0, 1e5 ) * ( 1.0 - max ( abs ( NDCCoord.x ), abs ( NDCCoord.y ) ) );\n"
     "   if ( EdgeFadeIn < 0.0 )\n"
     "   {\n"
     "       gl_FragColor = vec4(DistortionClearColor.r, DistortionClearColor.g, DistortionClearColor.b, 1.0);\n"
@@ -692,7 +698,7 @@ static const char* VShaderSrcs[VShader_Count] =
     DirectVertexShaderSrc,
     StdVertexShaderSrc,
     PostProcessVertexShaderSrc,
-	PostProcessMeshVertexShaderSrc,
+    PostProcessMeshVertexShaderSrc,
     PostProcessMeshTimewarpVertexShaderSrc,
     PostProcessMeshPositionalTimewarpVertexShaderSrc,
     PostProcessHeightmapTimewarpVertexShaderSrc,
@@ -703,7 +709,7 @@ static const char* FShaderSrcs[FShader_Count] =
     GouraudFragShaderSrc,
     TextureFragShaderSrc,
     AlphaTextureFragShaderSrc,
-	AlphaBlendedTextureFragShaderSrc,
+    AlphaBlendedTextureFragShaderSrc,
     PostProcessFragShaderWithChromAbSrc,
     LitSolidFragShaderSrc,
     LitTextureFragShaderSrc,
@@ -716,11 +722,25 @@ static const char* FShaderSrcs[FShader_Count] =
 
 
 RenderDevice::RenderDevice(const RendererParams&)
+  : VertexShaders(),
+    FragShaders(),
+    DefaultFill(),
+    Proj(),
+    Vao(0),
+    CurRenderTarget(),
+    DepthBuffers(),
+    CurrentFbo(0),
+    MsaaFbo(0),
+    GLVersionInfo(),
+    DebugCallbackControl(),
+    Lighting(NULL)
 {
+    DebugCallbackControl.Initialize();
+
     GetGLVersionAndExtensions(GLVersionInfo);
 
     OVR_ASSERT(GLVersionInfo.MajorVersion >= 2);
-
+    
     for (int i = 0; i < VShader_Count; i++)
     {
         OVR_ASSERT ( VShaderSrcs[i] != NULL );      // You forgot a shader!
@@ -732,13 +752,14 @@ RenderDevice::RenderDevice(const RendererParams&)
         OVR_ASSERT ( FShaderSrcs[i] != NULL );      // You forgot a shader!
         FragShaders[i] = *new Shader(this, Shader_Fragment, FShaderSrcs[i]);
     }
-
+    
     Ptr<ShaderSet> gouraudShaders = *new ShaderSet();
     gouraudShaders->SetShader(VertexShaders[VShader_MVP]);
     gouraudShaders->SetShader(FragShaders[FShader_Gouraud]);
     DefaultFill = *new ShaderFill(gouraudShaders);
 
     glGenFramebuffers(1, &CurrentFbo);
+    glGenFramebuffers(1, &MsaaFbo);
     
     if (GLVersionInfo.SupportsVAO)
     {
@@ -758,7 +779,8 @@ void RenderDevice::Shutdown()
     
     // This runs before the subclass's Shutdown(), where the context, etc, may be deleted.
 
-	glDeleteFramebuffers(1, &CurrentFbo);
+    glDeleteFramebuffers(1, &CurrentFbo);
+    glDeleteFramebuffers(1, &MsaaFbo);
     
     if (GLVersionInfo.SupportsVAO)
     {
@@ -777,12 +799,14 @@ void RenderDevice::Shutdown()
 
     DefaultFill.Clear();
     DepthBuffers.Clear();
+
+    DebugCallbackControl.Shutdown();
 }
 
 
 void RenderDevice::FillTexturedRect(float left, float top, float right, float bottom, float ul, float vt, float ur, float vb, Color c, Ptr<OVR::Render::Texture> tex)
 {
-	Render::RenderDevice::FillTexturedRect(left, top, right, bottom, ul, vb, ur, vt, c, tex);
+	Render::RenderDevice::FillTexturedRect(left, top, right, bottom, ul, vt, ur, vb, c, tex);
 }
 
 
@@ -829,12 +853,7 @@ void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
 
 void RenderDevice::SetViewport(const Recti& vp)
 {
-	int wh;
-	if (CurRenderTarget)
-		wh = CurRenderTarget->Height;
-	else
-		wh = WindowHeight;
-	glViewport(vp.x, wh - vp.y - vp.h, vp.w, vp.h);
+	glViewport(vp.x, vp.y, vp.w, vp.h);
 }
 
 void RenderDevice::Flush()
@@ -844,14 +863,14 @@ void RenderDevice::Flush()
 
 void RenderDevice::WaitUntilGpuIdle()
 {
-	glFlush();
-	glFinish();
+    glFlush();
+    glFinish();
 }
 
 void RenderDevice::Clear(float r, float g, float b, float a, float depth, bool clearColor /*= true*/, bool clearDepth /*= true*/)
 {
-	glClearColor(r,g,b,a);
-	glClearDepth(depth);
+    glClearColor(r,g,b,a);
+    glClearDepth(depth);
     glClear(
         ( clearColor ? ( GL_COLOR_BUFFER_BIT ) : 0 ) |
         ( clearDepth ? ( GL_DEPTH_BUFFER_BIT ) : 0 )
@@ -869,6 +888,31 @@ Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms)
     return newDepth.GetPtr();
 }
 
+void RenderDevice::ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Texture* outputTex)
+{
+    bool isMsaaTarget = msaaTex->GetSamples() > 1;
+    glBindFramebuffer( GL_READ_FRAMEBUFFER, MsaaFbo );
+    glFramebufferTexture2D( GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                            isMsaaTarget ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D,
+                            ((Texture*)msaaTex)->TexId, 0);
+    glFramebufferRenderbuffer(GL_READ_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+    OVR_ASSERT(glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    glBindFramebuffer( GL_DRAW_FRAMEBUFFER, CurrentFbo );
+    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ((Texture*)outputTex)->TexId, 0);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+
+    OVR_ASSERT(glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    //glReadBuffer(GL_TEXTURE_2D_MULTISAMPLE);
+    //glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glBlitFramebuffer( 0, 0, msaaTex->GetWidth(), msaaTex->GetHeight(),
+                       0, 0, outputTex->GetWidth(), outputTex->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST );
+    glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+    GLint err = glGetError();
+    OVR_ASSERT(!err); OVR_UNUSED(err);
+}
+
 void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* depth, Render::Texture* stencil)
 {
     OVR_UNUSED(stencil);
@@ -879,14 +923,19 @@ void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* dept
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         return;
     }
-	
-	if (depth == NULL)
-		depth = GetDepthBuffer(color->GetWidth(), color->GetHeight(), CurRenderTarget->GetSamples());
+
+    int sampleCount = CurRenderTarget->GetSamples();
+
+    if (depth == NULL)
+        depth = GetDepthBuffer(color->GetWidth(), color->GetHeight(), sampleCount);
 
     glBindFramebuffer(GL_FRAMEBUFFER, CurrentFbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ((Texture*)color)->TexId, 0);
+
+    GLenum texTarget = (sampleCount > 1) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texTarget, ((Texture*)color)->TexId, 0);
     if (depth)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ((Texture*)depth)->TexId, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texTarget, ((Texture*)depth)->TexId, 0);
     else
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 
@@ -904,7 +953,7 @@ void RenderDevice::SetWorldUniforms(const Matrix4f& proj)
 void RenderDevice::SetTexture(Render::ShaderStage, int slot, const Texture* t)
 {
     glActiveTexture(GL_TEXTURE0 + slot);
-    glBindTexture(GL_TEXTURE_2D, ((Texture*)t)->TexId);
+    glBindTexture((t->GetSamples() > 1) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D, ((Texture*)t)->TexId);
 }
 
 Buffer* RenderDevice::CreateBuffer()
@@ -979,11 +1028,11 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
         Lighting->Set(shaders);
     }
 
-	glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
-	for (int i = 0; i < 5; i++)
-		glEnableVertexAttribArray(i);
+    glBindBuffer(GL_ARRAY_BUFFER, ((Buffer*)vertices)->GLBuffer);
+    for (int i = 0; i < 5; i++)
+        glEnableVertexAttribArray(i);
 
-	switch (meshType)
+    switch (meshType)
     {
     case Mesh_Distortion:
         glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, Pos));
@@ -1016,8 +1065,8 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
         glDrawArrays(prim, 0, count);
     }
 
-	for (int i = 0; i < 5; i++)
-		glDisableVertexAttribArray(i);
+    for (int i = 0; i < 5; i++)
+        glDisableVertexAttribArray(i);
 }
 
 void RenderDevice::RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
@@ -1104,8 +1153,16 @@ bool Shader::Compile(const char* src)
     return 1;
 }
 
-ShaderSet::ShaderSet()
+ShaderSet::ShaderSet() :
+  //Prog(0),
+    UniformInfo(),
+    ProjLoc(0),
+    ViewLoc(0),
+  //TexLoc[8];
+    UsesLighting(false),
+    LightingVer(0)
 {
+    memset(TexLoc, 0, sizeof(TexLoc));
     Prog = glCreateProgram();
 }
 ShaderSet::~ShaderSet()
@@ -1155,9 +1212,9 @@ bool ShaderSet::Link()
     LightingVer = 0;
     UsesLighting = 0;
 
-	GLint uniformCount = 0;
-	glGetProgramiv(Prog, GL_ACTIVE_UNIFORMS, &uniformCount);
-	OVR_ASSERT(uniformCount >= 0);
+    GLint uniformCount = 0;
+    glGetProgramiv(Prog, GL_ACTIVE_UNIFORMS, &uniformCount);
+    OVR_ASSERT(uniformCount >= 0);
 
     for(GLuint i = 0; i < (GLuint)uniformCount; i++)
     {
@@ -1260,7 +1317,7 @@ bool ShaderSet::SetUniform4x4f(const char* name, const Matrix4f& m)
     return 0;
 }
 
-Texture::Texture(RenderDevice* r, int w, int h) : Ren(r), Width(w), Height(h)
+Texture::Texture(RenderDevice* r, int w, int h, int samples) : Ren(r), Width(w), Height(h), Samples(samples)
 {
     glGenTextures(1, &TexId);
 }
@@ -1278,7 +1335,7 @@ void Texture::Set(int slot, Render::ShaderStage stage) const
 
 void Texture::SetSampleMode(int sm)
 {
-    glBindTexture(GL_TEXTURE_2D, TexId);
+    glBindTexture((GetSamples() > 1) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D, TexId);
     switch (sm & Sample_FilterMask)
     {
     case Sample_Linear:
@@ -1294,7 +1351,7 @@ void Texture::SetSampleMode(int sm)
         break;
 
     case Sample_Nearest:
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
@@ -1321,8 +1378,8 @@ void Texture::SetSampleMode(int sm)
 
 ovrTexture Texture::Get_ovrTexture()
 {
-	ovrTexture tex;
-	OVR::Sizei newRTSize(Width, Height);
+    ovrTexture tex;
+    OVR::Sizei newRTSize(Width, Height);
 
     ovrGLTextureData* texData = (ovrGLTextureData*)&tex;
     texData->Header.API            = ovrRenderAPI_OpenGL;
@@ -1330,7 +1387,7 @@ ovrTexture Texture::Get_ovrTexture()
     texData->Header.RenderViewport = Recti(newRTSize);
     texData->TexId                 = TexId;
 
-	return tex;
+    return tex;
 }
 
 Texture* RenderDevice::CreateTexture(int format, int width, int height, const void* data, int mipcount)
@@ -1340,23 +1397,34 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     {
     case Texture_RGBA:  glformat = GL_RGBA; break;
     case Texture_R:     glformat = GL_RED; break;
-	case Texture_Depth: glformat = GL_DEPTH_COMPONENT; gltype = GL_FLOAT; break;
+    case Texture_Depth: glformat = GL_DEPTH_COMPONENT; gltype = GL_FLOAT; break;
     case Texture_DXT1:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
     case Texture_DXT3:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
     case Texture_DXT5:  glformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
     default:
         return NULL;
     }
-    Texture* NewTex = new Texture(this, width, height);
-    glBindTexture(GL_TEXTURE_2D, NewTex->TexId);
-	GLint err = glGetError();
+    int samples = format & Texture_SamplesMask;
+    if(samples < 1 ||
+        GLVersionInfo.WholeVersion < 302) // disallow MSAA for low GL context versions
+    {
+        samples = 1;
+    }
 
+    GLenum textureTarget = (samples > 1) ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+
+    Texture* NewTex = new Texture(this, width, height, samples);
+    glBindTexture(textureTarget, NewTex->TexId);
+    GLint err = glGetError();
+
+    #if ! defined(OVR_OS_MAC)
     OVR_ASSERT(!err);
+    #endif
 
-	if( err )
-	{
-		printf("%d\n", err);
-	}
+    if( err )
+    {
+        printf("RenderDevice::CreateTexture glGetError result: %d\n", err);
+    }
     
     if (format & Texture_Compressed)
     {
@@ -1374,14 +1442,17 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             if (h < 1) h = 1;
         }
     }
-	else
-	{
-		bool isSRGB = ((format & Texture_TypeMask) == Texture_RGBA && (format & Texture_SRGB) != 0);
-		bool isDepth = ((format & Texture_Depth) != 0);
-		GLenum internalFormat = (isSRGB) ? GL_SRGB_ALPHA : (isDepth) ? GL_DEPTH_COMPONENT32F : glformat;
+    else
+    {
+        bool isSRGB = ((format & Texture_TypeMask) == Texture_RGBA && (format & Texture_SRGB) != 0);
+        bool isDepth = ((format & Texture_Depth) != 0);
+        GLenum internalFormat = (isSRGB) ? GL_SRGB8_ALPHA8 : (isDepth) ? GL_DEPTH_COMPONENT32F : glformat;
 
-		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, glformat, gltype, data);
-	}
+        if (samples > 1)
+            glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, width, height, false);
+        else
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, glformat, gltype, data);
+    }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -1435,9 +1506,397 @@ RBuffer::~RBuffer()
 }
 
 
-//// GLVersion
 
-static void ParseGLVersion(GLVersionAndExtensions& versionInfo)
+
+
+
+DebugCallback::DebugCallback()
+  : Initialized(false),
+    MinLogSeverity(SeverityHigh),
+    MinAssertSeverity(SeverityHigh),
+    glDebugMessageCallback(NULL),
+    glDebugMessageControl(NULL),
+    glDebugMessageCallbackARB(NULL),
+    glDebugMessageControlARB(NULL),
+    glDebugMessageCallbackAMD(NULL),
+    glDebugMessageControlAMD(NULL)
+{
+}
+
+
+DebugCallback::~DebugCallback()
+{
+    Shutdown();
+}
+
+
+bool DebugCallback::GetGLDebugCallback(PFNGLDEBUGMESSAGECALLBACKPROC* debugCallback, const void** userParam) const
+{
+    // Curiously, the KHR and ARB callbacks use the same glGetPointerv defines, which means you can only have 
+    // one of them active concurrently. This also implies that an OpenGL implementation which implements both
+    // KHR and ARB implements the latter as simply a passthrough (or alias) of the former.
+    #if defined(GL_ARB_debug_output) || defined(GL_KHR_debug)
+        // glGetPointerv requires at least OpenGL 4.3 headers and implementation, 
+        // but will be present in the headers if GL_ARB_debug_output or GL_KHR_debug are.
+        if(glDebugMessageCallback || glDebugMessageCallbackARB)
+        {
+            glGetPointerv(GL_DEBUG_CALLBACK_FUNCTION, reinterpret_cast<GLvoid**>(debugCallback));
+            glGetPointerv(GL_DEBUG_CALLBACK_USER_PARAM, const_cast<GLvoid**>(userParam));
+            return true;
+        }
+    #endif
+
+    // AMD_debug_output doesn't provide an option to get the debug callback.
+    debugCallback = NULL;
+    userParam = NULL;
+    return false;
+}
+
+
+void DebugCallback::DebugCallbackInternal(Severity s, const char* pSource, const char* pType, GLuint id, const char* pSeverity, const char* message)
+{
+    if(s >= MinLogSeverity)
+    {
+        OVR::LogError("{ERR-xxxx} [GL Error] %s %s %#x %s: %s", pSource, pType, id, pSeverity, message);
+    }
+
+    if(s >= MinAssertSeverity)
+    {
+        OVR_ASSERT(s < MinAssertSeverity); // Unilateral fail.
+    }
+}
+
+
+void DebugCallback::Initialize()
+{
+    if(!Initialized)
+    {
+        Initialized = true;
+
+        int err = glGetError();
+        OVR_UNUSED(err);
+
+        // Used to see if a callback was already registered.
+        PFNGLDEBUGMESSAGECALLBACKPROC debugCallbackPrev = NULL;
+        const void* userParamPrev = NULL;
+
+        // Try getting the KHR interface.
+        #if defined(OVR_OS_MAC) // With Mac OpenGL, functions aren't dynamically linked. They are only directly called.
+          //glDebugMessageCallback = ::glDebugMessageCallback; // We can enable this some day when Apple includes support 
+          //glDebugMessageControl  = ::glDebugMessageControl;  // for glDebugMessageCallback in their headers and SDK.
+        #else
+            glDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKPROC) GetFunction("glDebugMessageCallback");
+            glDebugMessageControl  = (PFNGLDEBUGMESSAGECONTROLPROC) GetFunction("glDebugMessageControl");
+        #endif
+
+        if(glDebugMessageCallback) 
+        {
+            GetGLDebugCallback(&debugCallbackPrev, &userParamPrev);
+
+            if(!debugCallbackPrev) // If a callback isn't already registered...
+            {
+                glDebugMessageCallback(GLDEBUGPROC(DebugMessageCallback), this);
+                err = glGetError();
+                if(err)
+                {
+                	glDebugMessageCallback = NULL;
+                	glDebugMessageControl = NULL;
+                	OVR_DEBUG_LOG(("glDebugMessageCallback error: %x (%d)\n", err, err));
+            	}
+
+                glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+                err = glGetError();
+                if(err)
+                {
+                	OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
+                }
+
+                // To consider: disable marker/push/pop
+                // glDebugMessageControl(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_MARKER,     GL_DONT_CARE, 0, NULL, GL_FALSE);
+                // glDebugMessageControl(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_PUSH_GROUP, GL_DONT_CARE, 0, NULL, GL_FALSE);
+                // glDebugMessageControl(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_POP_GROUP,  GL_DONT_CARE, 0, NULL, GL_FALSE);
+            }
+        }
+
+        if(!glDebugMessageCallback) // If KHR_debug wasn't found, try ARB_debug_output.
+        {
+            #if !defined(OVR_OS_MAC)
+                glDebugMessageCallbackARB = (PFNGLDEBUGMESSAGECALLBACKARBPROC) GetFunction("glDebugMessageCallbackARB");
+                glDebugMessageControlARB  = (PFNGLDEBUGMESSAGECONTROLARBPROC) GetFunction("glDebugMessageControlARB");
+            #endif
+
+            if(glDebugMessageCallbackARB)
+            {
+                GetGLDebugCallback(&debugCallbackPrev, &userParamPrev);
+
+                if(!debugCallbackPrev) // If a callback isn't already registered...
+                {
+                    glDebugMessageCallbackARB(GLDEBUGPROCARB(DebugMessageCallback), this);
+                    err = glGetError();
+                    if(err)
+                    {
+                    	glDebugMessageCallbackARB = NULL;
+                    	glDebugMessageControlARB = NULL;
+                    	OVR_DEBUG_LOG(("glDebugMessageCallbackARB error: %x (%d)\n", err, err));
+                	}
+
+                    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+                    err = glGetError();
+                    if(err)
+                    {
+                    	OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
+                    }
+
+                    // To consider: disable marker/push/pop
+                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_MARKER,     GL_DONT_CARE, 0, NULL, GL_FALSE);
+                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_PUSH_GROUP, GL_DONT_CARE, 0, NULL, GL_FALSE);
+                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_POP_GROUP,  GL_DONT_CARE, 0, NULL, GL_FALSE);
+                }
+            }
+        }
+
+		if(!glDebugMessageCallback && !glDebugMessageCallbackARB)// If ARB_debug_output also wasn't found, try AMD_debug_output.
+		{
+			#if !defined(OVR_OS_MAC)
+				glDebugMessageCallbackAMD = (PFNGLDEBUGMESSAGECALLBACKAMDPROC) GetFunction("glDebugMessageCallbackAMD");
+				glDebugMessageControlAMD  = (PFNGLDEBUGMESSAGEENABLEAMDPROC) GetFunction("glDebugMessageControlAMD");
+			#endif
+
+			if(glDebugMessageCallbackAMD)
+			{
+				if(!debugCallbackPrev) // If a callback isn't already registered...
+				{
+					glDebugMessageCallbackAMD(GLDEBUGPROCAMD(DebugMessageCallbackAMD), this);
+                    err = glGetError();
+                    if(err)
+                    {
+                    	glDebugMessageCallbackAMD = NULL;
+                    	glDebugMessageControlAMD = NULL;
+                    	OVR_DEBUG_LOG(("glDebugMessageCallbackAMD error: %x (%d)\n", err, err));
+                	}
+					// There is no control for synchronous/asynchronous with AMD_debug_output.
+				}
+			}
+		}
+    }
+}
+
+
+void DebugCallback::Shutdown()
+{
+    if(Initialized)
+    {
+        if(glDebugMessageCallbackAMD)
+        {
+            glDebugMessageCallbackAMD(NULL, NULL);
+            glDebugMessageCallbackAMD = NULL;
+        }
+
+        if(glDebugMessageCallbackARB)
+        {
+            glDebugMessageCallbackARB(NULL, NULL);
+            glDebugMessageCallbackARB = NULL;
+        }
+
+        if(glDebugMessageCallback)
+        {
+            glDebugMessageCallback(NULL, NULL);
+            glDebugMessageCallback = NULL;
+        }
+
+        Initialized = false;
+    }
+}
+
+
+void DebugCallback::SetMinSeverity(Severity minLogSeverity, Severity minAssertSeverity)
+{
+    MinLogSeverity    = minLogSeverity;
+    MinAssertSeverity = minAssertSeverity;
+}
+
+
+DebugCallback::Implementation DebugCallback::GetImplementation() const
+{
+    if(glDebugMessageCallbackAMD)
+        return ImplementationAMD;
+
+    if(glDebugMessageCallbackARB)
+        return ImplementationARB;
+
+    if(glDebugMessageCallback)
+        return ImplementationKHR;
+
+    return ImplementationNone;
+}
+
+
+void DebugCallback::DebugMessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/, const GLchar* message, GLvoid* userParam)
+{
+    const char* pSource   = GetSource(source);
+    const char* pType     = GetType(type);
+    const char* pSeverity = GetSeverity(severity);
+    Severity    s;
+
+    switch(severity)
+    {
+        default:
+        case GL_DEBUG_SEVERITY_NOTIFICATION:
+            s = SeverityNotification;
+            break;
+        case GL_DEBUG_SEVERITY_LOW:
+            s = SeverityLow;
+            break;
+        case GL_DEBUG_SEVERITY_MEDIUM:
+            s = SeverityMedium;
+            break;
+        case GL_DEBUG_SEVERITY_HIGH:
+            s = SeverityHigh;
+            break;
+    }
+
+    DebugCallback* pThis = reinterpret_cast<DebugCallback*>(userParam);
+    pThis->DebugCallbackInternal(s, pSource, pType, id, pSeverity, message);
+}
+
+
+const char* DebugCallback::GetSource(GLenum Source)
+{
+    // There is one contiguous section of GL_DEBUG_SOURCE values.
+    static_assert((GL_DEBUG_SOURCE_OTHER - GL_DEBUG_SOURCE_API) == 5, "GL_DEBUG_SOURCE constants are not contiguous.");
+
+    static const char* GL_SourceStrings[] =
+    {
+        "API",             // GL_DEBUG_SOURCE_API
+        "System",          // GL_DEBUG_SOURCE_WINDOW_SYSTEM
+        "ShaderCompiler",  // GL_DEBUG_SOURCE_SHADER_COMPILER
+        "ThirdParty",      // GL_DEBUG_SOURCE_THIRD_PARTY
+        "Application",     // GL_DEBUG_SOURCE_APPLICATION
+        "Other"            // GL_DEBUG_SOURCE_OTHER
+    };
+    
+    if ((Source >= GL_DEBUG_SOURCE_API) && (Source <= GL_DEBUG_SOURCE_OTHER))
+        return GL_SourceStrings[Source - GL_DEBUG_SOURCE_API];
+        
+    return "Unknown";
+}
+
+
+
+const char* DebugCallback::GetType(GLenum Type)
+{
+    // There are two contiguous sections of GL_DEBUG_TYPE values.
+    static_assert((GL_DEBUG_TYPE_OTHER - GL_DEBUG_TYPE_ERROR) == 5, "GL_DEBUG_TYPE constants are not contiguous.");
+    static const char* TypeStrings[] =
+    {
+        "Error",                // GL_DEBUG_TYPE_ERROR
+        "Deprecated",           // GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR
+        "UndefinedBehavior",    // GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR
+        "Portability",          // GL_DEBUG_TYPE_PORTABILITY
+        "Performance",          // GL_DEBUG_TYPE_PERFORMANCE
+        "Other"                 // GL_DEBUG_TYPE_OTHER
+    };
+
+    if ((Type >= GL_DEBUG_TYPE_ERROR) && (Type <= GL_DEBUG_TYPE_OTHER))
+        return TypeStrings[Type - GL_DEBUG_TYPE_ERROR];
+
+    // KHR_debug marker/push/pop functionality.
+    static_assert((GL_DEBUG_TYPE_POP_GROUP - GL_DEBUG_TYPE_MARKER) == 2, "GL_DEBUG_TYPE constants are not contiguous.");
+    static const char* TypeStrings2[] =
+    {
+        "Marker",       // GL_DEBUG_TYPE_MARKER
+        "PushGroup",    // GL_DEBUG_TYPE_PUSH_GROUP
+        "PopGroup",     // GL_DEBUG_TYPE_POP_GROUP
+    };
+
+    if ((Type >= GL_DEBUG_TYPE_MARKER) && (Type <= GL_DEBUG_TYPE_POP_GROUP))
+        return TypeStrings2[Type - GL_DEBUG_TYPE_MARKER];
+
+    return "Unknown";
+}
+
+
+const char* DebugCallback::GetSeverity(GLenum Severity)
+{
+    // There are two sections of GL_DEBUG_SEVERITY.
+    static_assert((GL_DEBUG_SEVERITY_LOW - GL_DEBUG_SEVERITY_HIGH) == 2, "GL_DEBUG_SEVERITY constants are not contiguous.");
+    static const char* SeverityStrings[] =
+    {
+        "High",
+        "Medium",
+        "Low"
+    };
+
+    if ((Severity >= GL_DEBUG_SEVERITY_HIGH) && (Severity <= GL_DEBUG_SEVERITY_LOW))
+        return SeverityStrings[Severity - GL_DEBUG_SEVERITY_HIGH];
+
+    // There is just one value in this second section.
+    if(Severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+        return "Notification";
+
+    return "Unknown";
+}
+
+
+void DebugCallback::DebugMessageCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei /*length*/, const GLchar *message, GLvoid *userParam)
+{
+    static_assert(GL_DEBUG_SEVERITY_LOW_AMD == GL_DEBUG_SEVERITY_LOW, "Severity mismatch"); // Verify that AMD_debug_output severity constants are identical to KHR_debug severity contstants.
+
+    const char* pSource   = GetCategoryAMD(category);
+    const char* pSeverity = GetSeverity(severity);
+    Severity    s;
+
+    switch(severity)
+    {
+        default:
+        case GL_DEBUG_SEVERITY_NOTIFICATION:
+            s = SeverityNotification;
+            break;
+        case GL_DEBUG_SEVERITY_LOW:
+            s = SeverityLow;
+            break;
+        case GL_DEBUG_SEVERITY_MEDIUM:
+            s = SeverityMedium;
+            break;
+        case GL_DEBUG_SEVERITY_HIGH:
+            s = SeverityHigh;
+            break;
+    }
+
+    DebugCallback* pThis = reinterpret_cast<DebugCallback*>(userParam);
+    pThis->DebugCallbackInternal(s, pSource, "Other", id, pSeverity, message);
+}
+
+
+const char* DebugCallback::GetCategoryAMD(GLenum Category)
+{
+    static_assert((GL_DEBUG_CATEGORY_OTHER_AMD - GL_DEBUG_CATEGORY_API_ERROR_AMD) == 7, "GL_DEBUG_CATEGORY constants are not contiguous.");
+    static const char* CategoryStrings[] =
+    {
+        "API",                  // GL_DEBUG_CATEGORY_API_ERROR_AMD
+        "System",               // GL_DEBUG_CATEGORY_WINDOW_SYSTEM_AMD
+        "Deprecation",          // GL_DEBUG_CATEGORY_DEPRECATION_AMD
+        "UndefinedBehavior",    // GL_DEBUG_CATEGORY_UNDEFINED_BEHAVIOR_AMD
+        "Performance",          // GL_DEBUG_CATEGORY_PERFORMANCE_AMD
+        "ShaderCompiler",       // GL_DEBUG_CATEGORY_SHADER_COMPILER_AMD
+        "Application",          // GL_DEBUG_CATEGORY_APPLICATION_AMD
+        "Other"                 // GL_DEBUG_CATEGORY_OTHER_AMD
+    };
+
+    if((Category >= GL_DEBUG_CATEGORY_API_ERROR_AMD) && (Category <= GL_DEBUG_CATEGORY_OTHER_AMD))
+        return CategoryStrings[Category - GL_DEBUG_CATEGORY_API_ERROR_AMD];
+
+    return "Unknown";
+}
+
+
+
+
+
+
+
+
+void GLVersionAndExtensions::ParseGLVersion()
 {
     const char* version = (const char*)glGetString(GL_VERSION);
     int fields = 0, major = 0, minor = 0;
@@ -1448,23 +1907,14 @@ static void ParseGLVersion(GLVersionAndExtensions& versionInfo)
     {
         OVR_DEBUG_LOG(("GL_VERSION: %s", (const char*)version));
 
-#ifdef OVR_CC_MSVC
-        // Hack: This is using sscanf_s on MSVC to kill the security warning.
-        // Normally the two functions are not interchangeable because the string format
-        // is different for %s types, however we only use %d so it's fine.
-#define TEMP_OVR_SSCANF sscanf_s
-#else
-#define TEMP_OVR_SSCANF sscanf
-#endif
-
         // Skip all leading non-digits before reading %d.
         // Example GL_VERSION strings:
         //   "1.5 ATI-1.4.18"
         //   "OpenGL ES-CM 3.2"
-        fields = TEMP_OVR_SSCANF(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
+        OVR_DISABLE_MSVC_WARNING(4996) // "scanf may be unsafe"
+        fields = sscanf(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
         isGLES = (strstr(version, "OpenGL ES") != NULL);
-
-#undef TEMP_OVR_SSCANF
+        OVR_RESTORE_MSVC_WARNING()
     }
     else
     {
@@ -1481,81 +1931,122 @@ static void ParseGLVersion(GLVersionAndExtensions& versionInfo)
     }
 
     // Write version data
-    versionInfo.MajorVersion = major;
-    versionInfo.MinorVersion = minor;
-    versionInfo.IsGLES = isGLES;
+    MajorVersion = major;
+    MinorVersion = minor;
+    WholeVersion = (major * 100) + minor;
+    IsGLES = isGLES;
+    IsCoreProfile = (MajorVersion >= 3); // Until we get a better way to detect core profiles, we err on the conservative side and set to true if the version is >= 3.
 }
 
-static bool HasGLExtension(const char* extensions, const char* searchKey)
+
+bool GLVersionAndExtensions::HasGLExtension(const char* searchKey) const
 {
-    const int searchKeyLen = (int)strlen(searchKey);
-    const char* p = extensions;
-
-    for (;;)
+    if (Extensions && Extensions[0]) // If we have an extension string to search for individual extensions...
     {
-        p = strstr(p, searchKey);
+        const int searchKeyLen = (int)strlen(searchKey);
+        const char* p = Extensions;
 
-        // If not found,
-        if (p == NULL)
+        for (;;)
         {
-            break;
-        }
+            p = strstr(p, searchKey);
 
-        // Only match full string
-        if ((p == extensions || p[-1] == ' ') &&
-            (p[searchKeyLen] == '\0' || p[searchKeyLen] == ' '))
+            // If not found,
+            if (p == NULL)
+            {
+                break;
+            }
+
+            // Only match full string
+            if ((p == Extensions || p[-1] == ' ') &&
+                (p[searchKeyLen] == '\0' || p[searchKeyLen] == ' '))
+            {
+                return true;
+            }
+
+            // Skip ahead
+            p += searchKeyLen;
+        }
+    }
+    else
+    {
+        if (MajorVersion >= 3) // If glGetIntegerv(GL_NUM_EXTENSIONS, ...) is supported...
         {
-            return true;
-        }
+            GLint extensionCount = 0;
+            glGetIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
+            GLenum err = glGetError();
 
-        // Skip ahead
-        p += searchKeyLen;
+            if (err == 0)
+            {
+                for (GLint i = 0; i != extensionCount; ++i)
+                {
+                    const char* extension = (const char*)glGetStringi(GL_EXTENSIONS, (GLuint)i);
+
+                    if (extension) // glGetStringi returns NULL upon error.
+                    {
+                        if (strcmp(extension, searchKey) == 0)
+                            return true;
+                    }
+                    else
+                        break;
+                }
+            }
+        }
     }
 
     return false;
 }
 
-static void ParseGLExtensions(GLVersionAndExtensions& versionInfo)
+void GLVersionAndExtensions::ParseGLExtensions()
 {
-    const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
-
-    OVR_ASSERT(extensions);
-    if (!extensions)
+    if (MajorVersion >= 3)
     {
-        extensions = ""; // Note: glGetString() can return null
-        LogText("Warning: GL_EXTENSIONS was NULL\n");
+        // Set to empty because we need to use glGetStringi to read extensions on recent OpenGL.
+        Extensions = "";
     }
     else
     {
-        // Cannot print this to debug log: It's too long!
-        //OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", (const char*)extensions));
+        const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
+
+        OVR_ASSERT(extensions);
+        if (!extensions)
+        {
+            extensions = ""; // Note: glGetString() can return null
+            LogText("Warning: GL_EXTENSIONS was NULL\n");
+        }
+        else
+        {
+            // Cannot print this to debug log: It's too long!
+            //OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", (const char*)extensions));
+        }
+
+        Extensions = extensions;
     }
 
-    versionInfo.Extensions = extensions;
+    // To do: revise the code below to loop through calls to glGetStringi(GL_EXTENSIONS, ...) so that all extensions below 
+    // can be searched with a single pass over the extensions instead of a full loop per HasGLExtensionCall. 
 
-    if (versionInfo.MajorVersion >= 3)
+    if (MajorVersion >= 3)
     {
-        versionInfo.SupportsVAO = true;
+        SupportsVAO = true;
     }
     else
     {
-        versionInfo.SupportsVAO =
-            HasGLExtension(extensions, "GL_ARB_vertex_array_object") ||
-            HasGLExtension(extensions, "GL_APPLE_vertex_array_object");
+        SupportsVAO =
+            HasGLExtension("GL_ARB_vertex_array_object") ||
+            HasGLExtension("GL_APPLE_vertex_array_object");
     }
 
-    versionInfo.SupportsDrawBuffers = HasGLExtension(extensions, "GL_EXT_draw_buffers2");
+    SupportsDrawBuffers = HasGLExtension("GL_EXT_draw_buffers2");
 
     // Add more extension checks here...
 }
 
 void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo)
 {
-    ParseGLVersion(versionInfo);
-
+    versionInfo.ParseGLVersion();
     // GL Version must be parsed before parsing extensions:
-
-    ParseGLExtensions(versionInfo);
+    versionInfo.ParseGLExtensions();
+    // To consider: Call to glGetStringi(GL_SHADING_LANGUAGE_VERSION, ...) check/validate the GLSL support.
 }
 
 

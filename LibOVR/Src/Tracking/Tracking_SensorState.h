@@ -5,16 +5,16 @@ Content     :   Sensor state information shared by tracking system with games
 Created     :   May 13, 2014
 Authors     :   Dov Katz, Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License");
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
 you may not use the Oculus VR Rift SDK except in compliance with the License,
 which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,7 +70,7 @@ enum StatusBits
 class TrackingState
 {
 public:
-	TrackingState() : StatusFlags(0) { }
+	TrackingState() : HeadPose(), CameraPose(), LeveledCameraPose(), RawSensorData(), StatusFlags(0), LastVisionProcessingTime(0.0) { }
 
 	// C-interop support
 	TrackingState(const ovrTrackingState& s);
@@ -92,8 +92,16 @@ public:
 
     //// 0.4.1
 
-    // Time spent processing the last vision frame
+    // Measures the time from receiving the camera frame until vision CPU processing completes.
     double LastVisionProcessingTime;
+
+    //// 0.4.3
+
+    // Measures the time from exposure until the pose is available for the frame, including processing time.
+    double LastVisionFrameLatency;
+
+    // Tag the vision processing results to a certain frame counter number.
+    uint32_t LastCameraFrameCounter;
 };
 
 
@@ -115,17 +123,33 @@ struct LocklessSensorState
 
 	// ImuFromCpf for HMD pose tracking
 	Posed             ImuFromCpf;
+
+    // Performance logging
     double            LastVisionProcessingTime;
+    double            LastVisionFrameLatency;
+    uint32_t          LastCameraFrameCounter;
+    uint32_t          _PAD_1_;
 
 	// Initialized to invalid state
 	LocklessSensorState() :
-		StatusFlags(0)
+       WorldFromImu()
+     , RawSensorData()
+     , WorldFromCamera()
+	 , StatusFlags(0)
+     , _PAD_0_(0) // This assignment should be irrelevant, but it quells static/runtime analysis complaints.
+     , ImuFromCpf()
+     , LastVisionProcessingTime(0.0)
+     , LastVisionFrameLatency(0.0)
+     , LastCameraFrameCounter(0)
+     , _PAD_1_(0) // "
 	{
 	}
 
     LocklessSensorState& operator = (const LocklessSensorStatePadding& rhs);
 };
     
+static_assert((sizeof(LocklessSensorState) == sizeof(PoseState<double>) + sizeof(SensorDataType) + sizeof(Pose<double>) + 2*sizeof(uint32_t) + sizeof(Posed) + sizeof(double)*2 + sizeof(uint32_t)*2), "sizeof(LocklessSensorState) failure");
+
 // Padded out version stored in the updater slots
 // Designed to be a larger fixed size to allow the data to grow in the future
 // without breaking older compiled code.

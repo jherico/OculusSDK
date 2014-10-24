@@ -5,16 +5,16 @@ Content     :   State associated with a single HMD
 Created     :   January 24, 2014
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ limitations under the License.
 #include "../OVR_CAPI.h"
 
 #include "CAPI_FrameTimeManager.h"
+#include "CAPI_LatencyStatistics.h"
 #include "CAPI_HMDRenderState.h"
 #include "CAPI_DistortionRenderer.h"
 #include "CAPI_HSWDisplay.h"
@@ -182,7 +183,7 @@ public:
         OVR_UNUSED1(functionName); // for Release build.
         OVR_ASSERT_LOG(BeginFrameCalled == true,
                        ("%s called outside ovrHmd_BeginFrame.", functionName));
-        OVR_ASSERT_LOG(BeginFrameThreadId == OVR::GetCurrentThreadId(),
+		OVR_DEBUG_LOG_COND(BeginFrameThreadId != OVR::GetCurrentThreadId(),
                        ("%s called on a different thread then ovrHmd_BeginFrame.", functionName));
     }
 
@@ -254,6 +255,8 @@ public:
 
     // Rendering part
     FrameTimeManager        TimeManager;
+    LagStatsCalculator      LagStats;
+    LatencyStatisticsCSV    LagStatsCSV;
     HMDRenderState          RenderState;
     Ptr<DistortionRenderer> pRenderer;
 

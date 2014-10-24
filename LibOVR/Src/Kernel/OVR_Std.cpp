@@ -5,16 +5,16 @@ Content     :   Standard C function implementation
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,7 +37,7 @@ namespace OVR {
 // Case insensitive compare implemented in platform-specific way.
 int OVR_CDECL OVR_stricmp(const char* a, const char* b)
 {
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
         return ::_stricmp(a, b);
     #else
@@ -51,12 +51,12 @@ int OVR_CDECL OVR_stricmp(const char* a, const char* b)
 
 int OVR_CDECL OVR_strnicmp(const char* a, const char* b, size_t count)
 {
-#if defined(OVR_OS_WIN32)
-#if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
-    return ::_strnicmp(a, b, count);
-#else
-    return ::strnicmp(a, b, count);
-#endif
+#if defined(OVR_OS_MS)
+    #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
+        return ::_strnicmp(a, b, count);
+    #else
+        return ::strnicmp(a, b, count);
+    #endif
 
 #else
     return strncasecmp(a, b, count);
@@ -68,7 +68,7 @@ wchar_t* OVR_CDECL OVR_wcscpy(wchar_t* dest, size_t destsize, const wchar_t* src
 #if defined(OVR_MSVC_SAFESTRING)
     wcscpy_s(dest, destsize, src);
     return dest;
-#elif defined(OVR_OS_WIN32)
+#elif defined(OVR_OS_MS)
     OVR_UNUSED(destsize);
     wcscpy(dest, src);
     return dest;
@@ -107,7 +107,7 @@ wchar_t* OVR_CDECL OVR_wcscat(wchar_t* dest, size_t destsize, const wchar_t* src
 #if defined(OVR_MSVC_SAFESTRING)
     wcscat_s(dest, destsize, src);
     return dest;
-#elif defined(OVR_OS_WIN32)
+#elif defined(OVR_OS_MS)
     OVR_UNUSED(destsize);
     wcscat(dest, src);
     return dest;
@@ -122,7 +122,7 @@ wchar_t* OVR_CDECL OVR_wcscat(wchar_t* dest, size_t destsize, const wchar_t* src
 
 size_t  OVR_CDECL OVR_wcslen(const wchar_t* str)
 {
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     return wcslen(str);
 #else
     size_t i = 0;
@@ -134,7 +134,7 @@ size_t  OVR_CDECL OVR_wcslen(const wchar_t* str)
 
 int OVR_CDECL OVR_wcscmp(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32) || defined(OVR_OS_LINUX)
+#if defined(OVR_OS_MS) || defined(OVR_OS_LINUX)
     return wcscmp(a, b);
 #else
     // not supported, use custom implementation
@@ -161,12 +161,12 @@ int OVR_CDECL OVR_wcscmp(const wchar_t* a, const wchar_t* b)
 
 int OVR_CDECL OVR_wcsicmp(const wchar_t* a, const wchar_t* b)
 {
-#if defined(OVR_OS_WIN32)
-#if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
-    return ::_wcsicmp(a, b);
-#else
-    return ::wcsicmp(a, b);
-#endif
+#if defined(OVR_OS_MS)
+    #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
+        return ::_wcsicmp(a, b);
+    #else
+        return ::wcsicmp(a, b);
+    #endif
 #elif defined(OVR_OS_MAC) || defined(__CYGWIN__) || defined(OVR_OS_ANDROID) || defined(OVR_OS_IPHONE)
     // not supported, use custom implementation
     const wchar_t *pa = a, *pb = b;
@@ -193,16 +193,19 @@ int OVR_CDECL OVR_wcsicmp(const wchar_t* a, const wchar_t* b)
 }
 
 // This function is not inline because of dependency on <locale.h>
-double OVR_CDECL OVR_strtod(const char* string, char** tailptr)
+double OVR_CDECL OVR_strtod(const char* str, char** tailptr)
 {
-#if !defined(OVR_OS_ANDROID)
+#if !defined(OVR_OS_ANDROID) // The Android C library doesn't have localeconv.
     const char s = *localeconv()->decimal_point;
 
-    if (s != '.')
+    if (s != '.') // If the C library is using a locale that is not using '.' as a decimal point, we convert the input str's '.' chars to the char that the C library expects (e.g. ',' or ' ').
     {
         char buffer[347 + 1];
 
-        OVR_strcpy(buffer, sizeof(buffer), string);
+        OVR_strcpy(buffer, sizeof(buffer), str);
+
+        // Ensure null-termination of string
+        buffer[sizeof(buffer)-1] = '\0';
 
         for (char* c = buffer; *c != '\0'; ++c)
         {
@@ -213,11 +216,21 @@ double OVR_CDECL OVR_strtod(const char* string, char** tailptr)
             }
         }
 
-        return strtod(buffer, tailptr);
+        char *nextPtr = NULL;
+        double retval = strtod(buffer, &nextPtr);
+
+        // If a tail pointer is requested,
+        if (tailptr)
+        {
+            // Return a tail pointer that points to the same offset as nextPtr, in the orig string
+            *tailptr = !nextPtr ? NULL : (char*)str + (int)(nextPtr - buffer);
+        }
+
+        return retval;
     }
 #endif
 
-    return strtod(string, tailptr);
+    return strtod(str, tailptr);
 }
 
 

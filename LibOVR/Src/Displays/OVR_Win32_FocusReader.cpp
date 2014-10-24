@@ -5,16 +5,16 @@ Content     :   Reader for current app with focus on Windows
 Created     :   July 2, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,8 +35,9 @@ namespace OVR { namespace Win32 {
 
 HWND RenderFocusReader::ReadActiveWindow()
 {
-    FocusState = Reader.Get();
-    if (!FocusState || NoSharedMemory)
+    const LocklessFocusState* focusState = Reader.Get();
+
+    if (!focusState || NoSharedMemory)
     {
         if (!Reader.Open(OVR_FOCUS_OBSERVER_SHARE_NAME))
         {
@@ -46,8 +47,8 @@ HWND RenderFocusReader::ReadActiveWindow()
             return 0;
         }
 
-        FocusState = Reader.Get();
-        if (!FocusState)
+        focusState = Reader.Get();
+        if (!focusState)
         {
             OVR_DEBUG_LOG(("[Win32ShimFunctions] Unable to get the shared memory space"));
             NoSharedMemory = true;
@@ -55,13 +56,13 @@ HWND RenderFocusReader::ReadActiveWindow()
         }
     }
 
-    return (HWND)Ptr64ToPtr(FocusState->ActiveWindowHandle);
+    return (HWND)Ptr64ToPtr(focusState->ActiveWindowHandle);
 }
 
-RenderFocusReader::RenderFocusReader()
+RenderFocusReader::RenderFocusReader() :
+    NoSharedMemory(false)
 {
-	NoSharedMemory = false;
-
+	// Must be at end of function
     PushDestroyCallbacks();
 }
 

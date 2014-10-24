@@ -5,16 +5,16 @@ Content     :   Sample stereo rendering configuration classes.
 Created     :   October 22, 2012
 Authors     :   Michael Antonov, Tom Forsyth
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -328,13 +328,18 @@ struct DistortionMeshVertexData
     Vector2f    TanEyeAnglesB;    
 };
 
+// If you just want a single point on the screen transformed.
+DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
+                                                    bool rightEye,
+                                                    const HmdRenderInfo &hmdRenderInfo, 
+                                                    const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC );
 
 void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                             int *pNumVertices, int *pNumTriangles,
                             const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo );
 
-// Generate distortion mesh for a eye. This version requires less data then stereoParms, supporting
-// dynamic change in render target viewport.
+// Generate distortion mesh for a eye.
+// This version requires less data then stereoParms, supporting dynamic change in render target viewport.
 void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
@@ -406,8 +411,8 @@ PredictionValues PredictionGetDeviceValues ( const HmdRenderInfo &hmdRenderInfo,
 // (which may have been computed later on, and thus is more accurate), and this
 // will return the matrix to pass to the timewarp distortion shader.
 // TODO: deal with different handedness?
-Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust );
-Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&eyeViewAdjust );
+Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset );
+Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset );
 
 
 
@@ -459,13 +464,14 @@ public:
     bool        JustInTime_NeedDistortionTimeMeasurement() const;
     void        JustInTime_BeforeDistortionTimeMeasurement(double timeNow);
     void        JustInTime_AfterDistortionTimeMeasurement(double timeNow);
+    double      JustInTime_AverageDistortionTime();     // Just for profiling - use JustInTime_GetDistortionWaitUntilTime() for functionality.
 
 private:
     bool                VsyncEnabled;
     HmdRenderInfo       RenderInfo;
     PredictionValues    CurrentPredictionValues;
 
-    enum { NumDistortionTimes = 10 };
+    enum { NumDistortionTimes = 100 };
     int                 DistortionTimeCount;
     double              DistortionTimeCurrentStart;
     float               DistortionTimes[NumDistortionTimes];

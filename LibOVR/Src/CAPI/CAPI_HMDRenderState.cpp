@@ -5,16 +5,16 @@ Content     :   Combines all of the rendering state associated with the HMD
 Created     :   February 2, 2014
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -63,7 +63,7 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp |
                           ovrDistortionCap_Vignette | ovrDistortionCap_SRGB |
                           ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits |
-                          ovrDistortionCap_HqDistortion;
+                          ovrDistortionCap_HqDistortion | ovrDistortionCap_LinuxDevFullscreen;
 
     if( OurHMDInfo.InCompatibilityMode )
         d.HmdCaps |= ovrHmdCap_ExtendDesktop;
@@ -127,7 +127,7 @@ ovrEyeRenderDesc HMDRenderState::CalcRenderDesc(ovrEyeType eyeType, const ovrFov
     
     e0.Eye                       = eyeType;
     e0.Fov                       = fov;
-    e0.ViewAdjust                = CalculateEyeVirtualCameraOffset(hmdri, eye, false);
+    e0.HmdToEyeViewOffset        = CalculateEyeVirtualCameraOffset(hmdri, eye, false);
     e0.DistortedViewport         = GetFramebufferViewport(eye, hmdri);
     e0.PixelsPerTanAngleAtCenter = Distortion[0].PixelsPerTanAngleAtCenter;
 

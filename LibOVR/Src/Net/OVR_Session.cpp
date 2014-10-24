@@ -5,16 +5,16 @@ Content     :   One network session that provides connection/disconnection event
 Created     :   June 10, 2014
 Authors     :   Kevin Jenkins, Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -243,12 +243,9 @@ SessionResult Session::ListenPTCP(OVR::Net::BerkleyBindParameters *bbp)
     return Listen(&bld);
 }
 
-SessionResult Session::ConnectPTCP(OVR::Net::BerkleyBindParameters* bbp, SockAddr* RemoteAddress, bool blocking)
+SessionResult Session::ConnectPTCP(OVR::Net::BerkleyBindParameters* bbp, SockAddr* remoteAddress, bool blocking)
 {
-	ConnectParametersBerkleySocket cp;
-    cp.RemoteAddress = RemoteAddress;
-    cp.Transport = TransportType_PacketizedTCP;
-    cp.Blocking = blocking;
+    ConnectParametersBerkleySocket cp(NULL, remoteAddress, blocking, TransportType_PacketizedTCP);
     Ptr<PacketizedTCPSocket> connectSocket = *new PacketizedTCPSocket();
 
 	cp.BoundSocketToConnectWith = connectSocket.GetPtr();
@@ -341,9 +338,10 @@ void Session::Broadcast(BroadcastParameters *payload)
         }    
     }
 }
+// DO NOT CALL Poll() FROM MULTIPLE THREADS due to allBlockingTcpSockets being a member
 void Session::Poll(bool listeners)
 {
-	Array< Ptr< Net::TCPSocket > > allBlockingTcpSockets;
+    allBlockingTcpSockets.Clear();
 
 	if (listeners)
 	{
@@ -513,11 +511,14 @@ int Session::invokeSessionListeners(ReceivePayload* rp)
 
 void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
 {
-	Lock::Locker locker(&ConnectionsLock);
+	// KevinJ: 9/2/2014 Fix deadlock - Watchdog calls Broadcast(), which locks ConnectionsLock().
+	// Lock::Locker locker(&ConnectionsLock);
 
     // Look for the connection in the full connection list first
     int connIndex;
-    PacketizedTCPConnection* conn = findConnectionBySocket(AllConnections, pSocket, &connIndex);
+	ConnectionsLock.DoLock();
+    Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, pSocket, &connIndex);
+	ConnectionsLock.Unlock();
     if (conn)
     {
         if (conn->State == State_Connected)
@@ -553,7 +554,13 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
 
                 // Mark as connected
                 conn->SetState(State_Connected);
-                FullConnections.PushBack(conn);
+				ConnectionsLock.DoLock();
+				int connIndex2;
+				if (findConnectionBySocket(AllConnections, pSocket, &connIndex2)==conn && findConnectionBySocket(FullConnections, pSocket, &connIndex2)==NULL)
+				{
+					FullConnections.PushBack(conn);
+				}
+				ConnectionsLock.Unlock();
                 invokeSessionEvent(&SessionListener::OnConnectionRequestAccepted, conn);
             }
         }
@@ -591,7 +598,13 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
 
                 // Mark as connected
                 conn->SetState(State_Connected);
-                FullConnections.PushBack(conn);
+				ConnectionsLock.DoLock();
+				int connIndex2;
+				if (findConnectionBySocket(AllConnections, pSocket, &connIndex2)==conn && findConnectionBySocket(FullConnections, pSocket, &connIndex2)==NULL)
+				{
+					FullConnections.PushBack(conn);
+				}
+				ConnectionsLock.Unlock();
                 invokeSessionEvent(&SessionListener::OnNewIncomingConnection, conn);
 
             }

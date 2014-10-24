@@ -5,16 +5,16 @@ Content     :   Windows-specific socket-based networking implementation
 Created     :   June 10, 2014
 Authors     :   Kevin Jenkins
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -178,7 +178,6 @@ void SockAddr::Set(const char* hostAddress, uint16_t port, int sockType)
 {
 	memset(&Addr6, 0, sizeof(Addr6));
 
-	struct addrinfo* servinfo = 0;  // will point to the results
 	struct addrinfo hints;
 
 	// make sure the struct is empty
@@ -194,6 +193,8 @@ void SockAddr::Set(const char* hostAddress, uint16_t port, int sockType)
     //       now instead of introducing another variable.
 	hints.ai_protocol = IPPROTO_IPV6;
 
+    struct addrinfo* servinfo = NULL;  // will point to the results
+
 	char portStr[32];
 	OVR_itoa(port, portStr, sizeof(portStr), 10);
 	int errcode = getaddrinfo(hostAddress, portStr, &hints, &servinfo);
@@ -203,11 +204,14 @@ void SockAddr::Set(const char* hostAddress, uint16_t port, int sockType)
         OVR::LogError("{ERR-008w} getaddrinfo error: %s", gai_strerror(errcode));
     }
 
-    OVR_ASSERT(0 != servinfo);
+    OVR_ASSERT(servinfo);
 
-	memcpy(&Addr6, servinfo->ai_addr, sizeof(Addr6));
+    if (servinfo)
+    {
+        memcpy(&Addr6, servinfo->ai_addr, sizeof(Addr6));
 
-    freeaddrinfo(servinfo);
+        freeaddrinfo(servinfo);
+    }
 }
 
 uint16_t SockAddr::GetPort()
@@ -275,17 +279,17 @@ static bool SetSocketOptions(SocketHandle sock)
 	int sock_opt;
 
 	// This doubles the max throughput rate
-	sock_opt=1024*256;
+    sock_opt = 1024 * 256;
     result |= setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)& sock_opt, sizeof (sock_opt));
 
 	// Immediate hard close. Don't linger the socket, or recreating the socket quickly on Vista fails.
-	// Fail with voice
-	sock_opt=0;
+	// Fail with voice and xbox
+    sock_opt = 0;
     result |= setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *)& sock_opt, sizeof (sock_opt));
 
 	// This doesn't make much difference: 10% maybe
 	// Not supported on console 2
-	sock_opt=1024*16;
+    sock_opt = 1024 * 16;
     result |= setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)& sock_opt, sizeof (sock_opt));
 
     // If all the setsockopt() returned 0 there were no failures, so return true for success, else false
@@ -294,10 +298,10 @@ static bool SetSocketOptions(SocketHandle sock)
 
 void _Ioctlsocket(SocketHandle sock, unsigned long nonblocking)
 {
-	ioctlsocket( sock, FIONBIO, &nonblocking );
+    ioctlsocket(sock, FIONBIO, &nonblocking);
 }
 
-static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParameters *pBindParameters)
+static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParameters* pBindParameters)
 {
 	SocketHandle sock;
 
@@ -337,9 +341,9 @@ static SocketHandle BindShared(int ai_family, int ai_socktype, BerkleyBindParame
 				return sock;
 			}
 
-				closesocket(sock);
-			}
-		}
+            closesocket(sock);
+        }
+	}
 
     if (servinfo) { freeaddrinfo(servinfo); }
 	return INVALID_SOCKET;

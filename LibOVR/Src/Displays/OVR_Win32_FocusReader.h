@@ -5,16 +5,16 @@ Content     :   Reader for current app with focus on Windows
 Created     :   July 2, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,7 +69,6 @@ class RenderFocusReader : public OVR::SystemSingletonBase<RenderFocusReader>, pu
     OVR_DECLARE_SINGLETON(RenderFocusReader);
 
     SharedFocusReader         Reader;         // Shared memory reader
-    const LocklessFocusState* FocusState;     // Pointer to the current focus state
     bool                      NoSharedMemory; // Flag reporting that no shared memory has been detected;
 
 public:

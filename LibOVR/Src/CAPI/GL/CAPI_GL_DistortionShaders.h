@@ -5,11 +5,22 @@
  Created     :   November 11, 2013
  Authors     :   David Borel, Volga Aksoy
  
- Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
- 
- Use of this software is subject to the terms of the Oculus Inc license
- agreement provided at the time of installation or download, or which
- otherwise accompanies this software in either electronic or hard copy form.
+ Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+you may not use the Oculus VR Rift SDK except in compliance with the License, 
+which is provided at the time of installation or download, or which 
+otherwise accompanies this software in either electronic or hard copy form.
+
+You may obtain a copy of the License at
+
+http://www.oculusvr.com/licenses/LICENSE-3.2 
+
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
  
  ************************************************************************************/
 
@@ -25,23 +36,35 @@ namespace OVR { namespace CAPI { namespace GL {
     static const char glsl2Prefix[] =
     "#version 110\n"
     "#extension GL_ARB_shader_texture_lod : enable\n"
+    "#extension GL_ARB_draw_buffers : enable\n"
+    "#extension GL_EXT_gpu_shader4 : enable\n"
     "#define _FRAGCOLOR_DECLARATION\n"
+    "#define _MRTFRAGCOLOR0_DECLARATION\n"
+    "#define _MRTFRAGCOLOR1_DECLARATION\n"
     "#define _VS_IN attribute\n"
     "#define _VS_OUT varying\n"
     "#define _FS_IN varying\n"
     "#define _TEXTURELOD texture2DLod\n"
     "#define _TEXTURE texture2D\n"
-    "#define _FRAGCOLOR gl_FragColor\n";
+    "#define _FRAGCOLOR gl_FragColor\n"
+    "#define _MRTFRAGCOLOR0 gl_FragData[0]\n"
+    "#define _MRTFRAGCOLOR1 gl_FragData[1]\n"       // The texture coordinate [0.0,1.0] for texel i of a texture of size N is: (2i + 1)/2N
+    "#define _TEXELFETCHDECL vec4 texelFetch(sampler2D tex, ivec2 coord, int lod){ ivec2 size = textureSize2D(tex, lod); return texture2D(tex, vec2(float((coord.x * 2) + 1) / float(size.x * 2), float((coord.y * 2) + 1) / float(size.y * 2))); }\n";
     
     static const char glsl3Prefix[] =
     "#version 150\n"
     "#define _FRAGCOLOR_DECLARATION out vec4 FragColor;\n"
+    "#define _MRTFRAGCOLOR0_DECLARATION out vec4 FragData0;\n"
+    "#define _MRTFRAGCOLOR1_DECLARATION out vec4 FragData1;\n"
     "#define _VS_IN in\n"
     "#define _VS_OUT out\n"
     "#define _FS_IN in\n"
     "#define _TEXTURELOD textureLod\n"
     "#define _TEXTURE texture\n"
-    "#define _FRAGCOLOR FragColor\n";
+    "#define _FRAGCOLOR FragColor\n"
+    "#define _MRTFRAGCOLOR0 FragData0\n"
+    "#define _MRTFRAGCOLOR1 FragData1\n"
+    "#define _TEXELFETCHDECL\n";
     
     static const char SimpleQuad_vs[] =
     "uniform vec2 PositionOffset;\n"
@@ -178,7 +201,7 @@ namespace OVR { namespace CAPI { namespace GL {
     
     "void main()\n"
     "{\n"
-    "   _FRAGCOLOR = _TEXTURELOD(Texture0, oTexCoord0, 0.0);\n"
+    "   _FRAGCOLOR = _TEXTURE(Texture0, oTexCoord0, 0.0);\n"
     "   _FRAGCOLOR.a = 1.0;\n"
     "}\n";
     
@@ -276,23 +299,62 @@ namespace OVR { namespace CAPI { namespace GL {
     
     static const char DistortionChroma_fs[] =
     "uniform sampler2D Texture0;\n"
-    
+    "uniform sampler2D Texture1;\n"
+    "uniform vec3 OverdriveScales_IsSrgb;\n"
+
     "_FS_IN vec4 oColor;\n"
     "_FS_IN vec2 oTexCoord0;\n"
     "_FS_IN vec2 oTexCoord1;\n"
     "_FS_IN vec2 oTexCoord2;\n"
     
-    "_FRAGCOLOR_DECLARATION\n"
+    "_MRTFRAGCOLOR0_DECLARATION\n"   // Desired color (next frame's "PrevTexture")
+    "_MRTFRAGCOLOR1_DECLARATION\n"   // Overdriven color (Back-buffer)
+
+    "_FS_IN vec4 gl_FragCoord;\n"
+
+    "_TEXELFETCHDECL\n" // Defines texelFetch in case we're using GLSL 1.2 or earlier, which doesn't natively support it.
     
     "void main()\n"
     "{\n"
-    "   float ResultR = _TEXTURELOD(Texture0, oTexCoord0, 0.0).r;\n"
-    "   float ResultG = _TEXTURELOD(Texture0, oTexCoord1, 0.0).g;\n"
-    "   float ResultB = _TEXTURELOD(Texture0, oTexCoord2, 0.0).b;\n"
-    
-    "   _FRAGCOLOR = vec4(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b, 1.0);\n"
+    "   float ResultR = _TEXTURE(Texture0, oTexCoord0, 0.0).r;\n"
+    "   float ResultG = _TEXTURE(Texture0, oTexCoord1, 0.0).g;\n"
+    "   float ResultB = _TEXTURE(Texture0, oTexCoord2, 0.0).b;\n"
+    "   vec3 newColor = vec3(ResultR * oColor.r, ResultG * oColor.g, ResultB * oColor.b);\n"
+
+    "   _MRTFRAGCOLOR0 = vec4(newColor, 1);\n"
+    "   _MRTFRAGCOLOR1 = _MRTFRAGCOLOR0;\n"
+
+    // pixel luminance overdrive
+    "   if(OverdriveScales_IsSrgb.x > 0.0)\n"
+    "   {\n"
+    "       ivec2 pixelCoord = ivec2(gl_FragCoord.x, gl_FragCoord.y);\n"
+    "       vec3 oldColor = texelFetch(Texture1, pixelCoord, 0).rgb;\n"
+
+    "       vec3 adjustedScales;\n"
+    "       adjustedScales.x = newColor.x > oldColor.x ? OverdriveScales_IsSrgb.x : OverdriveScales_IsSrgb.y;\n"
+    "       adjustedScales.y = newColor.y > oldColor.y ? OverdriveScales_IsSrgb.x : OverdriveScales_IsSrgb.y;\n"
+    "       adjustedScales.z = newColor.z > oldColor.z ? OverdriveScales_IsSrgb.x : OverdriveScales_IsSrgb.y;\n"
+
+	// overdrive is tuned for gamma space so if we're in linear space fix gamma before doing the calculation
+	"		vec3 overdriveColor;\n"
+	"       if(OverdriveScales_IsSrgb.z > 0.0)\n"
+	"		{\n"
+	"           oldColor = pow(oldColor, vec3(1.0/2.2, 1.0/2.2, 1.0/2.2));\n"
+	"			newColor = pow(newColor, vec3(1.0/2.2, 1.0/2.2, 1.0/2.2));\n"
+    "			overdriveColor = clamp(newColor + (newColor - oldColor) * adjustedScales, 0.0, 1.0);\n"
+    "           overdriveColor = pow(overdriveColor, vec3(2.2, 2.2, 2.2));\n"
+	"		}\n"
+	"		else\n"
+	"			overdriveColor = clamp(newColor + (newColor - oldColor) * adjustedScales, 0.0, 1.0);\n"
+
+    "       _MRTFRAGCOLOR1 = vec4(overdriveColor, 1.0);\n"
+    "   }\n"
     "}\n";
 
+    const OVR::CAPI::GL::ShaderBase::Uniform DistortionChroma_ps_refl[] =
+    {
+        { "OverdriveScales_IsSrgb", OVR::CAPI::GL::ShaderBase::VARTYPE_FLOAT, 0, 12 },
+    };
     
     static const char DistortionTimewarpChroma_vs[] =
     "uniform vec2 EyeToSourceUVScale;\n"

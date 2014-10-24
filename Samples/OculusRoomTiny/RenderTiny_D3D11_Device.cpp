@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation  for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -191,7 +191,7 @@ static const char* FShaderSrcs[FShader_Count] =
 //-------------------------------------------------------------------------------------
 // ***** Buffer
 
-bool Buffer::Data(int use, const void *buffer, size_t size)
+bool Buffer::Data(int use, const void* buffer, size_t size)
 {
     if (D3DBuffer && Size >= size)
     {
@@ -281,7 +281,7 @@ void*  Buffer::Map(size_t start, size_t size, int flags)
 		return NULL;    
 }
 
-bool   Buffer::Unmap(void *m)
+bool   Buffer::Unmap(void* m)
 {
 	OVR_UNUSED(m);
 
@@ -324,28 +324,43 @@ template<> void Shader<Shader_Pixel, ID3D11PixelShader>::SetUniformBuffer(Buffer
 //-------------------------------------------------------------------------------------
 // ***** Shader Base
 
-ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage)
-    : Stage(stage), Ren(r), UniformData(0)
+ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage) :
+    Stage(stage),
+    Ren(r),
+    UniformData(NULL),
+    UniformsSize(-1)
+{
+}
+
+ShaderBase::ShaderBase(ShaderStage s) :
+    Stage(s),
+    Ren(NULL),
+    UniformData(NULL),
+    UniformsSize(-1)
 {
 }
 
 ShaderBase::~ShaderBase()
 {
-    if (UniformData)    
-        OVR_FREE(UniformData);    
+    if (UniformData)
+    {
+        OVR_FREE(UniformData);
+        UniformData = NULL;
+    }
 }
 
 bool ShaderBase::SetUniform(const char* name, int n, const float* v)
 {
-    for(unsigned i = 0; i < UniformInfo.GetSize(); i++)
+    for (int i = 0; i < UniformInfo.GetSizeI(); i++)
     {
-        if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
+        if (UniformInfo[i].Name == name)
         {
             memcpy(UniformData + UniformInfo[i].Offset, v, n * sizeof(float));
-            return 1;
+            return true;
         }
     }
-    return 0;
+
+    return false;
 }
 
 bool ShaderBase::SetUniformBool(const char* name, int n, const bool* v) 
@@ -424,10 +439,19 @@ void ShaderBase::UpdateBuffer(Buffer* buf)
 //-------------------------------------------------------------------------------------
 // ***** Texture
 // 
-Texture::Texture(RenderDevice* ren, int fmt, int w, int h)
-    : Ren(ren), Tex(NULL), TexSv(NULL), TexRtv(NULL), TexDsv(NULL), Width(w), Height(h)
+Texture::Texture(RenderDevice* ren, int fmt, int w, int h) :
+    Ren(ren),
+    Tex(NULL),
+    TexSv(NULL),
+    TexRtv(NULL),
+    TexDsv(NULL),
+    Sampler(NULL),
+    Width(w),
+    Height(h),
+    Samples(0)
 {
     OVR_UNUSED(fmt);
+
     Sampler = Ren->GetSamplerState(0);
 }
 
@@ -599,20 +623,58 @@ void ShaderFill::Set(PrimitiveType prim) const
 //-------------------------------------------------------------------------------------
 // ***** Render Device
 
-RenderDevice::RenderDevice(const RendererParams& p, HWND window)
+RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
+    WindowWidth(0),
+    WindowHeight(0),
+    Params(),
+    Proj(),
+    pTextVertexBuffer(),
+    LightingBuffer(),
+    DXGIFactory(),
+    Window(window),
+    Device(),
+    Context(),
+    SwapChain(),
+    Adapter(),
+    FullscreenOutput(),
+    FSDesktopX(-1),
+    FSDesktopY(-1),
+    BackBuffer(),
+    BackBufferRT(),
+    CurRenderTarget(),
+    CurDepthBuffer(),
+    Rasterizer(),
+    BlendState(),
+  //D3DViewport()
+  //DepthStates();
+    CurDepthState(),
+    ModelVertexIL(),
+  //SamplerStates(),
+    StdUniforms(),
+  //UniformBuffers(),
+  //MaxTextureSet(),
+  //VertexShaders(),
+  //PixelShaders(),
+  //CommonUniforms(),
+    DefaultFill(),
+    QuadVertexBuffer(),
+    DepthBuffers()
 {
+    memset(&D3DViewport, 0, sizeof(D3DViewport));
+    memset(MaxTextureSet, 0, sizeof(MaxTextureSet));
+
     RECT rc;
     if (p.Resolution == Sizei(0))
     {
         GetClientRect(window, &rc);        
-        WindowWidth = rc.right - rc.left;
-        WindowHeight= rc.bottom - rc.top;
+        WindowWidth  = rc.right - rc.left;
+        WindowHeight = rc.bottom - rc.top;
     }
     else
     {
         // TBD: Rename from WindowHeight or use Resolution from params for surface
-        WindowWidth = p.Resolution.w;
-        WindowHeight= p.Resolution.h;
+        WindowWidth  = p.Resolution.w;
+        WindowHeight = p.Resolution.h;
     }
 
     Window       = window;
@@ -620,13 +682,13 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     DXGIFactory = NULL;
     HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
-    if (FAILED(hr))    
+    if (FAILED(hr))
         return;
 
     // Find the adapter & output (monitor) to use for fullscreen, based on the reported name of the HMD's monitor.
     if (Params.MonitorName.GetLength() > 0)
     {
-        for(UINT AdapterIndex = 0; ; AdapterIndex++)
+        for (UINT AdapterIndex = 0; ; AdapterIndex++)
         {
             Adapter = NULL;
             HRESULT hr = DXGIFactory->EnumAdapters(AdapterIndex, &Adapter.GetRawRef());
@@ -648,11 +710,16 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     if (!Adapter)
     {
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        hr = DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        if (FAILED(hr) || !Adapter)
+        {
+            OVR_DEBUG_LOG(("WARNING: No graphics adapter."));
+            OVR_ASSERT(false);
+        }
     }
 
     int flags = 0;
-    //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
+    //int flags =  D3D11_CREATE_DEVICE_DEBUG;
 
     Device = NULL;
     Context = NULL;
@@ -933,6 +1000,7 @@ bool RenderDevice::RecreateSwapChain()
     {
         Context->OMSetRenderTargets(1, &BackBufferRT.GetRawRef(), depthBuffer->TexDsv);
     }
+
     return true;
 }
 

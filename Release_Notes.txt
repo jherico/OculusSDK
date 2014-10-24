@@ -1,4 +1,4 @@
-﻿Oculus SDK 0.4.2 Release Notes - Runtime Rev 1
+Oculus SDK 0.4.3 Release Notes - Runtime Rev 1
 ----------------------------------------------
 
 After installing the SDK, update the Oculus DK2 firmware
@@ -11,36 +11,68 @@ and Known Issues sections below.
 New SDK Features
 ----------------
 
-* Added OVRServiceLauncher Windows service, resolving the issue with the service not 
-  launching automatically on some systems.  
+* Display Driver latency reduction in Direct Mode by 1 frame, resulting in 0ms Post-present.
 
-* Added a new chroma setting for minimum eye relief, improving chromatic aberration 
-  correction when configured through the Oculus Configuration Utility.
+* Updated display driver to support multi-threaded calls efficiently, this may improve performance in some scenarios.
+
+* New thread-safe function ovrHmd_GetEyePoses() in OVR_CAPI makes it easier for the 
+  application to query the two eye (camera) poses by internalizing the HMD-to-eye-offset 
+  calculations among other benefits. The ovrHmd_GetEyePose() function is being deprecated.
+
+* Added Pixel Luminance Overdrive support to the OVR_CAPI OpenGL rendering back-end to 
+  remove various 2-frame-rise (ghosting) artifacts. This feature is tied to the 
+  ovrDistortionCap_Overdrive flag in OVR_CAPI. This effect can be toggled 
+  OculusWorldDemo’s option menu.
   
-* Added “Riftsaver” mode, which turns off Rift display in direct mode if the headset is not in use.
+* Added option to re-center starting head position across all applications.
+  This is tied to a specific device and serial number and will be shared
+  across profiles on the same system.
+  
+* Added option in the Oculus Configuration Utility to Suppress the Health and Safety Warning
+  during active development.  Please see section 7.2 of the Oculus Developer Guide for more 
+  information.
 
-* Adding App rendered support for DK2 latency testing in CAPI and OculusRoomTiny.
+* Added option in the Oculus Configuration Utility to set the OVRServer logging level.
+  
+* Added pop-up error messages when the Rift can't be activated in Direct Display mode.
+
+* Updated the Health and Safety Warning screen to reflect an age restriction of 13. 
+  More information can be found in the Oculus VR Best Practices Guide and in the Oculus VR 
+  Health And Safety Warnings documentation.
+  
+Unity
+* Overhauled C# API. Reduced performance overhead. See the migration guide for more details.
+
+* Improved support for multi-layered rendering. Just instantiate multiple OVRCameraRigs, set Camera.depth and Camera.clearFlags for each eye, and use.
+
+* Added support for Unity Free in Unity 4.5.5 and up.
+
+* Added support for Unity 5 internal beta.
+
+* Improved performance on all platforms.
 
 
 
-Bug Fixes since 0.4.1
+Bug Fixes since 0.4.2
 ---------------------
 
-* Removed ATL references from the LibOVR Win32 Display code.
-* Fixed full core utilization of Oculus Configuration Utility when in Desktop mode.
-* Fixed the lag in Oculus Configuration Utility when the service is stopped.
-* Miscellaneous improvements to the Oculus Runtime Service (now called OVRServer)
+*  OculusWorldDemo now showcases MSAA the proper way for both D3D10/11 and OpenGL by resolving the multi-sampled buffer before feeding it into the ovrHmd_EndFrame() function.
+*  Improved OpenGL state management through contexts
+*  Fixes in Vsync direct mode tearing
+*  Fixed a bug in the D3D10/11 rendering path that was causing the overall brightness of the visuals to change on some systems.
+*  Fix LibOVR build on OSX Yosemite
 
 Unity
-* Fixed crashes and corruption when using 64-bit client with 32-bit service.
-* Fixed NullReferenceExceptions due to script initialization order.
-* Fixed race conditions in TimeWarp responsible for camera stutter.
+*  Fixed a source of jitter in TimeWarp timing that resulted in shaky images.
+*  Removed problematic "out of camera range" message. Will be replaced by an optional camera bounds visualization in a future release.
+*  In the editor, Game view rendering no longer targets the wrong view.
+*  In the editor, Game view rendering no longer breaks when you resize the window or view.
 
 
 Troubleshooting
 ---------------
 
-The most likely issues you may experience with DK2 is scene Judder and Vsync tearing.
+The most likely issues you may experience with DK2 are scene Judder and Vsync tearing.
 Here we describe these issues and provide advice on addressing them.
 
 * Scene Judder - The whole view jitters as you look around, producing a strobing
@@ -55,53 +87,31 @@ Here we describe these issues and provide advice on addressing them.
   If you experience this on DK2 with multiple monitors attached, please try 
   disabling one monitor to see if the problem goes away.
 
-* VSync tear - A vertical tear line appears in one of the eyes of the display.
-  This is the result of vsync timing being done incorrectly in either our display
-  driver or Windows composition. Disabling one of the monitors, disabling windows
-  composition, or switching the Oculus driver mode may help. We are working on
-  resolving vsync issue across in future releases.
 
-
-
-0.4.2 Rev 1 Known Issues - LibOVR and Display Driver
+0.4.3 Rev 1 Known Issues - LibOVR and Display Driver
 ----------------------------------------------------
 
 * Monitors in multiple display configurations will blink when activating the Rift.
 
+* Current SDK rendering path includes two GPU/CPU sync points to reduce latency. 
+  As may reduce performance due to GPU under-utilization and draw call buffering; 
+  we are looking into addressing this in the future.
+
+* The ovrDistortionCap_sRGB flag affects the rendering 
+  path in slightly different ways for D3D10/11 and OpenGL, but the differences 
+  should not be exposed to the app developer. 
+  We will be looking at unifying this path for better visual fidelity.
+
 * Intel hardware as a single GPU configuration is generally too slow to run
   VR scenes with DK2. The most obvious effect will be judder.
-
-* Using duplicated displays in Windows will lead to display driver restart
-  when activating the Rift. The work around is use to use Extend Desktop mode.
 
 * Nvidia Optimus GPU configurations are not universally supported.
   Some Windows 7 and 8 configurations were tested successfully.
   Windows 8.1 is more likely to have issues.
 
-* Use of both DK1 and DK2 at the same time is not supported.
-
-* DK2 display may fail to work if plugged in after DK1 was unplugged and used in
-  Direct Mode. When this happens, status LED will blink with alternating
-  yellow-blue pattern. The work around is to switch to Extended Desktop mode and back.
-
-* Open GL rendering can have vsync tear with Nvidida cards in Extended Desktop mode.
-  Try direct Display Mode.
-
 * On some Radeon graphics cards, multisampling may cause scene judder.
-  The work wound is to turn-off multi-sampling for the back buffer.
-
-* Updates on another monitor may interfere with vsync timing on the Rift and this can
-  manifest  as visible tearing in the Rift. This can be eliminated in Windows 7 by 
-  disabling Windows composition.
+  The work around is to turn-off multi-sampling for the back buffer.
   
-* It is necessary to restart the Config Util after updating the Headset firmware.
-
-* Camera bound menu option is shown in Config Util Demo Scene for DK1. It has no
-  effect when a DK1 is connected.
-
-* Sample renderer doesn't and OWD sample does not honor Multisampling
-  setting in OpenGL.
-
 * The runtime installer does not support downgrading to previous versions
   of the installer.  If you need to go back to a previous version, first
   uninstall the current version and then install the previous one.
@@ -112,19 +122,9 @@ Known Issues - Unity
 
 * Unity app latency on Mac is higher than in C++ OWD resulting in slightly swimmy display.
 
-* Direct Mode Unity apps may judder on multi-monitor configurations.
-  Please try disconnecting one monitor as a work-around.
+* Editor Game view does not yet directly render to the Rift.
 
-* Unity applications built with DX11 support may crash at exit.
-  Use DX9 where possible.
+* D3D11 in extended mode is unsupported for this release. This configuration will typically appear to judder due to being capped at the 60hz refresh of your primary monitor.
 
-* OpenGL in Direct mode is not functional in Unity.
-
-
-Known Issues - UE4
-------------------
-
-* UE4: OpenGL is not supported on Windows in current release.
-
-* UE4: Direct Mode sometimes does not Vsync correctly.
+* Forcing Unity to use OpenGL on Windows is unsupported for this release. This configuration is currently unstable and may encounter crashes.
 

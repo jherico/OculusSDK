@@ -5,7 +5,7 @@ Content     :   GL specific structures used by the CAPI interface.
 Created     :   November 7, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2013 Oculus VR, LLC All Rights reserved.
 
 Use of this software is subject to the terms of the Oculus Inc license
 agreement provided at the time of installation or download, or which
@@ -30,8 +30,9 @@ otherwise accompanies this software in either electronic or hard copy form.
     #include <Windows.h>
     #include <GL/gl.h>
 #elif defined(OVR_OS_MAC)
-    #include <OpenGL/gl3.h>
     #include <OpenGL/OpenGL.h>
+#elif defined(OVR_OS_MS)
+    #error No OpenGL on non-desktop Microsoft platforms
 #else
     #include <GL/gl.h>
     #include <GL/glx.h>

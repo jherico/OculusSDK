@@ -5,16 +5,16 @@ Content     :   Win32 Display implementation
 Created     :   May 6, 2014
 Authors     :   Dean Beeler
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -713,13 +713,16 @@ static bool AccessDeviceRegistry(IN HDEVINFO devInfo, IN PSP_DEVINFO_DATA devInf
             EDIDdata,
             &edidsize);
 
+        // If no more items in the enumeration,
+        if (retValue == ERROR_NO_MORE_ITEMS)
+        {
+            // Stop here
+            break;
+        }
+
+        // If the request failed,
         if (FAILED(retValue))
         {
-            if (retValue == ERROR_NO_MORE_ITEMS)
-            {
-                break;
-            }
-
             LogError("{ERR-098} [Display] WARNING: RegEnumValueA failed to read a key. LastErr=%d", retValue);
             OVR_ASSERT(false);
         }
@@ -1033,9 +1036,16 @@ bool Display::Initialize()
 {
 	HANDLE hDevice = INVALID_HANDLE_VALUE;
 
-	hDevice = CreateFile( L"\\\\.\\ovr_video" ,
+    if (GlobalDisplayContext.hDevice == 0)
+    {
+        hDevice = CreateFile( L"\\\\.\\ovr_video" ,
 		                  GENERIC_READ | GENERIC_WRITE, NULL,
 		                  NULL, OPEN_EXISTING, NULL, NULL);
+    }
+    else
+    {   // The device has already been created
+        hDevice = GlobalDisplayContext.hDevice;
+    }
 
 	if (hDevice != NULL && hDevice != INVALID_HANDLE_VALUE)
 	{

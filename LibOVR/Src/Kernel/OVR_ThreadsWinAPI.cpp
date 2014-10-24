@@ -6,16 +6,16 @@ Content     :   Windows specific thread-related (safe) functionality
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,7 +68,12 @@ MutexImpl::MutexImpl(bool recursive)
 {    
     Recursive                   = recursive;
     LockCount                   = 0;
+#if defined(OVR_OS_WIN32) // Older versions of Windows don't support CreateSemaphoreEx, so stick with CreateSemaphore for portability.
     hMutexOrSemaphore           = Recursive ? CreateMutex(NULL, 0, NULL) : CreateSemaphore(NULL, 1, 1, NULL);
+#else
+    // No CreateSemaphore() call, so emulate it.
+    hMutexOrSemaphore           = Recursive ? CreateMutex(NULL, 0, NULL) : CreateSemaphoreEx(NULL, 1, 1, NULL, 0, SEMAPHORE_ALL_ACCESS);
+#endif
 }
 MutexImpl::~MutexImpl()
 {
@@ -827,19 +832,79 @@ int Thread::GetOSPriority(ThreadPriority p)
 {
     switch(p)
     {
-    case Thread::CriticalPriority:      return THREAD_PRIORITY_TIME_CRITICAL;
-    case Thread::HighestPriority:       return THREAD_PRIORITY_HIGHEST;
-    case Thread::AboveNormalPriority:   return THREAD_PRIORITY_ABOVE_NORMAL;
-    case Thread::NormalPriority:        return THREAD_PRIORITY_NORMAL;
-    case Thread::BelowNormalPriority:   return THREAD_PRIORITY_BELOW_NORMAL;
-    case Thread::LowestPriority:        return THREAD_PRIORITY_LOWEST;
-    case Thread::IdlePriority:          return THREAD_PRIORITY_IDLE;
+    // If the process is REALTIME_PRIORITY_CLASS then it could have priority values 3 through14 and -3 through -14.
+    case Thread::CriticalPriority:      return THREAD_PRIORITY_TIME_CRITICAL;   //  15
+    case Thread::HighestPriority:       return THREAD_PRIORITY_HIGHEST;         //   2
+    case Thread::AboveNormalPriority:   return THREAD_PRIORITY_ABOVE_NORMAL;    //   1
+    case Thread::NormalPriority:        return THREAD_PRIORITY_NORMAL;          //   0
+    case Thread::BelowNormalPriority:   return THREAD_PRIORITY_BELOW_NORMAL;    //  -1
+    case Thread::LowestPriority:        return THREAD_PRIORITY_LOWEST;          //  -2
+    case Thread::IdlePriority:          return THREAD_PRIORITY_IDLE;            // -15
     }
     return THREAD_PRIORITY_NORMAL;
 }
 
+/* static */
+Thread::ThreadPriority Thread::GetOVRPriority(int osPriority)
+{
+    // If the process is REALTIME_PRIORITY_CLASS then it could have priority values 3 through14 and -3 through -14.
+    // As a result, it's possible for those cases that an unknown/invalid ThreadPriority enum be returned. However,
+    // in practice we don't expect to be using such processes.
+
+    // The ThreadPriority types aren't linearly distributed, so we need to check for some values explicitly.
+    if(osPriority == THREAD_PRIORITY_TIME_CRITICAL)
+        return Thread::CriticalPriority;
+    if(osPriority == THREAD_PRIORITY_IDLE)
+        return Thread::IdlePriority;
+    return (ThreadPriority)(Thread::NormalPriority - osPriority);
+}
+
+Thread::ThreadPriority Thread::GetPriority()
+{
+    int osPriority = ::GetThreadPriority(ThreadHandle);
+
+    if(osPriority != THREAD_PRIORITY_ERROR_RETURN)
+    {
+        return GetOVRPriority(osPriority);
+    }
+
+    return NormalPriority;
+}
+
+/* static */
+Thread::ThreadPriority Thread::GetCurrentPriority()
+{
+    int osPriority = ::GetThreadPriority(::GetCurrentThread());
+
+    if(osPriority != THREAD_PRIORITY_ERROR_RETURN)
+    {
+        return GetOVRPriority(osPriority);
+    }
+
+    return NormalPriority;
+}
+
+bool Thread::SetPriority(ThreadPriority p)
+{
+    BOOL ret = ::SetThreadPriority(ThreadHandle, Thread::GetOSPriority(p));
+    return (ret != FALSE);
+}
+
+/* static */
+bool Thread::SetCurrentPriority(ThreadPriority p)
+{
+    BOOL ret = ::SetThreadPriority(::GetCurrentThread(), Thread::GetOSPriority(p));
+    return (ret != FALSE);
+}
+
+
+
 // The actual first function called on thread start
+#if defined(OVR_OS_WIN32)
 unsigned WINAPI Thread_Win32StartFn(void * phandle)
+#else // Other Micorosft OSs...
+DWORD WINAPI Thread_Win32StartFn(void *phandle)
+#endif
 {
     Thread *   pthread = (Thread*)phandle;
     if (pthread->Processor != -1)
@@ -886,8 +951,15 @@ bool Thread::Start(ThreadState initialState)
     ExitCode        = 0;
     SuspendCount    = 0;
     ThreadFlags     = (initialState == Running) ? 0 : OVR_THREAD_START_SUSPENDED;
+#if defined(OVR_OS_WIN32)
     ThreadHandle = (HANDLE) _beginthreadex(0, (unsigned)StackSize,
                                            Thread_Win32StartFn, this, 0, (unsigned*)&IdValue);
+#else // Other Micorosft OSs...
+    DWORD TheThreadId;
+    ThreadHandle = CreateThread(0, (unsigned)StackSize,
+                                           Thread_Win32StartFn, this, 0, &TheThreadId);
+    IdValue = (ThreadId)TheThreadId;
+#endif
 
     // Failed? Fail the function
     if (ThreadHandle == 0)
@@ -959,7 +1031,11 @@ void Thread::Exit(int exitCode)
     ThreadList::RemoveRunningThread(this);
 
     // Call the exit function.
+#if defined(OVR_OS_WIN32) // _endthreadex doesn't exist on other Microsoft OSs and instead we need to call ExitThread directly.
     _endthreadex((unsigned)exitCode);
+#else
+    ExitThread((unsigned)exitCode);
+#endif
 }
 
 
@@ -990,13 +1066,15 @@ bool Thread::MSleep(unsigned msecs)
 void Thread::SetThreadName( const char* name )
 {
 #if !defined(OVR_BUILD_SHIPPING) || defined(OVR_BUILD_PROFILING)
-    // Looks ugly, but it is the recommended way to name a thread.
-    typedef struct tagTHREADNAME_INFO {
+    // http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
+    #pragma pack(push,8)
+    struct THREADNAME_INFO {
         DWORD dwType;     // Must be 0x1000
         LPCSTR szName;    // Pointer to name (in user address space)
         DWORD dwThreadID; // Thread ID (-1 for caller thread)
         DWORD dwFlags;    // Reserved for future use; must be zero
-    } THREADNAME_INFO;
+    };
+    #pragma pack(pop)
 
     THREADNAME_INFO info;
 
@@ -1007,11 +1085,7 @@ void Thread::SetThreadName( const char* name )
 
     __try
     {
-#ifdef _WIN64
-        RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(DWORD), (const ULONG_PTR *)&info );
-#else
-        RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(DWORD), (DWORD *)&info );
-#endif
+        RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(ULONG_PTR), reinterpret_cast<ULONG_PTR *>(&info));
     }
     __except( GetExceptionCode()==0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER )
     {
@@ -1024,7 +1098,13 @@ void Thread::SetThreadName( const char* name )
 int  Thread::GetCPUCount()
 {
     SYSTEM_INFO sysInfo;
-    GetSystemInfo(&sysInfo);
+
+    #if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0501) // GetNativeSystemInfo requires WinXP+ and a corresponding SDK (0x0501) or later.
+        GetNativeSystemInfo(&sysInfo);
+    #else
+        GetSystemInfo(&sysInfo);
+    #endif
+
     return (int) sysInfo.dwNumberOfProcessors;
 }
 
