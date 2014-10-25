@@ -4,20 +4,20 @@ PublicHeader:   OVR.h
 Filename    :   OVR_Compiler.h
 Content     :   Compiler-specific feature identification and utilities
 Created     :   June 19, 2014
-Notes       : 
+Notes       :
 
 Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -102,7 +102,7 @@ limitations under the License.
 //    Compiler      Format   Example
 //    ----------------------------
 //    OVR_CC_GNU    Mmm      408 means GCC 4.8
-//    OVR_CC_CLANG  Mmm      305 means clang 3.5 
+//    OVR_CC_CLANG  Mmm      305 means clang 3.5
 //    OVR_CC_MSVC   MMMM     1700 means VS2012
 //    OVR_CC_ARM    Mmpbbb   401677 means 4.0, patch 1, build 677
 //    OVR_CC_INTEL  MMmm     1210 means 12.10
@@ -289,8 +289,8 @@ limitations under the License.
 // ***** OVR_DISABLE_ALL_MSVC_WARNINGS / OVR_RESTORE_ALL_MSVC_WARNINGS
 //
 // Portable wrapper for disabling all VC++ compiler warnings.
-// OVR_RESTORE_ALL_MSVC_WARNINGS restores warnings that were disabled by 
-// OVR_DISABLE_ALL_MSVC_WARNINGS. Any previously enabled warnings will still be 
+// OVR_RESTORE_ALL_MSVC_WARNINGS restores warnings that were disabled by
+// OVR_DISABLE_ALL_MSVC_WARNINGS. Any previously enabled warnings will still be
 // enabled after OVR_RESTORE_ALL_MSVC_WARNINGS.
 //
 // Example usage:
@@ -320,7 +320,7 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CC_HAS_FEATURE
 //
-// This is a portable way to use compile-time feature identification available 
+// This is a portable way to use compile-time feature identification available
 // with some compilers in a clean way. Direct usage of __has_feature in preprocessing
 // statements of non-supporting compilers results in a preprocessing error.
 //
@@ -343,7 +343,7 @@ limitations under the License.
 // ***** OVR_CC_HAS_BUILTIN
 //
 //
-// This is a portable way to use compile-time builtin identification available 
+// This is a portable way to use compile-time builtin identification available
 // with some compilers in a clean way. Direct usage of __has_builtin in preprocessing
 // statements of non-supporting compilers results in a preprocessing error.
 //
@@ -351,9 +351,9 @@ limitations under the License.
 //     #if OVR_CC_HAS_BUILTIN(__builtin_trap)
 //         #define DEBUG_BREAK __builtin_trap
 //     #endif
-//  
+//
 #if !defined(OVR_CC_HAS_BUILTIN)
-    #if defined(__clang__) 
+    #if defined(__clang__)
         #define OVR_CC_HAS_BUILTIN(x) __has_builtin(x) // http://clang.llvm.org/docs/LanguageExtensions.html#id2
     #else
         #define OVR_CC_HAS_BUILTIN(x) 0
@@ -372,7 +372,7 @@ limitations under the License.
 #if !defined(OVR_CPP11_ENABLED) && defined(__cplusplus)
     #if defined(__GNUC__) && defined(__GXX_EXPERIMENTAL_CXX0X__)
         #define OVR_CPP11_ENABLED 1
-    #elif defined(_MSC_VER) && (_MSC_VER >= 1500)   // VS2010+, the first version with any significant C++11 support. 
+    #elif defined(_MSC_VER) && (_MSC_VER >= 1500)   // VS2010+, the first version with any significant C++11 support.
         #define OVR_CPP11_ENABLED 1
     #elif (__cplusplus >= 201103L)                  // 201103 is the first C++11 version.
         #define OVR_CPP11_ENABLED 1
@@ -382,7 +382,7 @@ limitations under the License.
 #endif
 
 #if !defined(OVR_CPP_CPP14_ENABLED) && defined(__cplusplus)
-    #if defined(_MSC_VER) && (_MSC_VER >= 1800)     // VS2013+, the first version with any significant C++14 support. 
+    #if defined(_MSC_VER) && (_MSC_VER >= 1800)     // VS2013+, the first version with any significant C++14 support.
         #define OVR_CPP_CPP14_ENABLED 1
     #elif (__cplusplus > 201103L)
         #define OVR_CPP_CPP14_ENABLED 1
@@ -395,13 +395,13 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_EXCEPTIONS / OVR_CPP_NO_UNWIND
 //
-// OVR_CPP_NO_EXCEPTIONS is defined as 1 if the compiler doesn't support C++ 
+// OVR_CPP_NO_EXCEPTIONS is defined as 1 if the compiler doesn't support C++
 // exceptions or is configured to disable support for them. Else not defined.
 // If OVR_CPP_NO_EXCEPTIONS is defined then attempts to use try/catch
 // related C++ statements result in a compilation error with many
 // compilers.
 //
-// OVR_CPP_NO_UNWIND is defined as 1 if the compiler supports exceptions but 
+// OVR_CPP_NO_UNWIND is defined as 1 if the compiler supports exceptions but
 // doesn't support stack unwinding in the presence of an exception. Else not defined.
 // For the Microsoft compiler, disabling exceptions means disabling stack unwinding
 // and not disabling exceptions themselves.
@@ -477,23 +477,23 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_NULLPTR
 //
-// Defined as 1 if the compiler doesn't support C++11 nullptr built in type. 
-// Otherwise undefined. Does not identify if the standard library defines 
-// std::nullptr_t, as some standard libraries are further behind in standardization 
-// than the compilers using them (e.g. Apple clang with the supplied libstdc++). 
+// Defined as 1 if the compiler doesn't support C++11 nullptr built in type.
+// Otherwise undefined. Does not identify if the standard library defines
+// std::nullptr_t, as some standard libraries are further behind in standardization
+// than the compilers using them (e.g. Apple clang with the supplied libstdc++).
 //
-// OVR_Nullptr.h provides a portable nullptr and std::nullptr_t for when the 
+// OVR_Nullptr.h provides a portable nullptr and std::nullptr_t for when the
 // compiler or standard library do not.
 
 #if !defined(OVR_CPP_NO_NULLPTR)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_nullptr))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))          /* GCC 4.6+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))          /* GCC 4.6+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                /* VS2010+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))  /* EDG 4.3+  */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))  /* EDG 4.3+  */
         #define OVR_CPP_NO_NULLPTR 1
     #endif
-#endif  
+#endif
 
 
 //-----------------------------------------------------------------------------------
@@ -505,9 +505,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_RVALUE_REFERENCES)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_rvalue_references)) /* clang    */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                   /* GCC 4.5+ */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                   /* GCC 4.5+ */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                         /* VS2010+  */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))           /* EDG 4.3+ */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))           /* EDG 4.3+ */
         #define OVR_CPP_NO_RVALUE_REFERENCES 1
     #endif
 #endif
@@ -515,15 +515,15 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_AUTO
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 auto keyword. Otherwise undefined.
 
 #if !defined(OVR_CPP_NO_AUTO)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_auto_type))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))            /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))            /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                  /* VS2010+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 309)))    /* EDG 3.9+  */  
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 309)))    /* EDG 3.9+  */
         #define OVR_CPP_NO_AUTO 1
     #endif
 #endif
@@ -538,9 +538,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_RANGE_BASED_FOR_LOOP)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_range_for)) /* clang    */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))           /* GCC 4.6+ */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))           /* GCC 4.6+ */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1700))                 /* VS2012+  */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))   /* EDG 4.5+ */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))   /* EDG 4.5+ */
         #define OVR_CPP_NO_RANGE_BASED_FOR_LOOP 1
     #endif
 #endif
@@ -557,8 +557,8 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_CONSTEXPR)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_constexpr))  /* clang    */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))            /* GCC 4.6+ */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))    /* EDG 4.6+ */    
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))            /* GCC 4.6+ */ && \
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))    /* EDG 4.6+ */
         // Not supported by VC++ through at least VS2013.
         #define OVR_CPP_NO_CONSTEXPR 1
     #endif
@@ -582,9 +582,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_LAMBDA_EXPRESSIONS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_lambdas))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))          /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))          /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                /* VS2010+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))  /* EDG 4.1+  */ 
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))  /* EDG 4.1+  */
         // Conversion of lambdas to function pointers is not supported until EDG 4.5.
         #define OVR_CPP_NO_LAMBDA_EXPRESSIONS 1
     #endif
@@ -595,13 +595,13 @@ limitations under the License.
 // ***** OVR_CPP_NO_ALIGNOF
 //
 // Defined as 1 if the compiler supports C++11 alignof. Otherwise undefined.
-// Some compilers support __alignof__ instead of alignof, so for portability you 
+// Some compilers support __alignof__ instead of alignof, so for portability you
 // should use OVR_ALIGNOF instead of directly using C++11 alignof.
 
 #if !defined(OVR_CPP_NO_ALIGNOF)
     #if (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 300))  /* Apple clang 3.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 401))                    /* GCC 4.1+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 401))                    /* GCC 4.1+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 400)))            /* EDG 4.0+         */
         #define OVR_CPP_NO_ALIGNOF 1
@@ -619,7 +619,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 300))  /* clang 3.0+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 408))                    /* GCC 4.8+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))                    /* GCC 4.8+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         #define OVR_CPP_NO_ALIGNAS 1
@@ -637,9 +637,9 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209)) /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400)) /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                   /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                   /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1500))                         /* VS2008+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))           /* EDG 4.8+         */     
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))           /* EDG 4.8+         */
         #define OVR_CPP_NO_OVERRIDE 1
     #endif
 #endif
@@ -647,7 +647,7 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_FINAL
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 final attribute. Otherwise undefined.
 // See the OVR_FINAL and OVR_FINALOVERRIDE macros for a portable wrapper.
 
@@ -655,9 +655,9 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400))  /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                    /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1500))                          /* VS2008+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         #define OVR_CPP_NO_FINAL 1
     #endif
 #endif
@@ -673,9 +673,9 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))                    /* GCC 4.6+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))                    /* GCC 4.6+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1700))                          /* VS2012+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))            /* EDG 4.1+         */ 
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))            /* EDG 4.1+         */
         #define OVR_CPP_NO_EXTERN_TEMPLATE 1
     #endif
 #endif
@@ -689,9 +689,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_VARIADIC_TEMPLATES)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_variadic_templates)) /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                    /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                    /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                          /* VS2013+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))            /* EDG 4.3+  */   
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))            /* EDG 4.3+  */
         #define OVR_CPP_NO_VARIADIC_TEMPLATES 1
     #endif
 #endif
@@ -708,7 +708,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_NOEXCEPT)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_noexcept))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))           /* GCC 4.6+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))           /* GCC 4.6+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1900))                 /* VS2014+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))   /* EDG 4.5+  */
         #define OVR_CPP_NO_NOEXCEPT 1
@@ -720,34 +720,34 @@ limitations under the License.
 // ***** OVR_CPP_NO_DECLTYPE
 //
 // Defined as 1 if the compiler doesn't support C++11 decltype. Otherwise undefined.
-// Some compilers (e.g. VS2012) support most uses of decltype but don't support 
-// decltype with incomplete types (which is an uncommon usage seen usually in 
+// Some compilers (e.g. VS2012) support most uses of decltype but don't support
+// decltype with incomplete types (which is an uncommon usage seen usually in
 // template metaprogramming).  We don't include this support as a requirement for
 // our definition of decltype support here.
 
 #if !defined(OVR_CPP_NO_DECLTYPE)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_decltype))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 403))           /* GCC 4.3+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 403))           /* GCC 4.3+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                 /* VS2010+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))   /* EDG 4.2+  */       
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))   /* EDG 4.2+  */
         // VC++ fails to support decltype for incomplete types until VS2013.
         // EDG fails to support decltype for incomplete types until v4.8.
         #define OVR_CPP_NO_DECLTYPE 1
     #endif
-#endif  
+#endif
 
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_DEFAULTED_FUNCTIONS
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 defaulted functions. Otherwise undefined.
 // Some compilers have slightly crippled versions of this.
 
 #if !defined(OVR_CPP_NO_DEFAULTED_FUNCTIONS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_defaulted_functions))/* clang    */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                    /* GCC 4.4+ */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                    /* GCC 4.4+ */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                          /* VS2013+  */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))            /* EDG 4.1+ */
         // Up through at least VS2013 it's unsupported for defaulted move constructors and move assignment operators.
@@ -759,16 +759,16 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_DELETED_FUNCTIONS
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 deleted functions. Otherwise undefined.
 // Some compilers have slightly crippled versions of this.
 
 #if !defined(OVR_CPP_NO_DELETED_FUNCTIONS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_defaulted_functions)) /* clang    */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                     /* GCC 4.4+ */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                     /* GCC 4.4+ */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                           /* VS2013+  */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))             /* EDG 4.1+ */  
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))             /* EDG 4.1+ */
         // Up through at least VS2013 it's unsupported for defaulted move constructors and move assignment operators.
         // Until EDG 4.8 it's unsupported for defaulted move constructors and move assigment operators.
         #define OVR_CPP_NO_DELETED_FUNCTIONS 1
@@ -778,7 +778,7 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_STANDARD_LAYOUT_TYPES
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 standard layout (relaxed POD). Otherwise undefined.
 // http://en.cppreference.com/w/cpp/types/is_standard_layout
 
@@ -786,9 +786,9 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 300)) /* clang 3.0+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401)) /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                   /* GCC 4.5+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                   /* GCC 4.5+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1700))                         /* VS2013+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))           /* EDG 4.6+         */  
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))           /* EDG 4.6+         */
         #define OVR_CPP_NO_STANDARD_LAYOUT_TYPES 1
     #endif
 #endif
@@ -803,9 +803,9 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))                    /* GCC 4.6+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))                    /* GCC 4.6+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1700))                          /* VS2012+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))            /* EDG 4.5+         */ 
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))            /* EDG 4.5+         */
         #define OVR_CPP_NO_FORWARD_DECLARED_ENUMS 1
     #endif
 #endif
@@ -819,9 +819,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_STRONGLY_TYPED_ENUMS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_strong_enums))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))               /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))               /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1700))                     /* VS2012+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 400)))       /* EDG 4.0+ */ 
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 400)))       /* EDG 4.0+ */
         #define OVR_CPP_NO_STRONGLY_TYPED_ENUMS 1
     #endif
 #endif
@@ -836,9 +836,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_TRAILING_RETURN_TYPES)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_trailing_return)) /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                 /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                 /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                       /* VS2010+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))         /* EDG 4.1+ */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))         /* EDG 4.1+ */
         #define OVR_CPP_NO_TRAILING_RETURN_TYPES 1
     #endif
 #endif
@@ -852,9 +852,9 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_TEMPLATE_ALIASES)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_alias_templates)) /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                 /* GCC 4.7+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                 /* GCC 4.7+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                       /* VS2013+   */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))         /* EDG 4.2+  */ 
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))         /* EDG 4.2+  */
         #define OVR_CPP_NO_TEMPLATE_ALIASES 1
     #endif
 #endif
@@ -870,7 +870,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_INITIALIZER_LISTS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_generalized_initializers)) /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                          /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                          /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                                /* VS2013+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))                  /* EDG 4.5+  */
         #define OVR_CPP_NO_INITIALIZER_LISTS 1
@@ -888,7 +888,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 408))                    /* GCC 4.8+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))                    /* GCC 4.8+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1500))                          /* VS2008+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))            /* EDG 4.2+         */
         // Supported with VC++ only via __declspec(noreturn) (see OVR_NORETURN).
@@ -907,7 +907,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                    /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                          /* VS2013+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))            /* EDG 4.6+         */
         #define OVR_CPP_NO_NONSTATIC_MEMBER_INITIALIZERS 1
@@ -918,14 +918,14 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_DOUBLE_TEMPLATE_BRACKETS
 //
-// Defined as 1 if the compiler supports nested template declarations with >>, 
+// Defined as 1 if the compiler supports nested template declarations with >>,
 // as supported by C++11. Otherwise undefined.
 
 #if !defined(OVR_CPP_NO_DOUBLE_TEMPLATE_ANGLE_BRACKETS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400))  /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 403))                    /* GCC 4.3+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 403))                    /* GCC 4.3+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                          /* VS2010+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))            /* EDG 4.1+         */
         #define OVR_CPP_NO_DOUBLE_TEMPLATE_BRACKETS 1
@@ -945,7 +945,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_INHERITING_CONSTRUCTORS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_inheriting_constructors))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 408))                          /* GCC 4.8+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))                          /* GCC 4.8+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1900))                                /* VS2014+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))                  /* EDG 4.8+  */
         #define OVR_CPP_NO_INHERITING_CONSTRUCTORS 1
@@ -962,7 +962,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 300))  /* clang 3.0+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                    /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                          /* VS2013+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 407)))            /* EDG 4.7+         */
         #define OVR_CPP_NO_DELEGATING_CONSTRUCTORS 1
@@ -972,14 +972,14 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_FUNCTION_TEMPLATE_DEFAULT_ARGS
-//  
+//
 // Defined as 1 if the compiler supports C++11 function template default arguments. Otherwise undefined.
 
 #if !defined(OVR_CPP_NO_FUNCTION_TEMPLATE_DEFAULT_ARGS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 403))                    /* GCC 4.3+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 403))                    /* GCC 4.3+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                          /* VS2013+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 403)))            /* EDG 4.3+         */
         #define OVR_CPP_NO_FUNCTION_TEMPLATE_DEFAULT_ARGS 1
@@ -996,7 +996,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 406))                    /* GCC 4.6+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))                    /* GCC 4.6+         */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))            /* EDG 4.6+         */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_UNRESTRICTED_UNIONS 1
@@ -1008,14 +1008,14 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_EXTENDED_SIZEOF
 //
-// Defined as 1 if the compiler supports C++11 class sizeof extensions (e.g. sizeof SomeClass::someMember). 
+// Defined as 1 if the compiler supports C++11 class sizeof extensions (e.g. sizeof SomeClass::someMember).
 // Otherwise undefined.
 
 #if !defined(OVR_CPP_NO_EXTENDED_SIZEOF)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                    /* GCC 4.5+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                    /* GCC 4.5+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))            /* EDG 4.5+         */
         #define OVR_CPP_NO_EXTENDED_SIZEOF 1
@@ -1033,7 +1033,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400))  /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                    /* GCC 4.4+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                    /* GCC 4.4+         */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))            /* EDG 4.5+         */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_INLINE_NAMESPACES 1
@@ -1050,7 +1050,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_EXPLICIT_CONVERSION_OPERATORS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_explicit_conversions))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                       /* GCC 4.5+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                       /* GCC 4.5+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                             /* VS2013+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 404)))               /* EDG 4.4+  */
         #define OVR_CPP_NO_EXPLICIT_CONVERSION_OPERATORS 1
@@ -1063,15 +1063,15 @@ limitations under the License.
 //
 // Defined as 1 if the compiler supports C++11 local class template parameters. Otherwise undefined.
 // Example:
-//     void Test() {   
+//     void Test() {
 //         struct LocalClass{ };
 //         SomeTemplateClass<LocalClass> t; // Allowed only in C++11
 //     }
 
-#if !defined(OVR_CPP_NO_LOCAL_CLASS_TEMPLATE_PARAMETERS) 
+#if !defined(OVR_CPP_NO_LOCAL_CLASS_TEMPLATE_PARAMETERS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_local_type_template_args))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                           /* GCC 4.5+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                           /* GCC 4.5+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                                 /* VS2010+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 402)))                   /* EDG 4.2+  */
         #define OVR_CPP_NO_LOCAL_CLASS_TEMPLATE_PARAMETERS 1
@@ -1089,7 +1089,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_NEW_CHARACTER_TYPES)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_unicode_literals))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                   /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                   /* GCC 4.4+  */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 407)))           /* EDG 4.7+  */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_NEW_CHARACTER_TYPES 1
@@ -1100,14 +1100,14 @@ limitations under the License.
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_UNICODE_CHAR_NAME_LITERALS
 //
-// Defined as 1 if the compiler supports C++11 \u and \U character literals for 
+// Defined as 1 if the compiler supports C++11 \u and \U character literals for
 // native char16_t and char32_t types.
 //
 #if !defined(OVR_CPP_NO_UNICODE_CHAR_NAME_LITERALS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                    /* GCC 4.5+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                    /* GCC 4.5+         */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         // Not supported by VC++ as of VS2013. VC++'s existing \U and \u are non-conforming.
         #define OVR_CPP_NO_UNICODE_CHAR_NAME_LITERALS 1
@@ -1124,7 +1124,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                    /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_USER_DEFINED_LITERALS 1
@@ -1141,7 +1141,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_UNICODE_STRING_LITERALS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_unicode_literals))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                   /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                   /* GCC 4.4+  */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 407)))           /* EDG 4.7+  */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_UNICODE_STRING_LITERALS 1
@@ -1158,7 +1158,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_RAW_STRING_LITERALS)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_raw_string_literals))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 405))                      /* GCC 4.5+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                      /* GCC 4.5+  */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 407)))              /* EDG 4.7+  */
         // Not supported by VC++ as of VS2013.
         #define OVR_CPP_NO_RAW_STRING_LITERALS 1
@@ -1175,7 +1175,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_UNIFIED_INITIALIZATION_SYNTAX)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_generalized_initializers))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 404))                           /* GCC 4.4+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 404))                           /* GCC 4.4+  */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1800))                                 /* VS2013+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 406)))                   /* EDG 4.6+  */
         #define OVR_CPP_NO_UNIFIED_INITIALIZATION_SYNTAX 1
@@ -1192,7 +1192,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400))  /* Apple clang 4.0+ */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 407))                    /* GCC 4.7+         */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1600))                          /* VS2010+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401)))            /* EDG 4.1+         */
         #define OVR_CPP_NO_EXTENDED_FRIEND_DECLARATIONS 1
@@ -1205,8 +1205,8 @@ limitations under the License.
 //
 // Defined as 1 if the compiler supports C++11 thread_local. Else undefined. Does not
 // indicate if the compiler supports C thread-local compiler extensions such as __thread
-// and declspec(thread). Use OVR_THREAD_LOCAL if you want to declare a thread-local 
-// variable that supports C++11 thread_local when available but the C extension when 
+// and declspec(thread). Use OVR_THREAD_LOCAL if you want to declare a thread-local
+// variable that supports C++11 thread_local when available but the C extension when
 // it's available. The primary difference between C++11 thread_local and C extensions is
 // that C++11 thread_local supports non-PODs and calls their constructors and destructors.
 //
@@ -1216,7 +1216,7 @@ limitations under the License.
 #if !defined(OVR_CPP_NO_THREAD_LOCAL)
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_thread_local))  /* clang     */ && \
-         !(defined(__GNUC__) && (OVR_CPP_VERSION >= 408))               /* GCC 4.8+  */ && \
+         !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))               /* GCC 4.8+  */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))       /* EDG 4.8+  */
         #define OVR_CPP_NO_THREAD_LOCAL 1
     #endif
@@ -1315,7 +1315,7 @@ limitations under the License.
 // ***** OVR_RESTRICT
 //
 // Wraps the C99 restrict keyword in a portable way.
-// C++11 and C++14 don't have restrict but this functionality is supported by 
+// C++11 and C++14 don't have restrict but this functionality is supported by
 // all C++ compilers.
 //
 // Example usage:
@@ -1414,8 +1414,8 @@ limitations under the License.
 // ***** OVR_EXTERN_TEMPLATE
 //
 // Portable wrapper for C++11 extern template. This tells the compiler to not instantiate
-// the template in the current translation unit, which can significantly speed up 
-// compilation and avoid problems due to two translation units compiling code with 
+// the template in the current translation unit, which can significantly speed up
+// compilation and avoid problems due to two translation units compiling code with
 // different settings.
 //
 // Example usage:
@@ -1467,7 +1467,7 @@ limitations under the License.
 // Example usage:
 //     struct Test{
 //         Test() OVR_FUNCTION_DEFAULT;            // Non-C++11 compilers will require a separate definition for Test().
-//     private:                                   // Users should put OVR_FUNCTION_DELETE usage in a private 
+//     private:                                   // Users should put OVR_FUNCTION_DELETE usage in a private
 //         void Uncallable() OVR_FUNCTION_DELETE;  // area for compatibility with pre-C++11 compilers.
 //     };
 
