@@ -44,6 +44,33 @@ typedef char ovrBool;
 //-----------------------------------------------------------------------------------
 // ***** OVR_EXPORT definition
 
+
+#if (defined(__APPLE__) && (defined(__GNUC__) ||\
+     defined(__xlC__) || defined(__xlc__))) || defined(__MACOS__)
+#  if (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) || defined(__IPHONE_OS_VERSION_MIN_REQUIRED))
+#    define OVR_OS_IPHONE
+#  else
+#    define OVR_OS_DARWIN
+#    define OVR_OS_MAC
+#    define OVR_OS_BSD
+#  endif
+#elif (defined(WIN64) || defined(_WIN64) || defined(__WIN64__))
+#  define OVR_OS_WIN64
+#  define OVR_OS_WIN32   // Defined for compatibility and because the Win64 API supports the Win32 API.
+#elif (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__))
+#  define OVR_OS_WIN32
+#elif defined(ANDROID) || defined(__ANDROID__)
+#  define OVR_OS_ANDROID
+#  define OVR_OS_LINUX
+#elif defined(__linux__) || defined(__linux)
+#  define OVR_OS_LINUX
+#elif defined(_BSD_) || defined(__FreeBSD__)
+#  define OVR_OS_BSD
+#else
+#  define OVR_OS_OTHER
+#endif
+
+
 #if !defined(OVR_EXPORT)
     #ifdef OVR_OS_WIN32
         #define OVR_EXPORT __declspec(dllexport)
@@ -839,6 +866,9 @@ OVR_EXPORT void ovrHmd_GetHSWDisplayState(ovrHmd hmd, ovrHSWDisplayState *hasWar
 ///        }
 ///    }
 OVR_EXPORT ovrBool ovrHmd_DismissHSWDisplay(ovrHmd hmd);
+
+OVR_EXPORT void ovrhmd_EnableHSWDisplaySDKRender(ovrHmd hmd, ovrBool enabled);
+
 
 /// Get boolean property. Returns first element if property is a boolean array.
 /// Returns defaultValue if property doesn't exist.

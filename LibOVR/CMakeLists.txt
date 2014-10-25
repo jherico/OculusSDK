@@ -81,6 +81,6 @@ else()
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
-add_library(OculusVR STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+add_library(OculusVR SHARED ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
 target_link_libraries(OculusVR ${EXTRA_LIBS})
 set(OVR_LIBRARIES ${EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")
