@@ -36,8 +36,6 @@ if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
 elseif(APPLE)
 else() 
-    add_subdirectory(3rdParty/EDID)
-    set_target_properties(edid PROPERTIES FOLDER "3rdParty")
 endif()
 
 # The primary SDK artifact, a static library for Oculus access 

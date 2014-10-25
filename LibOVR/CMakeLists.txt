@@ -60,7 +60,7 @@ else()
     add_subdirectory(../3rdParty/EDID ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID)
     
     # Used by the SDK to read the EDID of the monitors
-    list(APPEND EXTRA_LIBS edid)
+    list(APPEND EXTRA_LIBS edid rt)
 
     # Used by the SDK to access the HID functions
     list(APPEND EXTRA_LIBS udev)
