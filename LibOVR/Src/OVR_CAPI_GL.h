@@ -38,6 +38,7 @@ otherwise accompanies this software in either electronic or hard copy form.
     #include <GL/glx.h>
 #endif
 
+typedef void      (*CtxFunc)(void *, ovrBool enable);
 
 /// Used to configure slave GL rendering (i.e. for devices created externally).
 typedef struct ovrGLConfigData_s
@@ -55,6 +56,8 @@ typedef struct ovrGLConfigData_s
     _XDisplay* Disp;
     /// The optional window. If unset, rendering will use the current window.
     Window     Win;
+    CtxFunc    ctxFunc;
+    void *     ctxData;
 #endif
 } ovrGLConfigData;
 

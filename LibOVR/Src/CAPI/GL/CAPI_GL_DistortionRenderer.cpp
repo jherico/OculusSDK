@@ -136,6 +136,29 @@ CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
 
+void bindDistortionContext(RenderParams & RParams) {
+  if (RParams.SharedContextFunction) {
+    RParams.SharedContextFunction(RParams.SharedContextData, true);
+  }
+}
+
+void unbindDistortionContext(RenderParams & RParams) {
+  if (RParams.SharedContextFunction) {
+    RParams.SharedContextFunction(RParams.SharedContextData, true);
+  }
+}
+
+template <typename Function>
+void withDistortionContext(RenderParams & RParams, Function function) {
+  if (RParams.SharedContextFunction) {
+    RParams.SharedContextFunction(RParams.SharedContextData, true);
+  }
+  function();
+  if (RParams.SharedContextFunction) {
+    RParams.SharedContextFunction(RParams.SharedContextData, false);
+  }
+}
+
 
 bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 {
@@ -160,6 +183,12 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
     RParams.DC          = config->OGL.DC;
 #elif defined(OVR_OS_LINUX)
+    if (config->OGL.ctxData) {
+      RParams.SharedContextData = config->OGL.ctxData;
+    }
+    if (config->OGL.ctxFunc) {
+      RParams.SharedContextFunction = config->OGL.ctxFunc;
+    }
     if (config->OGL.Disp)
         RParams.Disp = config->OGL.Disp;
     if (!RParams.Disp)
@@ -195,9 +224,9 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     LatencyVAO = 0;
 
-    Context currContext;
-    currContext.InitFromCurrent();
-    distortionContext.CreateShared( currContext );
+//    Context currContext;
+//    currContext.InitFromCurrent();
+//    distortionContext.CreateShared( currContext );
 
     //DistortionWarper.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
 
@@ -206,9 +235,9 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     initBuffersAndShaders();
 
-    distortionContext.Bind();
-    initOverdrive(); // because this creates an FBO
-    currContext.Bind();
+    withDistortionContext(RParams, [&]{
+      initOverdrive(); // because this creates an FBO
+    });
 
 	RestoreGraphicsState();
 
@@ -329,8 +358,8 @@ void DistortionRenderer::renderEndFrame()
 
 void DistortionRenderer::EndFrame(bool swapBuffers)
 {
-    Context currContext;
-    currContext.InitFromCurrent();
+//    Context currContext;
+//    currContext.InitFromCurrent();
 #if defined(OVR_OS_MAC)
     distortionContext.SetSurface( currContext );
 #endif
@@ -344,7 +373,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             // Wait for timewarp distortion if it is time and Gpu idle
             FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
 
-            distortionContext.Bind();
+            bindDistortionContext(RParams);
+            // distortionContext.Bind();
             renderEndFrame();
         }
         else
@@ -354,7 +384,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             WaitUntilGpuIdle();
             double  distortionStartTime = ovr_GetTimeInSeconds();
 
-            distortionContext.Bind();
+            bindDistortionContext(RParams);
+            // distortionContext.Bind();
             renderEndFrame();
 
             WaitUntilGpuIdle();
@@ -363,7 +394,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
     }
     else
     {
-        distortionContext.Bind();
+        bindDistortionContext(RParams);
+        // distortionContext.Bind();
         renderEndFrame();
     }
 
@@ -422,7 +454,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
             WaitUntilGpuIdle();
     }
-    currContext.Bind();
+    unbindDistortionContext(RParams);
+//    currContext.Bind();
 }
 
 void DistortionRenderer::WaitUntilGpuIdle()
@@ -1057,48 +1090,42 @@ void DistortionRenderer::destroy()
 
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
     
-    Context currContext;
-    currContext.InitFromCurrent();
-    
-    distortionContext.Bind();
+    withDistortionContext(RParams, [&]{
+      for(int eyeNum = 0; eyeNum < 2; eyeNum++)
+      {
+          if (glState->GLVersionInfo.SupportsVAO)
+          {
+              glDeleteVertexArrays(1, &DistortionMeshVAOs[eyeNum]);
+          }
 
-	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
-	{
-        if (glState->GLVersionInfo.SupportsVAO)
-        {
-            glDeleteVertexArrays(1, &DistortionMeshVAOs[eyeNum]);
-        }
+          DistortionMeshVAOs[eyeNum] = 0;
 
-		DistortionMeshVAOs[eyeNum] = 0;
+          DistortionMeshVBs[eyeNum].Clear();
+          DistortionMeshIBs[eyeNum].Clear();
+      }
 
-		DistortionMeshVBs[eyeNum].Clear();
-		DistortionMeshIBs[eyeNum].Clear();
-	}
+      if (DistortionShader)
+      {
+          DistortionShader->UnsetShader(Shader_Vertex);
+          DistortionShader->UnsetShader(Shader_Pixel);
+          DistortionShader.Clear();
+      }
 
-	if (DistortionShader)
-    {
-        DistortionShader->UnsetShader(Shader_Vertex);
-	    DistortionShader->UnsetShader(Shader_Pixel);
-	    DistortionShader.Clear();
-    }
+      LatencyTesterQuadVB.Clear();
 
-    LatencyTesterQuadVB.Clear();
+      if(LatencyVAO != 0)
+      {
+          glDeleteVertexArrays(1, &LatencyVAO);
+          LatencyVAO = 0;
+      }
 
-    if(LatencyVAO != 0)
-    {
-        glDeleteVertexArrays(1, &LatencyVAO);
-	    LatencyVAO = 0;
-    }
+      if(OverdriveFbo != 0)
+      {
+          glDeleteFramebuffers(1, &OverdriveFbo);
+      }
+    });
 
-    if(OverdriveFbo != 0)
-    {
-        glDeleteFramebuffers(1, &OverdriveFbo);
-    }
-
-    currContext.Bind();
-    distortionContext.Destroy();
     // Who is responsible for destroying the app's context?
-
 	RestoreGraphicsState();
 }
 

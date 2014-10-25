@@ -440,6 +440,7 @@ void HSWDisplay::LoadGraphics()
 
 void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 {
+  return;
     if(RenderEnabled && eyeTexture)
     {        
         // We need to render to the eyeTexture with the texture viewport.

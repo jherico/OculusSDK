@@ -138,7 +138,7 @@ protected:
 
     // GL context and utility variables.
     RenderParams        RParams;
-    Context             distortionContext;
+//    Context             distortionContext;
 
 	// Helpers
     void initOverdrive();

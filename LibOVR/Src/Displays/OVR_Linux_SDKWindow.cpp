@@ -243,12 +243,46 @@ DistortionRotation SDKWindow::getRotation(const ovrHmd& hmd)
 
 bool SDKWindow::getVisualFromDrawable(GLXDrawable drawable, XVisualInfo* vinfoOut)
 {
-    _XDisplay* display = glXGetCurrentDisplay();
 
-    unsigned int value;
-    glXQueryDrawable(display, drawable, GLX_FBCONFIG_ID, &value);
-    XVisualInfo* chosen = glXGetVisualFromFBConfig(display, reinterpret_cast<GLXFBConfig>(value));
-    *vinfoOut = *chosen;
+//  _XDisplay* display = glXGetCurrentDisplay();
+//
+//  Window win;
+//  int x, y;
+//  unsigned int width, height;
+//  unsigned int borderWidth;
+//  unsigned int depth; // This is color depth.
+//  Status st = XGetGeometry(display, drawable, &win, &x, &y, &width, &height,
+//                           &borderWidth, &depth);
+//
+//  if (st == 0)
+//  {
+//      OVR::LogError("[SDKWindow] Unable to obtain drawable geometry.");
+//      return false;
+//  }
+//
+//  XWindowAttributes wa;
+//  st = XGetWindowAttributes(display, win, &wa);
+//
+//  if (st == 0)
+//  {
+//      OVR::LogError("[SDKWindow] Unable to obtain window attributes.");
+//      return false;
+//  }
+//
+//  st = XMatchVisualInfo(display, DefaultScreen(display),
+//                        depth, wa.visual->c_class, vinfoOut);
+//  if (st == 0)
+//  {
+//      OVR::LogError("[SDKWindow] Unable to match visual info");
+//      return false;
+//  }
+
+//    _XDisplay* display = glXGetCurrentDisplay();
+//
+//    unsigned int value;
+//    glXQueryDrawable(display, drawable, GLX_FBCONFIG_ID, &value);
+//    XVisualInfo* chosen = glXGetVisualFromFBConfig(display, reinterpret_cast<GLXFBConfig>(value));
+//    *vinfoOut = *chosen;
     return true;
 }
 

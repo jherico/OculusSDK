@@ -274,6 +274,8 @@ enum SampleMode
     Sample_Count        =13,
 };
 
+typedef void      (*CtxFunc)(void *, ovrBool enable);
+
 
 // Rendering parameters/pointers describing GL rendering setup.
 struct RenderParams
@@ -285,7 +287,8 @@ struct RenderParams
     _XDisplay*  Disp;
     Window      Win;
 #endif
-
+    CtxFunc    SharedContextFunction;
+    void *     SharedContextData;
     ovrSizei  RTSize;
     int    Multisample;
 };
