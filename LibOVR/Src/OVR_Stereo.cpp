@@ -5,16 +5,16 @@ Content     :   Stereo rendering functions
 Created     :   November 30, 2013
 Authors     :   Tom Fosyth
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,40 +28,13 @@ limitations under the License.
 #include "OVR_Profile.h"
 #include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_Alg.h"
-#include <OVR_CAPI.h>
+
 //To allow custom distortion to be introduced to CatMulSpline.
 float (*CustomDistortion)(float) = NULL;
 float (*CustomDistortionInv)(float) = NULL;
 
 
 namespace OVR {
-
-
-
-// ***** FovPort
-
-// C-interop support: FovPort <-> ovrFovPort
-FovPort::FovPort(const ovrFovPort &src)
-    : UpTan(src.UpTan), DownTan(src.DownTan), LeftTan(src.LeftTan), RightTan(src.RightTan)
-{ }
-
-FovPort::operator ovrFovPort () const
-{
-    ovrFovPort result;
-    result.LeftTan  = LeftTan;
-    result.RightTan = RightTan;
-    result.UpTan    = UpTan;
-    result.DownTan  = DownTan;
-    return result;
-}
-
-// Converts Fov Tan angle units to [-1,1] render target NDC space
-Vector2f FovPort::TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle)
-{
-    ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(*this);
-    return tanEyeAngle * eyeToSourceNDC.Scale + eyeToSourceNDC.Offset;
-}
-
 
 
 using namespace Alg;
@@ -108,11 +81,42 @@ bool FitCubicPolynomial ( float *pResult, const float *pFitX, const float *pFitY
     return true;
 }
 
-
+#define TPH_SPLINE_STATISTICS 0
+#if TPH_SPLINE_STATISTICS
+static float max_scaledVal = 0;
+static float average_total_out_of_range = 0;
+static float average_out_of_range;
+static int num_total = 0;
+static int num_out_of_range = 0;
+static int num_out_of_range_over_1 = 0;
+static int num_out_of_range_over_2 = 0;
+static int num_out_of_range_over_3 = 0;
+static float percent_out_of_range;
+#endif
 
 float EvalCatmullRom10Spline ( float const *K, float scaledVal )
 {
     int const NumSegments = LensConfig::NumCoefficients;
+
+	#if TPH_SPLINE_STATISTICS
+	//Value should be in range of 0 to (NumSegments-1) (typically 10) if spline is valid. Right?
+	if (scaledVal > (NumSegments-1))
+	{
+		num_out_of_range++;
+		average_total_out_of_range+=scaledVal;
+		average_out_of_range = average_total_out_of_range / ((float) num_out_of_range); 
+		percent_out_of_range = 100.0f*(num_out_of_range)/num_total;
+	}
+	if (scaledVal > (NumSegments-1+1)) num_out_of_range_over_1++;
+	if (scaledVal > (NumSegments-1+2)) num_out_of_range_over_2++;
+	if (scaledVal > (NumSegments-1+3)) num_out_of_range_over_3++;
+	num_total++;
+	if (scaledVal > max_scaledVal)
+	{
+		max_scaledVal = scaledVal;
+		max_scaledVal = scaledVal;
+	}
+	#endif
 
     float scaledValFloor = floorf ( scaledVal );
     scaledValFloor = Alg::Max ( 0.0f, Alg::Min ( (float)(NumSegments-1), scaledValFloor ) );
@@ -428,26 +432,26 @@ enum LensConfigStoredVersion
 struct LensConfigStored_CatmullRom10Version1
 {
     // All these items must be fixed-length integers - no "float", no "int", etc.
-    UInt16      VersionNumber;      // Must be LCSV_CatmullRom10Version1
+    uint16_t    VersionNumber;      // Must be LCSV_CatmullRom10Version1
 
-    UInt16      K[11];
-    UInt16      MaxR;
-    UInt16      MetersPerTanAngleAtCenter;
-    UInt16      ChromaticAberration[4];
+    uint16_t    K[11];
+    uint16_t    MaxR;
+    uint16_t    MetersPerTanAngleAtCenter;
+    uint16_t    ChromaticAberration[4];
     // InvK and MaxInvR are calculated on load.
 };
 
-UInt16 EncodeFixedPointUInt16 ( float val, UInt16 zeroVal, int fractionalBits )
+uint16_t EncodeFixedPointUInt16 ( float val, uint16_t zeroVal, int fractionalBits )
 {
     OVR_ASSERT ( ( fractionalBits >= 0 ) && ( fractionalBits < 31 ) );
     float valWhole = val * (float)( 1 << fractionalBits );
     valWhole += (float)zeroVal + 0.5f;
     valWhole = floorf ( valWhole );
     OVR_ASSERT ( ( valWhole >= 0.0f ) && ( valWhole < (float)( 1 << 16 ) ) );
-    return (UInt16)valWhole;
+    return (uint16_t)valWhole;
 }
 
-float DecodeFixedPointUInt16 ( UInt16 val, UInt16 zeroVal, int fractionalBits )
+float DecodeFixedPointUInt16 ( uint16_t val, uint16_t zeroVal, int fractionalBits )
 {
     OVR_ASSERT ( ( fractionalBits >= 0 ) && ( fractionalBits < 31 ) );
     float valFloat = (float)val;
@@ -458,14 +462,14 @@ float DecodeFixedPointUInt16 ( UInt16 val, UInt16 zeroVal, int fractionalBits )
 
 
 // Returns true on success.
-bool LoadLensConfig ( LensConfig *presult, UByte const *pbuffer, int bufferSizeInBytes )
+bool LoadLensConfig ( LensConfig *presult, uint8_t const *pbuffer, int bufferSizeInBytes )
 {
     if ( bufferSizeInBytes < 2 )
     {
         // Can't even tell the version number!
         return false;
     }
-    UInt16 version = DecodeUInt16 ( pbuffer + 0 );
+    uint16_t version = DecodeUInt16 ( pbuffer + 0 );
     switch ( version )
     {
     case LCSV_CatmullRom10Version1:
@@ -531,7 +535,7 @@ int SaveLensConfigSizeInBytes ( LensConfig const &config )
 }
 
 // Returns true on success.
-bool SaveLensConfig ( UByte *pbuffer, int bufferSizeInBytes, LensConfig const &config )
+bool SaveLensConfig ( uint8_t *pbuffer, int bufferSizeInBytes, LensConfig const &config )
 {
     if ( bufferSizeInBytes < (int)sizeof ( LensConfigStored_CatmullRom10Version1 ) )
     {
@@ -559,7 +563,7 @@ bool SaveLensConfig ( UByte *pbuffer, int bufferSizeInBytes, LensConfig const &c
     }
 
 
-    // Now store them out, sensitive to endinness.
+    // Now store them out, sensitive to endianness.
     EncodeUInt16 (      pbuffer + 0,        lcs.VersionNumber );
     for ( int i = 0; i < 11; i++ )
     {
@@ -582,7 +586,7 @@ void TestSaveLoadLensConfig ( LensConfig const &config )
     OVR_ASSERT ( config.Eqn == Distortion_CatmullRom10 );
     // As a test, make sure this can be encoded and decoded correctly.
     const int bufferSize = 256;
-    UByte buffer[bufferSize];
+    uint8_t buffer[bufferSize];
     OVR_ASSERT ( SaveLensConfigSizeInBytes ( config ) < bufferSize );
     bool success;
     success = SaveLensConfig ( buffer, bufferSize, config );
@@ -617,7 +621,8 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
     HMDInfo info;    
 
     if ((hmdType != HmdType_DK1) &&
-        (hmdType != HmdType_CrystalCoveProto))
+        (hmdType != HmdType_CrystalCoveProto) &&
+        (hmdType != HmdType_DK2))
     {
         LogText("Debug HMDInfo - HmdType not supported. Defaulting to DK1.\n");
         hmdType = HmdType_DK1;
@@ -684,14 +689,16 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
 }
 
 
-
-// profile may be NULL, in which case it uses the hard-coded defaults.
-HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo, 
-                                                 Profile const *profile /*=NULL*/,
+HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
+                                                 Profile const *profile,
                                                  DistortionEqnType distortionType /*= Distortion_CatmullRom10*/,
                                                  EyeCupType eyeCupOverride /*= EyeCup_LAST*/ )
 {
     HmdRenderInfo renderInfo;
+    
+    OVR_ASSERT(profile);  // profiles are required
+    if(!profile)
+        return renderInfo;
 
     renderInfo.HmdType                              = hmdInfo.HmdType;
     renderInfo.ResolutionInPixels                   = hmdInfo.ResolutionInPixels;
@@ -745,15 +752,13 @@ HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
 
     renderInfo.EyeRight = renderInfo.EyeLeft;
 
-
     // Obtain data from profile.
-    if ( profile != NULL )
+    char eyecup[16];
+    if (profile->GetValue(OVR_KEY_EYE_CUP, eyecup, 16))
     {
-        char eyecup[16];
-        if (profile->GetValue(OVR_KEY_EYE_CUP, eyecup, 16))
-            SetEyeCup(&renderInfo, eyecup);
+        SetEyeCup(&renderInfo, eyecup);
     }
-
+    
     switch ( hmdInfo.HmdType )
     {
     case HmdType_None:
@@ -818,54 +823,60 @@ HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
     default: OVR_ASSERT ( false ); break;
     }
 
-    if ( profile != NULL )
-    {
-        // Set the customized user eye position
-        // TBD: Maybe we should separate custom camera positioning from custom distortion rendering ??
-        if (profile->GetBoolValue(OVR_KEY_CUSTOM_EYE_RENDER, true))
-        {
-            float eye2nose[2];
-            if (profile->GetFloatValues(OVR_KEY_EYE_TO_NOSE_DISTANCE, eye2nose, 2) == 2)
-            {   // Load per-eye half-IPD
-                renderInfo.EyeLeft.NoseToPupilInMeters = eye2nose[0];
-                renderInfo.EyeRight.NoseToPupilInMeters = eye2nose[1];
-            }
-            else
-            {   // Use a centered IPD instead
-                float ipd = profile->GetFloatValue(OVR_KEY_IPD, OVR_DEFAULT_IPD);
-                renderInfo.EyeLeft.NoseToPupilInMeters = 0.5f * ipd;
-                renderInfo.EyeRight.NoseToPupilInMeters = 0.5f * ipd;
-            }
-        
-            float eye2plate[2];
-            if (profile->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, eye2plate, 2) == 2)
-            {   // Subtract the eye-cup height from the plate distance to get the eye-to-lens distance
-                // This measurement should be the the distance at maximum dial setting
-                // We still need to adjust with the dial offset
-                renderInfo.EyeLeft.ReliefInMeters = eye2plate[0] - renderInfo.LensSurfaceToMidplateInMeters;
-                renderInfo.EyeRight.ReliefInMeters = eye2plate[1] - renderInfo.LensSurfaceToMidplateInMeters;
+    Profile* def = ProfileManager::GetInstance()->GetDefaultProfile(hmdInfo.HmdType);
 
-                // Adjust the eye relief with the dial setting (from the assumed max eye relief)
-                int dial = profile->GetIntValue(OVR_KEY_EYE_RELIEF_DIAL, -1);
-                if (dial >= 0)
-                {
-                    renderInfo.EyeLeft.ReliefInMeters -= ((10 - dial) * 0.001f);
-                    renderInfo.EyeRight.ReliefInMeters -= ((10 - dial) * 0.001f);
-                }
-            }
-            else
-            {
-                // Set the eye relief with the user configured dial setting
-                int dial = profile->GetIntValue(OVR_KEY_EYE_RELIEF_DIAL, -1);
-                if (dial >= 0)
-                {   // Assume a default of 7 to 17 mm eye relief based on the dial.  This corresponds
-                    // to the sampled and tuned distortion range on the DK1.
-                    renderInfo.EyeLeft.ReliefInMeters = 0.007f + (dial * 0.001f);
-                    renderInfo.EyeRight.ReliefInMeters = 0.007f + (dial * 0.001f);
-                }
-            }
-        }
+    // Set the eye position
+    // Use the user profile value unless they have elected to use the defaults
+    if (!profile->GetBoolValue(OVR_KEY_CUSTOM_EYE_RENDER, true))
+        profile = def;  // use the default
+
+    char user[32];
+    profile->GetValue(OVR_KEY_USER, user, 32);   // for debugging purposes
+
+    // TBD: Maybe we should separate custom camera positioning from custom distortion rendering ??
+    float eye2nose[2] = { OVR_DEFAULT_IPD / 2, OVR_DEFAULT_IPD / 2 };
+    if (profile->GetFloatValues(OVR_KEY_EYE_TO_NOSE_DISTANCE, eye2nose, 2) == 2)
+    {   
+        renderInfo.EyeLeft.NoseToPupilInMeters = eye2nose[0];
+        renderInfo.EyeRight.NoseToPupilInMeters = eye2nose[1];
     }
+    else
+    {   // Legacy profiles may not include half-ipd, so use the regular IPD value instead
+        float ipd = profile->GetFloatValue(OVR_KEY_IPD, OVR_DEFAULT_IPD);
+        renderInfo.EyeLeft.NoseToPupilInMeters = 0.5f * ipd;
+        renderInfo.EyeRight.NoseToPupilInMeters = 0.5f * ipd;
+    }
+        
+    float eye2plate[2];
+    if ((profile->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, eye2plate, 2) == 2) ||
+        (def->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, eye2plate, 2) == 2))
+    {   // Subtract the eye-cup height from the plate distance to get the eye-to-lens distance
+        // This measurement should be the the distance at maximum dial setting
+        // We still need to adjust with the dial offset
+        renderInfo.EyeLeft.ReliefInMeters = eye2plate[0] - renderInfo.LensSurfaceToMidplateInMeters;
+        renderInfo.EyeRight.ReliefInMeters = eye2plate[1] - renderInfo.LensSurfaceToMidplateInMeters;
+
+        // Adjust the eye relief with the dial setting (from the assumed max eye relief)
+        int dial = profile->GetIntValue(OVR_KEY_EYE_RELIEF_DIAL, OVR_DEFAULT_EYE_RELIEF_DIAL);
+        renderInfo.EyeLeft.ReliefInMeters -= ((10 - dial) * 0.001f);
+        renderInfo.EyeRight.ReliefInMeters -= ((10 - dial) * 0.001f);
+    }
+    else
+    {
+        // We shouldn't be here.  The user or default profile should have the eye relief
+        OVR_ASSERT(false);
+
+        // Set the eye relief with the user configured dial setting
+		//int dial = profile->GetIntValue(OVR_KEY_EYE_RELIEF_DIAL, OVR_DEFAULT_EYE_RELIEF_DIAL);
+
+        // Assume a default of 7 to 17 mm eye relief based on the dial.  This corresponds
+        // to the sampled and tuned distortion range on the DK1.
+        //renderInfo.EyeLeft.ReliefInMeters = 0.007f + (dial * 0.001f);
+        //renderInfo.EyeRight.ReliefInMeters = 0.007f + (dial * 0.001f);
+    }
+
+    def->Release();
+
 
     // Now we know where the eyes are relative to the lenses, we can compute a distortion for each.
     // TODO: incorporate lateral offset in distortion generation.
@@ -900,12 +911,14 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         LensConfig Config;
     };
 
-    DistortionDescriptor distortions[10];
-    for ( unsigned int i = 0; i < sizeof(distortions)/sizeof(distortions[0]); i++ )
+	static const int MaxDistortions = 10;
+	DistortionDescriptor distortions[MaxDistortions];
+	for (int i = 0; i < MaxDistortions; i++)
     {
-        distortions[i].Config.SetToIdentity();
         distortions[i].EyeRelief = 0.0f;
+        memset(distortions[i].SampleRadius, 0, sizeof(distortions[i].SampleRadius));
         distortions[i].MaxRadius = 1.0f;
+        distortions[i].Config.SetToIdentity(); // Note: This line causes a false Microsoft static analysis error -cat
     }
     int numDistortions = 0;
     int defaultDistortion = 0;     // index of the default distortion curve to use if zero eye relief supplied
@@ -916,7 +929,7 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
     {
 
         numDistortions = 0;
-       
+                
         // Tuned at minimum dial setting - extended to r^2 == 1.8
         distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
         distortions[numDistortions].EyeRelief                            = 0.012760465f - 0.005f;
@@ -932,9 +945,6 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[8]                          = 5.1f;
         distortions[numDistortions].Config.K[9]                          = 7.4f;
         distortions[numDistortions].Config.K[10]                         = 11.0f;
-        distortions[numDistortions].SampleRadius[0]                      = 0.222717149f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.512249443f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.712694878f;
         distortions[numDistortions].MaxRadius                            = sqrt(1.8f);
         defaultDistortion = numDistortions;                      // this is the default
         numDistortions++;
@@ -954,9 +964,6 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[8]                          = 1.6986004f;
         distortions[numDistortions].Config.K[9]                          = 1.9940577f;
         distortions[numDistortions].Config.K[10]                         = 2.4783147f;
-        distortions[numDistortions].SampleRadius[0]                      = 0.222717149f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.512249443f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.712694878f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
         numDistortions++;
 
@@ -975,11 +982,10 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[8]                          = 1.8f;
         distortions[numDistortions].Config.K[9]                          = 2.25f;
         distortions[numDistortions].Config.K[10]                         = 3.0f;
-        distortions[numDistortions].SampleRadius[0]                      = 0.222717149f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.512249443f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.712694878f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
         numDistortions++;
+        
+
         
         // Chromatic aberration doesn't seem to change with eye relief.
         for ( int i = 0; i < numDistortions; i++ )
@@ -1009,14 +1015,8 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[8]                          = 1.620f;
         distortions[numDistortions].Config.K[9]                          = 1.840f;
         distortions[numDistortions].Config.K[10]                         = 2.200f;
-        distortions[numDistortions].SampleRadius[0]                      = 0.222717149f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.512249443f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.712694878f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
         
-        distortions[numDistortions].SampleRadius[0]                      = 0.405405405f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.675675676f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.945945946f;
         defaultDistortion = numDistortions;   // this is the default
         numDistortions++;
 
@@ -1038,7 +1038,36 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         // Tuned Crystal Cove & DK2 Lens (CES & GDC)
         numDistortions = 0;
        
-        distortions[numDistortions].EyeRelief                            = 0.010f;
+        
+        distortions[numDistortions].EyeRelief                            = 0.008f;
+        distortions[numDistortions].Config.MetersPerTanAngleAtCenter     = 0.036f;
+        // TODO: Need to retune this distortion for minimum eye relief
+        distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
+        distortions[numDistortions].Config.K[0]                          = 1.003f;
+        distortions[numDistortions].Config.K[1]                          = 1.02f;
+        distortions[numDistortions].Config.K[2]                          = 1.042f;
+        distortions[numDistortions].Config.K[3]                          = 1.066f;
+        distortions[numDistortions].Config.K[4]                          = 1.094f;
+        distortions[numDistortions].Config.K[5]                          = 1.126f;
+        distortions[numDistortions].Config.K[6]                          = 1.162f;
+        distortions[numDistortions].Config.K[7]                          = 1.203f;
+        distortions[numDistortions].Config.K[8]                          = 1.25f;
+        distortions[numDistortions].Config.K[9]                          = 1.31f;
+        distortions[numDistortions].Config.K[10]                         = 1.38f;
+        distortions[numDistortions].MaxRadius                            = 1.0f;
+        
+        distortions[numDistortions].Config.ChromaticAberration[0]        = -0.0112f;
+        distortions[numDistortions].Config.ChromaticAberration[1]        = -0.015f;
+        distortions[numDistortions].Config.ChromaticAberration[2]        =  0.0187f;
+        distortions[numDistortions].Config.ChromaticAberration[3]        =  0.015f;
+        
+        numDistortions++;
+
+
+
+
+
+        distortions[numDistortions].EyeRelief                            = 0.018f;
         distortions[numDistortions].Config.MetersPerTanAngleAtCenter     = 0.036f;
 
         distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
@@ -1046,34 +1075,42 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         distortions[numDistortions].Config.K[1]                          = 1.02f;
         distortions[numDistortions].Config.K[2]                          = 1.042f;
         distortions[numDistortions].Config.K[3]                          = 1.066f;
-        distortions[numDistortions].Config.K[4]                          = 1.094f;  //1.0945f;
-        distortions[numDistortions].Config.K[5]                          = 1.126f;  //1.127f;
-        distortions[numDistortions].Config.K[6]                          = 1.162f;  //1.167f;
-        distortions[numDistortions].Config.K[7]                          = 1.203f;  //1.218f;
-        distortions[numDistortions].Config.K[8]                          = 1.25f;   //1.283f;
-        distortions[numDistortions].Config.K[9]                          = 1.31f;   //1.37f;
-        distortions[numDistortions].Config.K[10]                         = 1.38f;   //1.48f;
+        distortions[numDistortions].Config.K[4]                          = 1.094f;
+        distortions[numDistortions].Config.K[5]                          = 1.126f;
+        distortions[numDistortions].Config.K[6]                          = 1.162f;
+        distortions[numDistortions].Config.K[7]                          = 1.203f;
+        distortions[numDistortions].Config.K[8]                          = 1.25f;
+        distortions[numDistortions].Config.K[9]                          = 1.31f;
+        distortions[numDistortions].Config.K[10]                         = 1.38f;
         distortions[numDistortions].MaxRadius                            = 1.0f;
+
+        distortions[numDistortions].Config.ChromaticAberration[0]        = -0.015f;
+        distortions[numDistortions].Config.ChromaticAberration[1]        = -0.02f;
+        distortions[numDistortions].Config.ChromaticAberration[2]        =  0.025f;
+        distortions[numDistortions].Config.ChromaticAberration[3]        =  0.02f;
         
-        
-        distortions[numDistortions].SampleRadius[0]                      = 0.405405405f;
-        distortions[numDistortions].SampleRadius[1]                      = 0.675675676f;
-        distortions[numDistortions].SampleRadius[2]                      = 0.945945946f;
         defaultDistortion = numDistortions;   // this is the default
         numDistortions++;
+        
+        /*
+        // Orange Lens on DK2
+        distortions[numDistortions].EyeRelief                            = 0.010f;
+        distortions[numDistortions].Config.MetersPerTanAngleAtCenter     = 0.031f;
 
-        distortions[numDistortions] = distortions[0];
-        distortions[numDistortions].EyeRelief = 0.020f;
-        numDistortions++;
-
-        // Chromatic aberration doesn't seem to change with eye relief.
-        for ( int i = 0; i < numDistortions; i++ )
-        {
-            distortions[i].Config.ChromaticAberration[0]        = -0.015f;
-            distortions[i].Config.ChromaticAberration[1]        = -0.02f;
-            distortions[i].Config.ChromaticAberration[2]        =  0.025f;
-            distortions[i].Config.ChromaticAberration[3]        =  0.02f;
-        }
+        distortions[numDistortions].Config.Eqn = Distortion_CatmullRom10;
+        distortions[numDistortions].Config.K[0]                          = 1.00f;
+        distortions[numDistortions].Config.K[1]                          = 1.0169f;
+        distortions[numDistortions].Config.K[2]                          = 1.0378f;
+        distortions[numDistortions].Config.K[3]                          = 1.0648f;
+        distortions[numDistortions].Config.K[4]                          = 1.0990f;
+        distortions[numDistortions].Config.K[5]                          = 1.141f;
+        distortions[numDistortions].Config.K[6]                          = 1.192f;
+        distortions[numDistortions].Config.K[7]                          = 1.255f;
+        distortions[numDistortions].Config.K[8]                          = 1.335f;
+        distortions[numDistortions].Config.K[9]                          = 1.435f;
+        distortions[numDistortions].Config.K[10]                         = 1.56f;
+        distortions[numDistortions].MaxRadius                            = 1.0f;
+        */
     }
     else
     {
@@ -1105,8 +1142,7 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         }
     }
 
-    OVR_ASSERT ( numDistortions < (sizeof(distortions)/sizeof(distortions[0])) );
-
+	OVR_ASSERT(numDistortions < MaxDistortions);
 
     DistortionDescriptor *pUpper = NULL;
     DistortionDescriptor *pLower = NULL;
@@ -1188,7 +1224,8 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
         fitY[0] = 1.0f;
         for ( int ctrlPt = 1; ctrlPt < 4; ctrlPt ++ )
         {
-            float radiusLerp = invLerpVal * pLower->SampleRadius[ctrlPt-1] + lerpVal * pUpper->SampleRadius[ctrlPt-1];
+            // SampleRadius is not valid for Distortion_RecipPoly4 types.
+            float radiusLerp = ( invLerpVal * pLower->MaxRadius + lerpVal * pUpper->MaxRadius ) * ( (float)ctrlPt / 4.0f );
             float radiusLerpSq = radiusLerp * radiusLerp;
             float fitYLower = pLower->Config.DistortionFnScaleRadiusSquared ( radiusLerpSq );
             float fitYUpper = pUpper->Config.DistortionFnScaleRadiusSquared ( radiusLerpSq );
@@ -1267,9 +1304,6 @@ LensConfig GenerateLensConfigFromEyeRelief ( float eyeReliefInMeters, HmdRenderI
     */
     return result;
 }
-
-
-
 
 
 DistortionRenderDesc CalculateDistortionRenderDesc ( StereoEye eyeType, HmdRenderInfo const &hmd,
@@ -1733,21 +1767,21 @@ void TransformScreenNDCToTanFovSpaceChroma ( Vector2f *resultR, Vector2f *result
 }
 
 // This mimics the second half of the distortion shader's function.
-Vector2f TransformTanFovSpaceToRendertargetTexUV( StereoEyeParams const &eyeParams,
+Vector2f TransformTanFovSpaceToRendertargetTexUV( ScaleAndOffset2D const &eyeToSourceUV,
                                                   Vector2f const &tanEyeAngle )
 {
     Vector2f textureUV;
-    textureUV.x = tanEyeAngle.x * eyeParams.EyeToSourceUV.Scale.x + eyeParams.EyeToSourceUV.Offset.x;
-    textureUV.y = tanEyeAngle.y * eyeParams.EyeToSourceUV.Scale.y + eyeParams.EyeToSourceUV.Offset.y;
+    textureUV.x = tanEyeAngle.x * eyeToSourceUV.Scale.x + eyeToSourceUV.Offset.x;
+    textureUV.y = tanEyeAngle.y * eyeToSourceUV.Scale.y + eyeToSourceUV.Offset.y;
     return textureUV;
 }
 
-Vector2f TransformTanFovSpaceToRendertargetNDC( StereoEyeParams const &eyeParams,
+Vector2f TransformTanFovSpaceToRendertargetNDC( ScaleAndOffset2D const &eyeToSourceNDC,
                                                 Vector2f const &tanEyeAngle )
 {
     Vector2f textureNDC;
-    textureNDC.x = tanEyeAngle.x * eyeParams.EyeToSourceNDC.Scale.x + eyeParams.EyeToSourceNDC.Offset.x;
-    textureNDC.y = tanEyeAngle.y * eyeParams.EyeToSourceNDC.Scale.y + eyeParams.EyeToSourceNDC.Offset.y;
+    textureNDC.x = tanEyeAngle.x * eyeToSourceNDC.Scale.x + eyeToSourceNDC.Offset.x;
+    textureNDC.y = tanEyeAngle.y * eyeToSourceNDC.Scale.y + eyeToSourceNDC.Offset.y;
     return textureNDC;
 }
 

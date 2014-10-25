@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation  for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -191,7 +191,7 @@ static const char* FShaderSrcs[FShader_Count] =
 //-------------------------------------------------------------------------------------
 // ***** Buffer
 
-bool Buffer::Data(int use, const void *buffer, size_t size)
+bool Buffer::Data(int use, const void* buffer, size_t size)
 {
     if (D3DBuffer && Size >= size)
     {
@@ -253,6 +253,7 @@ bool Buffer::Data(int use, const void *buffer, size_t size)
     sr.SysMemPitch = 0;
     sr.SysMemSlicePitch = 0;
 
+    D3DBuffer = NULL;
     HRESULT hr = Ren->Device->CreateBuffer(&desc, buffer ? &sr : NULL, &D3DBuffer.GetRawRef());
     if (SUCCEEDED(hr))
     {
@@ -280,7 +281,7 @@ void*  Buffer::Map(size_t start, size_t size, int flags)
 		return NULL;    
 }
 
-bool   Buffer::Unmap(void *m)
+bool   Buffer::Unmap(void* m)
 {
 	OVR_UNUSED(m);
 
@@ -323,28 +324,43 @@ template<> void Shader<Shader_Pixel, ID3D11PixelShader>::SetUniformBuffer(Buffer
 //-------------------------------------------------------------------------------------
 // ***** Shader Base
 
-ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage)
-    : Stage(stage), Ren(r), UniformData(0)
+ShaderBase::ShaderBase(RenderDevice* r, ShaderStage stage) :
+    Stage(stage),
+    Ren(r),
+    UniformData(NULL),
+    UniformsSize(-1)
+{
+}
+
+ShaderBase::ShaderBase(ShaderStage s) :
+    Stage(s),
+    Ren(NULL),
+    UniformData(NULL),
+    UniformsSize(-1)
 {
 }
 
 ShaderBase::~ShaderBase()
 {
-    if (UniformData)    
-        OVR_FREE(UniformData);    
+    if (UniformData)
+    {
+        OVR_FREE(UniformData);
+        UniformData = NULL;
+    }
 }
 
 bool ShaderBase::SetUniform(const char* name, int n, const float* v)
 {
-    for(unsigned i = 0; i < UniformInfo.GetSize(); i++)
+    for (int i = 0; i < UniformInfo.GetSizeI(); i++)
     {
-        if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
+        if (UniformInfo[i].Name == name)
         {
             memcpy(UniformData + UniformInfo[i].Offset, v, n * sizeof(float));
-            return 1;
+            return true;
         }
     }
-    return 0;
+
+    return false;
 }
 
 bool ShaderBase::SetUniformBool(const char* name, int n, const bool* v) 
@@ -423,10 +439,19 @@ void ShaderBase::UpdateBuffer(Buffer* buf)
 //-------------------------------------------------------------------------------------
 // ***** Texture
 // 
-Texture::Texture(RenderDevice* ren, int fmt, int w, int h)
-    : Ren(ren), Tex(NULL), TexSv(NULL), TexRtv(NULL), TexDsv(NULL), Width(w), Height(h)
+Texture::Texture(RenderDevice* ren, int fmt, int w, int h) :
+    Ren(ren),
+    Tex(NULL),
+    TexSv(NULL),
+    TexRtv(NULL),
+    TexDsv(NULL),
+    Sampler(NULL),
+    Width(w),
+    Height(h),
+    Samples(0)
 {
     OVR_UNUSED(fmt);
+
     Sampler = Ren->GetSamplerState(0);
 }
 
@@ -474,7 +499,7 @@ void Scene::Render(RenderDevice* ren, const Matrix4f& view)
 
 
 
-UInt16 CubeIndices[] =
+uint16_t CubeIndices[] =
 {
     0, 1, 3,
     3, 1, 2,
@@ -556,7 +581,7 @@ void Model::AddSolidColorBox(float x1, float y1, float z1,
     };
 
 
-    UInt16 startIndex = GetNextVertexIndex();
+    uint16_t startIndex = GetNextVertexIndex();
 
     enum
     {
@@ -598,26 +623,74 @@ void ShaderFill::Set(PrimitiveType prim) const
 //-------------------------------------------------------------------------------------
 // ***** Render Device
 
-RenderDevice::RenderDevice(const RendererParams& p, HWND window)
+RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
+    WindowWidth(0),
+    WindowHeight(0),
+    Params(),
+    Proj(),
+    pTextVertexBuffer(),
+    LightingBuffer(),
+    DXGIFactory(),
+    Window(window),
+    Device(),
+    Context(),
+    SwapChain(),
+    Adapter(),
+    FullscreenOutput(),
+    FSDesktopX(-1),
+    FSDesktopY(-1),
+    BackBuffer(),
+    BackBufferRT(),
+    CurRenderTarget(),
+    CurDepthBuffer(),
+    Rasterizer(),
+    BlendState(),
+  //D3DViewport()
+  //DepthStates();
+    CurDepthState(),
+    ModelVertexIL(),
+  //SamplerStates(),
+    StdUniforms(),
+  //UniformBuffers(),
+  //MaxTextureSet(),
+  //VertexShaders(),
+  //PixelShaders(),
+  //CommonUniforms(),
+    DefaultFill(),
+    QuadVertexBuffer(),
+    DepthBuffers()
 {
+    memset(&D3DViewport, 0, sizeof(D3DViewport));
+    memset(MaxTextureSet, 0, sizeof(MaxTextureSet));
+
     RECT rc;
-    GetClientRect(window, &rc);
-    UINT width   = rc.right - rc.left;
-    UINT height  = rc.bottom - rc.top;
-    WindowWidth  = width;
-    WindowHeight = height;
+    if (p.Resolution == Sizei(0))
+    {
+        GetClientRect(window, &rc);        
+        WindowWidth  = rc.right - rc.left;
+        WindowHeight = rc.bottom - rc.top;
+    }
+    else
+    {
+        // TBD: Rename from WindowHeight or use Resolution from params for surface
+        WindowWidth  = p.Resolution.w;
+        WindowHeight = p.Resolution.h;
+    }
+
     Window       = window;
     Params       = p;
 
+    DXGIFactory = NULL;
     HRESULT hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)(&DXGIFactory.GetRawRef()));
-    if (FAILED(hr))    
+    if (FAILED(hr))
         return;
 
     // Find the adapter & output (monitor) to use for fullscreen, based on the reported name of the HMD's monitor.
     if (Params.MonitorName.GetLength() > 0)
     {
-        for(UINT AdapterIndex = 0; ; AdapterIndex++)
+        for (UINT AdapterIndex = 0; ; AdapterIndex++)
         {
+            Adapter = NULL;
             HRESULT hr = DXGIFactory->EnumAdapters(AdapterIndex, &Adapter.GetRawRef());
             if (hr == DXGI_ERROR_NOT_FOUND)
                 break;
@@ -637,12 +710,19 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window)
 
     if (!Adapter)
     {
-        DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        hr = DXGIFactory->EnumAdapters(0, &Adapter.GetRawRef());
+        if (FAILED(hr) || !Adapter)
+        {
+            OVR_DEBUG_LOG(("WARNING: No graphics adapter."));
+            OVR_ASSERT(false);
+        }
     }
 
     int flags = 0;
-    //int flags =  D3D11_CREATE_DEVICE_DEBUG;    
+    //int flags =  D3D11_CREATE_DEVICE_DEBUG;
 
+    Device = NULL;
+    Context = NULL;
     hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
                             NULL, flags, NULL, 0, D3D11_SDK_VERSION,
                             &Device.GetRawRef(), NULL, &Context.GetRawRef());
@@ -697,8 +777,9 @@ void  RenderDevice::initShadersAndStates()
         PixelShaders[i] = *new PixelShader(this, CompileShader("ps_4_0", FShaderSrcs[i]));
     }
 
-    SPInt               bufferSize = vsData->GetBufferSize();
+    intptr_t            bufferSize = vsData->GetBufferSize();
     const void*         buffer     = vsData->GetBufferPointer();
+    ModelVertexIL = NULL;
     ID3D11InputLayout** objRef     = &ModelVertexIL.GetRawRef();
 
     HRESULT validate = Device->CreateInputLayout(ModelVertexDesc, sizeof(ModelVertexDesc)/sizeof(D3D11_INPUT_ELEMENT_DESC),
@@ -717,6 +798,7 @@ void  RenderDevice::initShadersAndStates()
     bm.RenderTarget[0].SrcBlend    = bm.RenderTarget[0].SrcBlendAlpha   = D3D11_BLEND_SRC_ALPHA;
     bm.RenderTarget[0].DestBlend   = bm.RenderTarget[0].DestBlendAlpha  = D3D11_BLEND_INV_SRC_ALPHA;
     bm.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    BlendState = NULL;
     Device->CreateBlendState(&bm, &BlendState.GetRawRef());
 
     D3D11_RASTERIZER_DESC rs;
@@ -725,6 +807,7 @@ void  RenderDevice::initShadersAndStates()
     rs.CullMode              = D3D11_CULL_BACK;    
     rs.DepthClipEnable       = true;
     rs.FillMode              = D3D11_FILL_SOLID;
+    Rasterizer = NULL;
     Device->CreateRasterizerState(&rs, &Rasterizer.GetRawRef());
 
     QuadVertexBuffer = *CreateBuffer();
@@ -763,7 +846,7 @@ void RenderDevice::InitShaders( const char * vertex_shader, const char * pixel_s
 
 RenderDevice::~RenderDevice()
 {
-    if (SwapChain && Params.Fullscreen)
+	    if (SwapChain && Params.Fullscreen)
     {
         SwapChain->SetFullscreenState(false, NULL);
     }
@@ -875,7 +958,7 @@ bool RenderDevice::RecreateSwapChain()
 {
     DXGI_SWAP_CHAIN_DESC scDesc;
     memset(&scDesc, 0, sizeof(scDesc));
-    scDesc.BufferCount          = 1;
+    scDesc.BufferCount          = 2;
     scDesc.BufferDesc.Width     = WindowWidth;
     scDesc.BufferDesc.Height    = WindowHeight;
     scDesc.BufferDesc.Format    = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -887,6 +970,7 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.SampleDesc.Quality   = 0;
     scDesc.Windowed             = (Params.Fullscreen != Display_Fullscreen);
     scDesc.Flags                = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+	scDesc.SwapEffect			= DXGI_SWAP_EFFECT_SEQUENTIAL;
 
 	if (SwapChain)
 	{
@@ -916,6 +1000,7 @@ bool RenderDevice::RecreateSwapChain()
     {
         Context->OMSetRenderTargets(1, &BackBufferRT.GetRawRef(), depthBuffer->TexDsv);
     }
+
     return true;
 }
 
@@ -1263,7 +1348,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         {
             int srcw = width, srch = height;
             int level = 0;
-            UByte* mipmaps = NULL;
+            uint8_t* mipmaps = NULL;
             do
             {
                 level++;
@@ -1279,9 +1364,9 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                 }
                 if (mipmaps == NULL)
                 {
-                    mipmaps = (UByte*)OVR_ALLOC(mipw * miph * 4);
+                    mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
                 }
-                FilterRgba2x2(level == 1 ? (const UByte*)data : mipmaps, srcw, srch, mipmaps);
+                FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
                 Context->UpdateSubresource(NewTex->Tex, level, NULL, mipmaps, mipw * bpp, miph * bpp);
                 srcw = mipw;
                 srch = miph;
@@ -1345,7 +1430,6 @@ void RenderDevice::SetProjection(const Matrix4f& proj)
 void RenderDevice::BeginScene()
 {
     BeginRendering();
-    SetViewport(VP);
     SetWorldUniforms(Proj);
 }
 
@@ -1416,19 +1500,19 @@ void RenderDevice::Render(const Matrix4f& view, Model* model)
     }
 
     Render(model->Fill ? model->Fill : DefaultFill,
-           model->VertexBuffer, model->IndexBuffer,
+           model->VertexBuffer, model->IndexBuffer,sizeof(Vertex),
            view, 0, (unsigned)model->Indices.GetSize(), model->GetPrimType());
 }
 
 
 //Cut down one for ORT for simplicity
-void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices)
+void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices, int stride)
 {
-    Render(fill, vertices, indices, Matrix4f(), 0, (int)vertices->GetSize(), Prim_Triangles, false);
+    Render(fill, vertices, indices, stride, Matrix4f(), 0,(int)vertices->GetSize(), Prim_Triangles, false);
 }
 
 
-void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,
+void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices, int stride,
                           const Matrix4f& matrix, int offset, int count, PrimitiveType rprim, bool updateUniformData)
 {
 
@@ -1443,8 +1527,9 @@ void RenderDevice::Render(const ShaderFill* fill, Buffer* vertices, Buffer* indi
     }
 
     ID3D11Buffer* vertexBuffer = ((Buffer*)vertices)->GetBuffer();
-    UINT vertexStride = sizeof(Vertex);
-    UINT vertexOffset = offset;
+    UINT vertexStride = stride;
+
+	UINT vertexOffset = offset;
     Context->IASetVertexBuffers(0, 1, &vertexBuffer, &vertexStride, &vertexOffset);
 
     ShaderSet* shaders = ((ShaderFill*)fill)->GetShaders();
@@ -1535,12 +1620,12 @@ int GetNumMipLevels(int w, int h)
     return n;
 }
 
-void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest)
+void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest)
 {
     for(int j = 0; j < (h & ~1); j += 2)
     {
-        const UByte* psrc = src + (w * j * 4);
-        UByte*       pdest = dest + ((w >> 1) * (j >> 1) * 4);
+        const uint8_t* psrc = src + (w * j * 4);
+        uint8_t*       pdest = dest + ((w >> 1) * (j >> 1) * 4);
 
         for(int i = 0; i < w >> 1; i++, psrc += 8, pdest += 4)
         {

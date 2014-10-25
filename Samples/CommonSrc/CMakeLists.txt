@@ -15,7 +15,8 @@ if(WIN32)
     file(GLOB PLATFORM_SOURCE_FILES 
         Platform/Win32*
         Render/Render_GL_Win32*
-        Render/Render_D3D*
+        Render/Render_D3D10*
+        Render/Render_D3D11*
     )
 elseif(APPLE)
     file(GLOB PLATFORM_SOURCE_FILES 
@@ -27,5 +28,6 @@ else()
     )
 endif()
 
+include_directories(../../3rdParty/glext)
 
 add_library (CommonSrc STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})

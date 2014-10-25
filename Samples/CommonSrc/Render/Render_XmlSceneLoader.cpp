@@ -5,7 +5,7 @@ Content     :   Imports and exports XML files - implementation
 Created     :   January 21, 2013
 Authors     :   Robotic Arm Software - Peter Hoff, Dan Goodman, Bryan Croteau
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,13 +24,14 @@ limitations under the License.
 #include "Render_XmlSceneLoader.h"
 #include <Kernel/OVR_Log.h>
 
-#ifdef OVR_DEFINE_NEW
-#undef new
-#endif
-
 namespace OVR { namespace Render {
 
-XmlHandler::XmlHandler() : pXmlDocument(NULL)
+XmlHandler::XmlHandler() :
+    pXmlDocument(NULL),
+    textureCount(0),
+    modelCount(0),
+    collisionModelCount(0),
+    groundCollisionModelCount(0)
 {
     pXmlDocument = new tinyxml2::XMLDocument();
 }
@@ -52,9 +53,9 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 
     // Extract the relative path to our working directory for loading textures
     filePath[0] = 0;
-    SPInt pos = 0;
-	SPInt len = strlen(fileName);
-    for(SPInt i = len; i > 0; i--)
+    intptr_t pos = 0;
+	intptr_t len = strlen(fileName);
+    for(intptr_t i = len; i > 0; i--)
     {
         if (fileName[i-1]=='\\' || fileName[i-1]=='/')
         {
@@ -67,6 +68,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     // Load the textures
 	OVR_DEBUG_LOG_TEXT(("Loading textures..."));
     XMLElement* pXmlTexture = pXmlDocument->FirstChildElement("scene")->FirstChildElement("textures");
+    OVR_ASSERT(pXmlTexture);
     if (pXmlTexture)
     {
         pXmlTexture->QueryIntAttribute("count", &textureCount);
@@ -76,7 +78,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     for(int i = 0; i < textureCount; ++i)
     {
         const char* textureName = pXmlTexture->Attribute("fileName");
-		SPInt       dotpos = strcspn(textureName, ".");
+		intptr_t    dotpos = strcspn(textureName, ".");
         char        fname[300];
 
 		if (pos == len)
@@ -216,8 +218,8 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         Models[i]->Fill = shader;
 
         //add all the vertices to the model
-        const UPInt numVerts = vertices->GetSize();
-        for(UPInt v = 0; v < numVerts; ++v)
+        const size_t numVerts = vertices->GetSize();
+        for(size_t v = 0; v < numVerts; ++v)
         {
             if(diffuseTextureIndex > -1)
             {
@@ -246,18 +248,18 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         const char* indexStr = pXmlModel->FirstChildElement("indices")->
                                           FirstChild()->ToText()->Value();
         
-        UPInt stringLength = strlen(indexStr);
+        size_t stringLength = strlen(indexStr);
 
-        for(UPInt j = 0; j < stringLength; )
+        for(size_t j = 0; j < stringLength; )
         {
-            UPInt k = j + 1;
+            size_t k = j + 1;
             for(; k < stringLength; ++k)
             {
                 if (indexStr[k] == ' ')
                     break;                
             }
             char text[20];
-            for(UPInt l = 0; l < k - j; ++l)
+            for(size_t l = 0; l < k - j; ++l)
             {
                 text[l] = indexStr[j + l];
             }
@@ -268,10 +270,10 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         }
 
         // Reverse index order to match original expected orientation
-        Array<UInt16>& indices    = Models[i]->Indices;
-        UPInt          indexCount = indices.GetSize();         
+        Array<uint16_t>& indices    = Models[i]->Indices;
+        size_t         indexCount = indices.GetSize();         
 
-        for (UPInt revIndex = 0; revIndex < indexCount/2; revIndex++)
+        for (size_t revIndex = 0; revIndex < indexCount/2; revIndex++)
         {
             unsigned short itemp               = indices[revIndex];
             indices[revIndex]                  = indices[indexCount - revIndex - 1];
@@ -303,61 +305,68 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     {
         Ptr<CollisionModel> cm = *new CollisionModel();
         int planeCount = 0;
-        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
-
-        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-        for(int j = 0; j < planeCount; ++j)
+        
+        OVR_ASSERT(pXmlCollisionModel != NULL); // collisionModelCount should guarantee this.
+        if (pXmlCollisionModel)
         {
-            Vector3f norm;
-            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
-            float D;
-            pXmlPlane->QueryFloatAttribute("d", &D);
-            D -= 0.5f;
-            if (i == 26)
-                D += 0.5f;  // tighten the terrace collision so player can move right up to rail
-            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-            cm->Add(p);
-            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-        }
+            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pCollisions->PushBack(cm);
-        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+            for(int j = 0; j < planeCount; ++j)
+            {
+                Vector3f norm;
+                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+                float D;
+                pXmlPlane->QueryFloatAttribute("d", &D);
+                D -= 0.5f;
+                if (i == 26)
+                    D += 0.5f;  // tighten the terrace collision so player can move right up to rail
+                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+                cm->Add(p);
+                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
+            }
+
+            pCollisions->PushBack(cm);
+            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+        }
     }
 	OVR_DEBUG_LOG(("done."));
 
     //load the ground collision models
 	OVR_DEBUG_LOG(("Loading ground collision models..."));
     pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("groundCollisionModels");
+    OVR_ASSERT(pXmlCollisionModel);
     if (pXmlCollisionModel)
     {
 		pXmlCollisionModel->QueryIntAttribute("count", &groundCollisionModelCount);
         pXmlCollisionModel = pXmlCollisionModel->FirstChildElement("collisionModel");
-    }
-    pXmlPlane = NULL;
-    for(int i = 0; i < groundCollisionModelCount; ++i)
-    {
-        Ptr<CollisionModel> cm = *new CollisionModel();
-        int planeCount = 0;
-        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-        for(int j = 0; j < planeCount; ++j)
+        pXmlPlane = NULL;
+        for (int i = 0; i < groundCollisionModelCount; ++i)
         {
-            Vector3f norm;
-            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
-            float D;
-            pXmlPlane->QueryFloatAttribute("d", &D);
-            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-            cm->Add(p);
-            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-        }
+            Ptr<CollisionModel> cm = *new CollisionModel();
+            int planeCount = 0;
+            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-        pGroundCollisions->PushBack(cm);
-        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+            for (int j = 0; j < planeCount; ++j)
+            {
+                Vector3f norm;
+                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+                float D = 0.f;
+                pXmlPlane->QueryFloatAttribute("d", &D);
+                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+                cm->Add(p);
+                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
+            }
+
+            pGroundCollisions->PushBack(cm);
+            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+        }
     }
 	OVR_DEBUG_LOG(("done."));
 	return true;
@@ -366,14 +375,14 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 void XmlHandler::ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *array,
 	                               bool is2element)
 {
-    UPInt stride = is2element ? 2 : 3;
-    UPInt stringLength = strlen(str);
-    UPInt element = 0;
+    size_t stride = is2element ? 2 : 3;
+    size_t stringLength = strlen(str);
+    size_t element = 0;
     float v[3];
 
-    for(UPInt j = 0; j < stringLength;)
+    for(size_t j = 0; j < stringLength;)
     {
-        UPInt k = j + 1;
+        size_t k = j + 1;
         for(; k < stringLength; ++k)
         {
             if(str[k] == ' ')
@@ -382,7 +391,7 @@ void XmlHandler::ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *a
             }
         }
         char text[20];
-        for(UPInt l = 0; l < k - j; ++l)
+        for(size_t l = 0; l < k - j; ++l)
         {
             text[l] = str[j + l];
         }

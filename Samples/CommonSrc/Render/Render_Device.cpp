@@ -5,7 +5,7 @@ Content     :   Platform renderer for simple scene graph - implementation
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ namespace OVR { namespace Render {
 
 
 
-	UInt16 CubeIndices[] =
+	uint16_t CubeIndices[] =
 	{
 		0, 1, 3,
 		3, 1, 2,
@@ -127,7 +127,7 @@ namespace OVR { namespace Render {
 
 		Model* box = new Model();
 
-		UInt16 startIndex = 0;
+		uint16_t startIndex = 0;
 		// Cube
 		startIndex =
 			box->AddVertex(Vector3f(x1, y2, z1), ycolor);
@@ -238,7 +238,7 @@ namespace OVR { namespace Render {
 		};
 
 
-		UInt16 startIndex = GetNextVertexIndex();
+		uint16_t startIndex = GetNextVertexIndex();
 
 		enum
 		{
@@ -265,7 +265,7 @@ namespace OVR { namespace Render {
 	{    
 		Vector3f s = size * 0.5f;
 		Vector3f o = origin;
-		UInt16   i = GetNextVertexIndex();
+		uint16_t i = GetNextVertexIndex();
 
 		AddVertex(-s.x + o.x,  s.y + o.y, -s.z + o.z,  c, 0, 1, 0, 0, -1);
 		AddVertex(s.x  + o.x,  s.y + o.y, -s.z + o.z,  c, 1, 1, 0, 0, -1);
@@ -324,15 +324,15 @@ namespace OVR { namespace Render {
 	{
 		Model *cyl = new Model();
 		float halfht = height * 0.5f;
-		for(UInt16 i = 0; i < sides; i++)
+		for(uint16_t i = 0; i < sides; i++)
 		{
-			float x = cosf(Math<float>::TwoPi * i / float(sides));
-			float y = sinf(Math<float>::TwoPi * i / float(sides));
+			float x = cosf(MATH_FLOAT_TWOPI * i / float(sides));
+			float y = sinf(MATH_FLOAT_TWOPI * i / float(sides));
 
 			cyl->AddVertex(radius * x, radius * y, halfht, color, x + 1, y, 0, 0, 1);
 			cyl->AddVertex(radius * x, radius * y, -1.0f*halfht, color, x, y, 0, 0, -1);
 
-			UInt16 j = 0;
+			uint16_t j = 0;
 			if(i < sides - 1)
 			{
 				j = i + 1;
@@ -340,8 +340,8 @@ namespace OVR { namespace Render {
 				cyl->AddTriangle(1, i * 4 + 1, i * 4 + 5);
 			}
 
-			float nx = cosf(Math<float>::Pi * (0.5f + 2.0f * i / float(sides)));
-			float ny = sinf(Math<float>::Pi * (0.5f + 2.0f * i / float(sides)));
+			float nx = cosf(MATH_FLOAT_PI * (0.5f + 2.0f * i / float(sides)));
+			float ny = sinf(MATH_FLOAT_PI * (0.5f + 2.0f * i / float(sides)));
 			cyl->AddVertex(radius * x, radius * y, halfht, color, x + 1, y, nx, ny, 0);
 			cyl->AddVertex(radius * x, radius * y, -1.0f*halfht, color, x, y, nx, ny, 0);
 
@@ -359,21 +359,21 @@ namespace OVR { namespace Render {
 		float halfht = height * 0.5f;
 		cone->AddVertex(0.0f, 0.0f, -1.0f*halfht, color, 0, 0, 0, 0, -1);
 
-		for(UInt16 i = 0; i < sides; i++)
+		for(uint16_t i = 0; i < sides; i++)
 		{
-			float x = cosf(Math<float>::TwoPi * i / float(sides));
-			float y = sinf(Math<float>::TwoPi * i / float(sides));
+			float x = cosf(MATH_FLOAT_TWOPI * i / float(sides));
+			float y = sinf(MATH_FLOAT_TWOPI * i / float(sides));
 
 			cone->AddVertex(radius * x, radius * y, -1.0f*halfht, color, 0, 0, 0, 0, -1);
 
-			UInt16 j = 1;
+			uint16_t j = 1;
 			if(i < sides - 1)
 			{
 				j = i + 1;
 			}
 
-			float next_x = cosf(Math<float>::TwoPi * j / float(sides));
-			float next_y = sinf(Math<float>::TwoPi *  j / float(sides));
+			float next_x = cosf(MATH_FLOAT_TWOPI * j / float(sides));
+			float next_y = sinf(MATH_FLOAT_TWOPI *  j / float(sides));
 
 			Vector3f normal = Vector3f(x, y, -halfht).Cross(Vector3f(next_x, next_y, -halfht));
 
@@ -391,13 +391,13 @@ namespace OVR { namespace Render {
 	Model* Model::CreateSphere(Color color, Vector3f origin, float radius, int sides)
 	{
 		Model *sphere = new Model();
-		UInt16 usides = (UInt16) sides;
-		UInt16 halfsides = usides/2;
+		uint16_t usides = (uint16_t) sides;
+		uint16_t halfsides = usides/2;
 
-		for(UInt16 k = 0; k < halfsides; k++) {
+		for(uint16_t k = 0; k < halfsides; k++) {
 
-			float z = cosf(Math<float>::Pi * k / float(halfsides));
-			float z_r = sinf(Math<float>::Pi * k / float(halfsides)); // the radius of the cross circle with coordinate z
+			float z = cosf(MATH_FLOAT_PI * k / float(halfsides));
+			float z_r = sinf(MATH_FLOAT_PI * k / float(halfsides)); // the radius of the cross circle with coordinate z
 
 			if (k == 0)  
 			{       // add north and south poles
@@ -406,12 +406,12 @@ namespace OVR { namespace Render {
 			}
 			else 
 			{
-				for(UInt16 i = 0; i < sides; i++)
+				for(uint16_t i = 0; i < sides; i++)
 				{
-					float x = cosf(Math<float>::TwoPi * i / float(sides)) * z_r;
-					float y = sinf(Math<float>::TwoPi * i / float(sides)) * z_r;
+					float x = cosf(MATH_FLOAT_TWOPI * i / float(sides)) * z_r;
+					float y = sinf(MATH_FLOAT_TWOPI * i / float(sides)) * z_r;
 
-					UInt16 j = 0;
+					uint16_t j = 0;
 					if(i < sides - 1)
 					{
 						j = i + 1;
@@ -419,8 +419,8 @@ namespace OVR { namespace Render {
 
 					sphere->AddVertex(radius * x, radius * y, radius * z, color, 0, 1, x, y, z);
 
-					UInt16 indi = 2 + (k -1)*usides + i;
-					UInt16 indj = 2 + (k -1)*usides + j;
+					uint16_t indi = 2 + (k -1)*usides + i;
+					uint16_t indj = 2 + (k -1)*usides + j;
 					if (k == 1) // NorthPole
 						sphere->AddTriangle(0, j + 2, i + 2);
 					else if (k == halfsides - 1)  //SouthPole
@@ -548,14 +548,14 @@ namespace OVR { namespace Render {
 	}
 
 	float RenderDevice::MeasureText(const Font* font, const char* str, float size, float strsize[2],
-		const UPInt charRange[2], Vector2f charRangeRect[2])
+		const size_t charRange[2], Vector2f charRangeRect[2])
 	{
-		UPInt length = strlen(str);
+		size_t length = strlen(str);
 		float w  = 0;
 		float xp = 0;
 		float yp = 0;
 
-		for (UPInt i = 0; i < length; i++)
+		for (size_t i = 0; i < length; i++)
 		{
 			if (str[i] == '\n')
 			{
@@ -621,8 +621,13 @@ namespace OVR { namespace Render {
 
 
 	void RenderDevice::RenderText(const Font* font, const char* str,
-		float x, float y, float size, Color c)
+		float x, float y, float size, Color c, const Matrix4f* view)
 	{
+		size_t length = strlen(str);
+
+        // Do not attempt to render if we have an empty string.
+        if (length == 0) { return; }
+
 		if(!pTextVertexBuffer)
 		{
 			pTextVertexBuffer = *CreateBuffer();
@@ -638,8 +643,6 @@ namespace OVR { namespace Render {
 				*CreateTexture(Texture_R, font->twidth, font->theight, font->tex)), true);
 		}
 
-		UPInt length = strlen(str);
-
 		pTextVertexBuffer->Data(Buffer_Vertex, NULL, length * 6 * sizeof(Vertex));
 		Vertex* vertices = (Vertex*)pTextVertexBuffer->Map(0, length * 6 * sizeof(Vertex), Map_Discard);
 		if(!vertices)
@@ -652,10 +655,13 @@ namespace OVR { namespace Render {
 			0, 0, 0, 0,
 			x, y, 0, 1).Transposed();
 
+        if (view)
+            m = (*view) * m;
+
 		float xp = 0, yp = (float)font->ascent;
 		int   ivertex = 0;
 
-		for (UPInt i = 0; i < length; i++)
+		for (size_t i = 0; i < length; i++)
 		{
 			if(str[i] == '\n')
 			{
@@ -696,10 +702,10 @@ namespace OVR { namespace Render {
 
 		pTextVertexBuffer->Unmap(vertices);
 
-		Render(font->fill, pTextVertexBuffer, NULL, m, 0, ivertex, Prim_Triangles);
+        Render(font->fill, pTextVertexBuffer, NULL, m, 0, ivertex, Prim_Triangles);
 	}
 
-	void RenderDevice::FillRect(float left, float top, float right, float bottom, Color c)
+	void RenderDevice::FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* matrix)
 	{
 		if(!pTextVertexBuffer)
 		{
@@ -729,12 +735,15 @@ namespace OVR { namespace Render {
 
 		pTextVertexBuffer->Unmap(vertices);
 
-		Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
+        if (matrix == NULL)
+            Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
+        else
+            Render(fill, pTextVertexBuffer, NULL, *matrix, 0, 6, Prim_Triangles);
 	}
 
 
 
-	void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm)
+	void RenderDevice::FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* matrix)
 	{
 		if(!pTextVertexBuffer)
 		{
@@ -764,7 +773,10 @@ namespace OVR { namespace Render {
 
 		pTextVertexBuffer->Unmap(vertices);
 
-		Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
+        if (matrix)
+            Render(fill, pTextVertexBuffer, NULL, *matrix, 0, 6, Prim_Triangles);
+        else
+            Render(fill, pTextVertexBuffer, NULL, Matrix4f(), 0, 6, Prim_Triangles);
 	}
 
 
@@ -860,7 +872,8 @@ namespace OVR { namespace Render {
 		float right,
 		float bottom,
 		ShaderFill* image,
-		unsigned char alpha)
+		unsigned char alpha,
+        const Matrix4f* view)
 	{
 		Color c = Color(255, 255, 255, alpha);
 		Ptr<Model> m = *new Model(Prim_Triangles);
@@ -872,7 +885,10 @@ namespace OVR { namespace Render {
 		m->AddTriangle(0,3,2);
 		m->Fill = image;
 
-		Render(Matrix4f(), m);
+        if (view)
+            Render(*view, m);
+        else
+            Render(Matrix4f(), m);
 	}
 
 	bool RenderDevice::initPostProcessSupport(PostProcessType pptype)
@@ -970,7 +986,6 @@ namespace OVR { namespace Render {
 	{
 		BeginRendering();
 		initPostProcessSupport(pptype);
-		SetViewport(VP);
 		SetWorldUniforms(Proj);
 		SetExtraShaders(NULL);
 	}
@@ -978,7 +993,7 @@ namespace OVR { namespace Render {
 	void RenderDevice::FinishScene()
 	{
 		SetExtraShaders(0);
-		SetDefaultRenderTarget();
+		//SetDefaultRenderTarget();
 	}
 
 
@@ -1002,7 +1017,7 @@ namespace OVR { namespace Render {
 				int numVerts = 0;
 				int numTris = 0;
 				DistortionMeshVertexData *pRawVerts = NULL;
-				UInt16 *pIndices = NULL;
+				uint16_t *pIndices = NULL;
 				DistortionMeshCreate ( &pRawVerts, &pIndices, &numVerts, &numTris, stereoParams, hmdRenderInfo );
 				int numIndices = numTris * 3;
 
@@ -1018,10 +1033,10 @@ namespace OVR { namespace Render {
 					pCurVert->TexG = pCurRawVert->TanEyeAnglesG;
 					pCurVert->TexB = pCurRawVert->TanEyeAnglesB;
 					// Convert [0.0f,1.0f] to [0,255]
-					pCurVert->Col.R = (OVR::UByte)( floorf ( pCurRawVert->Shade * 255.999f ) );
+					pCurVert->Col.R = (uint8_t)( floorf ( Alg::Max ( pCurRawVert->Shade, 0.0f ) * 255.999f ) );
 					pCurVert->Col.G = pCurVert->Col.R;
 					pCurVert->Col.B = pCurVert->Col.R;
-					pCurVert->Col.A = (OVR::UByte)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
+					pCurVert->Col.A = (uint8_t)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
 					pCurRawVert++;
 					pCurVert++;
 				}
@@ -1030,7 +1045,7 @@ namespace OVR { namespace Render {
 				pDistortionMeshVertexBuffer[eyeNum] = *CreateBuffer();
 				pDistortionMeshVertexBuffer[eyeNum]->Data ( Buffer_Vertex | Buffer_ReadOnly, pVerts, sizeof(DistortionVertex) * numVerts );
 				pDistortionMeshIndexBuffer[eyeNum] = *CreateBuffer();
-				pDistortionMeshIndexBuffer[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, pIndices, ( sizeof(UInt16) * numIndices ) );
+				pDistortionMeshIndexBuffer[eyeNum]->Data ( Buffer_Index | Buffer_ReadOnly, pIndices, ( sizeof(uint16_t) * numIndices ) );
 
 				DistortionMeshDestroy ( pRawVerts, pIndices );
 				OVR_FREE ( pVerts );
@@ -1047,7 +1062,7 @@ namespace OVR { namespace Render {
                     int numVerts = 0;
                     int numTris = 0;
                     HeightmapMeshVertexData *pRawVerts = NULL;
-                    UInt16 *pIndices = NULL;
+                    uint16_t *pIndices = NULL;
                     HeightmapMeshCreate ( &pRawVerts, &pIndices, &numVerts, &numTris, stereoParams, hmdRenderInfo );
                     int numIndices = numTris * 3;
 
@@ -1062,7 +1077,7 @@ namespace OVR { namespace Render {
                         Vector2f texCoord = pCurRawVert->TanEyeAngles;
                         pCurVert->Tex.x = texCoord.x;
                         pCurVert->Tex.y = texCoord.y;
-                        pCurVert->Tex.z = (OVR::UByte)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
+                        pCurVert->Tex.z = (uint8_t)( floorf ( pCurRawVert->TimewarpLerp * 255.999f ) );
                         pCurRawVert++;
                         pCurVert++;
                     }
@@ -1071,7 +1086,7 @@ namespace OVR { namespace Render {
                     pHeightmapMeshVertexBuffer[eyeNum] = *CreateBuffer();
                     pHeightmapMeshVertexBuffer[eyeNum]->Data ( Buffer_Vertex, pVerts, sizeof(HeightmapVertex) * numVerts );
                     pHeightmapMeshIndexBuffer[eyeNum] = *CreateBuffer();
-                    pHeightmapMeshIndexBuffer[eyeNum]->Data ( Buffer_Index, pIndices, ( sizeof(UInt16) * numIndices ) );
+                    pHeightmapMeshIndexBuffer[eyeNum]->Data ( Buffer_Index, pIndices, ( sizeof(uint16_t) * numIndices ) );
 
                     HeightmapMeshDestroy ( pRawVerts, pIndices );
                     OVR_FREE ( pVerts );
@@ -1091,8 +1106,18 @@ namespace OVR { namespace Render {
                                         RenderTarget* pHmdSpaceLayerRenderTargetLeftOrBothEyes,
                                         RenderTarget* pHmdSpaceLayerRenderTargetRight,
                                         RenderTarget* pOverlayLayerRenderTargetLeftOrBothEyes,
-                                        RenderTarget* pOverlayLayerRenderTargetRight)
+                                        RenderTarget* pOverlayLayerRenderTargetRight,
+                                        RenderTarget* pOutputTarget)
 	{
+        if(pOutputTarget != NULL)
+        {
+            SetRenderTarget(pOutputTarget->pColorTex, pOutputTarget->pDepthTex);
+        }
+        else
+        {
+            SetDefaultRenderTarget();
+        }
+
 		SetExtraShaders(0);
 
         bool usingOverlay = pOverlayLayerRenderTargetLeftOrBothEyes != NULL;
@@ -1146,8 +1171,8 @@ namespace OVR { namespace Render {
 				    Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
 				    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
 
-				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
 				    pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
 				    pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
@@ -1184,8 +1209,8 @@ namespace OVR { namespace Render {
                     Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
                     const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
 
-                    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-                    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+                    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+                    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
                     pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
                     pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
@@ -1288,8 +1313,8 @@ namespace OVR { namespace Render {
 
                         Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
 
-                        Matrix4f matRenderFromNowStart = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldStart, stereoParams.ViewAdjust );
-                        Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.ViewAdjust );
+                        Matrix4f matRenderFromNowStart = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+                        Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDeltaPosition ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
 
                         pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
                         pPostProcessHeightmapShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
@@ -1310,7 +1335,15 @@ namespace OVR { namespace Render {
 
                 // Pass 2 - do distortion
                 {
+                    if(pOutputTarget != NULL)
+                    {
+                        SetRenderTarget(pOutputTarget->pColorTex, pOutputTarget->pDepthTex);
+                    }
+                    else
+                    {
                     SetDefaultRenderTarget();
+                    }
+
                     SetDepthMode(false, false);
 
                     Recti vp( 0, 0, WindowWidth, WindowHeight );
@@ -1540,7 +1573,7 @@ namespace OVR { namespace Render {
 			len = 0;
 		}
 		float tp = Planes[crossing].TestSide(origin + norm * len);
-		OVR_ASSERT(fabsf(tp) < 0.05f + Mathf::Tolerance);
+		OVR_ASSERT(fabsf(tp) < 0.05f + MATH_FLOAT_TOLERANCE);
 		OVR_UNUSED(tp);
 
 		if(ph)
@@ -1562,12 +1595,12 @@ namespace OVR { namespace Render {
 		return n;
 	}
 
-	void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest)
+	void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest)
 	{
 		for(int j = 0; j < (h & ~1); j += 2)
 		{
-			const UByte* psrc = src + (w * j * 4);
-			UByte*       pdest = dest + ((w >> 1) * (j >> 1) * 4);
+			const uint8_t* psrc = src + (w * j * 4);
+			uint8_t*       pdest = dest + ((w >> 1) * (j >> 1) * 4);
 
 			for(int i = 0; i < w >> 1; i++, psrc += 8, pdest += 4)
 			{

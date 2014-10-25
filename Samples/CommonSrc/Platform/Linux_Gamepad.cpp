@@ -5,7 +5,7 @@ Content     :   Linux implementation of Platform app infrastructure
 Created     :   May 6, 2013
 Authors     :   Lee Cooper, Simon Hallam
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,17 +21,16 @@ limitations under the License.
 
 ************************************************************************************/
 
-#include "Linux_Gamepad.h"
-#ifdef OVR_OS_LINUX
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <glob.h>
 #include <linux/joystick.h>
+#include "Linux_Gamepad.h"
 
 
-namespace OVR { namespace Platform { namespace Linux {
+namespace OVR { namespace OvrPlatform { namespace Linux {
 
 const char* pNameXbox360Wireless = "Xbox 360";
 const char* pNameXbox360Wired    = "Microsoft X-Box 360";
@@ -39,25 +38,6 @@ const char* pNameXbox360Wired    = "Microsoft X-Box 360";
 
 GamepadManager::GamepadManager() :
     pDevice(NULL)
-{
-}
-
-GamepadManager::~GamepadManager()
-{
-    // if we have an open device, close it
-    if (pDevice)
-    {
-        pDevice->Close();
-        pDevice = NULL;
-    }
-}
-
-UInt32 GamepadManager::GetGamepadCount()
-{
-    return 1;
-}
-
-bool GamepadManager::GetGamepadState(UInt32 index, GamepadState *pState)
 {
     if (!pDevice)
     {
@@ -82,9 +62,26 @@ bool GamepadManager::GetGamepadState(UInt32 index, GamepadState *pState)
             pDevice->Close();
             pDevice = NULL;
         }
-
     }
+}
 
+GamepadManager::~GamepadManager()
+{
+    // if we have an open device, close it
+    if (pDevice)
+    {
+        pDevice->Close();
+        pDevice = NULL;
+    }
+}
+
+UInt32 GamepadManager::GetGamepadCount()
+{
+    return 1;
+}
+
+bool GamepadManager::GetGamepadState(UInt32 index, GamepadState *pState)
+{
     if (pDevice)
     {
         // we have a device, so update it
@@ -450,5 +447,5 @@ void Gamepad::SetStateButton(GamepadState *pState, UInt32 button, SInt32 value)
     }
 }
 
-}}} // OVR::Platform::Linux
-#endif
+}}} // OVR::OvrPlatform::Linux
+

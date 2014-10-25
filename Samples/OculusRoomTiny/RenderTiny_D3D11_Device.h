@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for D3DX10.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -125,12 +125,12 @@ class ShaderBase : public RefCountBase<ShaderBase>
     friend class ShaderSet;
 
 protected:
-    ShaderStage Stage;
+    ShaderStage    Stage;
 
 public:
-    RenderDevice*   Ren;
-    unsigned char*  UniformData;
-    int             UniformsSize;
+    RenderDevice*  Ren;
+    unsigned char* UniformData;
+    int            UniformsSize;
 
 	enum VarType
 	{
@@ -141,14 +141,15 @@ public:
 
 	struct Uniform
 	{
-		String Name;
+		String  Name;
 		VarType Type;
-		int    Offset, Size;
+        int     Offset;
+        int     Size;
 	};
 	Array<Uniform> UniformInfo;
 
     ShaderBase(RenderDevice* r, ShaderStage stage);
-    ShaderBase(ShaderStage s) : Stage(s) {}
+    ShaderBase(ShaderStage s);
 
 	~ShaderBase();
 
@@ -165,11 +166,12 @@ public:
     void UpdateBuffer(Buffer* b);
 };
 
+
 template<ShaderStage SStage, class D3DShaderType>
 class Shader : public ShaderBase
 {
 public:
-    D3DShaderType*  D3DShader;
+    D3DShaderType* D3DShader;
 
     Shader(RenderDevice* r, D3DShaderType* s) : ShaderBase(r, SStage), D3DShader(s) {}
     Shader(RenderDevice* r, ID3D10Blob* s) : ShaderBase(r, SStage)
@@ -301,6 +303,7 @@ public:
     void SetInputLayout(void* newIL) { InputLayout = (void*)newIL; }
 };
 
+
 // Buffer for vertex or index data. Some renderers require separate buffers, so that
 // is recommended. Some renderers cannot have high-performance buffers which are readable,
 // so reading in Map should not be relied on.
@@ -323,7 +326,13 @@ public:
     bool              Dynamic;
 
 public:
-    Buffer(RenderDevice* r) : Ren(r), Size(0), Use(0) {}
+    Buffer(RenderDevice* r) :
+        Ren(r),
+        Size(0),
+        Use(0),
+        Dynamic(false)
+    {
+    }
     virtual ~Buffer() {}
 
     ID3D11Buffer* GetBuffer()
@@ -336,10 +345,11 @@ public:
         return Size;
     }
     virtual void*  Map(size_t start, size_t size, int flags = 0);
-    virtual bool   Unmap(void *m);
+    virtual bool   Unmap(void* m);
     // Allocates a buffer, optionally filling it with data.
     virtual bool   Data(int use, const void* buffer, size_t size);
 };
+
 
 class Texture : public RefCountBase<Texture>
 {
@@ -503,7 +513,7 @@ class Model : public Node
 {
 public:
     Array<Vertex>     Vertices;
-    Array<UInt16>     Indices;
+    Array<uint16_t>   Indices;
     PrimitiveType     Type;
     Ptr<ShaderFill>   Fill;
     bool              Visible;	
@@ -524,24 +534,24 @@ public:
 
     // Node implementation.
     virtual NodeType GetType() const       { return Node_Model; }
-    virtual void    Render(const Matrix4f& ltw, RenderDevice* ren);
+    virtual void     Render(const Matrix4f& ltw, RenderDevice* ren);
 
 
     // Returns the index next added vertex will have.
-    UInt16 GetNextVertexIndex() const
+    uint16_t GetNextVertexIndex() const
     {
-        return (UInt16)Vertices.GetSize();
+        return (uint16_t)Vertices.GetSize();
     }
 
-    UInt16 AddVertex(const Vertex& v)
+    uint16_t AddVertex(const Vertex& v)
     {
         OVR_ASSERT(!VertexBuffer && !IndexBuffer);
-        UInt16 index = (UInt16)Vertices.GetSize();
+        uint16_t index = (uint16_t)Vertices.GetSize();
         Vertices.PushBack(v);
         return index;
     }
 
-    void AddTriangle(UInt16 a, UInt16 b, UInt16 c)
+    void AddTriangle(uint16_t a, uint16_t b, uint16_t c)
     {
         Indices.PushBack(a);
         Indices.PushBack(b);
@@ -550,8 +560,8 @@ public:
 
     // Uses texture coordinates for uniform world scaling (must use a repeat sampler).
     void  AddSolidColorBox(float x1, float y1, float z1,
-        float x2, float y2, float z2,
-        Color c);
+                           float x2, float y2, float z2,
+                           Color c);
 };
 
 
@@ -559,7 +569,7 @@ public:
 class Container : public Node
 {
 public:
-    Array<Ptr<Node> > Nodes;
+    Array< Ptr<Node> > Nodes;
 
     Container()  { }
     ~Container() { }
@@ -568,7 +578,7 @@ public:
 
     virtual void Render(const Matrix4f& ltw, RenderDevice* ren);
 
-    void Add(Node *n)  { Nodes.PushBack(n); }	
+    void Add(Node* n)  { Nodes.PushBack(n); }	
     void Clear()       { Nodes.Clear(); }	
 };
 
@@ -619,15 +629,24 @@ enum DisplayMode
 // Rendering parameters used by RenderDevice::CreateDevice.
 struct RendererParams
 {
-    int  Multisample;
-    int  Fullscreen;
+    int     Multisample;
+    int     Fullscreen;
+    // Resolution of the rendering buffer used during creation.
+    // Allows buffer of different size then the widow if not zero.
+    Sizei   Resolution;
 
     // Windows - Monitor name for fullscreen mode.
-    String MonitorName;
+    String  MonitorName;
     // MacOS
-    long   DisplayId;
+    long    DisplayId;
 
-    RendererParams(int ms = 1) : Multisample(ms), Fullscreen(0) {}
+    RendererParams(int ms = 1) :
+        Multisample(ms),
+        Fullscreen(0),
+        Resolution(0),
+        DisplayId(-1)
+    {
+    }
 
     bool IsDisplaySet() const
     {
@@ -635,14 +654,12 @@ struct RendererParams
     }
 };
 
+
 class RenderDevice : public RefCountBase<RenderDevice>
 {
-
-
 protected:
     int             WindowWidth, WindowHeight;
     RendererParams  Params;
-    Recti           VP;
 
     Matrix4f        Proj;
     Ptr<Buffer>     pTextVertexBuffer;
@@ -701,7 +718,6 @@ public:
     Array<Ptr<Texture> >     DepthBuffers;
 
 public:
-
     // Slave parameters are used to create a renderer that uses an externally
     // specified device.
     struct SlaveRendererParams
@@ -725,7 +741,6 @@ public:
     // Creates a "slave" renderer existing device.
     static RenderDevice* CreateSlaveDevice(const SlaveRendererParams& srp);
 
-    
 
     // Constructor helper
     void  initShadersAndStates();
@@ -733,8 +748,7 @@ public:
 				  D3D11_INPUT_ELEMENT_DESC * DistortionMeshVertexDesc, int num_elements);
 
 
-
-    void        UpdateMonitorOutputs();
+    void         UpdateMonitorOutputs();
 
     void         SetViewport(int x, int y, int w, int h) { SetViewport(Recti(x,y,w,h)); }
     // Set viewport ignoring any adjustments used for the stereo mode.
@@ -755,11 +769,11 @@ public:
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1, float depth = 1);
 
     // Resources
-    virtual Buffer* CreateBuffer();
-    virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount=1);
+    virtual Buffer*    CreateBuffer();
+    virtual Texture*   CreateTexture(int format, int width, int height, const void* data, int mipcount=1);
 
     // Placeholder texture to come in externally
-    virtual Texture* CreatePlaceholderTexture(int format);
+    virtual Texture*   CreatePlaceholderTexture(int format);
 
     virtual ShaderSet* CreateShaderSet() { return new ShaderSet; }
 
@@ -790,14 +804,14 @@ public:
 
     // This is a View matrix only, it will be combined with the projection matrix from SetProjection
     virtual void Render(const Matrix4f& view, Model* model);
-    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices);
-    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,
+    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,int stride);
+    virtual void Render(const ShaderFill* fill, Buffer* vertices, Buffer* indices,int stride,
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, bool updateUniformData = true);
 
-    virtual ShaderFill *CreateSimpleFill() { return DefaultFill; }
-    ShaderFill *        CreateTextureFill(Texture* tex);
+    virtual ShaderFill* CreateSimpleFill() { return DefaultFill; }
+    ShaderFill*         CreateTextureFill(Texture* tex);
 
-    virtual ShaderBase *LoadBuiltinShader(ShaderStage stage, int shader);
+    virtual ShaderBase* LoadBuiltinShader(ShaderStage stage, int shader);
 
     bool                RecreateSwapChain();
     virtual ID3D10Blob* CompileShader(const char* profile, const char* src, const char* mainName = "main");
@@ -809,16 +823,16 @@ public:
 
 int GetNumMipLevels(int w, int h);
 
-// Filter an rgba image with a 2x2 box filter, for mipmaps.
+// Filter an RGBA image with a 2x2 box filter, for mipmaps.
 // Image size must be a power of 2.
-void FilterRgba2x2(const UByte* src, int w, int h, UByte* dest);
+void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest);
 
-}}
+
+}} // namespace OVR::RenderTiny
 
 
 //Anything including this file, uses these
 using namespace OVR;
 using namespace OVR::RenderTiny;
-
 
 #endif

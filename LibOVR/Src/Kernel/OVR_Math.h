@@ -1,22 +1,22 @@
 /************************************************************************************
 
-PublicHeader:   OVR.h
+PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Math.h
 Content     :   Implementation of 3D primitives such as vectors, matrices.
 Created     :   September 4, 2012
 Authors     :   Andrew Reisse, Michael Antonov, Steve LaValle, 
 				Anna Yershova, Max Katsev, Dov Katz
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -125,7 +125,7 @@ template<class T> class Vector2;
 template<class T> class Vector3;
 template<class T> class Matrix3;
 template<class T> class Matrix4;
-template<class T> class Transform;
+template<class T> class Pose;
 template<class T> class PoseState;
 
 // CompatibleTypes::Type is used to lookup a compatible C-version of a C++ class.
@@ -134,7 +134,7 @@ struct CompatibleTypes
 {    
     // Declaration here seems necessary for MSVC; specializations are
     // used instead.
-    typedef float Type;
+    typedef struct {} Type;
 };
 
 // Specializations providing CompatibleTypes::Type value.
@@ -150,11 +150,8 @@ template<> struct CompatibleTypes<Vector2<float> >  { typedef ovrVector2f Type; 
 template<> struct CompatibleTypes<Vector3<float> >  { typedef ovrVector3f Type; };
 template<> struct CompatibleTypes<Vector3<double> > { typedef ovrVector3d Type; };
 
-template<> struct CompatibleTypes<Transform<float> > { typedef ovrPosef Type; };
-template<> struct CompatibleTypes<PoseState<float> > { typedef ovrPoseStatef Type; };
-
-template<> struct CompatibleTypes<Transform<double> > { typedef ovrPosed Type; };
-template<> struct CompatibleTypes<PoseState<double> > { typedef ovrPoseStated Type; };
+template<> struct CompatibleTypes<Pose<float> > { typedef ovrPosef Type; };
+template<> struct CompatibleTypes<Pose<double> > { typedef ovrPosed Type; };
 
 //------------------------------------------------------------------------------------//
 // ***** Math
@@ -170,28 +167,40 @@ public:
     typedef float OtherFloatType;
 };
 
+
+#define MATH_FLOAT_PI                (3.1415926f)
+#define MATH_FLOAT_TWOPI             (2.0f *MATH_FLOAT_PI)
+#define MATH_FLOAT_PIOVER2           (0.5f *MATH_FLOAT_PI)
+#define MATH_FLOAT_PIOVER4           (0.25f*MATH_FLOAT_PI)
+#define MATH_FLOAT_E                 (2.7182818f)
+#define MATH_FLOAT_MAXVALUE			 (FLT_MAX) 
+#define MATH_FLOAT MINPOSITIVEVALUE  (FLT_MIN)  
+#define MATH_FLOAT_RADTODEGREEFACTOR (360.0f / MATH_FLOAT_TWOPI)
+#define MATH_FLOAT_DEGREETORADFACTOR (MATH_FLOAT_TWOPI / 360.0f)
+#define MATH_FLOAT_TOLERANCE		 (0.00001f)
+#define MATH_FLOAT_SINGULARITYRADIUS (0.0000001f) // Use for Gimbal lock numerical problems
+
+#define MATH_DOUBLE_PI                (3.14159265358979)
+#define MATH_DOUBLE_TWOPI             (2.0f *MATH_DOUBLE_PI)
+#define MATH_DOUBLE_PIOVER2           (0.5f *MATH_DOUBLE_PI)
+#define MATH_DOUBLE_PIOVER4           (0.25f*MATH_DOUBLE_PI)
+#define MATH_DOUBLE_E                 (2.71828182845905)
+#define MATH_DOUBLE_MAXVALUE		  (DBL_MAX)
+#define MATH_DOUBLE MINPOSITIVEVALUE  (DBL_MIN)
+#define MATH_DOUBLE_RADTODEGREEFACTOR (360.0f / MATH_DOUBLE_TWOPI)
+#define MATH_DOUBLE_DEGREETORADFACTOR (MATH_DOUBLE_TWOPI / 360.0f)
+#define MATH_DOUBLE_TOLERANCE		  (0.00001)
+#define MATH_DOUBLE_SINGULARITYRADIUS (0.000000000001) // Use for Gimbal lock numerical problems
+
+
+
+
 // Single-precision Math constants class.
 template<>
 class Math<float>
 {
 public:
-    static const float Pi;
-    static const float TwoPi;
-    static const float PiOver2;
-    static const float PiOver4;
-    static const float E;
-
-    static const float MaxValue;			// Largest positive float Value
-    static const float MinPositiveValue;	// Smallest possible positive value
-
-    static const float RadToDegreeFactor;
-    static const float DegreeToRadFactor;
-
-    static const float Tolerance;			// 0.00001f;
-    static const float SingularityRadius;	// 0.0000001f for Gimbal lock numerical problems
-
-    // Used to support direct conversions in template classes.
-    typedef double OtherFloatType;
+     typedef double OtherFloatType;
 };
 
 // Double-precision Math constants class.
@@ -199,21 +208,6 @@ template<>
 class Math<double>
 {
 public:
-    static const double Pi;
-    static const double TwoPi;
-    static const double PiOver2;
-    static const double PiOver4;
-    static const double E;
-
-    static const double MaxValue;			// Largest positive double Value
-    static const double MinPositiveValue;	// Smallest possible positive value
-
-    static const double RadToDegreeFactor;
-    static const double DegreeToRadFactor;
-
-    static const double Tolerance;			// 0.00001;
-    static const double SingularityRadius;	// 0.000000000001 for Gimbal lock numerical problems    
-
     typedef float OtherFloatType;
 };
 
@@ -223,23 +217,23 @@ typedef Math<double> Mathd;
 
 // Conversion functions between degrees and radians
 template<class T>
-T RadToDegree(T rads) { return rads * Math<T>::RadToDegreeFactor; }
+T RadToDegree(T rads) { return rads * ((T)MATH_DOUBLE_RADTODEGREEFACTOR); }
 template<class T>
-T DegreeToRad(T rads) { return rads * Math<T>::DegreeToRadFactor; }
+T DegreeToRad(T rads) { return rads * ((T)MATH_DOUBLE_DEGREETORADFACTOR); }
 
 // Numerically stable acos function
 template<class T>
 T Acos(T val) { 
 		if (val > T(1))				return T(0);
-		else if (val < T(-1))		return Math<T>::Pi;
+		else if (val < T(-1))		return ((T)MATH_DOUBLE_PI);
 		else						return acos(val); 
 };
 
 // Numerically stable asin function
 template<class T>
 T Asin(T val) { 
-	if (val > T(1))				return Math<T>::PiOver2;
-	else if (val < T(-1))		return Math<T>::PiOver2 * T(3);
+	if (val > T(1))				return ((T)MATH_DOUBLE_PIOVER2);
+	else if (val < T(-1))		return ((T)MATH_DOUBLE_PIOVER2) * T(3);
 	else						return asin(val); 
 };
 
@@ -277,7 +271,7 @@ public:
 
     operator const CompatibleType& () const
     {
-        OVR_COMPILER_ASSERT(sizeof(Vector2<T>) == sizeof(CompatibleType));
+        static_assert(sizeof(Vector2<T>) == sizeof(CompatibleType), "sizeof(Vector2<T>) failure");
         return reinterpret_cast<const CompatibleType&>(*this);
     }
 
@@ -307,12 +301,24 @@ public:
                                                                              (a.y > b.y) ? a.y : b.y); }
 
     // Compare two vectors for equality with tolerance. Returns true if vectors match withing tolerance.
-    bool	Compare(const Vector2&b, T tolerance = Mathf::Tolerance)
+    bool	Compare(const Vector2&b, T tolerance = ((T)MATH_DOUBLE_TOLERANCE))  
     {
         return (fabs(b.x-x) < tolerance) && (fabs(b.y-y) < tolerance);
     }
     
-    // Entrywise product of two vectors
+	// Access element by index
+	T& operator[] (int idx)
+	{
+		OVR_ASSERT(0 <= idx && idx < 2);
+		return *(&x + idx);
+	}
+	const T& operator[] (int idx) const
+	{
+		OVR_ASSERT(0 <= idx && idx < 2);
+		return *(&x + idx);
+	}
+
+    // Entry-wise product of two vectors
     Vector2	EntrywiseMultiply(const Vector2& b) const	{ return Vector2(x * b.x, y * b.y);}
 
 
@@ -341,13 +347,13 @@ public:
     T       Length() const                       { return sqrt(LengthSq()); }
 
     // Returns squared distance between two points represented by vectors.
-    T       DistanceSq(Vector2& b) const         { return (*this - b).LengthSq(); }
+    T       DistanceSq(const Vector2& b) const   { return (*this - b).LengthSq(); }
 
 	// Returns distance between two points represented by vectors.
-    T       Distance(Vector2& b) const           { return (*this - b).Length(); }
+    T       Distance(const Vector2& b) const     { return (*this - b).Length(); }
 
 	// Determine if this a unit vector.
-    bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
+    bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < ((T)MATH_DOUBLE_TOLERANCE); }
 
     // Normalize, convention vector length to 1.    
     void    Normalize()                          
@@ -383,6 +389,10 @@ typedef Vector2<float>  Vector2f;
 typedef Vector2<double> Vector2d;
 typedef Vector2<int>    Vector2i;
 
+typedef Vector2<float>  Point2f;
+typedef Vector2<double> Point2d;
+typedef Vector2<int>    Point2i;
+
 //-------------------------------------------------------------------------------------
 // ***** Vector3<> - 3D vector of {x, y, z}
 
@@ -396,12 +406,16 @@ class Vector3
 public:
     T x, y, z;
 
+    // FIXME: default initialization of a vector class can be very expensive in a full-blown
+    // application.  A few hundred thousand vector constructions is not unlikely and can add
+    // up to milliseconds of time on processors like the PS3 PPU.
     Vector3() : x(0), y(0), z(0) { }
     Vector3(T x_, T y_, T z_ = 0) : x(x_), y(y_), z(z_) { }
     explicit Vector3(T s) : x(s), y(s), z(s) { }
     explicit Vector3(const Vector3<typename Math<T>::OtherFloatType> &src)
         : x((T)src.x), y((T)src.y), z((T)src.z) { }
 
+    static const Vector3 ZERO;
 
     // C-interop support.
     typedef  typename CompatibleTypes<Vector3<T> >::Type CompatibleType;
@@ -410,7 +424,7 @@ public:
 
     operator const CompatibleType& () const
     {
-        OVR_COMPILER_ASSERT(sizeof(Vector3<T>) == sizeof(CompatibleType));
+        static_assert(sizeof(Vector3<T>) == sizeof(CompatibleType), "sizeof(Vector3<T>) failure");
         return reinterpret_cast<const CompatibleType&>(*this);
     }
 
@@ -447,7 +461,7 @@ public:
     }        
 
     // Compare two vectors for equality with tolerance. Returns true if vectors match withing tolerance.
-    bool      Compare(const Vector3&b, T tolerance = Mathf::Tolerance)
+    bool      Compare(const Vector3&b, T tolerance = ((T)MATH_DOUBLE_TOLERANCE)) 
     {
         return (fabs(b.x-x) < tolerance) && 
 			   (fabs(b.y-y) < tolerance) && 
@@ -515,7 +529,7 @@ public:
     T       Distance(Vector3 const& b) const     { return (*this - b).Length(); }
     
     // Determine if this a unit vector.
-    bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
+    bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < ((T)MATH_DOUBLE_TOLERANCE); }
 
     // Normalize, convention vector length to 1.    
     void    Normalize()                          
@@ -550,27 +564,208 @@ public:
     Vector3 ProjectToPlane(const Vector3& normal) const { return *this - this->ProjectTo(normal); }
 };
 
-
 typedef Vector3<float>  Vector3f;
 typedef Vector3<double> Vector3d;
-typedef Vector3<SInt32>  Vector3i;
+typedef Vector3<int32_t>  Vector3i;
+    
+static_assert((sizeof(Vector3f) == 3*sizeof(float)), "sizeof(Vector3f) failure");
+static_assert((sizeof(Vector3d) == 3*sizeof(double)), "sizeof(Vector3d) failure");
+static_assert((sizeof(Vector3i) == 3*sizeof(int32_t)), "sizeof(Vector3i) failure");
+
+typedef Vector3<float>   Point3f;
+typedef Vector3<double>  Point3d;
+typedef Vector3<int32_t>  Point3i;
 
 
-// JDC: this was defined in Render_Device.h, I moved it here, but it
-// needs to be fleshed out like the other Vector types.
+//-------------------------------------------------------------------------------------
+// ***** Vector4<> - 4D vector of {x, y, z, w}
+
 //
-// A vector with a dummy w component for alignment in uniform buffers (and for float colors).
-// The w component is not used in any calculations.
+// Vector4f (Vector4d) represents a 3-dimensional vector or point in space,
+// consisting of coordinates x, y, z and w.
 
-struct Vector4f : public Vector3f
+template<class T>
+class Vector4
 {
-    float w;
+public:
+    T x, y, z, w;
 
-    Vector4f() : w(1) {}
-    Vector4f(const Vector3f& v) : Vector3f(v), w(1) {}
-    Vector4f(float r, float g, float b, float a) : Vector3f(r,g,b), w(a) {}
+	// FIXME: default initialization of a vector class can be very expensive in a full-blown
+	// application.  A few hundred thousand vector constructions is not unlikely and can add
+	// up to milliseconds of time on processors like the PS3 PPU.
+    Vector4() : x(0), y(0), z(0), w(0) { }
+    Vector4(T x_, T y_, T z_, T w_) : x(x_), y(y_), z(z_), w(w_) { }
+    explicit Vector4(T s) : x(s), y(s), z(s), w(s) { }
+	explicit Vector4(const Vector3<T>& v, const float w_=1) : x(v.x), y(v.y), z(v.z), w(w_) { }
+    explicit Vector4(const Vector4<typename Math<T>::OtherFloatType> &src)
+        : x((T)src.x), y((T)src.y), z((T)src.z), w((T)src.w) { }
+
+    static const Vector4 ZERO;
+
+    // C-interop support.
+    typedef  typename CompatibleTypes< Vector4<T> >::Type CompatibleType;
+
+    Vector4(const CompatibleType& s) : x(s.x), y(s.y), z(s.z), w(s.w) {  }
+
+    operator const CompatibleType& () const
+    {
+        static_assert(sizeof(Vector4<T>) == sizeof(CompatibleType), "sizeof(Vector4<T>) failure");
+        return reinterpret_cast<const CompatibleType&>(*this);
+    }
+
+	Vector4& operator= (const Vector3<T>& other)  { x=other.x; y=other.y; z=other.z; w=1; return *this; }
+    bool     operator== (const Vector4& b) const  { return x == b.x && y == b.y && z == b.z && w == b.w; }
+    bool     operator!= (const Vector4& b) const  { return x != b.x || y != b.y || z != b.z || w != b.w; }
+             
+    Vector4  operator+  (const Vector4& b) const  { return Vector4(x + b.x, y + b.y, z + b.z, w + b.w); }
+    Vector4& operator+= (const Vector4& b)        { x += b.x; y += b.y; z += b.z; w += b.w; return *this; }
+    Vector4  operator-  (const Vector4& b) const  { return Vector4(x - b.x, y - b.y, z - b.z, w - b.w); }
+    Vector4& operator-= (const Vector4& b)        { x -= b.x; y -= b.y; z -= b.z; w -= b.w; return *this; }
+    Vector4  operator- () const                   { return Vector4(-x, -y, -z, -w); }
+
+    // Scalar multiplication/division scales vector.
+    Vector4  operator*  (T s) const               { return Vector4(x*s, y*s, z*s, w*s); }
+    Vector4& operator*= (T s)                     { x *= s; y *= s; z *= s; w *= s;return *this; }
+
+    Vector4  operator/  (T s) const               { T rcp = T(1)/s;
+                                                    return Vector4(x*rcp, y*rcp, z*rcp, w*rcp); }
+    Vector4& operator/= (T s)                     { T rcp = T(1)/s;
+                                                    x *= rcp; y *= rcp; z *= rcp; w *= rcp;
+                                                    return *this; }
+
+    static Vector4  Min(const Vector4& a, const Vector4& b)
+    {
+        return Vector4((a.x < b.x) ? a.x : b.x,
+                       (a.y < b.y) ? a.y : b.y,
+                       (a.z < b.z) ? a.z : b.z,
+					   (a.w < b.w) ? a.w : b.w);
+    }
+    static Vector4  Max(const Vector4& a, const Vector4& b)
+    { 
+        return Vector4((a.x > b.x) ? a.x : b.x,
+                       (a.y > b.y) ? a.y : b.y,
+                       (a.z > b.z) ? a.z : b.z,
+					   (a.w > b.w) ? a.w : b.w);
+    }        
+
+    // Compare two vectors for equality with tolerance. Returns true if vectors match withing tolerance.
+    bool      Compare(const Vector4&b, T tolerance = ((T)MATH_DOUBLE_TOLERANCE))
+    {
+        return (fabs(b.x-x) < tolerance) && 
+			   (fabs(b.y-y) < tolerance) && 
+			   (fabs(b.z-z) < tolerance) &&
+			   (fabs(b.w-w) < tolerance);
+    }
+    
+    T& operator[] (int idx)
+    {
+        OVR_ASSERT(0 <= idx && idx < 4);
+        return *(&x + idx);
+    }
+
+    const T& operator[] (int idx) const
+    {
+        OVR_ASSERT(0 <= idx && idx < 4);
+        return *(&x + idx);
+    }
+
+    // Entry wise product of two vectors
+    Vector4	EntrywiseMultiply(const Vector4& b) const	{ return Vector4(x * b.x, 
+																		 y * b.y, 
+																		 z * b.z);}
+
+    // Multiply and divide operators do entry-wise math
+    Vector4  operator*  (const Vector4& b) const        { return Vector4(x * b.x, 
+																		 y * b.y, 
+																		 z * b.z,
+																		 w * b.w); }
+
+    Vector4  operator/  (const Vector4& b) const        { return Vector4(x / b.x, 
+																		 y / b.y, 
+																		 z / b.z,
+																		 w / b.w); }
+
+
+	// Dot product
+    T       Dot(const Vector4& b) const          { return x*b.x + y*b.y + z*b.z + w*b.w; }
+
+    // Return Length of the vector squared.
+    T       LengthSq() const                     { return (x * x + y * y + z * z + w * w); }
+
+    // Return vector length.
+    T       Length() const                       { return sqrt(LengthSq()); }
+    
+    // Determine if this a unit vector.
+    bool    IsNormalized() const                 { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
+
+    // Normalize, convention vector length to 1.    
+    void    Normalize()                          
+	{
+		T l = Length();
+		OVR_ASSERT(l != T(0));
+		*this /= l; 
+	}
+
+    // Returns normalized (unit) version of the vector without modifying itself.
+    Vector4 Normalized() const                   
+	{ 
+		T l = Length();
+		OVR_ASSERT(l != T(0));
+		return *this / l; 
+	}
 };
 
+typedef Vector4<float>  Vector4f;
+typedef Vector4<double> Vector4d;
+typedef Vector4<int>    Vector4i;
+
+
+//-------------------------------------------------------------------------------------
+// ***** Bounds3
+
+// Bounds class used to describe a 3D axis aligned bounding box.
+
+template<class T>
+class Bounds3
+{
+public:
+	Vector3<T>	b[2];
+
+	Bounds3()
+	{
+	}
+
+	Bounds3( const Vector3<T> & mins, const Vector3<T> & maxs )
+{
+		b[0] = mins;
+		b[1] = maxs;
+	}
+
+	void Clear()
+	{
+		b[0].x = b[0].y = b[0].z = Math<T>::MaxValue;
+		b[1].x = b[1].y = b[1].z = -Math<T>::MaxValue;
+	}
+
+	void AddPoint( const Vector3<T> & v )
+	{
+		b[0].x = Alg::Min( b[0].x, v.x );
+		b[0].y = Alg::Min( b[0].y, v.y );
+		b[0].z = Alg::Min( b[0].z, v.z );
+		b[1].x = Alg::Max( b[1].x, v.x );
+		b[1].y = Alg::Max( b[1].y, v.y );
+		b[1].z = Alg::Max( b[1].z, v.z );
+	}
+
+	const Vector3<T> & GetMins() const { return b[0]; }
+	const Vector3<T> & GetMaxs() const { return b[1]; }
+
+	Vector3<T> & GetMins() { return b[0]; }
+	Vector3<T> & GetMaxs() { return b[1]; }
+};
+
+typedef Bounds3<float>	Bounds3f;
+typedef Bounds3<double>	Bounds3d;
 
 
 //-------------------------------------------------------------------------------------
@@ -598,7 +793,7 @@ public:
 
     operator const CompatibleType& () const
     {
-        OVR_COMPILER_ASSERT(sizeof(Size<T>) == sizeof(CompatibleType));
+        static_assert(sizeof(Size<T>) == sizeof(CompatibleType), "sizeof(Size<T>) failure");
         return reinterpret_cast<const CompatibleType&>(*this);
     }
 
@@ -626,7 +821,6 @@ public:
     static Size Max(const Size& a, const Size& b)  { return Size((a.w  > b.w)  ? a.w  : b.w,
                                                                  (a.h > b.h) ? a.h : b.h); }
     
-
     T       Area() const                    { return w * h; }
 
     inline  Vector2<T> ToVector() const     { return Vector2<T>(w, h); }
@@ -663,7 +857,7 @@ public:
 
     operator const CompatibleType& () const
     {
-        OVR_COMPILER_ASSERT(sizeof(Rect<T>) == sizeof(CompatibleType));
+        static_assert(sizeof(Rect<T>) == sizeof(CompatibleType), "sizeof(Rect<T>) failure");
         return reinterpret_cast<const CompatibleType&>(*this);
     }
 
@@ -702,12 +896,14 @@ public:
     explicit Quat(const Quat<typename Math<T>::OtherFloatType> &src)
         : x((T)src.x), y((T)src.y), z((T)src.z), w((T)src.w) { }
 
-    // C-interop support.
-    Quat(const typename CompatibleTypes<Quat<T> >::Type& s) : x(s.x), y(s.y), z(s.z), w(s.w) { }
+    typedef  typename CompatibleTypes<Quat<T> >::Type CompatibleType;
 
-    operator typename CompatibleTypes<Quat<T> >::Type () const
+    // C-interop support.
+    Quat(const CompatibleType& s) : x(s.x), y(s.y), z(s.z), w(s.w) { }
+
+    operator CompatibleType () const
     {
-        typename CompatibleTypes<Quat<T> >::Type result;
+        CompatibleType result;
         result.x = x;
         result.y = y;
         result.z = z;
@@ -753,12 +949,12 @@ public:
     // Compute axis and angle from quaternion
     void GetAxisAngle(Vector3<T>* axis, T* angle) const
     {
-		if ( x*x + y*y + z*z > Math<T>::Tolerance * Math<T>::Tolerance ) {
+		if ( x*x + y*y + z*z > ((T)MATH_DOUBLE_TOLERANCE) * ((T)MATH_DOUBLE_TOLERANCE) ) {
 			*axis  = Vector3<T>(x, y, z).Normalized();
 			*angle = 2 * Acos(w);
-			if (*angle > Math<T>::Pi) // Reduce the magnitude of the angle, if necessary
+			if (*angle > ((T)MATH_DOUBLE_PI)) // Reduce the magnitude of the angle, if necessary
 			{
-				*angle = Math<T>::TwoPi - *angle;
+				*angle = ((T)MATH_DOUBLE_TWOPI) - *angle;
 				*axis = *axis * (-1);
 			}
 		}
@@ -903,7 +1099,7 @@ public:
 	}
 
     // Normalize
-    bool    IsNormalized() const            { return fabs(LengthSq() - T(1)) < Math<T>::Tolerance; }
+    bool    IsNormalized() const            { return fabs(LengthSq() - T(1)) < ((T)MATH_DOUBLE_TOLERANCE); }
 
     void    Normalize()                     
 	{
@@ -973,10 +1169,10 @@ public:
     // is followed by rotation b around axis A2
     // is followed by rotation c around axis A3
     // rotations are CCW or CW (D) in LH or RH coordinate system (S)
-    template <Axis A1, Axis A2, Axis A3, RotateDirection D, HandedSystem S>
-    void GetEulerAngles(T *a, T *b, T *c) const
+	template <Axis A1, Axis A2, Axis A3, RotateDirection D, HandedSystem S>
+    void GetEulerAngles(T *a, T *b, T *c) const 
     {
-        OVR_COMPILER_ASSERT((A1 != A2) && (A2 != A3) && (A1 != A3));
+        static_assert((A1 != A2) && (A2 != A3) && (A1 != A3), "(A1 != A2) && (A2 != A3) && (A1 != A3)");
 
         T Q[3] = { x, y, z };  //Quaternion components x,y,z
 
@@ -992,17 +1188,17 @@ public:
         
         T s2 = psign * T(2) * (psign*w*Q[A2] + Q[A1]*Q[A3]);
 
-        if (s2 < T(-1) + Math<T>::SingularityRadius)
+        if (s2 < T(-1) + ((T)MATH_DOUBLE_SINGULARITYRADIUS))
         { // South pole singularity
             *a = T(0);
-            *b = -S*D*Math<T>::PiOver2;
+            *b = -S*D*((T)MATH_DOUBLE_PIOVER2);
             *c = S*D*atan2(T(2)*(psign*Q[A1]*Q[A2] + w*Q[A3]),
 		                   ww + Q22 - Q11 - Q33 );
         }
-        else if (s2 > T(1) - Math<T>::SingularityRadius)
+        else if (s2 > T(1) - ((T)MATH_DOUBLE_SINGULARITYRADIUS))
         {  // North pole singularity
             *a = T(0);
-            *b = S*D*Math<T>::PiOver2;
+            *b = S*D*((T)MATH_DOUBLE_PIOVER2);
             *c = S*D*atan2(T(2)*(psign*Q[A1]*Q[A2] + w*Q[A3]),
 		                   ww + Q22 - Q11 - Q33);
         }
@@ -1025,7 +1221,6 @@ public:
     void GetEulerAngles(T *a, T *b, T *c) const
     { GetEulerAngles<A1, A2, A3, Rotate_CCW, Handed_R>(a, b, c); }
 
-
     // GetEulerAnglesABA extracts Euler angles from the quaternion, in the specified order of
     // axis rotations and the specified coordinate system. Right-handed coordinate system
     // is the default, with CCW rotations while looking in the negative axis direction.
@@ -1037,7 +1232,7 @@ public:
     template <Axis A1, Axis A2, RotateDirection D, HandedSystem S>
     void GetEulerAnglesABA(T *a, T *b, T *c) const
     {
-        OVR_COMPILER_ASSERT(A1 != A2);
+        static_assert(A1 != A2, "A1 != A2");
 
         T Q[3] = {x, y, z}; // Quaternion components
 
@@ -1059,7 +1254,7 @@ public:
         if (c2 < T(-1) + Math<T>::SingularityRadius)
         { // South pole singularity
             *a = T(0);
-            *b = S*D*Math<T>::Pi;
+            *b = S*D*((T)MATH_DOUBLE_PI);
             *c = S*D*atan2( T(2)*(w*Q[A1] - psign*Q[A2]*Q[m]),
 		                    ww + Q22 - Q11 - Qmm);
         }
@@ -1085,31 +1280,33 @@ public:
 typedef Quat<float>  Quatf;
 typedef Quat<double> Quatd;
 
+static_assert((sizeof(Quatf) == 4*sizeof(float)), "sizeof(Quatf) failure");
+static_assert((sizeof(Quatd) == 4*sizeof(double)), "sizeof(Quatd) failure");
+
 //-------------------------------------------------------------------------------------
 // ***** Pose
 
 // Position and orientation combined.
 
 template<class T>
-class Transform
+class Pose
 {
 public:
+    typedef typename CompatibleTypes<Pose<T> >::Type CompatibleType;
 
-    typedef typename CompatibleTypes<Transform<T> >::Type CompatibleType;
-
-    Transform() { }
-    Transform(const Quat<T>& orientation, const Vector3<T>& pos)
+    Pose() { }
+    Pose(const Quat<T>& orientation, const Vector3<T>& pos)
         : Rotation(orientation), Translation(pos) {  }
-    Transform(const Transform& s)
+    Pose(const Pose& s)
         : Rotation(s.Rotation), Translation(s.Translation) {  }
-    Transform(const CompatibleType& s)
+    Pose(const CompatibleType& s)
         : Rotation(s.Orientation), Translation(s.Position) {  }
-    explicit Transform(const Transform<typename Math<T>::OtherFloatType> &s)
+    explicit Pose(const Pose<typename Math<T>::OtherFloatType> &s)
         : Rotation(s.Rotation), Translation(s.Translation) {  }
 
-    operator typename CompatibleTypes<Transform<T> >::Type () const
+    operator typename CompatibleTypes<Pose<T> >::Type () const
     {
-        typename CompatibleTypes<Transform<T> >::Type result;
+        typename CompatibleTypes<Pose<T> >::Type result;
         result.Orientation = Rotation;
         result.Position = Translation;
         return result;
@@ -1117,6 +1314,21 @@ public:
 
     Quat<T>    Rotation;
     Vector3<T> Translation;
+    
+    static_assert((sizeof(T) == sizeof(double) || sizeof(T) == sizeof(float)), "(sizeof(T) == sizeof(double) || sizeof(T) == sizeof(float))");
+
+    void ToArray(T* arr) const
+    {
+        T temp[7] =  { Rotation.x, Rotation.y, Rotation.z, Rotation.w, Translation.x, Translation.y, Translation.z };
+        for (int i = 0; i < 7; i++) arr[i] = temp[i];
+    }
+
+    static Pose<T> FromArray(const T* v)
+    {
+        Quat<T> rotation(v[0], v[1], v[2], v[3]);
+        Vector3<T> translation(v[4], v[5], v[6]);
+        return Pose<T>(rotation, translation);
+    }
 
     Vector3<T> Rotate(const Vector3<T>& v) const
     {
@@ -1133,32 +1345,24 @@ public:
         return Translate(Rotate(v));
     }
 
-    Transform operator*(const Transform& other) const   
+    Pose operator*(const Pose& other) const   
     {
-        return Transform(Rotation * other.Rotation, Apply(other.Translation));
+        return Pose(Rotation * other.Rotation, Apply(other.Translation));
     }
 
-    PoseState<T> operator*(const PoseState<T>& poseState) const   
-    {
-        PoseState<T> result;
-        result.Pose                = (*this) * poseState.Pose;
-        result.LinearVelocity      = this->Rotate(poseState.LinearVelocity);
-        result.LinearAcceleration  = this->Rotate(poseState.LinearAcceleration);
-        result.AngularVelocity     = this->Rotate(poseState.AngularVelocity);
-        result.AngularAcceleration = this->Rotate(poseState.AngularAcceleration);
-        return result;
-    }
-
-    Transform Inverted() const   
+    Pose Inverted() const   
     {
         Quat<T> inv = Rotation.Inverted();
-        return Transform(inv, inv.Rotate(-Translation));
+        return Pose(inv, inv.Rotate(-Translation));
     }
 };
 
-typedef Transform<float>  Transformf;
-typedef Transform<double> Transformd;
+typedef Pose<float>  Posef;
+typedef Pose<double> Posed;
 
+static_assert((sizeof(Posed) == sizeof(Quatd) + sizeof(Vector3d)), "sizeof(Posed) failure");
+static_assert((sizeof(Posef) == sizeof(Quatf) + sizeof(Vector3f)), "sizeof(Posef) failure");
+    
 
 //-------------------------------------------------------------------------------------
 // ***** Matrix4
@@ -1241,7 +1445,7 @@ public:
         M[3][0] = 0;                       M[3][1] = 0;                       M[3][2] = 0;                       M[3][3] = 1;
     }
 
-    explicit Matrix4(const Transform<T>& p)
+    explicit Matrix4(const Pose<T>& p)
     {
         Matrix4 result(p.Rotation);
         result.SetTranslation(p.Translation);
@@ -1259,21 +1463,21 @@ public:
     // C-interop support.
     Matrix4(const typename CompatibleTypes<Matrix4<T> >::Type& s) 
     {
-        OVR_COMPILER_ASSERT(sizeof(s) == sizeof(Matrix4));
+        static_assert(sizeof(s) == sizeof(Matrix4), "sizeof(s) == sizeof(Matrix4)");
         memcpy(M, s.M, sizeof(M));
     }
 
     operator typename CompatibleTypes<Matrix4<T> >::Type () const
     {
         typename CompatibleTypes<Matrix4<T> >::Type result;
-        OVR_COMPILER_ASSERT(sizeof(result) == sizeof(Matrix4));
+        static_assert(sizeof(result) == sizeof(Matrix4), "sizeof(result) == sizeof(Matrix4)");
         memcpy(result.M, M, sizeof(M));
         return result;
     }
 
-    void ToString(char* dest, UPInt destsize) const
+    void ToString(char* dest, size_t destsize) const
     {
-        UPInt pos = 0;
+        size_t pos = 0;
         for (int r=0; r<4; r++)
             for (int c=0; c<4; c++)
                 pos += OVR_sprintf(dest+pos, destsize-pos, "%g ", M[r][c]);
@@ -1282,15 +1486,24 @@ public:
     static Matrix4 FromString(const char* src)
     {
         Matrix4 result;
+		if (src)
+		{
         for (int r=0; r<4; r++)
+			{
             for (int c=0; c<4; c++)
             {
                 result.M[r][c] = (T)atof(src);
                 while (src && *src != ' ')
+					{
                     src++;
+					}
                 while (src && *src == ' ')
+					{
                     src++;
             }
+				}
+			}
+		}
         return result;
     }
 
@@ -1303,6 +1516,39 @@ public:
         M[0][2] = M[1][2] = M[2][0] = M[3][2] = 0;
         M[0][3] = M[1][3] = M[2][1] = M[3][0] = 0;
     }
+
+	void SetXBasis(const Vector3f & v)
+	{
+		M[0][0] = v.x;
+		M[1][0] = v.y;
+		M[2][0] = v.z;
+	}
+	Vector3f GetXBasis() const
+	{
+		return Vector3f(M[0][0], M[1][0], M[2][0]);
+	}
+
+	void SetYBasis(const Vector3f & v)
+	{
+		M[0][1] = v.x;
+		M[1][1] = v.y;
+		M[2][1] = v.z;
+	}
+	Vector3f GetYBasis() const
+	{
+		return Vector3f(M[0][1], M[1][1], M[2][1]);
+	}
+
+	void SetZBasis(const Vector3f & v)
+	{
+		M[0][2] = v.x;
+		M[1][2] = v.y;
+		M[2][2] = v.z;
+	}
+	Vector3f GetZBasis() const
+	{
+		return Vector3f(M[0][2], M[1][2], M[2][2]);
+	}
 
 	bool operator== (const Matrix4& b) const
 	{
@@ -1404,9 +1650,18 @@ public:
 
     Vector3<T> Transform(const Vector3<T>& v) const
     {
-        return Vector3<T>(M[0][0] * v.x + M[0][1] * v.y + M[0][2] * v.z + M[0][3],
-                          M[1][0] * v.x + M[1][1] * v.y + M[1][2] * v.z + M[1][3],
-                          M[2][0] * v.x + M[2][1] * v.y + M[2][2] * v.z + M[2][3]);
+		const T rcpW = 1.0f / (M[3][0] * v.x + M[3][1] * v.y + M[3][2] * v.z + M[3][3]);
+		return Vector3<T>((M[0][0] * v.x + M[0][1] * v.y + M[0][2] * v.z + M[0][3]) * rcpW,
+						  (M[1][0] * v.x + M[1][1] * v.y + M[1][2] * v.z + M[1][3]) * rcpW,
+						  (M[2][0] * v.x + M[2][1] * v.y + M[2][2] * v.z + M[2][3]) * rcpW);
+	}
+
+	Vector4<T> Transform(const Vector4<T>& v) const
+	{
+		return Vector4<T>(M[0][0] * v.x + M[0][1] * v.y + M[0][2] * v.z + M[0][3] * v.w,
+						  M[1][0] * v.x + M[1][1] * v.y + M[1][2] * v.z + M[1][3] * v.w,
+						  M[2][0] * v.x + M[2][1] * v.y + M[2][2] * v.z + M[2][3] * v.w,
+						  M[3][0] * v.x + M[3][1] * v.y + M[3][2] * v.z + M[3][3] * v.w);
     }
 
     Matrix4 Transposed() const
@@ -1423,16 +1678,16 @@ public:
     }
 
 
-    T SubDet (const UPInt* rows, const UPInt* cols) const
+    T SubDet (const size_t* rows, const size_t* cols) const
     {
         return M[rows[0]][cols[0]] * (M[rows[1]][cols[1]] * M[rows[2]][cols[2]] - M[rows[1]][cols[2]] * M[rows[2]][cols[1]])
              - M[rows[0]][cols[1]] * (M[rows[1]][cols[0]] * M[rows[2]][cols[2]] - M[rows[1]][cols[2]] * M[rows[2]][cols[0]])
              + M[rows[0]][cols[2]] * (M[rows[1]][cols[0]] * M[rows[2]][cols[1]] - M[rows[1]][cols[1]] * M[rows[2]][cols[0]]);
     }
 
-    T Cofactor(UPInt I, UPInt J) const
+    T Cofactor(size_t I, size_t J) const
     {
-        const UPInt indices[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
+        const size_t indices[4][3] = {{1,2,3},{0,2,3},{0,1,3},{0,1,2}};
         return ((I+J)&1) ? -SubDet(indices[I],indices[J]) : SubDet(indices[I],indices[J]);
     }
 
@@ -1488,9 +1743,9 @@ public:
     // is followed by rotation c around axis A3
     // rotations are CCW or CW (D) in LH or RH coordinate system (S)
     template <Axis A1, Axis A2, Axis A3, RotateDirection D, HandedSystem S>
-    void ToEulerAngles(T *a, T *b, T *c)
+    void ToEulerAngles(T *a, T *b, T *c) const
     {
-        OVR_COMPILER_ASSERT((A1 != A2) && (A2 != A3) && (A1 != A3));
+        static_assert((A1 != A2) && (A2 != A3) && (A1 != A3), "(A1 != A2) && (A2 != A3) && (A1 != A3)");
 
         T psign = -1;
         if (((A1 + 1) % 3 == A2) && ((A2 + 1) % 3 == A3)) // Determine whether even permutation
@@ -1500,13 +1755,13 @@ public:
         if (pm < -1.0f + Math<T>::SingularityRadius)
         { // South pole singularity
             *a = 0;
-            *b = -S*D*Math<T>::PiOver2;
+            *b = -S*D*((T)MATH_DOUBLE_PIOVER2);
             *c = S*D*atan2( psign*M[A2][A1], M[A2][A2] );
         }
         else if (pm > 1.0f - Math<T>::SingularityRadius)
         { // North pole singularity
             *a = 0;
-            *b = S*D*Math<T>::PiOver2;
+            *b = S*D*((T)MATH_DOUBLE_PIOVER2);
             *c = S*D*atan2( psign*M[A2][A1], M[A2][A2] );
         }
         else
@@ -1526,9 +1781,9 @@ public:
     // is followed by rotation c around axis A1
     // rotations are CCW or CW (D) in LH or RH coordinate system (S)
     template <Axis A1, Axis A2, RotateDirection D, HandedSystem S>
-    void ToEulerAnglesABA(T *a, T *b, T *c)
+    void ToEulerAnglesABA(T *a, T *b, T *c) const
     {        
-         OVR_COMPILER_ASSERT(A1 != A2);
+         static_assert(A1 != A2, "A1 != A2");
   
         // Determine the axis that was not supplied
         int m = 3 - A1 - A2;
@@ -1541,7 +1796,7 @@ public:
         if (c2 < -1 + Math<T>::SingularityRadius)
         { // South pole singularity
             *a = 0;
-            *b = S*D*Math<T>::Pi;
+            *b = S*D*((T)MATH_DOUBLE_PI);
             *c = S*D*atan2( -psign*M[A2][m],M[A2][A2]);
         }
         else if (c2 > 1.0f - Math<T>::SingularityRadius)
@@ -1781,19 +2036,20 @@ public:
         Matrix4 m;
         T tanHalfFov = tan(yfov * 0.5f);
 
-        m.M[0][0] = 1 / (aspect * tanHalfFov);
-        m.M[1][1] = 1 / tanHalfFov;
-        m.M[2][2] = zfar / (zfar - znear);
-        m.M[3][2] = 1;
+        m.M[0][0] = 1. / (aspect * tanHalfFov);
+        m.M[1][1] = 1. / tanHalfFov;
+        m.M[2][2] = zfar / (znear - zfar);
+        m.M[3][2] = -1.;
         m.M[2][3] = (zfar * znear) / (znear - zfar);
-        m.M[3][3] = 0;
+        m.M[3][3] = 0.;
 
         // Note: Post-projection matrix result assumes Left-Handed coordinate system,
         //       with Y up, X right and Z forward. This supports positive z-buffer values.
+		// This is the case even for RHS coordinate input.
         return m;
     }
     
-    // PerspectiveRH creates a left-handed perspective projection matrix that can be
+    // PerspectiveLH creates a left-handed perspective projection matrix that can be
     // used with the Oculus sample renderer. 
     //  yfov   - Specifies vertical field of view in radians.
     //  aspect - Screen aspect ration, which is usually width/height for square pixels.
@@ -1805,17 +2061,17 @@ public:
         Matrix4 m;
         T tanHalfFov = tan(yfov * 0.5f);
 
-        m.M[0][0] = 1.0 / (aspect * tanHalfFov);
-        m.M[1][1] = 1.0 / tanHalfFov;
-        m.M[2][2] = zfar / (znear - zfar);
-        // m.M[2][2] = zfar / (zfar - znear);
-        m.M[3][2] = -1.0;
+        m.M[0][0] = 1. / (aspect * tanHalfFov);
+        m.M[1][1] = 1. / tanHalfFov;
+        //m.M[2][2] = zfar / (znear - zfar);
+         m.M[2][2] = zfar / (zfar - znear);
+        m.M[3][2] = -1.;
         m.M[2][3] = (zfar * znear) / (znear - zfar);
-        m.M[3][3] = 0.0;
+        m.M[3][3] = 0.;
 
         // Note: Post-projection matrix result assumes Left-Handed coordinate system,    
         //       with Y up, X right and Z forward. This supports positive z-buffer values.
-        // This is the case even for RHS cooridnate input.       
+        // This is the case even for RHS coordinate input. 
         return m;
     }
 
@@ -1916,7 +2172,7 @@ public:
         M[0][1] = M[0][2] = M[1][0] = M[1][2] = M[2][0] = M[2][1] = 0;
     }
 
-	explicit Matrix3(const Transform<T>& p)
+	explicit Matrix3(const Pose<T>& p)
 	{
 		Matrix3 result(p.Rotation);
 		result.SetTranslation(p.Translation);
@@ -1934,21 +2190,21 @@ public:
 	// C-interop support.
 	Matrix3(const typename CompatibleTypes<Matrix3<T> >::Type& s) 
 	{
-		OVR_COMPILER_ASSERT(sizeof(s) == sizeof(Matrix3));
+		static_assert(sizeof(s) == sizeof(Matrix3), "sizeof(s) == sizeof(Matrix3)");
 		memcpy(M, s.M, sizeof(M));
 	}
 
-	operator typename CompatibleTypes<Matrix3<T> >::Type () const
+	operator const typename CompatibleTypes<Matrix3<T> >::Type () const
 	{
 		typename CompatibleTypes<Matrix3<T> >::Type result;
-		OVR_COMPILER_ASSERT(sizeof(result) == sizeof(Matrix3));
+		static_assert(sizeof(result) == sizeof(Matrix3), "sizeof(result) == sizeof(Matrix3)");
 		memcpy(result.M, M, sizeof(M));
 		return result;
 	}
 
-	void ToString(char* dest, UPInt destsize) const
+	void ToString(char* dest, size_t destsize) const
 	{
-		UPInt pos = 0;
+		size_t pos = 0;
 		for (int r=0; r<3; r++)
 			for (int c=0; c<3; c++)
 				pos += OVR_sprintf(dest+pos, destsize-pos, "%g ", M[r][c]);
@@ -2108,6 +2364,13 @@ public:
 		return *this;
 	}
 
+	Vector2<T> Transform(const Vector2<T>& v) const
+	{
+		const float rcpZ = 1.0f / (M[2][0] * v.x + M[2][1] * v.y + M[2][2]);
+		return Vector2<T>((M[0][0] * v.x + M[0][1] * v.y + M[0][2]) * rcpZ,
+						  (M[1][0] * v.x + M[1][1] * v.y + M[1][2]) * rcpZ);
+	}
+
 	Vector3<T> Transform(const Vector3<T>& v) const
 	{
 		return Vector3<T>(M[0][0] * v.x + M[0][1] * v.y + M[0][2] * v.z,
@@ -2128,7 +2391,7 @@ public:
 	}
 
 
-	T SubDet (const UPInt* rows, const UPInt* cols) const
+	T SubDet (const size_t* rows, const size_t* cols) const
 	{
 		return M[rows[0]][cols[0]] * (M[rows[1]][cols[1]] * M[rows[2]][cols[2]] - M[rows[1]][cols[2]] * M[rows[2]][cols[1]])
 			 - M[rows[0]][cols[1]] * (M[rows[1]][cols[0]] * M[rows[2]][cols[2]] - M[rows[1]][cols[2]] * M[rows[2]][cols[0]])
@@ -2415,10 +2678,10 @@ public:
     Angle() : a(0) {}
     
 	// Fix the range to be between -Pi and Pi
-	Angle(T a_, AngularUnits u = Radians) : a((u == Radians) ? a_ : a_*Math<T>::DegreeToRadFactor) { FixRange(); }
+	Angle(T a_, AngularUnits u = Radians) : a((u == Radians) ? a_ : a_*((T)MATH_DOUBLE_DEGREETORADFACTOR)) { FixRange(); }
 
-	T    Get(AngularUnits u = Radians) const       { return (u == Radians) ? a : a*Math<T>::RadToDegreeFactor; }
-	void Set(const T& x, AngularUnits u = Radians) { a = (u == Radians) ? x : x*Math<T>::DegreeToRadFactor; FixRange(); }
+	T    Get(AngularUnits u = Radians) const       { return (u == Radians) ? a : a*((T)MATH_DOUBLE_RADTODEGREEFACTOR); }
+	void Set(const T& x, AngularUnits u = Radians) { a = (u == Radians) ? x : x*((T)MATH_DOUBLE_DEGREETORADFACTOR); FixRange(); }
 	int Sign() const                               { if (a == 0) return 0; else return (a > 0) ? 1 : -1; }
 	T   Abs() const                                { return (a > 0) ? a : -a; }
 
@@ -2440,7 +2703,7 @@ public:
 	Angle  operator-  (const Angle& b) const  { Angle res = *this; res -= b; return res; }
 	Angle  operator-  (const T& x) const      { Angle res = *this; res -= x; return res; }
 	
-	T   Distance(const Angle& b)              { T c = fabs(a - b.a); return (c <= Math<T>::Pi) ? c : Math<T>::TwoPi - c; }
+	T   Distance(const Angle& b)              { T c = fabs(a - b.a); return (c <= ((T)MATH_DOUBLE_PI)) ? c : ((T)MATH_DOUBLE_TWOPI) - c; }
 
 private:
 
@@ -2450,23 +2713,23 @@ private:
 	// Fixes the angle range to [-Pi,Pi], but assumes no more than 2Pi away on either side 
 	inline void FastFixRange()
 	{
-		if (a < -Math<T>::Pi)
-			a += Math<T>::TwoPi;
-		else if (a > Math<T>::Pi)
-			a -= Math<T>::TwoPi;
+		if (a < -((T)MATH_DOUBLE_PI))
+			a += ((T)MATH_DOUBLE_TWOPI);
+		else if (a > ((T)MATH_DOUBLE_PI))
+			a -= ((T)MATH_DOUBLE_TWOPI);
 	}
 
 	// Fixes the angle range to [-Pi,Pi] for any given range, but slower then the fast method
 	inline void FixRange()
 	{
         // do nothing if the value is already in the correct range, since fmod call is expensive
-        if (a >= -Math<T>::Pi && a <= Math<T>::Pi)
+        if (a >= -((T)MATH_DOUBLE_PI) && a <= ((T)MATH_DOUBLE_PI))
             return;
-		a = fmod(a,Math<T>::TwoPi);
-		if (a < -Math<T>::Pi)
-			a += Math<T>::TwoPi;
-		else if (a > Math<T>::Pi)
-			a -= Math<T>::TwoPi;
+		a = fmod(a,((T)MATH_DOUBLE_TWOPI));
+		if (a < -((T)MATH_DOUBLE_PI))
+			a += ((T)MATH_DOUBLE_TWOPI);
+		else if (a > ((T)MATH_DOUBLE_PI))
+			a -= ((T)MATH_DOUBLE_TWOPI);
 	}
 };
 
@@ -2481,7 +2744,7 @@ typedef Angle<double> Angled;
 // Consists of a normal vector and distance from the origin where the plane is located.
 
 template<class T>
-class Plane : public RefCountBase<Plane<T> >
+class Plane
 {
 public:
     Vector3<T> N;
@@ -2520,6 +2783,8 @@ public:
 };
 
 typedef Plane<float> Planef;
+typedef Plane<double> Planed;
+
 
 } // Namespace OVR
 

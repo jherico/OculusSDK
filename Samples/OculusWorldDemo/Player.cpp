@@ -23,14 +23,21 @@ limitations under the License.
 #include "Player.h"
 #include <Kernel/OVR_Alg.h>
 
-Player::Player()
-    : UserEyeHeight(1.76f - 0.15f),        // 1.76 meters height (ave US male, Wikipedia), less 15 centimeters (TomF's top-of-head-to-eye distance).
+
+Player::Player() :
+    UserEyeHeight(1.76f - 0.15f), // 1.76 meters height (ave US male, Wikipedia), less 15 centimeters (TomF's top-of-head-to-eye distance).
+    HeightScale(1.0f),
     BodyPos(7.7f, 1.76f - 0.15f, -1.0f),
-    BodyYaw(YawInitial)
+    BodyYaw(YawInitial),
+    HeadPose(),
+    MoveForward(0),
+    MoveBack(0),
+    MoveLeft(0),
+    MoveRight(0),
+    GamepadMove(),
+    GamepadRotate(),
+    bMotionRelativeToBody(false)
 {
-	MoveForward = MoveBack = MoveLeft = MoveRight = 0;
-    GamepadMove = Vector3f(0);
-    GamepadRotate = Vector3f(0);
 }
 
 Player::~Player()
@@ -48,14 +55,13 @@ Quatf Player::GetOrientation(bool baseOnly)
     return baseOnly ? baseQ : baseQ * HeadPose.Rotation;
 }
 
-Transformf Player::VirtualWorldTransformfromRealPose(const Transformf &sensorHeadPose)
+Posef Player::VirtualWorldTransformfromRealPose(const Posef &sensorHeadPose)
 {
     Quatf baseQ = Quatf(Vector3f(0,1,0), BodyYaw.Get());
 
-    return Transformf(baseQ * sensorHeadPose.Rotation,
+    return Posef(baseQ * sensorHeadPose.Rotation,
                  BodyPos + baseQ.Rotate(sensorHeadPose.Translation));
 }
-
 
 void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
 	                        Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
@@ -145,14 +151,14 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
     BodyPos += orientationVector;
 
     Planef collisionPlaneDown;
-    float finalDistanceDown = 10;
+    float finalDistanceDown = GetScaledEyeHeight() + 10.0f;
 
     // Only apply down if there is collision model (otherwise we get jitter).
     if (groundCollisionModels->GetSize())
     {
         for(unsigned int i = 0; i < groundCollisionModels->GetSize(); ++i)
         {
-            float checkLengthDown = 10;
+            float checkLengthDown = GetScaledEyeHeight() + 10;
             if (groundCollisionModels->At(i)->TestRay(BodyPos, Vector3f(0.0f, -1.0f, 0.0f),
                 checkLengthDown, &collisionPlaneDown))
             {
@@ -161,15 +167,13 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
         }
 
         // Maintain the minimum camera height
-        if (UserEyeHeight - finalDistanceDown < 1.0f)
+        if (GetScaledEyeHeight() - finalDistanceDown < 1.0f)
         {
-            BodyPos.y += UserEyeHeight - finalDistanceDown;
+            BodyPos.y += GetScaledEyeHeight() - finalDistanceDown;
         }
     }
 
 }
-
-
 
 // Handle directional movement. Returns 'true' if movement was processed.
 bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
@@ -190,5 +194,3 @@ bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
     default: return false;
     }
 }
-
-

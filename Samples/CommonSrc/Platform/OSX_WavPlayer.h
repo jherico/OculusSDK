@@ -24,8 +24,6 @@ limitations under the License.
 #ifndef OVR_WavPlayer_h
 #define OVR_WavPlayer_h
 
-#include "OVR.h"
-#ifdef OVR_OS_MAC
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -34,7 +32,7 @@ limitations under the License.
 
 #define AUDIO_BUFFERS 4
 
-namespace OVR { namespace Platform { namespace OSX {
+namespace OVR { namespace OvrPlatform { namespace OSX {
 
 typedef struct AQCallbackStruct
 {
@@ -71,5 +69,4 @@ private:
 
 }}}
 
-#endif
 #endif

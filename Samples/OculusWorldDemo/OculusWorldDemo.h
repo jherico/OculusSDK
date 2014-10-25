@@ -6,7 +6,7 @@ Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
 				Peter Hoff, Dan Goodman, Bryan Croteau                
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ limitations under the License.
 #ifndef INC_OculusWorldDemo_h
 #define INC_OculusWorldDemo_h
 
-#include "OVR.h"
+#include "OVR_Kernel.h"
 
 #include "../CommonSrc/Platform/Platform_Default.h"
 #include "../CommonSrc/Render/Render_Device.h"
@@ -37,12 +37,9 @@ limitations under the License.
 #include "Util/Util_Render_Stereo.h"
 using namespace OVR::Util::Render;
 
-#include <Kernel/OVR_SysFile.h>
-#include <Kernel/OVR_Log.h>
-#include <Kernel/OVR_Timer.h>
 
 #include "Player.h"
-#include "OVR_DeviceConstants.h"
+#include "Sensors/OVR_DeviceConstants.h"
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
@@ -51,9 +48,10 @@ using namespace OVR::Util::Render;
 #define WORLDDEMO_ASSET_PATH2 "../../../Assets/Tuscany/"
 // This path allows the shortcut to work.
 #define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH4 "../Assets/Tuscany/"
 
 using namespace OVR;
-using namespace OVR::Platform;
+using namespace OVR::OvrPlatform;
 using namespace OVR::Render;
 
 
@@ -132,13 +130,13 @@ public:
     void         RenderAnimatedBlocks(ovrEyeType eye, double appTime);
     void         RenderGrid(ovrEyeType eye);
     
-    Matrix4f     CalculateViewFromPose(const Transformf& pose);
+    Matrix4f     CalculateViewFromPose(const Posef& pose);
 
     // Determine whether this frame needs rendering based on timewarp timing and flags.
     bool        FrameNeedsRendering(double curtime);
     void        ApplyDynamicResolutionScaling();
     void        UpdateFrameRateCounter(double curtime);
-
+    void        UpdateVisionProcessingTime(const ovrTrackingState& trackState);
 
     // Model creation and misc functions.
     Model*      CreateModel(Vector3f pos, struct SlabModel* sm);
@@ -154,14 +152,24 @@ public:
 
     // These contain extra actions to be taken in addition to switching the state.
     void HmdSettingChange(OptionVar* = 0)   { HmdSettingsChanged = true; }
+    void MirrorSettingChange(OptionVar* = 0)
+    { HmdSettingsChanged = true; NotificationTimeout = ovr_GetTimeInSeconds() + 10.0f;}
+    
     void BlockShowChange(OptionVar* = 0)    { BlocksCenter = ThePlayer.BodyPos; }
-    void EyeHeightChange(OptionVar* = 0)    { ThePlayer.BodyPos.y = ThePlayer.UserEyeHeight; }
+    void EyeHeightChange(OptionVar* = 0)
+    {
+        ThePlayer.HeightScale = ScaleAffectsEyeHeight ? PositionTrackingScale : 1.0f;
+        ThePlayer.BodyPos.y = ThePlayer.GetScaledEyeHeight();
+    }
 
+	void HmdSensorToggle(OptionVar* = 0);
     void HmdSettingChangeFreeRTs(OptionVar* = 0);
     void MultisampleChange(OptionVar* = 0);
     void CenterPupilDepthChange(OptionVar* = 0);
     void DistortionClearColorChange(OptionVar* = 0);
+    void ToggleLogging(OptionVar* = 0);
 
+    void ResetHmdPose(OptionVar* = 0);
 
 protected:
     RenderDevice*       pRender;
@@ -169,11 +177,18 @@ protected:
     Sizei               WindowSize;
     int                 ScreenNumber;
     int                 FirstScreenInCycle;
+    bool                SupportsSrgb;
+
+    // Last vision processing statistics
+    double              LastVisionProcessingTime;
+    int                 VisionTimesCount;
+    double              VisionProcessingSum;
+    double              VisionProcessingAverage;
 
     struct RenderTarget
     {
         Ptr<Texture>     pTex;
-        ovrTexture       Tex;
+        ovrTexture       OvrTex;
     };
     enum RendertargetsEnum
     {
@@ -183,25 +198,26 @@ protected:
         Rendertarget_LAST
     };
     RenderTarget        RenderTargets[Rendertarget_LAST];
-
+    RenderTarget        MsaaRenderTargets[Rendertarget_LAST];
+    RenderTarget*       DrawEyeTargets; // the buffers we'll actually render to (could be MSAA)
 
     // ***** Oculus HMD Variables
 
     ovrHmd              Hmd;
-    ovrHmdDesc          HmdDesc;
     ovrEyeRenderDesc    EyeRenderDesc[2];
     Matrix4f            Projection[2];          // Projection matrix for eye.
     Matrix4f            OrthoProjection[2];     // Projection for 2D.
+    ovrPosef            EyeRenderPose[2];       // Poses we used for rendering.
     ovrTexture          EyeTexture[2];
     Sizei               EyeRenderSize[2];       // Saved render eye sizes; base for dynamic sizing.
     // Sensor caps applied.
-    unsigned            StartSensorCaps;    
+    unsigned            StartTrackingCaps;    
     bool                UsingDebugHmd;
 
     // Frame timing logic.
     enum { SecondsOfFpsMeasurement = 1 };
     int                 FrameCounter;
-    double              NextFPSUpdate;	
+	int					TotalFrameCounter;
     float               SecondsPerFrame;
     float               FPS;
     double              LastFpsUpdate;
@@ -223,8 +239,10 @@ protected:
         LoadingState_Finished
     } LoadingState;
 
-    // Set when vision tracking is detected.
+    // Current status flags so that edges can be reported
     bool                HaveVisionTracking;
+    bool                HavePositionTracker;
+    bool                HaveHMDConnected;
     
     GamepadState        LastGamepadState;
 
@@ -242,6 +260,8 @@ protected:
     ovrFrameTiming      HmdFrameTiming;
     unsigned            HmdStatus;
 
+    // Overlay notifications time out in 
+    double              NotificationTimeout;
 
     // ***** Modifiable Menu Options 
 
@@ -251,26 +271,37 @@ protected:
     // Render Target - affecting state.
     bool                RendertargetIsSharedByBothEyes;
     bool                DynamicRezScalingEnabled;
-    bool                ForceZeroIpd;
+	bool                EnableSensor;
+    bool                MonoscopicRender;
+    float               PositionTrackingScale;
+    bool                ScaleAffectsEyeHeight;
     float               DesiredPixelDensity;    
     float               FovSideTanMax;
-    float               FovSideTanLimit; // Limit value for Fov.    
+    float               FovSideTanLimit; // Limit value for Fov.   
+
     // Time-warp.
     bool                TimewarpEnabled;
+    bool                TimewarpNoJitEnabled;
     float               TimewarpRenderIntervalInSeconds;    
     bool                FreezeEyeUpdate;
     bool                FreezeEyeOneFrameRendered;
 
     // Other global settings.
     float               CenterPupilDepthMeters;
-    // float               IPD;
     bool                ForceZeroHeadMovement;
     bool                VsyncEnabled;
     bool                MultisampleEnabled;
-    // DK2 only
+#if defined(OVR_OS_LINUX)
+    bool                LinuxFullscreenOnDevice;
+#endif
+    // DK2 only:
     bool                IsLowPersistence;
     bool                DynamicPrediction;
+    bool                DisplaySleep;
     bool                PositionTrackingEnabled;
+	bool				PixelLuminanceOverdrive;
+    bool                HqAaDistortion;
+    bool                MirrorToWindow;
 
     // Support toggling background color for distortion so that we can see
     // the effect on the periphery.
@@ -280,6 +311,8 @@ protected:
     bool                ShiftDown;
     bool                CtrlDown;
 
+    // Logging
+    bool                IsLogging;
 
     // ***** Scene Rendering Modes
 

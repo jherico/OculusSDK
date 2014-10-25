@@ -6,16 +6,16 @@ Content     :   Contains thread-related (safe) functionality
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -196,9 +196,7 @@ typedef void* ThreadId;
 
 class Thread : public RefCountBase<Thread>
 { // NOTE: Waitable must be the first base since it implements RefCountImpl.    
-
 public:
-
     // *** Callback functions, can be used instead of overriding Run
 
     // Run function prototypes.    
@@ -234,17 +232,18 @@ public:
     // Thread constructor parameters
     struct CreateParams
     {
-        CreateParams(ThreadFn func = 0, void* hand = 0, UPInt ssize = 128 * 1024, 
+        CreateParams(ThreadFn func = 0, void* hand = 0, size_t ssize = 128 * 1024, 
                      int proc = -1, ThreadState state = NotRunning, ThreadPriority prior = NormalPriority)
                      : threadFunction(func), userHandle(hand), stackSize(ssize), 
                        processor(proc), initialState(state), priority(prior) {}
         ThreadFn       threadFunction;   // Thread function
         void*          userHandle;       // User handle passes to a thread
-        UPInt          stackSize;        // Thread stack size
+        size_t         stackSize;        // Thread stack size
         int            processor;        // Thread hardware processor
         ThreadState    initialState;     // 
         ThreadPriority priority;         // Thread priority
     };
+
 
     // *** Constructors
 
@@ -252,12 +251,12 @@ public:
     // the derived class has not yet been initialized. The derived class can call Start explicitly.
     // "processor" parameter specifies which hardware processor this thread will be run on. 
     // -1 means OS decides this. Implemented only on Win32
-    Thread(UPInt stackSize = 128 * 1024, int processor = -1);
+    Thread(size_t stackSize = 128 * 1024, int processor = -1);
     // Constructors that initialize the thread with a pointer to function.
     // An option to start a thread is available, but it should not be used if classes are derived from Thread.
     // "processor" parameter specifies which hardware processor this thread will be run on. 
     // -1 means OS decides this. Implemented only on Win32
-    Thread(ThreadFn threadFunction, void*  userHandle = 0, UPInt stackSize = 128 * 1024,
+    Thread(ThreadFn threadFunction, void*  userHandle = 0, size_t stackSize = 128 * 1024,
            int processor = -1, ThreadState initialState = NotRunning);
     // Constructors that initialize the thread with a create parameters structure.
     explicit Thread(const CreateParams& params);
@@ -314,6 +313,11 @@ public:
     // Returns current thread state
     ThreadState   GetThreadState() const;
 
+    // Wait for thread to finish for a maxmimum number of milliseconds
+    // For maxWaitMs = 0 it simply polls and then returns if the thread is not finished
+    // For maxWaitMs < 0 it will wait forever
+    bool          Join(int maxWaitMs = -1) const;
+
     // Returns the number of available CPUs on the system 
     static int    GetCPUCount();
 
@@ -321,19 +325,35 @@ public:
     // and set to the return value if Run function after the thread is finished.
     inline int    GetExitCode() const { return ExitCode; }
     // Returns an OS handle 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     void*          GetOSHandle() const { return ThreadHandle; }
 #else
     pthread_t      GetOSHandle() const { return ThreadHandle; }
 #endif
 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     ThreadId       GetThreadId() const { return IdValue; }
 #else
     ThreadId       GetThreadId() const { return (ThreadId)GetOSHandle(); }
 #endif
 
-    static int      GetOSPriority(ThreadPriority);
+    // Returns the platform-specific equivalent const that corresponds to the given ThreadPriority. 
+    static int            GetOSPriority(ThreadPriority);
+    static ThreadPriority GetOVRPriority(int osPriority); // May return a value outside the ThreadPriority enum range in unusual cases.
+
+    // Gets this instance's priority.
+    ThreadPriority GetPriority();
+
+    // Gets the current thread's priority.
+    static ThreadPriority GetCurrentPriority();
+
+    // Sets this instance's thread's priority.
+    // Some platforms (e.g. Unix) don't let you set thread priorities unless you have root privileges/
+    bool SetPriority(ThreadPriority);
+
+    // Sets the current thread's priority.
+    static bool SetCurrentPriority(ThreadPriority);
+
     // *** Sleep
 
     // Sleep secs seconds
@@ -343,16 +363,13 @@ public:
 
 
     // *** Debugging functionality
-#if defined(OVR_OS_WIN32)
     virtual void    SetThreadName( const char* name );
-#else
-    virtual void    SetThreadName( const char* name ) { OVR_UNUSED(name); }
-#endif
 
 private:
 #if defined(OVR_OS_WIN32)
-    friend unsigned WINAPI Thread_Win32StartFn(void *pthread);
-
+    friend unsigned WINAPI Thread_Win32StartFn(void *phandle);
+#elif defined(OVR_OS_MS) // Any other Microsoft OS...
+    friend DWORD WINAPI Thread_Win32StartFn(void *phandle);
 #else
     friend void *Thread_PthreadStartFn(void * phandle);
 
@@ -362,15 +379,15 @@ private:
 
 protected:    
     // Thread state flags
-    AtomicInt<UInt32>   ThreadFlags;
-    AtomicInt<SInt32>   SuspendCount;
-    UPInt               StackSize;
+    AtomicInt<uint32_t>   ThreadFlags;
+    AtomicInt<int32_t>   SuspendCount;
+    size_t              StackSize;
 
     // Hardware processor which this thread is running on.
     int            Processor;
     ThreadPriority Priority;
 
-#if defined(OVR_OS_WIN32)
+#if defined(OVR_OS_MS)
     void*               ThreadHandle;
     volatile ThreadId   IdValue;
 

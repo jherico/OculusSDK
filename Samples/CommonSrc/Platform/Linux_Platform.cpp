@@ -5,7 +5,7 @@ Content     :   Linux (X11) implementation of Platform app infrastructure
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,46 +21,72 @@ limitations under the License.
 
 ************************************************************************************/
 
-#include "Linux_Platform.h"
-#ifdef OVR_OS_LINUX
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_Timer.h"
+#include "Kernel/OVR_Threads.h"
+
+#include "Displays/OVR_Linux_SDKWindow.h"
+
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xmd.h>
+#include <signal.h>
+
+//#include <CAPI/GL/CAPI_GLE.h>
+#include <GL/glx.h> // To be replaced with the above #include.
+
 #include "OVR_CAPI_GL.h"
 
+#include "Linux_Platform.h"
 #include "Linux_Gamepad.h"
 
-// Renderers
-#include "../Render/Render_GL_Device.h"
-
 #include "../../3rdParty/EDID/edid.h"
-#include <X11/extensions/Xinerama.h>
 #include <X11/extensions/Xrandr.h>
 
 
-namespace OVR { namespace Platform { namespace Linux {
+namespace OVR { namespace OvrPlatform { namespace Linux {
+
+struct XDisplayInfo
+{
+    XDisplayInfo() :
+        valid(false),
+        output(0),
+        crtc(0)
+    {}
+
+    bool        valid;
+    RROutput    output;
+    RRCrtc      crtc;
+    int         product;
+};
 
 static const char *AtomNames[] = {"WM_PROTOCOLS", "WM_DELETE_WINDOW"};
 
 PlatformCore::PlatformCore(Application* app)
-    : Platform::PlatformCore(app), Disp(NULL), Win(0), Vis(NULL), Quit(0), MMode(Mouse_Normal)    
-    , StartVP(0, 0, 0, 0)
+    : OvrPlatform::PlatformCore(app),
+	  StartVP(0, 0, 0, 0),
+      HasWM(false), Disp(NULL), Vis(NULL), Win(0), Quit(0), ExitCode(0),
+      Width(0), Height(0), MMode(Mouse_Normal), InvisibleCursor(), Atoms()
 {
     pGamepadManager = *new Linux::GamepadManager();
 }
+
 PlatformCore::~PlatformCore()
 {
     XFreeCursor(Disp, InvisibleCursor);
 
     if (Disp)
+    {
         XCloseDisplay(Disp);
+        Disp = NULL;
+    }
 }
 
 // Setup an X11 window in windowed mode.
-bool PlatformCore::SetupWindow(int w, int h)
+void* PlatformCore::SetupWindow(int w, int h)
 {
-
     if (!Disp)
     {
         XInitThreads();
@@ -69,20 +95,28 @@ bool PlatformCore::SetupWindow(int w, int h)
         if (!Disp)
         {
             OVR_DEBUG_LOG(("XOpenDisplay failed."));
-            return false;
+            return NULL;
         }
 
         XInternAtoms(Disp, const_cast<char**>(AtomNames), NumAtoms, false, Atoms);
     }
 
+    int screenNumber = DefaultScreen(Disp);
+
+    // Determine if we are running under a WM. Window managers will set the
+    // substructure redirect mask on the root window.
+    XWindowAttributes rootWA;
+    XGetWindowAttributes(Disp, RootWindow(Disp, screenNumber), &rootWA);
+    HasWM = (rootWA.all_event_masks & SubstructureRedirectMask);
+
     XSetWindowAttributes winattr;
     unsigned attrmask = CWEventMask | CWBorderPixel;
 
-    winattr.event_mask = ButtonPressMask|ButtonReleaseMask|KeyPressMask|KeyReleaseMask|ButtonMotionMask|PointerMotionMask|
-        /*PointerMotionHintMask|*/StructureNotifyMask;//|ExposureMask;
+    winattr.event_mask =
+        ButtonPressMask|ButtonReleaseMask|KeyPressMask|KeyReleaseMask|
+        ButtonMotionMask|PointerMotionMask|StructureNotifyMask|
+        SubstructureNotifyMask;
     winattr.border_pixel = 0;
-
-    int screenNumber = DefaultScreen(Disp);
 
     if (!Vis)
     {
@@ -100,7 +134,7 @@ bool PlatformCore::SetupWindow(int w, int h)
         if (!Vis)
         {
             OVR_DEBUG_LOG(("glXChooseVisual failed."));
-            return false;
+            return NULL;
         }
     }
 
@@ -109,16 +143,14 @@ bool PlatformCore::SetupWindow(int w, int h)
     winattr.colormap = XCreateColormap(Disp, rootWindow, Vis->visual, AllocNone);
     attrmask |= CWColormap;
 
-
     Win = XCreateWindow(Disp, rootWindow, 0, 0, w, h, 0, Vis->depth,
                         InputOutput, Vis->visual, attrmask, &winattr);
 
     if (!Win)
     {
         OVR_DEBUG_LOG(("XCreateWindow failed."));
-        return false;
+        return NULL;
     }
-
 
     XStoreName(Disp, Win, "OVR App");
     XSetWMProtocols(Disp, Win, &Atoms[WM_DELETE_WINDOW], 1);
@@ -136,7 +168,7 @@ bool PlatformCore::SetupWindow(int w, int h)
     Width = w;
     Height = h;
 
-    return true;
+    return (void*)&Win;
 }
 
 void PlatformCore::SetMouseMode(MouseMode mm)
@@ -173,15 +205,21 @@ void PlatformCore::SetWindowTitle(const char* title)
 void PlatformCore::ShowWindow(bool show)
 {
     if (show)
+    {
         XRaiseWindow(Disp, Win);
+    }
     else
+    {
         XIconifyWindow(Disp, Win, 0);
+    }
 }
 
 void PlatformCore::DestroyWindow()
 {
     if (Win)
+    {
         XDestroyWindow(Disp, Win);
+    }
     Win = 0;
 }
 
@@ -383,26 +421,56 @@ int PlatformCore::Run()
 
 bool PlatformCore::determineScreenOffset(int screenId, int* screenOffsetX, int* screenOffsetY)
 {
-    Display* display = XOpenDisplay(NULL);
-
     bool foundScreen = false;
 
-    if (display)
+    RROutput primaryOutput     = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
+    XRRScreenResources* screen = XRRGetScreenResources(Disp, Win);
+
+    int screenIndex = 0;
+    for (int i = 0; i < screen->ncrtc; ++i)
     {
-        int numberOfScreens;
-        XineramaScreenInfo* screens = XineramaQueryScreens(display, &numberOfScreens);
+        XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(Disp, screen, screen->crtcs[i]);
 
-        if (screenId < numberOfScreens)
+        if (0 == crtcInfo->noutput)
         {
-            XineramaScreenInfo screenInfo = screens[screenId];
-            *screenOffsetX = screenInfo.x_org;
-            *screenOffsetY = screenInfo.y_org;
-
-            foundScreen = true;
+            XRRFreeCrtcInfo(crtcInfo);
+            // We intentionally do not increment screenIndex. We do not
+            // consider this a valid display.
+            continue;
         }
 
-        XFree(screens);
+        RROutput output = crtcInfo->outputs[0];
+        for (int ii = 0; ii < crtcInfo->noutput; ++ii)
+        {
+            if (primaryOutput == crtcInfo->outputs[ii])
+            {
+                output = primaryOutput;
+                break;
+            }
+        }
+
+        XRROutputInfo* outputInfo = XRRGetOutputInfo(Disp, screen, output);
+        if (RR_Connected != outputInfo->connection)
+        {
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        if (screenId == screenIndex)
+        {
+            *screenOffsetX = crtcInfo->x;
+            *screenOffsetY = crtcInfo->y;
+            foundScreen = true;
+            break;
+        }
+
+        XRRFreeOutputInfo(outputInfo);
+        XRRFreeCrtcInfo(crtcInfo);
+
+        ++screenIndex;
     }
+    XRRFreeScreenResources(screen);
 
     return foundScreen;
 }
@@ -448,24 +516,15 @@ void PlatformCore::showWindowDecorations(bool show)
 
 int PlatformCore::IndexOf(Render::DisplayId id)
 {
-    RROutput primaryOutput = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
-    if (id.CgDisplayId == 0 && primaryOutput != 0)
-        return 0;
-
-    int index = (primaryOutput != 0) ? 0 : -1;
-    XRRScreenResources *screen = XRRGetScreenResources(Disp, Win);
-    for (int i = 0; i < screen->noutput && i <= id.CgDisplayId; ++i)
+    int numScreens = GetDisplayCount();
+    for (int i = 0; i < numScreens; i++)
     {
-        RROutput output = screen->outputs[i];
-        MonitorInfo * mi = read_edid_data(Disp, output);
-        if (mi != NULL && (primaryOutput == 0 || output != primaryOutput))
-            ++index;
-
-        delete mi;
+        if (GetDisplay(i).MonitorName == id.MonitorName)
+        {
+            return i;
+        }
     }
-    XRRFreeScreenResources(screen);
-
-    return index;
+    return -1;
 }
 
 bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscreen)
@@ -473,9 +532,13 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
     if (fullscreen == pRender->GetParams().Fullscreen)
         return false;
 
-    int displayIndex = IndexOf(rp.Display);
-    OVR_DEBUG_LOG(("Display %d has index %d", rp.Display.CgDisplayId, displayIndex));
+    // Consume any X Configure Notify event. We will wait for a configure
+    // notify event after modifying our window.
+    XEvent report;
+    long eventMask = StructureNotifyMask | SubstructureNotifyMask;
+    while (XCheckWindowEvent(Disp, Win, eventMask, &report));
 
+    int displayIndex = IndexOf(rp.Display);
     if (pRender->GetParams().Fullscreen == Render::Display_Window)
     {
         // Save the original window size and position so we can restore later.
@@ -486,18 +549,13 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
         Window unused;
         XTranslateCoordinates(Disp, Win, DefaultRootWindow(Disp), xwa.x, xwa.y, &x, &y, &unused);
 
-        StartVP.w = Width;
-        StartVP.h = Height;
+        StartVP.w = xwa.width;//Width;
+        StartVP.h = xwa.height;//Height;
         StartVP.x = x;
         StartVP.y = y;
     }
     else if (pRender->GetParams().Fullscreen == Render::Display_Fullscreen)
     {
-//        if (StartMode == NULL)
-//            return true;
-
-//        XF86VidModeSwitchToMode(Disp, 0, StartMode);
-//        XF86VidModeSetViewPort(Disp, Win, 0, 0);
         {
             XEvent xev;
             memset(&xev, 0, sizeof(xev));
@@ -512,15 +570,6 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
 
             XSendEvent( Disp, DefaultRootWindow( Disp ), False, SubstructureNotifyMask, &xev);
         }
-
-//        XWindowAttributes windowattr;
-//        XGetWindowAttributes(Disp, Win, &windowattr);
-//        Width = windowattr.width;
-//        Height = windowattr.height;
-//        pApp->OnResize(Width, Height);
-
-//        if (pRender)
-//            pRender->SetWindowSize(Width, Height);
 
         XWindowChanges wc;
         wc.width = StartVP.w;
@@ -559,13 +608,36 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
     }
     else if (fullscreen == Render::Display_Fullscreen)
     {
-        // Move, size, and decorate the window for fullscreen.
+        // Obtain display information so that we can make and informed
+        // decision about display modes.
+        XDisplayInfo displayInfo = getXDisplayInfo(rp.Display);
+
+        XRRScreenResources* screen = XRRGetScreenResources(Disp, DefaultRootWindow(Disp));
+        XRRCrtcInfo* crtcInfo      = XRRGetCrtcInfo(Disp, screen, displayInfo.crtc);
+        XRROutputInfo* outputInfo  = XRRGetOutputInfo(Disp, screen, displayInfo.output);
 
         int xOffset;
         int yOffset;
 
         if (!determineScreenOffset(displayIndex, &xOffset, &yOffset))
             return false;
+
+        // We should probably always be fullscreen if we don't have a WM.
+        if (!HasWM)
+        {
+            // Determine if we are entering fullscreen on a rift device.
+            char deviceID[32];
+            OVR_sprintf(deviceID, 32, "OVR%04d-%d",
+                        displayInfo.product, displayInfo.crtc);
+
+            LinuxDeviceScreen devScreen = SDKWindow::findDevScreenForDevID(deviceID);
+            if (devScreen.isValid())
+            {
+                XMoveResizeWindow(Disp, Win,
+                                  devScreen.offsetX, devScreen.offsetY,
+                                  devScreen.width, devScreen.height);
+            }
+        }
 
         showWindowDecorations(false);
 
@@ -576,31 +648,9 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
 
         XConfigureWindow(Disp, Win, CWX | CWY | CWStackMode, &wc);
 
-        // Change the display mode.
-
-//        XF86VidModeModeInfo **modes = NULL;
-//        int modeNum = 0;
-//        if (!XF86VidModeGetAllModeLines(Disp, 0, &modeNum, &modes))
-//            return false;
-
-//        OVR_ASSERT(modeNum > 0);
-//        StartMode = modes[0];
-
-//        int bestMode = -1;
-//        for (int i = 0; i < modeNum; i++)
-//        {
-//            if ((modes[i]->hdisplay == Width) && (modes[i]->vdisplay == Height))
-//                bestMode = i;
-//        }
-
-//        if (bestMode == -1)
-//            return false;
-
-//        XF86VidModeSwitchToMode(Disp, 0, modes[bestMode]);
-        //XF86VidModeSetViewPort(Disp, Win, 0, 0);
-
         // Make the window fullscreen in the window manager.
-
+        // If we are using override redirect, or are on a separate screen
+        // with no WM, the following code will have no effect.
         {
             XEvent xev;
             memset(&xev, 0, sizeof(xev));
@@ -618,53 +668,210 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
     }
 
     XMapRaised(Disp, Win);
+    XFlush(Disp);
 
-    Platform::PlatformCore::SetFullscreen(rp, fullscreen);
+    OvrPlatform::PlatformCore::SetFullscreen(rp, fullscreen);
+
+    // Wait until we receive a configure notify event. If the WM redirected our
+    // structure, then WM should synthesize a configure notify event even
+    // if there was no change in the window layout.
+    XWindowEvent(Disp, Win, eventMask, &report);
+
+    // Process the resize event.
+    processEvent(report);
+
     return true;
 }
 
 int PlatformCore::GetDisplayCount()
 {
-    int numberOfScreens = 0;
-    XineramaScreenInfo* screens = XineramaQueryScreens(Disp, &numberOfScreens);
-    XFree(screens);
-    return numberOfScreens;
+    XRRScreenResources* screen = XRRGetScreenResources(Disp, Win);
+    RROutput primaryOutput     = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
+
+    // Iterate through displays and ensure that they have valid outputs.
+    int numDisplays = 0;
+    for (int i = 0; i < screen->ncrtc; ++i)
+    {
+        XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(Disp, screen, screen->crtcs[i]);
+        if (0 == crtcInfo->noutput)
+        {
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        RROutput output = crtcInfo->outputs[0];
+        for (int ii = 0; ii < crtcInfo->noutput; ++ii)
+        {
+            if (primaryOutput == crtcInfo->outputs[ii])
+            {
+                output = primaryOutput;
+                break;
+            }
+        }
+
+        XRROutputInfo* outputInfo = XRRGetOutputInfo(Disp, screen, output);
+        if (RR_Connected != outputInfo->connection)
+        {
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        if (RR_Connected == outputInfo->connection)
+        {
+            ++numDisplays;
+        }
+
+        XRRFreeOutputInfo(outputInfo);
+        XRRFreeCrtcInfo(crtcInfo);
+    }
+
+    XRRFreeScreenResources(screen);
+    return numDisplays;
 }
 
 Render::DisplayId PlatformCore::GetDisplay(int screenId)
 {
     char device_id[32] = "";
-    int displayId = 0;
-
-    int screensPassed = 0;
 
     RROutput primaryOutput = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
+    XRRScreenResources* screen = XRRGetScreenResources(Disp, Win);
 
-    XRRScreenResources *screen = XRRGetScreenResources(Disp, Win);
-    for (int i = 0; i < screen->noutput; ++i)
+    int screenIndex = 0;
+    for (int i = 0; i < screen->ncrtc; ++i)
     {
-        RROutput output = screen->outputs[i];
+        XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(Disp, screen, screen->crtcs[i]);
+
+        if (0 == crtcInfo->noutput)
+        {
+            XRRFreeCrtcInfo(crtcInfo);
+            // We intentionally do not increment screenIndex. We do not
+            // consider this a valid display.
+            continue;
+        }
+
+        RROutput output = crtcInfo->outputs[0];
+        for (int ii = 0; ii < crtcInfo->noutput; ++ii)
+        {
+            if (primaryOutput == crtcInfo->outputs[ii])
+            {
+                output = primaryOutput;
+                break;
+            }
+        }
+
+        XRROutputInfo* outputInfo = XRRGetOutputInfo(Disp, screen, output);
+        if (RR_Connected != outputInfo->connection)
+        {
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
         MonitorInfo * mi = read_edid_data(Disp, output);
         if (mi == NULL)
-            continue;
-
-        bool isMyScreen =
-                (primaryOutput == 0) ? screensPassed++ > screenId :
-                                       (output == primaryOutput) ? screenId == 0 :
-                                                                   ++screensPassed >= screenId;
-        if (isMyScreen)
         {
-            OVR_sprintf(device_id, 32, "%s%04d", mi->manufacturer_code, mi->product_code);
-            displayId = (screenId == 0 && primaryOutput != 0) ? 0 : i; // Require 0 to return the primary display
+            ++screenIndex;
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        if (screenIndex == screenId)
+        {
+            OVR_sprintf(device_id, 32, "%s%04d-%d",
+                        mi->manufacturer_code, mi->product_code,
+                        screen->crtcs[i]);
+
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+
             delete mi;
             break;
         }
 
+        XRRFreeOutputInfo(outputInfo);
+        XRRFreeCrtcInfo(crtcInfo);
+
         delete mi;
+        ++screenIndex;
     }
     XRRFreeScreenResources(screen);
 
-    return Render::DisplayId(device_id, displayId);
+    return Render::DisplayId(device_id);
+}
+
+XDisplayInfo PlatformCore::getXDisplayInfo(Render::DisplayId id)
+{
+    int screenId = IndexOf(id);
+
+    // Locate and return XDisplayInfo
+    RROutput primaryOutput = XRRGetOutputPrimary(Disp, DefaultRootWindow(Disp));
+    XRRScreenResources* screen = XRRGetScreenResources(Disp, Win);
+
+    int screenIndex = 0;
+    for (int i = 0; i < screen->ncrtc; ++i)
+    {
+        XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(Disp, screen, screen->crtcs[i]);
+
+        if (0 == crtcInfo->noutput)
+        {
+            XRRFreeCrtcInfo(crtcInfo);
+            // We intentionally do not increment screenIndex. We do not
+            // consider this a valid display.
+            continue;
+        }
+
+        RROutput output = crtcInfo->outputs[0];
+        for (int ii = 0; ii < crtcInfo->noutput; ++ii)
+        {
+            if (primaryOutput == crtcInfo->outputs[ii])
+            {
+                output = primaryOutput;
+                break;
+            }
+        }
+
+        XRROutputInfo* outputInfo = XRRGetOutputInfo(Disp, screen, output);
+        if (RR_Connected != outputInfo->connection)
+        {
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        MonitorInfo * mi = read_edid_data(Disp, output);
+        if (mi == NULL)
+        {
+            ++screenIndex;
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+            continue;
+        }
+
+        if (screenIndex == screenId)
+        {
+            XDisplayInfo dinfo;
+            dinfo.valid  = true;
+            dinfo.output = output;
+            dinfo.crtc   = outputInfo->crtc;
+            dinfo.product= mi->product_code;
+
+            XRRFreeOutputInfo(outputInfo);
+            XRRFreeCrtcInfo(crtcInfo);
+
+            return dinfo;
+        }
+
+        XRRFreeOutputInfo(outputInfo);
+        XRRFreeCrtcInfo(crtcInfo);
+
+        delete mi;
+        ++screenIndex;
+    }
+    XRRFreeScreenResources(screen);
+
+    return XDisplayInfo();
 }
 
 RenderDevice* PlatformCore::SetupGraphics(const SetupGraphicsDeviceSet& setupGraphicsDesc,
@@ -697,6 +904,45 @@ void PlatformCore::showCursor(bool show)
 // GL
 namespace Render { namespace GL { namespace Linux {
 
+
+// To do: We can do away with this function by using our GLEContext class, which already tracks extensions.
+static bool IsGLXExtensionSupported(const char* extension, _XDisplay* pDisplay, int screen = 0)
+{
+    // const char* extensionList = glXQueryExtensionsString(pDisplay, screen);
+    const char* extensionList = glXGetClientString(pDisplay, GLX_EXTENSIONS);  // This is returning more extensions than glXQueryExtensionsString does.
+
+    if(extensionList)
+    {
+        const char* start = extensionList;
+        const char* where;
+
+        static bool printed = false;
+        if(!printed)
+        {
+            OVR_DEBUG_LOG(("glX extensions: %s", extensionList));
+            printed = true;
+        }
+
+        while((where = (char*)strstr(start, extension)) != NULL)
+        {
+            if (where)
+            {
+                const char* term = (where + strlen(extension));
+
+                if ((where == start) || (where[-1] == ' '))
+                {
+                    if ((term[0] == ' ') || (term[0] == '\0'))
+                        return true;
+                }
+
+                start = term;
+            }
+        }
+    }
+
+    return false;
+}
+
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
     static ovrGLConfig cfg;
@@ -710,7 +956,7 @@ ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 
 Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
 {
-    Platform::Linux::PlatformCore* PC = (Platform::Linux::PlatformCore*)oswnd;
+    OvrPlatform::Linux::PlatformCore* PC = (OvrPlatform::Linux::PlatformCore*)oswnd;
 
     GLXContext context = glXCreateContext(PC->Disp, PC->Vis, 0, GL_TRUE);
 
@@ -761,21 +1007,35 @@ void RenderDevice::Shutdown()
 
 }}}}
 
+OVR::OvrPlatform::Linux::PlatformCore* gPlatform;
+
+static void handleSigInt(int sig)
+{
+    signal(SIGINT, SIG_IGN);
+    gPlatform->Exit(0);
+}
 
 int main(int argc, const char* argv[])
 {
     using namespace OVR;
-    using namespace OVR::Platform;
+    using namespace OVR::OvrPlatform;
+
+    // SigInt for capturing Ctrl-c.
+    if (signal(SIGINT, handleSigInt) == SIG_ERR)
+    {
+        fprintf(stderr, "Failed setting SIGINT handler\n");
+        return EXIT_FAILURE;
+    }
 
     // CreateApplication must be the first call since it does OVR::System::Initialize.
-    Application*       app = Application::CreateApplication();
-    Linux::PlatformCore* platform = new Linux::PlatformCore(app);
+    Application* app = Application::CreateApplication();
+    gPlatform        = new Linux::PlatformCore(app);
     // The platform attached to an app will be deleted by DestroyApplication.
-    app->SetPlatformCore(platform);
+    app->SetPlatformCore(gPlatform);
 
     int exitCode = app->OnStartup(argc, argv);
     if (!exitCode)
-        exitCode = platform->Run();
+        exitCode = gPlatform->Run();
 
     // No OVR functions involving memory are allowed after this.
     Application::DestroyApplication(app);
@@ -783,4 +1043,3 @@ int main(int argc, const char* argv[])
 
     return exitCode;
 }
-#endif

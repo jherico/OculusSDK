@@ -5,7 +5,7 @@ Content     :   Option selection and editing for OculusWorldDemo
 Created     :   March 7, 2014
 Authors     :   Michael Antonov, Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ limitations under the License.
 //-------------------------------------------------------------------------------------
 bool OptionShortcut::MatchKey(OVR::KeyCode key, bool shift) const
 {
-    for (UInt32 i = 0; i < Keys.GetSize(); i++)
+    for (uint32_t i = 0; i < Keys.GetSize(); i++)
     {
         if (Keys[i].Key != key)
             continue;
@@ -54,9 +54,9 @@ bool OptionShortcut::MatchKey(OVR::KeyCode key, bool shift) const
     return false;
 }
 
-bool OptionShortcut::MatchGamepadButton(UInt32 gamepadButtonMask) const
+bool OptionShortcut::MatchGamepadButton(uint32_t gamepadButtonMask) const
 {
-    for (UInt32 i = 0; i < GamepadButtons.GetSize(); i++)
+    for (uint32_t i = 0; i < GamepadButtons.GetSize(); i++)
     {
         if (GamepadButtons[i] & gamepadButtonMask)
         {
@@ -75,7 +75,7 @@ bool OptionShortcut::MatchGamepadButton(UInt32 gamepadButtonMask) const
 String OptionMenuItem::PopNamespaceFrom(OptionMenuItem* menuItem)
 {
     String label = menuItem->Label;
-    for (UInt32 i = 0; i < label.GetLength(); i++)
+    for (uint32_t i = 0; i < label.GetLength(); i++)
     {
         if (label.GetCharAt(i) == '.')
         {
@@ -91,7 +91,7 @@ String OptionMenuItem::PopNamespaceFrom(OptionMenuItem* menuItem)
 
 String OptionVar::FormatEnum(OptionVar* var)
 {
-    UInt32 index = var->GetEnumIndex();
+    uint32_t index = var->GetEnumIndex();
     if (index < var->EnumValues.GetSize())
         return var->EnumValues[index].Name;
     return String("<Bad enum index>");    
@@ -116,6 +116,12 @@ String OptionVar::FormatBool(OptionVar* var)
     return *var->AsBool() ? "On" : "Off";
 }
 
+String OptionVar::FormatTrigger(OptionVar* var)
+{
+	OVR_UNUSED(var);
+    return "[Trigger]";
+}
+
 
 OptionVar::OptionVar(const char* name, void* pvar, VarType type,
                      FormatFunction formatFunction,
@@ -124,13 +130,13 @@ OptionVar::OptionVar(const char* name, void* pvar, VarType type,
     Label       = name;
     Type        = type;
     this->pVar  = pvar;
-    fFormat     = formatFunction;
+    fFormat     = ((Type == Type_Trigger) && !formatFunction) ? FormatTrigger : formatFunction;
     fUpdate     = updateFunction;
     pNotify     = 0;
     FormatString= 0;
 
-    MaxFloat    = Math<float>::MaxValue;
-    MinFloat    = -Math<float>::MaxValue;
+    MaxFloat    = MATH_FLOAT_MAXVALUE;
+    MinFloat    = -MATH_FLOAT_MAXVALUE;
     StepFloat   = 1.0f;
     FormatScale = 1.0f;
 
@@ -138,12 +144,15 @@ OptionVar::OptionVar(const char* name, void* pvar, VarType type,
     MinInt      = -(MaxInt) - 1;
     StepInt     = 1;
 
+    SelectedIndex = 0;
+
     ShortcutUp.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::NextValue);
     ShortcutDown.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::PrevValue);
 }
 
-OptionVar::OptionVar(const char* name, SInt32* pvar,
-                     SInt32 min, SInt32 max, SInt32 stepSize,
+
+OptionVar::OptionVar(const char* name, int32_t* pvar,
+                     int32_t min, int32_t max, int32_t stepSize,
                      const char* formatString,
                      FormatFunction formatFunction,
                      UpdateFunction updateFunction)
@@ -156,9 +165,16 @@ OptionVar::OptionVar(const char* name, SInt32* pvar,
     pNotify     = 0;
     FormatString= formatString;
 
+    MaxFloat    = MATH_FLOAT_MAXVALUE;
+    MinFloat    = -MATH_FLOAT_MAXVALUE;
+    StepFloat   = 1.0f;
+    FormatScale = 1.0f;
+
     MinInt      = min;
     MaxInt      = max;
     StepInt     = stepSize;
+
+    SelectedIndex = 0;
 
     ShortcutUp.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::NextValue);
     ShortcutDown.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::PrevValue);
@@ -184,6 +200,12 @@ OptionVar::OptionVar(const char* name, float* pvar,
     StepFloat   = stepSize;
     FormatScale = formatScale;
 
+    MaxInt      = 0x7FFFFFFF;
+    MinInt      = -(MaxInt) - 1;
+    StepInt     = 1;
+
+    SelectedIndex = 0;
+
     ShortcutUp.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::NextValue);
     ShortcutDown.pNotify = new FunctionNotifyContext<OptionVar, bool>(this, &OptionVar::PrevValue);
 }
@@ -204,7 +226,7 @@ void OptionVar::NextValue(bool* pFastStep)
         break;
 
     case Type_Int:
-        *AsInt() = Alg::Min<SInt32>(*AsInt() + StepInt * (fastStep ? 5 : 1), MaxInt);
+        *AsInt() = Alg::Min<int32_t>(*AsInt() + StepInt * (fastStep ? 5 : 1), MaxInt);
         break;
 
     case Type_Float:
@@ -215,6 +237,11 @@ void OptionVar::NextValue(bool* pFastStep)
     case Type_Bool:
         *AsBool() = !*AsBool();
         break;
+
+    case Type_Trigger:
+        break;  // nothing to do
+
+    default: OVR_ASSERT(false); break; // unhandled
     }
 
     SignalUpdate();
@@ -226,11 +253,14 @@ void OptionVar::PrevValue(bool* pFastStep)
     switch (Type)
     {
     case Type_Enum:
-        *AsInt() = ((GetEnumIndex() + (UInt32)EnumValues.GetSize() - 1) % EnumValues.GetSize());
+    {
+        uint32_t size = (uint32_t)(EnumValues.GetSize() ? EnumValues.GetSize() : 1);
+        *AsInt() = ((GetEnumIndex() + (size - 1)) % size);
         break;
-
+    }
+    
     case Type_Int:
-        *AsInt() = Alg::Max<SInt32>(*AsInt() - StepInt * (fastStep ? 5 : 1), MinInt);
+        *AsInt() = Alg::Max<int32_t>(*AsInt() - StepInt * (fastStep ? 5 : 1), MinInt);
         break;
 
     case Type_Float:
@@ -241,6 +271,11 @@ void OptionVar::PrevValue(bool* pFastStep)
     case Type_Bool:
         *AsBool() = !*AsBool();
         break;
+
+    case Type_Trigger:
+        break;  // nothing to do
+
+    default: OVR_ASSERT(false); break; // unhandled
     }
 
     SignalUpdate();
@@ -248,8 +283,16 @@ void OptionVar::PrevValue(bool* pFastStep)
 
 String OptionVar::HandleShortcutUpdate()
 {
-    SignalUpdate();
-    return Label + " - " + GetValue();
+    if(Type != Type_Trigger)
+    {
+        SignalUpdate();
+        return Label + " - " + GetValue();
+    }
+    else
+    {
+        // Avoid double trigger (shortcut key already triggers NextValue())
+        return String("Triggered: ") + Label;
+    }
 }
 
 String OptionVar::ProcessShortcutKey(OVR::KeyCode key, bool shift)
@@ -262,7 +305,7 @@ String OptionVar::ProcessShortcutKey(OVR::KeyCode key, bool shift)
     return String();
 }
 
-String OptionVar::ProcessShortcutButton(UInt32 buttonMask)
+String OptionVar::ProcessShortcutButton(uint32_t buttonMask)
 {
     if (ShortcutUp.MatchGamepadButton(buttonMask) || ShortcutDown.MatchGamepadButton(buttonMask))
     {
@@ -272,7 +315,7 @@ String OptionVar::ProcessShortcutButton(UInt32 buttonMask)
 }
 
 
-OptionVar& OptionVar::AddEnumValue(const char* displayName, SInt32 value)
+OptionVar& OptionVar::AddEnumValue(const char* displayName, int32_t value)
 {
     EnumEntry entry;
     entry.Name = displayName;
@@ -283,16 +326,19 @@ OptionVar& OptionVar::AddEnumValue(const char* displayName, SInt32 value)
 
 String OptionVar::GetValue()
 {
-    return fFormat(this);
+    if(fFormat == NULL)
+        return String();
+    else
+        return fFormat(this);
 }
 
-UInt32 OptionVar::GetEnumIndex()
+uint32_t OptionVar::GetEnumIndex()
 {
     OVR_ASSERT(Type == Type_Enum);
     OVR_ASSERT(EnumValues.GetSize() > 0);
 
     // TODO: Change this from a linear search to binary or a hash.
-    for (UInt32 i = 0; i < EnumValues.GetSize(); i++)
+    for (uint32_t i = 0; i < EnumValues.GetSize(); i++)
     {
         if (EnumValues[i].Value == *AsInt())
             return i;
@@ -353,7 +399,7 @@ OptionSelectionMenu::OptionSelectionMenu(OptionSelectionMenu* parentMenu)
 
 OptionSelectionMenu::~OptionSelectionMenu()
 {
-    for (UInt32 i = 0; i < Items.GetSize(); i++)
+    for (uint32_t i = 0; i < Items.GetSize(); i++)
         delete Items[i];
 }
 
@@ -400,7 +446,7 @@ bool OptionSelectionMenu::OnKey(OVR::KeyCode key, int chr, bool down, int modifi
     return false;
 }
 
-bool OptionSelectionMenu::OnGamepad(UInt32 buttonMask)
+bool OptionSelectionMenu::OnGamepad(uint32_t buttonMask)
 {
     // Check global shortcuts first.
     String s = ProcessShortcutButton(buttonMask);
@@ -436,7 +482,7 @@ String OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
 {
     String s;
 
-    for (UPInt i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
+    for (size_t i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
     {
         s = Items[i]->ProcessShortcutKey(key, shift);
     }
@@ -444,11 +490,11 @@ String OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
     return s;
 }
 
-String OptionSelectionMenu::ProcessShortcutButton(UInt32 buttonMask)
+String OptionSelectionMenu::ProcessShortcutButton(uint32_t buttonMask)
 {
     String s;
 
-    for (UPInt i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
+    for (size_t i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
     {
         s = Items[i]->ProcessShortcutButton(buttonMask);
     }
@@ -457,9 +503,9 @@ String OptionSelectionMenu::ProcessShortcutButton(UInt32 buttonMask)
 }
 
 // Fills in inclusive character range; returns false if line not found.
-bool FindLineCharRange(const char* text, int searchLine, UPInt charRange[2])
+bool FindLineCharRange(const char* text, int searchLine, size_t charRange[2])
 {
-    UPInt i    = 0;
+    size_t i    = 0;
     
     for (int line = 0; line <= searchLine; line ++)
     {
@@ -522,11 +568,9 @@ void OptionSelectionMenu::Render(RenderDevice* prender, String title)
     float    valuesSize[2]     = {0.0f, 0.0f};
     float    maxValueWidth     = 0.0f;
 
-    UPInt    selection[2] = { 0, 0 };
+    size_t   selection[2] = { 0, 0 };
     Vector2f labelSelectionRect[2];
     Vector2f valueSelectionRect[2];
-    bool     havelLabelSelection = false;
-    bool     haveValueSelection = false;
 
     float textSize = 22.0f;
     prender->MeasureText(&DejaVu, "      ", textSize, bufferSize);
@@ -538,14 +582,14 @@ void OptionSelectionMenu::Render(RenderDevice* prender, String title)
     if (DisplayState == Display_Menu)
     {
         highlightIndex = SelectedIndex;
-        for (UInt32 i = 0; i < Items.GetSize(); i++)
+        for (uint32_t i = 0; i < Items.GetSize(); i++)
         {
             if (i > 0)
                 values += "\n";
             values += Items[i]->GetValue();
         }
 
-        for (UInt32 i = 0; i < Items.GetSize(); i++)
+        for (uint32_t i = 0; i < Items.GetSize(); i++)
         {
             if (i > 0)
                 menuItems += "\n";
@@ -560,13 +604,15 @@ void OptionSelectionMenu::Render(RenderDevice* prender, String title)
 
     // Measure labels
     const char* menuItemsCStr = menuItems.ToCStr();
-    havelLabelSelection = FindLineCharRange(menuItemsCStr, highlightIndex, selection);
+    bool havelLabelSelection = FindLineCharRange(menuItemsCStr, highlightIndex, selection);
+	OVR_UNUSED(havelLabelSelection);
     prender->MeasureText(&DejaVu, menuItemsCStr, textSize, labelsSize,
                          selection, labelSelectionRect);
 
     // Measure label-to-value gap
     const char* valuesCStr = values.ToCStr();
-    haveValueSelection = FindLineCharRange(valuesCStr, highlightIndex, selection);
+    bool haveValueSelection = FindLineCharRange(valuesCStr, highlightIndex, selection);
+	OVR_UNUSED(haveValueSelection);
     prender->MeasureText(&DejaVu, valuesCStr, textSize, valuesSize, selection, valueSelectionRect);
 
     // Measure max value size (absolute size varies, so just use a reasonable max)
@@ -712,7 +758,7 @@ OptionSelectionMenu* OptionSelectionMenu::GetSubmenu()
 
 OptionSelectionMenu* OptionSelectionMenu::GetOrCreateSubmenu(String submenuName)
 {
-    for (UInt32 i = 0; i < Items.GetSize(); i++)
+    for (uint32_t i = 0; i < Items.GetSize(); i++)
     {
         if (!Items[i]->IsMenu())
             continue;

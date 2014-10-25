@@ -257,7 +257,7 @@ void PopulateRoomScene(Scene* scene, RenderDevice* render)
 
 
 // Render a debug marker static in rift (special request for eye-tracking)
-void renderSphere(RenderDevice* render, Vector3f ViewAdjust, float metresLeft, float metresUp, float metresAway, float metresRadius,
+void renderSphere(RenderDevice* render, Vector3f HmdToEyeViewOffset, float metresLeft, float metresUp, float metresAway, float metresRadius,
 				unsigned char red,unsigned char green,unsigned char blue)
 {
 	//Get textures, if haven't already
@@ -295,7 +295,7 @@ void renderSphere(RenderDevice* render, Vector3f ViewAdjust, float metresLeft, f
 
 	//Render object
     Matrix4f view = Matrix4f::LookAtRH(Vector3f(0,0,0), Vector3f(0,0,0) + Vector3f(0,0,1), Vector3f(0,1,0)); 
-	scene->Render(render, Matrix4f::Translation(ViewAdjust) * view);
+	scene->Render(render, Matrix4f::Translation(HmdToEyeViewOffset) * view);
 
 	//Delete object
 	delete scene;

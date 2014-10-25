@@ -22,7 +22,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OSX_Gamepad.h"
-#ifdef OVR_OS_MAC
+
 
 static const UInt32 Logitech_F710_VendorID = 0x046D;
 //static const UInt32 Logitech_F710_ProductID = 0xC219;
@@ -31,7 +31,7 @@ static const UInt32 Sony_DualShock3_VendorID = 0x054C;
 //static const UInt32 Sony_DualShock3_ProductID = 0x0268;
 
 
-namespace OVR { namespace Platform { namespace OSX {
+namespace OVR { namespace OvrPlatform { namespace OSX {
 
     
 GamepadManager::GamepadManager()
@@ -427,5 +427,4 @@ void GamepadManager::manipulateBitField(unsigned int& bitfield, unsigned int mas
     }
 }
 
-}}} // OVR::Platform::OSX
-#endif
+}}} // OVR::OvrPlatform::OSX

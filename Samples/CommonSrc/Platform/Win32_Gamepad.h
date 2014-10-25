@@ -5,7 +5,7 @@ Content     :   Win32 implementation of Gamepad functionality.
 Created     :   May 6, 2013
 Authors     :   Lee Cooper
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,19 +26,22 @@ limitations under the License.
 
 #include "Gamepad.h"
 
-#include <windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <xinput.h>
 
-namespace OVR { namespace Platform { namespace Win32 {
+namespace OVR { namespace OvrPlatform { namespace Win32 {
 
-class GamepadManager : public Platform::GamepadManager
+class GamepadManager : public OvrPlatform::GamepadManager
 {
 public:
     GamepadManager();
     ~GamepadManager();
 
-    virtual UInt32  GetGamepadCount();
-    virtual bool    GetGamepadState(UInt32 index, GamepadState* pState);
+    virtual uint32_t  GetGamepadCount();
+    virtual bool    GetGamepadState(uint32_t index, GamepadState* pState);
 
 private:
     // Dynamically ink to XInput to simplify projects.
@@ -46,7 +49,8 @@ private:
     typedef DWORD (WINAPI *PFn_XInputGetState)(DWORD dwUserIndex, XINPUT_STATE* pState);
     PFn_XInputGetState  pXInputGetState;
 
-    UInt32              LastPadPacketNo;
+    uint32_t            LastPadPacketNo;    // Used to prevent reading the same packet twice.
+    uint32_t            NextTryTime;        // If no device was found then we don't try to access it again until some later time. 
 };
 
 }}}

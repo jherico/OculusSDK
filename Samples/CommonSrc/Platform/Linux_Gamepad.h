@@ -5,7 +5,7 @@ Content     :   Linux implementation of Gamepad functionality.
 Created     :   May 6, 2013
 Authors     :   Lee Cooper, Simon Hallam
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,13 +25,12 @@ limitations under the License.
 #define OVR_Linux_Gamepad_h
 
 #include "Gamepad.h"
-#ifdef OVR_OS_LINUX
 
-namespace OVR { namespace Platform { namespace Linux {
+namespace OVR { namespace OvrPlatform { namespace Linux {
 
 class Gamepad;  // forward declaration for readability
 
-class GamepadManager : public Platform::GamepadManager
+class GamepadManager : public OvrPlatform::GamepadManager
 {
 public:
 
@@ -81,5 +80,4 @@ private:
 
 }}}
 
-#endif
 #endif // OVR_Linux_Gamepad_h

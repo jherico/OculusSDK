@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,10 @@ limitations under the License.
 // This file can be included twice, once with OVR_D3D_VERSION=10 and
 // once with OVR_D3D_VERSION=11.
 
-#ifdef OVR_D3D_VERSION
+
+#ifndef OVR_D3D_VERSION
+#error define OVR_D3D_VERSION to 10 or 11
+#endif
 
 #include "Kernel/OVR_String.h"
 #include "Kernel/OVR_Array.h"
@@ -35,6 +38,9 @@ limitations under the License.
 
 #include "../Render/Render_Device.h"
 
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #if (OVR_D3D_VERSION == 10)
@@ -111,6 +117,7 @@ typedef D3D11_QUERY_DESC        D3D1x_QUERY_DESC;
 
 class Buffer;
 
+
 class ShaderBase : public Render::Shader
 {
 public:
@@ -121,7 +128,8 @@ public:
     struct Uniform
     {
         String Name;
-        int    Offset, Size;
+        int    Offset;
+        int    Size;
     };
     Array<Uniform> UniformInfo;
 
@@ -134,6 +142,7 @@ public:
 
     void UpdateBuffer(Buffer* b);
 };
+
 
 template<Render::ShaderStage SStage, class D3DShaderType>
 class Shader : public ShaderBase
@@ -180,7 +189,13 @@ public:
     bool              Dynamic;
 
 public:
-    Buffer(RenderDevice* r) : Ren(r), Size(0), Use(0) {}
+    Buffer(RenderDevice* r) :
+        Ren(r),
+        Size(0),
+        Use(0),
+        Dynamic(false)
+    {
+    }
     ~Buffer();
 
     ID3D1xBuffer* GetBuffer()
@@ -193,9 +208,10 @@ public:
         return Size;
     }
     virtual void*  Map(size_t start, size_t size, int flags = 0);
-    virtual bool   Unmap(void *m);
+    virtual bool   Unmap(void* m);
     virtual bool   Data(int use, const void* buffer, size_t size);
 };
+
 
 class Texture : public Render::Texture
 {
@@ -209,6 +225,7 @@ public:
     mutable Ptr<ID3D1xSamplerState> Sampler;
     int                             Width, Height;
     int                             Samples;
+    int                             Format;
 
     Texture(RenderDevice* r, int fmt, int w, int h);
     ~Texture();
@@ -233,8 +250,8 @@ public:
 	virtual ovrTexture Get_ovrTexture();
 
 	virtual void* GetInternalImplementation();
-
 };
+
 
 class RenderDevice : public Render::RenderDevice
 {
@@ -296,7 +313,7 @@ public:
     // to get the latest info about monitors (including just connected/
     // disconnected ones). Note, SwapChain will be released in this case
     // and it should be recreated.
-    void        UpdateMonitorOutputs(bool needRecreate = false);
+    void         UpdateMonitorOutputs(bool needRecreate = false);
 
     virtual void SetViewport(const Recti& vp);
     virtual void SetWindowSize(int w, int h);
@@ -307,9 +324,10 @@ public:
 
     virtual void Present ( bool withVsync );
     virtual void WaitUntilGpuIdle();
+    virtual void Flush();
 
     virtual bool SetFullscreen(DisplayMode fullscreen);
-	virtual UPInt QueryGPUMemorySize();
+	virtual size_t QueryGPUMemorySize();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1,
                        float depth = 1,
@@ -330,6 +348,8 @@ public:
 
     Texture* GetDepthBuffer(int w, int h, int ms);
 
+    virtual void ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Texture* outputTex) OVR_OVERRIDE;
+
     virtual void BeginRendering();
     virtual void SetRenderTarget(Render::Texture* color,
                                  Render::Texture* depth = NULL, Render::Texture* stencil = NULL);
@@ -341,11 +361,11 @@ public:
         ExtraShaders = s;
     }
 
-    // Overrident to apply proper blend state.
-    virtual void FillRect(float left, float top, float right, float bottom, Color c);
-    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm);
-	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c);
-    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image);
+    // Overridden to apply proper blend state.
+    virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view=NULL);
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view);
+	virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view=NULL);
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha=255, const Matrix4f* view=NULL);
 
     virtual void Render(const Matrix4f& matrix, Model* model);
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
@@ -366,11 +386,11 @@ public:
     void SetTexture(Render::ShaderStage stage, int slot, const Texture* t);
 
     // GPU Profiling
-    virtual void BeginGpuEvent(const char* markerText, UInt32 markerColor);
+    virtual void BeginGpuEvent(const char* markerText, uint32_t markerColor);
     virtual void EndGpuEvent();
 };
 
-}}}
 
-#endif
+}}} // namespace OVR::Render::D3D1?
+
 #endif

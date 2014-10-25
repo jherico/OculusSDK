@@ -44,15 +44,6 @@ endif()
 add_subdirectory(LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
-# Cross platform GL access.  Used by the C API and by
-# the sample applications
-add_definitions(-DGLEW_STATIC)
-add_subdirectory(3rdParty/glew)
-set_target_properties(glew PROPERTIES FOLDER "3rdParty")
-
-add_subdirectory(Bindings/C)
-set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
-
 ###############################################################################
 #
 # Sample code support

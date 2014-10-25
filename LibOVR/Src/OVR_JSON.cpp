@@ -30,16 +30,16 @@ Notes       :
   THE SOFTWARE.
 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -67,7 +67,7 @@ namespace OVR {
 // Create a new copy of a string
 static char* JSON_strdup(const char* str)
 {
-    UPInt len  = OVR_strlen(str) + 1;
+    size_t len  = OVR_strlen(str) + 1;
     char* copy = (char*)OVR_ALLOC(len);
     if (!copy)
         return 0;
@@ -78,16 +78,27 @@ static char* JSON_strdup(const char* str)
 
 //-----------------------------------------------------------------------------
 // Render the number from the given item into a string.
+static char* PrintInt(int valueint)
+{
+    char *str;
+    str = (char*)OVR_ALLOC(21);	// 2^64+1 can be represented in 21 chars.
+    if (str)
+    {
+        OVR_sprintf(str, 21, "%d", valueint);
+    }
+    return str;
+}
+
+
+//-----------------------------------------------------------------------------
+// Render the number from the given item into a string.
 static char* PrintNumber(double d)
 {
-	char *str;
-	//double d=item->valuedouble;
+    char *str;
     int valueint = (int)d;
 	if (fabs(((double)valueint)-d)<=DBL_EPSILON && d<=INT_MAX && d>=INT_MIN)
 	{
-		str=(char*)OVR_ALLOC(21);	// 2^64+1 can be represented in 21 chars.
-		if (str)
-            OVR_sprintf(str, 21, "%d", valueint);
+        return PrintInt(valueint);
 	}
 	else
 	{
@@ -105,6 +116,7 @@ static char* PrintNumber(double d)
 	return str;
 }
 
+
 // Parse the input text into an un-escaped cstring, and populate item.
 static const unsigned char firstByteMark[7] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
 
@@ -119,8 +131,8 @@ const char* AssignError(const char** perror, const char *errorMessage)
 //-----------------------------------------------------------------------------
 // ***** JSON Node class
 
-JSON::JSON(JSONItemType itemType)
-    : Type(itemType), dValue(0.0)
+JSON::JSON(JSONItemType itemType) :
+    Type(itemType), dValue(0.)
 {
 }
 
@@ -141,21 +153,27 @@ JSON::~JSON()
 const char* JSON::parseNumber(const char *num)
 {
     const char* num_start = num;
-    double      n=0, sign=1, scale=0;
+    double      n=0, scale=0;
     int         subscale     = 0,
                 signsubscale = 1;
+    bool positiveSign = true;
 
 	// Could use sscanf for this?
-	if (*num=='-') 
-        sign=-1,num++;	// Has sign?
-	if (*num=='0')
+    if (*num == '-')
+    {
+        positiveSign = false;
+        num++;	// Has sign?
+    }
+    if (*num == '0')
+    {
         num++;			// is zero
-	
+    }
+
     if (*num>='1' && *num<='9')	
     {
         do
-        {   
-            n=(n*10.0)+(*num++ -'0');
+        {
+            n = (n*10.0) + (*num++ - '0');
         }
         while (*num>='0' && *num<='9');	// Number?
     }
@@ -174,26 +192,35 @@ const char* JSON::parseNumber(const char *num)
 	if (*num=='e' || *num=='E')		// Exponent?
 	{
         num++;
-        if (*num=='+')
+        if (*num == '+')
+        {
             num++;
+        }
         else if (*num=='-')
         {
             signsubscale=-1;
             num++;		// With sign?
         }
 
-		while (*num>='0' && *num<='9')
-            subscale=(subscale*10)+(*num++ - '0');	// Number?
+        while (*num >= '0' && *num <= '9')
+        {
+            subscale = (subscale * 10) + (*num++ - '0');	// Number?
+        }
 	}
 
     // Number = +/- number.fraction * 10^+/- exponent
-	n = sign*n*pow(10.0,(scale+subscale*signsubscale));
+    n *= pow(10.0, (scale + subscale*signsubscale));
+
+    if (!positiveSign)
+    {
+        n = -n;
+    }
 
     // Assign parsed value.
-	Type   = JSON_Number;
+    Type = JSON_Number;
     dValue = n;
     Value.AssignString(num_start, num - num_start);
-    
+
 	return num;
 }
 
@@ -310,9 +337,13 @@ const char* JSON::parseString(const char* str, const char** perror)
 					switch (len)
                     {
 						case 4: *--ptr2 =((uc | 0x80) & 0xBF); uc >>= 6;
+							//no break, fall through
 						case 3: *--ptr2 =((uc | 0x80) & 0xBF); uc >>= 6;
+							//no break
 						case 2: *--ptr2 =((uc | 0x80) & 0xBF); uc >>= 6;
+							//no break
 						case 1: *--ptr2 = (char)(uc | firstByteMark[len]);
+							//no break
 					}
 					ptr2+=len;
 					break;
@@ -467,15 +498,15 @@ const char* JSON::parseValue(const char* buff, const char** perror)
     { 
         Type   = JSON_Bool;
         Value  = "false";
-        dValue = 0;
+        dValue = 0.;
         return buff+5;
     }
 	if (!strncmp(buff,"true",4))
     {
         Type   = JSON_Bool;
         Value  = "true";
-        dValue = 1;
-        return buff+4;
+        dValue = 1.;
+        return buff + 4;
     }
 	if (*buff=='\"')
     {
@@ -508,7 +539,7 @@ char* JSON::PrintValue(int depth, bool fmt)
 	{
         case JSON_Null:	    out = JSON_strdup("null");	break;
         case JSON_Bool:
-            if (dValue == 0)
+            if ((int)dValue == 0)
                 out = JSON_strdup("false");
             else
                 out = JSON_strdup("true");
@@ -571,9 +602,9 @@ const char* JSON::parseArray(const char* buff, const char** perror)
 // Render an array to text.  The returned text must be freed
 char* JSON::PrintArray(int depth, bool fmt)
 {
-	char **entries;
-	char * out = 0,*ptr,*ret;
-    SPInt  len = 5;
+	char **  entries;
+	char *   out = 0, *ptr,*ret;
+    intptr_t len = 5;
 	
     bool fail = false;
 	
@@ -720,11 +751,11 @@ const char* JSON::parseObject(const char* buff, const char** perror)
 // Render an object to text.  The returned string must be freed
 char* JSON::PrintObject(int depth, bool fmt)
 {
-	char** entries = 0, **names = 0;
-	char*  out = 0;
-    char*  ptr, *ret, *str;
-    SPInt  len = 7, i = 0, j;
-    bool   fail = false;
+	char**   entries = 0, **names = 0;
+	char*    out = 0;
+    char*    ptr, *ret, *str;
+    intptr_t len = 7, i = 0, j;
+    bool     fail = false;
 	
     // Count the number of entries.
     int numentries = GetItemCount();
@@ -732,7 +763,7 @@ char* JSON::PrintObject(int depth, bool fmt)
 	// Explicitly handle empty object case
 	if (numentries == 0)
 	{
-		out=(char*)OVR_ALLOC(fmt?depth+3:3);
+		out=(char*)OVR_ALLOC(fmt?depth+4:4);
 		if (!out)
             return 0;
 		ptr=out;
@@ -775,7 +806,7 @@ char* JSON::PrintObject(int depth, bool fmt)
 
 		if (str && ret)
         {
-            len += OVR_strlen(ret)+OVR_strlen(str)+2+(fmt?2+depth:0);
+            len += OVR_strlen(ret)+OVR_strlen(str)+2+(fmt?3+depth:0);
         }
         else
         {
@@ -812,31 +843,47 @@ char* JSON::PrintObject(int depth, bool fmt)
 	*out = '{';
     ptr  = out+1;
     if (fmt)
-        *ptr++='\n';
+    {
+#ifdef OVR_OS_WIN32
+        *ptr++ = '\r';
+#endif
+        *ptr++ = '\n';
+    }
     *ptr = 0;
 	
     for (i=0; i<numentries; i++)
 	{
 		if (fmt)
         {
-            for (j=0; j<depth; j++)
+            for (j = 0; j < depth; j++)
+            {
                 *ptr++ = '\t';
+            }
         }
 		OVR_strcpy(ptr, len - (ptr-out), names[i]);
         ptr   += OVR_strlen(names[i]);
 		*ptr++ =':';
         
         if (fmt)
-            *ptr++='\t';
+        {
+            *ptr++ = '\t';
+        }
 		
         OVR_strcpy(ptr, len - (ptr-out), entries[i]);
         ptr+=OVR_strlen(entries[i]);
 		
-        if (i!=numentries-1)
+        if (i != numentries - 1)
+        {
             *ptr++ = ',';
+        }
 		
         if (fmt)
+        {
+#ifdef OVR_OS_WIN32
+            *ptr++ = '\r';
+#endif
             *ptr++ = '\n';
+        }
         *ptr = 0;
 		
         OVR_FREE(names[i]);
@@ -848,8 +895,10 @@ char* JSON::PrintObject(int depth, bool fmt)
 	
     if (fmt)
     {
-        for (i=0;i<depth-1;i++)
-            *ptr++='\t';
+        for (i = 0; i < depth - 1; i++)
+        {
+            *ptr++ = '\t';
+        }
     }
 	*ptr++='}';
     *ptr++=0;
@@ -864,8 +913,10 @@ char* JSON::PrintObject(int depth, bool fmt)
 unsigned JSON::GetItemCount() const
 {
     unsigned count = 0;
-    for(const JSON* p = Children.GetFirst(); !Children.IsNull(p); p = p->pNext)
+    for (const JSON* p = Children.GetFirst(); !Children.IsNull(p); p = p->pNext)
+    {
         count++;
+    }
     return count;
 }
 
@@ -920,11 +971,11 @@ JSON* JSON::GetItemByName(const char* name)
 // Adds a new item to the end of the child list
 void JSON::AddItem(const char *string, JSON *item)
 {
-    if (!item)
-        return;
- 
-    item->Name = string;
-    Children.PushBack(item);
+    if (item)
+    {
+        item->Name = string;
+        Children.PushBack(item);
+    }
 }
 
 /*
@@ -977,28 +1028,59 @@ void JSON::RemoveLast()
     }
 }
 
-// Helper function to simplify creation of a typed object
-JSON* JSON::createHelper(JSONItemType itemType, double dval, const char* strVal)
+JSON* JSON::CreateBool(bool b)
 {
-    JSON *item = new JSON(itemType);
+    JSON *item = new JSON(JSON_Bool);
     if (item)
     {
-        item->dValue = dval;
-        if (strVal)
-            item->Value = strVal;
+        item->dValue = b ? 1. : 0.;
+        item->Value = b ? "true" : "false";
     }
     return item;
 }
+
+JSON* JSON::CreateNumber(double num)
+{
+    JSON *item = new JSON(JSON_Number);
+    if (item)
+    {
+        item->dValue = num;
+    }
+    return item;
+}
+
+JSON* JSON::CreateInt(int num)
+{
+    JSON *item = new JSON(JSON_Number);
+    if (item)
+    {
+        item->dValue = num;
+    }
+    return item;
+}
+
+JSON* JSON::CreateString(const char *s)
+{
+    JSON *item = new JSON(JSON_String);
+    if (item && s)
+    {
+        item->Value = s;
+    }
+    return item;
+}
+
 
 //-----------------------------------------------------------------------------
 // Get elements by name
 double JSON::GetNumberByName(const char *name, double defValue)
 {
 	JSON* item = GetItemByName(name);
-	if (!item || item->Type != JSON_Number) {
+	if (!item || item->Type != JSON_Number)
+    {
 		return defValue;
 	}
-	else {
+	else
+    {
 		return item->dValue;
 	}
 }
@@ -1006,10 +1088,12 @@ double JSON::GetNumberByName(const char *name, double defValue)
 int JSON::GetIntByName(const char *name, int defValue)
 {
 	JSON* item = GetItemByName(name);
-	if (!item || item->Type != JSON_Number) {
+	if (!item || item->Type != JSON_Number)
+    {
 		return defValue;
 	}
-	else {
+	else
+    {
 		return (int)item->dValue;
 	}
 }
@@ -1017,10 +1101,12 @@ int JSON::GetIntByName(const char *name, int defValue)
 bool JSON::GetBoolByName(const char *name, bool defValue)
 {
 	JSON* item = GetItemByName(name);
-	if (!item || item->Type != JSON_Bool) {
+	if (!item || item->Type != JSON_Bool)
+    {
 		return defValue;
 	}
-	else {
+	else
+    {
 		return (int)item->dValue != 0;
 	}
 }
@@ -1028,10 +1114,12 @@ bool JSON::GetBoolByName(const char *name, bool defValue)
 String JSON::GetStringByName(const char *name, const String &defValue)
 {
 	JSON* item = GetItemByName(name);
-	if (!item || item->Type != JSON_String) {
+	if (!item || item->Type != JSON_String)
+    {
 		return defValue;
 	}
-	else {
+	else
+    {
 		return item->Value;
 	}
 }
@@ -1040,17 +1128,19 @@ String JSON::GetStringByName(const char *name, const String &defValue)
 // Adds an element to an array object type
 void JSON::AddArrayElement(JSON *item)
 {
-    if (!item)
-        return;
-
-    Children.PushBack(item);
+    if (item)
+    {
+        Children.PushBack(item);
+    }
 }
 
 // Inserts an element into a valid array position
 void JSON::InsertArrayElement(int index, JSON *item)
 {
     if (!item)
+    {
         return;
+    }
 
     if (index == 0)
     {
@@ -1076,9 +1166,11 @@ void JSON::InsertArrayElement(int index, JSON *item)
 int JSON::GetArraySize()
 {
     if (Type == JSON_Array)
+    {
         return GetItemCount();
-    else
-        return 0;
+    }
+
+    return 0;
 }
 
 // Returns the number value an the give array index
@@ -1089,10 +1181,8 @@ double JSON::GetArrayNumber(int index)
         JSON* number = GetItemByIndex(index);
         return number ? number->dValue : 0.0;
     }
-    else
-    {
-        return 0;
-    }
+
+    return 0;
 }
 
 // Returns the string value at the given array index
@@ -1103,10 +1193,8 @@ const char* JSON::GetArrayString(int index)
         JSON* number = GetItemByIndex(index);
         return number ? number->Value : 0;
     }
-    else
-    {
-        return 0;
-    }
+
+    return 0;
 }
 
 JSON* JSON::Copy()
@@ -1139,7 +1227,7 @@ JSON* JSON::Load(const char* path, const char** perror)
     }
 
     int    len   = f.GetLength();
-    UByte* buff  = (UByte*)OVR_ALLOC(len + 1);
+    uint8_t* buff  = (uint8_t*)OVR_ALLOC(len + 1);
     int    bytes = f.Read(buff, len);
     f.Close();
 
@@ -1168,10 +1256,10 @@ bool JSON::Save(const char* path)
     char* text = PrintValue(0, true);
     if (text)
     {
-        SPInt len   = OVR_strlen(text);
-        OVR_ASSERT(len <= (SPInt)(int)len);
+        intptr_t len   = OVR_strlen(text);
+        OVR_ASSERT(len <= (intptr_t)(int)len);
 
-        int   bytes = f.Write((UByte*)text, (int)len);
+        int   bytes = f.Write((uint8_t*)text, (int)len);
         f.Close();
         OVR_FREE(text);
         return (bytes == len);
@@ -1182,4 +1270,5 @@ bool JSON::Save(const char* path)
     }
 }
 
-}
+
+} // namespace OVR

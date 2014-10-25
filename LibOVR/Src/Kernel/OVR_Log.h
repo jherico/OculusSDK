@@ -6,16 +6,16 @@ Content     :   Logging support
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,8 @@ limitations under the License.
 #define OVR_Log_h
 
 #include "OVR_Types.h"
+#include "../Kernel/OVR_Delegates.h"
+#include "../Kernel//OVR_Observer.h"
 #include <stdarg.h>
 
 namespace OVR {
@@ -92,7 +94,6 @@ enum LogMessageType
 #  define OVR_LOG_VAARG_ATTRIBUTE(a,b)
 #endif
 
-
 //-----------------------------------------------------------------------------------
 // ***** Log
 
@@ -102,20 +103,33 @@ enum LogMessageType
 
 class Log
 {
-    friend class System;
+	friend class System;
+
+#ifdef OVR_OS_WIN32
+    void* hEventSource;
+#endif
+
 public: 
-    Log(unsigned logMask = LogMask_Debug) : LoggingMask(logMask) { }
+    Log(unsigned logMask = LogMask_Debug);
     virtual ~Log();
 
-    // Log formating buffer size used by default LogMessageVarg. Longer strings are truncated.
+	typedef Delegate2<void, const char*, LogMessageType> LogHandler;
+
+    // The following is deprecated, as there is no longer a max log buffer message size.
     enum { MaxLogBufferMessageSize = 4096 };
 
     unsigned        GetLoggingMask() const            { return LoggingMask; }
     void            SetLoggingMask(unsigned logMask)  { LoggingMask = logMask; }
 
+	// Internal
+	// Invokes observers, then calls LogMessageVarg()
+	static void    LogMessageVargInt(LogMessageType messageType, const char* fmt, va_list argList);
+
     // This virtual function receives all the messages,
     // developers should override this function in order to do custom logging
     virtual void    LogMessageVarg(LogMessageType messageType, const char* fmt, va_list argList);
+
+	static void		AddLogObserver(ObserverScope<LogHandler> *logObserver);
 
     // Call the logging function with specific message type, with no type filtering.
     void            LogMessage(LogMessageType messageType,
@@ -124,14 +138,16 @@ public:
 
     // Helper used by LogMessageVarg to format the log message, writing the resulting
     // string into buffer. It formats text based on fmt and appends prefix/new line
-    // based on LogMessageType.
-    static void     FormatLog(char* buffer, unsigned bufferSize, LogMessageType messageType,
+    // based on LogMessageType. Return behavior is the same as ISO C vsnprintf: returns the 
+    // required strlen of buffer (which will be >= bufferSize if bufferSize is insufficient)
+    // or returns a negative value because the input was bad.
+    static int     FormatLog(char* buffer, size_t bufferSize, LogMessageType messageType,
                               const char* fmt, va_list argList);
 
     // Default log output implementation used by by LogMessageVarg.
     // Debug flag may be used to re-direct output on some platforms, but doesn't
     // necessarily disable it in release builds; that is the job of the called.    
-    static void     DefaultLogOutput(const char* textBuffer, bool debug);
+    void            DefaultLogOutput(const char* textBuffer, LogMessageType messageType, int bufferSize = -1);
 
     // Determines if the specified message type is for debugging only.
     static bool     IsDebugMessage(LogMessageType messageType)
@@ -184,18 +200,25 @@ void LogError(const char* fmt, ...) OVR_LOG_VAARG_ATTRIBUTE(1,2);
 
     // Macro to do debug logging, printf-style.
     // An extra set of set of parenthesis must be used around arguments,
-    // as in: OVR_LOG_DEBUG(("Value %d", 2)).
+    // as in: OVR_DEBUG_LOG(("Value %d", 2)).
     #define OVR_DEBUG_LOG(args)       do { OVR::LogDebug args; } while(0)
     #define OVR_DEBUG_LOG_TEXT(args)  do { OVR::LogDebugText args; } while(0)
 
-    #define OVR_ASSERT_LOG(c, args)   do { if (!(c)) { OVR::LogAssert args; OVR_DEBUG_BREAK; } } while(0)
+	// Conditional logging. It logs when the condition 'c' is true.
+	#define OVR_DEBUG_LOG_COND(c, args)			do { if ((c)) { OVR::LogDebug args; } } while(0)
+	#define OVR_DEBUG_LOG_TEXT_COND(c, args)	do { if ((c)) { OVR::LogDebugText args; } } while(0)
+
+	// Conditional logging & asserting. It asserts/logs when the condition 'c' is NOT true.
+    #define OVR_ASSERT_LOG(c, args)	  do { if (!(c)) { OVR::LogAssert args; OVR_DEBUG_BREAK; } } while(0)
 
 #else
 
     // If not in debug build, macros do nothing.
-    #define OVR_DEBUG_LOG(args)         ((void)0)
-    #define OVR_DEBUG_LOG_TEXT(args)    ((void)0)
-    #define OVR_ASSERT_LOG(c, args)     ((void)0)
+    #define OVR_DEBUG_LOG(args)				((void)0)
+    #define OVR_DEBUG_LOG_TEXT(args)		((void)0)
+	#define OVR_DEBUG_LOG_COND(c, args)		((void)0)
+	#define OVR_DEBUG_LOG_TEXT_COND(args)	((void)0)
+    #define OVR_ASSERT_LOG(c, args)			((void)0)
 
 #endif
 

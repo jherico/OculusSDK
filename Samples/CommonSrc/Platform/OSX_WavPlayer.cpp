@@ -22,8 +22,8 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OSX_WavPlayer.h"
-#ifdef OVR_OS_MAC
-namespace OVR { namespace Platform { namespace OSX {
+
+namespace OVR { namespace OvrPlatform { namespace OSX {
 
 WavPlayer::WavPlayer(const char* fileName)
 {
@@ -248,4 +248,3 @@ int WavPlayer::PlayAudio()
 }
 
 }}}
-#endif

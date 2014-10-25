@@ -50,7 +50,7 @@ class OculusRoomTinyApp;
 
 @interface OVRView : NSOpenGLView <NSWindowDelegate>
 
-//@property (assign) OVR::Platform::OSX::PlatformCore* Platform;
+//@property (assign) OVR::OvrPlatform::OSX::PlatformCore* Platform;
 @property (assign) OculusRoomTinyApp* App;
 @property unsigned long Modifiers;
 

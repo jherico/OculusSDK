@@ -6,16 +6,16 @@ Content     :   Provides static functions for precise timing
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,9 +42,9 @@ class Timer
 {
 public:
     enum {
-        MsPerSecond     = 1000, // Milliseconds in one second.
-        NanosPerSecond  = MsPerSecond * 1000 * 1000,
-        MksPerSecond    = MsPerSecond * 1000
+        MsPerSecond     = 1000,                  // Milliseconds in one second.
+        MksPerSecond    = 1000 * 1000,           // Microseconds in one second.
+        NanosPerSecond  = 1000 * 1000 * 1000,    // Nanoseconds in one second.
     };
 
     // ***** Timing APIs for Application    
@@ -56,19 +56,19 @@ public:
     static double  OVR_STDCALL GetSeconds();    
 
     // Returns time in Nanoseconds, using highest possible system resolution.
-    static UInt64  OVR_STDCALL GetTicksNanos();
+    static uint64_t  OVR_STDCALL GetTicksNanos();
 
     // Kept for compatibility.
     // Returns ticks in milliseconds, as a 32-bit number. May wrap around every 49.2 days.
     // Use either time difference of two values of GetTicks to avoid wrap-around.
-    static UInt32  OVR_STDCALL GetTicksMs()
-    { return  UInt32(GetTicksNanos() / 1000000); }
+    static uint32_t  OVR_STDCALL GetTicksMs()
+    { return  uint32_t(GetTicksNanos() / 1000000); }
 
     // for recorded data playback
-    static void SetFakeSeconds(double fakeSeconds) 
+    static void SetFakeSeconds(double fakeSeconds, bool enable = true) 
     { 
         FakeSeconds = fakeSeconds; 
-        useFakeSeconds = true; 
+        useFakeSeconds = enable; 
     }
 
 private:
@@ -79,7 +79,18 @@ private:
 
     // for recorded data playback
     static double FakeSeconds;
-    static bool   useFakeSeconds; 
+    static bool   useFakeSeconds;
+    
+    #if defined(OVR_OS_ANDROID)
+        // Android-specific data
+    #elif defined (OVR_OS_MS)
+        // Microsoft-specific data
+    #elif defined(OVR_OS_MAC)
+        static double TimeConvertFactorNanos;     // Conversion factor for GetTicksNanos
+        static double TimeConvertFactorSeconds;   // Conversion factor for GetSeconds.
+    #else
+        static bool MonotonicClockAvailable;      // True if clock_gettime supports CLOCK_MONOTONIC
+    #endif
 };
 
 

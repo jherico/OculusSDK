@@ -31,8 +31,8 @@ limitations under the License.
 @interface OVRApp : NSApplication
 
 @property (assign) IBOutlet NSWindow* win;
-@property (assign) OVR::Platform::OSX::PlatformCore* Platform;
-@property (assign) OVR::Platform::Application* App;
+@property (assign) OVR::OvrPlatform::OSX::PlatformCore* Platform;
+@property (assign) OVR::OvrPlatform::Application* App;
 
 -(void) run;
 
@@ -40,8 +40,8 @@ limitations under the License.
 
 @interface OVRView : NSOpenGLView <NSWindowDelegate>
 
-@property (assign) OVR::Platform::OSX::PlatformCore* Platform;
-@property (assign) OVR::Platform::Application* App;
+@property (assign) OVR::OvrPlatform::OSX::PlatformCore* Platform;
+@property (assign) OVR::OvrPlatform::Application* App;
 @property unsigned long Modifiers;
 
 -(void)ProcessMouse:(NSEvent*)event;

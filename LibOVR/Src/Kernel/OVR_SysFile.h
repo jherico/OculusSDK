@@ -11,16 +11,16 @@ Notes       :   errno may not be preserved across use of GBaseFile member functi
             :   Directories cannot be deleted while files opened from them are in use
                 (For the GetFullName function)
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.1 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.1 
+http://www.oculusvr.com/licenses/LICENSE-3.2 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,9 +48,9 @@ class   SysFile;
 struct FileStat
 {
     // No change or create time because they are not available on most systems
-    SInt64  ModifyTime;
-    SInt64  AccessTime;
-    SInt64  FileSize;
+    int64_t ModifyTime;
+    int64_t AccessTime;
+    int64_t FileSize;
 
     bool operator== (const FileStat& stat) const
     {

@@ -5,7 +5,7 @@ Content     :   Win32 OpenGL Device implementation
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse, Michael Antonov, David Borel
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ limitations under the License.
 
 namespace OVR { namespace Render { namespace GL { namespace Win32 {
 
-typedef HRESULT (__stdcall *PFNDWMENABLECOMPOSITIONPROC) (UINT);
+typedef HRESULT (WINAPI *PFNDWMENABLECOMPOSITIONPROC) (UINT);
 
 #pragma warning(disable : 4995)
-PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition;
+PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition = NULL;
 
 
 // ***** GL::Win32::RenderDevice
@@ -55,12 +55,16 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
     
     if (!DwmEnableComposition)
     {
-	    HINSTANCE hInst = LoadLibrary( L"dwmapi.dll" );
+	    HINSTANCE hInst = LoadLibraryA( "dwmapi.dll" );
 	    OVR_ASSERT(hInst);
         DwmEnableComposition = (PFNDWMENABLECOMPOSITIONPROC)GetProcAddress( hInst, "DwmEnableComposition" );
         OVR_ASSERT(DwmEnableComposition);
     }
 
+    // Why do we need to disable composition for OpenGL rendering?
+    // "Enabling DWM in extended mode causes 60Hz judder on NVIDIA cards unless the Rift is the main display. "
+    // "Maybe the confusion is that GL goes through the same compositional pipeline as DX. To the kernel and DWM there is no difference between the two."
+    // "The judder does not occur with DX. My understanding is that for DWM, GL actually requires an additional blt whose timing is dependent on the main monitor."
     DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
     {
 		PIXELFORMATDESCRIPTOR pfd;
@@ -201,16 +205,16 @@ BOOL CALLBACK MonitorEnumFunc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData)
 {
     RenderDevice* renderer = (RenderDevice*)dwData;
 
-    MONITORINFOEX monitor;
+    MONITORINFOEXA monitor;
     monitor.cbSize = sizeof(monitor);
 
-    if (::GetMonitorInfo(hMonitor, &monitor) && monitor.szDevice[0])
+    if (::GetMonitorInfoA(hMonitor, &monitor) && monitor.szDevice[0])
     {
-        DISPLAY_DEVICE dispDev;
+        DISPLAY_DEVICEA dispDev;
         memset(&dispDev, 0, sizeof(dispDev));
         dispDev.cb = sizeof(dispDev);
 
-        if (::EnumDisplayDevices(monitor.szDevice, 0, &dispDev, 0))
+        if (::EnumDisplayDevicesA(monitor.szDevice, 0, &dispDev, 0))
         {
             if (strstr(String(dispDev.DeviceName).ToCStr(), renderer->GetParams().Display.MonitorName.ToCStr()))
             {

@@ -5,7 +5,7 @@ Content     :   Linux (X11) implementation of Platform app infrastructure
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,14 +23,11 @@ limitations under the License.
 
 #ifndef OVR_Platform_Linux_h
 #define OVR_Platform_Linux_h
-#include "Gamepad.h"
-#include "../Render/Render_Device.h"
-#include "Platform.h"
 
-#ifdef OVR_OS_LINUX
+#include "Platform.h"
 #include "../Render/Render_GL_Device.h"
+
 #include <GL/glx.h>
-#include <X11/extensions/xf86vmode.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
@@ -38,17 +35,20 @@ namespace OVR { namespace Render {
     class RenderDevice;
 }}
 
-namespace OVR { namespace Platform { namespace Linux {
+namespace OVR { namespace OvrPlatform { namespace Linux {
 
-class PlatformCore : public Platform::PlatformCore
+struct XDisplayInfo;
+
+class PlatformCore : public OvrPlatform::PlatformCore
 {
-    XF86VidModeModeInfo* StartMode;
     Recti StartVP;
+    bool  HasWM;
 
-    int       IndexOf(Render::DisplayId id);
+    int             IndexOf(Render::DisplayId id);
+    XDisplayInfo    getXDisplayInfo(Render::DisplayId id);
 
 public:
-    Display*     Disp;
+    _XDisplay*   Disp;
     XVisualInfo* Vis;
     Window       Win;
 
@@ -79,7 +79,7 @@ public:
     PlatformCore(Application* app);
     ~PlatformCore();
 
-    bool      SetupWindow(int w, int h);
+    void*     SetupWindow(int w, int h);
     void      Exit(int exitcode) { Quit = 1; ExitCode = exitcode; }
 
     RenderDevice* SetupGraphics(const SetupGraphicsDeviceSet& setupGraphicsDesc,
@@ -104,12 +104,12 @@ namespace Render { namespace GL { namespace Linux {
 
 class RenderDevice : public Render::GL::RenderDevice
 {
-    Display*   Disp;
+    _XDisplay* Disp;
     Window     Win;
     GLXContext Context;
 
 public:
-    RenderDevice(const Render::RendererParams& p, Display* disp, Window w, GLXContext gl)
+    RenderDevice(const Render::RendererParams& p, _XDisplay* disp, Window w, GLXContext gl)
     : GL::RenderDevice(p), Disp(disp), Win(w), Context(gl) {}
 
     virtual void Shutdown();
@@ -126,25 +126,24 @@ public:
 // OVR_PLATFORM_APP_ARGS specifies the Application class to use for startup,
 // providing it with startup arguments.
 #define OVR_PLATFORM_APP_ARGS(AppClass, args)                                            \
-    OVR::Platform::Application* OVR::Platform::Application::CreateApplication()          \
+    OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
     { OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));                \
       return new AppClass args; }                                                        \
-    void OVR::Platform::Application::DestroyApplication(OVR::Platform::Application* app) \
-    { OVR::Platform::PlatformCore* platform = app->pPlatform;                            \
+    void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
+    { OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
       delete app; delete platform; OVR::System::Destroy(); };
 
 // OVR_PLATFORM_APP_ARGS specifies the Application startup class with no args.
 #define OVR_PLATFORM_APP(AppClass) OVR_PLATFORM_APP_ARGS(AppClass, ())
 
 #define OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass, LogClass, args)                         \
-	OVR::Platform::Application* OVR::Platform::Application::CreateApplication()          \
+	OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
 	{ static LogClass log; OVR::System::Init(&log);                                      \
 	   return new AppClass args; }                                                       \
-	void OVR::Platform::Application::DestroyApplication(OVR::Platform::Application* app) \
-	{ OVR::Platform::PlatformCore* platform = app->pPlatform;                            \
+	void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
+	{ OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
 	    delete app; delete platform; OVR::System::Destroy(); };
 
 #define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())
 
-#endif
 #endif
