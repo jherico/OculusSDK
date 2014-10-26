@@ -4,3 +4,6 @@
 [submodule "Bindings/Python"]
 	path = Bindings/Python
 	url = https://github.com/jherico/python-ovrsdk.git
+[submodule "cmake"]
+	path = cmake
+	url = https://github.com/jherico/cmake.git
