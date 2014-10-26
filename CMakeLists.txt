@@ -49,25 +49,16 @@ set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
 option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
 if(OCULUS_BUILD_SAMPLES)
-    # Make sure to set up the OVR include paths
-    include_directories(3rdParty/glew/include)
-    include_directories(${OculusVR_SOURCE_DIR}/Include)
-    include_directories(${OculusVR_SOURCE_DIR}/Src)
-    include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
-    include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
-    include_directories(Bindings/C/Include)
-
-    # Cross platform window creation
- #   add_subdirectory(3rdParty/glfw)
- #   include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glfw/include)
-
-    # Cross platform access to shader functionality
-#    include_directories(${CMAKE_SOURCE_DIR}/3rdParty/glext)
-
     # Used by the sample code to read the tuscany resources
     add_subdirectory(3rdParty/TinyXml)
     set_target_properties(TinyXML2 PROPERTIES FOLDER "3rdParty")
     include_directories(3rdParty/TinyXml)
+
+    # Make sure to set up the OVR include paths
+    include_directories(${OculusVR_SOURCE_DIR}/Include)
+    include_directories(${OculusVR_SOURCE_DIR}/Src)
+    include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
+    include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
 
     add_subdirectory (Samples/CommonSrc )
     set_target_properties(CommonSrc PROPERTIES FOLDER "Samples")
