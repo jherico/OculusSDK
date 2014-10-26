@@ -7,7 +7,7 @@ file(GLOB_RECURSE SOURCE_FILES Src/*.cpp Src/*.h Include/*.h)
 
 file(GLOB_RECURSE WIN32_FILES Src/OVR_Win32_*.cpp Src/OVR_Win32_*.h Src/Kernel/OVR_ThreadsWinAPI.cpp *D3D*.cpp)
 file(GLOB_RECURSE D3DX_FILES Src/CAPI_D3D1X*.cpp Src/OVR_D3D1X*.h)
-file(GLOB_RECURSE OSX_FILES Src/OVR_OSX_*.cpp Src/OVR_OSX_*.h )
+file(GLOB_RECURSE OSX_FILES Src/OVR_OSX_*.cpp Src/OVR_OSX_*.h Src/*.mm)
 file(GLOB_RECURSE LINUX_FILES Src/OVR_Linux_*.cpp Src/OVR_Linux_*.h)
 file(GLOB_RECURSE UNIX_FILES Src/OVR_Unix_*.cpp Src/OVR_Unix_*.h Src/Kernel/OVR_ThreadsPthread.cpp)
 
@@ -45,10 +45,19 @@ elseif(APPLE)
     list(APPEND SOURCE_FILES ${OSX_FILES})
     list(APPEND SOURCE_FILES ${UNIX_FILES})
 
+    # Some special files that apparently don’t belong in the SDK ?!
+    file(GLOB_RECURSE OSX_PRIVATE_FILES Src/Displays/OVR_OSX_Focus*)
+    foreach(f ${OSX_PRIVATE_FILES}) 
+        message(“Remove” ${f})
+    endforeach(f) 
+
     # Extra libs
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKIT_LIBRARY IOKit)
     list(APPEND EXTRA_LIBS ${COCOA_LIBRARY} ${IOKIT_LIBRARY})
+
+    find_package(OpenGL REQUIRED)
+    list(APPEND EXTRA_LIBS ${OPENGL_LIBRARIES})
 
 else()
 
