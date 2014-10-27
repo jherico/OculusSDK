@@ -160,27 +160,9 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
     RParams.DC          = config->OGL.DC;
 #elif defined(OVR_OS_LINUX)
-    if (config->OGL.Disp)
-        RParams.Disp = config->OGL.Disp;
-    if (!RParams.Disp)
-        RParams.Disp = XOpenDisplay(NULL);
-    if (!RParams.Disp)
-    {
-        OVR_DEBUG_LOG(("XOpenDisplay failed."));
-        return false;
-    }
-
-    if (config->OGL.Win)
-        RParams.Win         = config->OGL.Win;
-    if (!RParams.Win)
-    {
-        RParams.Win = glXGetCurrentDrawable();
-    }
-    if (!RParams.Win)
-    {
-        OVR_DEBUG_LOG(("XGetInputFocus failed."));
-        return false;
-    }
+    RParams.ContextData = config->OGL.ContextData;
+    RParams.ContextSwitch  = config->OGL.ContextSwitch;
+    RParams.SwapBuffers = config->OGL.SwapBuffers;
 
     RotateCCW90 = false;
     if (   RState.DistortionCaps & ovrDistortionCap_LinuxDevFullscreen
@@ -195,9 +177,9 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     LatencyVAO = 0;
 
-    Context currContext;
-    currContext.InitFromCurrent();
-    distortionContext.CreateShared( currContext );
+//    Context currContext;
+//    currContext.InitFromCurrent();
+//    distortionContext.CreateShared( currContext );
 
     //DistortionWarper.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
 
@@ -206,9 +188,11 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     initBuffersAndShaders();
 
-    distortionContext.Bind();
+    RParams.ContextSwitch(RParams.ContextData, true);
+//    distortionContext.Bind();
     initOverdrive(); // because this creates an FBO
-    currContext.Bind();
+//    currContext.Bind();
+    RParams.ContextSwitch(RParams.ContextData, false);
 
 	RestoreGraphicsState();
 
@@ -329,8 +313,8 @@ void DistortionRenderer::renderEndFrame()
 
 void DistortionRenderer::EndFrame(bool swapBuffers)
 {
-    Context currContext;
-    currContext.InitFromCurrent();
+//    Context currContext;
+//    currContext.InitFromCurrent();
 #if defined(OVR_OS_MAC)
     distortionContext.SetSurface( currContext );
 #endif
@@ -344,7 +328,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             // Wait for timewarp distortion if it is time and Gpu idle
             FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
 
-            distortionContext.Bind();
+            RParams.ContextSwitch(RParams.ContextData, true);
+//            distortionContext.Bind();
             renderEndFrame();
         }
         else
@@ -354,7 +339,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             WaitUntilGpuIdle();
             double  distortionStartTime = ovr_GetTimeInSeconds();
 
-            distortionContext.Bind();
+            RParams.ContextSwitch(RParams.ContextData, true);
+//            distortionContext.Bind();
             renderEndFrame();
 
             WaitUntilGpuIdle();
@@ -363,7 +349,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
     }
     else
     {
-        distortionContext.Bind();
+        RParams.ContextSwitch(RParams.ContextData, true);
+//        distortionContext.Bind();
         renderEndFrame();
     }
 
@@ -401,17 +388,18 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         
         CGLFlushDrawable(context);
 #elif defined(OVR_OS_LINUX)
-        static const char* extensions = glXQueryExtensionsString(RParams.Disp, 0);
-        static bool supportsVSync = (extensions != NULL && strstr(extensions, "GLX_EXT_swap_control"));
-        if (supportsVSync)
-        {
-            GLuint currentSwapInterval = 0;
-            glXQueryDrawable(RParams.Disp, RParams.Win, GLX_SWAP_INTERVAL_EXT, &currentSwapInterval);
-            if (currentSwapInterval != (GLuint)swapInterval)
-                glXSwapIntervalEXT(RParams.Disp, RParams.Win, swapInterval);
-        }
-
-        glXSwapBuffers(RParams.Disp, RParams.Win);
+//        static const char* extensions = glXQueryExtensionsString(RParams.Disp, 0);
+//        static bool supportsVSync = (extensions != NULL && strstr(extensions, "GLX_EXT_swap_control"));
+//        if (supportsVSync)
+//        {
+//            GLuint currentSwapInterval = 0;
+//            glXQueryDrawable(RParams.Disp, RParams.Win, GLX_SWAP_INTERVAL_EXT, &currentSwapInterval);
+//            if (currentSwapInterval != (GLuint)swapInterval)
+//                glXSwapIntervalEXT(RParams.Disp, RParams.Win, swapInterval);
+//        }
+//
+//        glXSwapBuffers(RParams.Disp, RParams.Win);
+        RParams.SwapBuffers(RParams.ContextData);
 #endif
         // Force GPU to flush the scene, resulting in the lowest possible latency.
         // It's critical that this flush is *after* present.
@@ -422,7 +410,8 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
             WaitUntilGpuIdle();
     }
-    currContext.Bind();
+    RParams.ContextSwitch(RParams.ContextData, false);
+//    currContext.Bind();
 }
 
 void DistortionRenderer::WaitUntilGpuIdle()
@@ -1057,10 +1046,11 @@ void DistortionRenderer::destroy()
 
     GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
     
-    Context currContext;
-    currContext.InitFromCurrent();
+//    Context currContext;
+//    currContext.InitFromCurrent();
     
-    distortionContext.Bind();
+    RParams.ContextSwitch(RParams.ContextData, true);
+//    distortionContext.Bind();
 
 	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
 	{
@@ -1095,8 +1085,9 @@ void DistortionRenderer::destroy()
         glDeleteFramebuffers(1, &OverdriveFbo);
     }
 
-    currContext.Bind();
-    distortionContext.Destroy();
+    RParams.ContextSwitch(RParams.ContextData, false);
+//    currContext.Bind();
+//    distortionContext.Destroy();
     // Who is responsible for destroying the app's context?
 
 	RestoreGraphicsState();

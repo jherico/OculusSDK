@@ -274,6 +274,9 @@ enum SampleMode
     Sample_Count        =13,
 };
 
+typedef void (*ContextFunc)(void *, ovrBool);
+typedef void (*SwapFunc)(void *);
+
 
 // Rendering parameters/pointers describing GL rendering setup.
 struct RenderParams
@@ -282,8 +285,11 @@ struct RenderParams
     HWND   Window;
     HDC    DC;
 #elif defined(OVR_OS_LINUX)
-    _XDisplay*  Disp;
-    Window      Win;
+//    _XDisplay*  Disp;
+//    Window      Win;
+    void *              ContextData;
+    ContextFunc         ContextSwitch;
+    SwapFunc            SwapBuffers;
 #endif
 
     ovrSizei  RTSize;
@@ -656,37 +662,37 @@ protected:
 
 void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
 
-class Context
-{
-    bool                initialized;
-    bool                ownsContext;
-    int                 incarnation;
-#if defined(OVR_OS_WIN32)
-    HDC                 hdc;
-    HGLRC               systemContext;
-#elif defined(OVR_OS_LINUX)
-    Display            *x11Display;
-    GLXDrawable         x11Drawable;
-    GLXContext          systemContext;
-    XVisualInfo         x11Visual;
-#elif defined(OVR_OS_MAC)
-    CGLContextObj       systemContext;
-#endif
-        
-public:
-
-    Context();
-    void InitFromCurrent();
-    void CreateShared( Context & ctx );
-#if defined(OVR_OS_MAC)
-    void SetSurface( Context & ctx );
-#endif
-    void Destroy();
-    void Bind();
-    void Unbind();
-    int  GetIncarnation() const { return incarnation; }
-
-};
+//class Context
+//{
+//    bool                initialized;
+//    bool                ownsContext;
+//    int                 incarnation;
+//#if defined(OVR_OS_WIN32)
+//    HDC                 hdc;
+//    HGLRC               systemContext;
+//#elif defined(OVR_OS_LINUX)
+//    Display            *x11Display;
+//    GLXDrawable         x11Drawable;
+//    GLXContext          systemContext;
+//    XVisualInfo         x11Visual;
+//#elif defined(OVR_OS_MAC)
+//    CGLContextObj       systemContext;
+//#endif
+//
+//public:
+//
+//    Context();
+//    void InitFromCurrent();
+//    void CreateShared( Context & ctx );
+//#if defined(OVR_OS_MAC)
+//    void SetSurface( Context & ctx );
+//#endif
+//    void Destroy();
+//    void Bind();
+//    void Unbind();
+//    int  GetIncarnation() const { return incarnation; }
+//
+//};
 
 
 }}} // namespace OVR::CAPI::GL

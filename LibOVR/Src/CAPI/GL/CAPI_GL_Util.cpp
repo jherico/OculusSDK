@@ -764,157 +764,157 @@ void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo)
 }
 
 
-Context::Context() : initialized(false), ownsContext(true), incarnation(0)
-{
-#if defined(OVR_OS_MAC)
-    systemContext = 0;
-#elif defined(OVR_OS_WIN32)
-    hdc = 0;
-    systemContext = 0;
-#elif defined(OVR_OS_LINUX)
-    x11Display = 0;
-    x11Drawable = 0;
-    systemContext = 0;
-#endif
-
-}
-
-void Context::InitFromCurrent()
-{
-    Destroy();
-
-    initialized = true;
-    ownsContext = false;
-    incarnation++;
-    
-#if defined(OVR_OS_MAC)
-    systemContext = CGLGetCurrentContext();
-        {
-        CGSConnectionID cid;
-        CGSWindowID wid;
-        CGSSurfaceID sid;
-        CGLError e  = kCGLNoError;
-        e = CGLGetSurface(systemContext, &cid, &wid, &sid);
-        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    }
-
-#elif defined(OVR_OS_WIN32)
-    hdc = wglGetCurrentDC();
-    systemContext = wglGetCurrentContext();
-#elif defined(OVR_OS_LINUX)
-    x11Display = glXGetCurrentDisplay();
-    x11Drawable = glXGetCurrentDrawable();
-    systemContext = glXGetCurrentContext();
-    if (!SDKWindow::getVisualFromDrawable(x11Drawable, &x11Visual))
-    {
-        OVR::LogError("[Context] Unable to obtain x11 visual from context");
-    }
-#endif
-}
-
-
-void Context::CreateShared( Context & ctx )
-{
-    Destroy();
-    OVR_ASSERT( ctx.initialized == true );
-    if( ctx.initialized == false )
-    {
-        return;
-    }
-
-    initialized = true;
-    ownsContext = true;
-    incarnation++;
-    
-#if defined(OVR_OS_MAC)
-    CGLPixelFormatObj pixelFormat = CGLGetPixelFormat( ctx.systemContext );
-    CGLError e = CGLCreateContext( pixelFormat, ctx.systemContext, &systemContext );
-    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    SetSurface(ctx);
-#elif defined(OVR_OS_WIN32)
-    hdc = ctx.hdc;
-    systemContext = wglCreateContext( ctx.hdc );
-    BOOL success = wglShareLists(ctx.systemContext, systemContext );
-    OVR_ASSERT( success == TRUE );
-    OVR_UNUSED(success);
-#elif defined(OVR_OS_LINUX)
-    x11Display = ctx.x11Display;
-    x11Drawable = ctx.x11Drawable;
-    x11Visual = ctx.x11Visual;
-    systemContext = glXCreateContext( ctx.x11Display, &x11Visual, ctx.systemContext, True );
-    OVR_ASSERT( systemContext != NULL );
-#endif
-}
-
-#if defined(OVR_OS_MAC)
-void Context::SetSurface( Context & ctx ) {
-    CGLError e = kCGLNoError;
-    CGSConnectionID cid, cid2;
-    CGSWindowID wid, wid2;
-    CGSSurfaceID sid, sid2;
-    
-
-    
-    e = CGLGetSurface(ctx.systemContext, &cid, &wid, &sid);
-    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    e = CGLGetSurface(systemContext, &cid2, &wid2, &sid2);
-    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    if( sid && sid != sid2 ) {
-        e = CGLSetSurface(systemContext, cid, wid, sid);
-        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    }
-}
-#endif
-
-void Context::Destroy()
-{
-    if( initialized == false )
-    {
-        return;
-    }
-  
-    if( ownsContext )
-    {
-#if defined(OVR_OS_MAC)
-        CGLDestroyContext( systemContext );
-#elif defined(OVR_OS_WIN32)
-        BOOL success = wglDeleteContext( systemContext );
-		OVR_ASSERT( success == TRUE );
-        OVR_UNUSED( success );
-#elif defined(OVR_OS_LINUX)
-        glXDestroyContext( x11Display, systemContext );
-#endif
-        systemContext = NULL;
-    }
-  
-  initialized = false;
-  ownsContext = true;
-  
-  
-}
-
-void Context::Bind()
-{
-#if defined(OVR_OS_MAC)
-    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
-    CGLSetCurrentContext( systemContext );
-#elif defined(OVR_OS_WIN32)
-    wglMakeCurrent( hdc, systemContext );
-#elif defined(OVR_OS_LINUX)
-    glXMakeCurrent( x11Display, x11Drawable, systemContext );
-#endif
-}
-
-void Context::Unbind()
-{
-#if defined(OVR_OS_MAC)
-    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
-    CGLSetCurrentContext( NULL );
-#elif defined(OVR_OS_WIN32)
-    wglMakeCurrent( hdc, NULL );
-#elif defined(OVR_OS_LINUX)
-    glXMakeCurrent( x11Display, None, NULL );
-#endif
-}
+//Context::Context() : initialized(false), ownsContext(true), incarnation(0)
+//{
+//#if defined(OVR_OS_MAC)
+//    systemContext = 0;
+//#elif defined(OVR_OS_WIN32)
+//    hdc = 0;
+//    systemContext = 0;
+//#elif defined(OVR_OS_LINUX)
+//    x11Display = 0;
+//    x11Drawable = 0;
+//    systemContext = 0;
+//#endif
+//
+//}
+//
+//void Context::InitFromCurrent()
+//{
+//    Destroy();
+//
+//    initialized = true;
+//    ownsContext = false;
+//    incarnation++;
+//
+//#if defined(OVR_OS_MAC)
+//    systemContext = CGLGetCurrentContext();
+//        {
+//        CGSConnectionID cid;
+//        CGSWindowID wid;
+//        CGSSurfaceID sid;
+//        CGLError e  = kCGLNoError;
+//        e = CGLGetSurface(systemContext, &cid, &wid, &sid);
+//        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+//    }
+//
+//#elif defined(OVR_OS_WIN32)
+//    hdc = wglGetCurrentDC();
+//    systemContext = wglGetCurrentContext();
+//#elif defined(OVR_OS_LINUX)
+////    x11Display = glXGetCurrentDisplay();
+////    x11Drawable = glXGetCurrentDrawable();
+////    systemContext = glXGetCurrentContext();
+////    if (!SDKWindow::getVisualFromDrawable(x11Drawable, &x11Visual))
+////    {
+////        OVR::LogError("[Context] Unable to obtain x11 visual from context");
+////    }
+//#endif
+//}
+//
+//
+//void Context::CreateShared( Context & ctx )
+//{
+////    Destroy();
+////    OVR_ASSERT( ctx.initialized == true );
+////    if( ctx.initialized == false )
+////    {
+////        return;
+////    }
+////
+////    initialized = true;
+////    ownsContext = true;
+////    incarnation++;
+//
+//#if defined(OVR_OS_MAC)
+//    CGLPixelFormatObj pixelFormat = CGLGetPixelFormat( ctx.systemContext );
+//    CGLError e = CGLCreateContext( pixelFormat, ctx.systemContext, &systemContext );
+//    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+//    SetSurface(ctx);
+//#elif defined(OVR_OS_WIN32)
+//    hdc = ctx.hdc;
+//    systemContext = wglCreateContext( ctx.hdc );
+//    BOOL success = wglShareLists(ctx.systemContext, systemContext );
+//    OVR_ASSERT( success == TRUE );
+//    OVR_UNUSED(success);
+//#elif defined(OVR_OS_LINUX)
+////    x11Display = ctx.x11Display;
+////    x11Drawable = ctx.x11Drawable;
+////    x11Visual = ctx.x11Visual;
+////    systemContext = glXCreateContext( ctx.x11Display, &x11Visual, ctx.systemContext, True );
+////    OVR_ASSERT( systemContext != NULL );
+//#endif
+//}
+//
+//#if defined(OVR_OS_MAC)
+//void Context::SetSurface( Context & ctx ) {
+//    CGLError e = kCGLNoError;
+//    CGSConnectionID cid, cid2;
+//    CGSWindowID wid, wid2;
+//    CGSSurfaceID sid, sid2;
+//
+//
+//
+//    e = CGLGetSurface(ctx.systemContext, &cid, &wid, &sid);
+//    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+//    e = CGLGetSurface(systemContext, &cid2, &wid2, &sid2);
+//    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+//    if( sid && sid != sid2 ) {
+//        e = CGLSetSurface(systemContext, cid, wid, sid);
+//        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+//    }
+//}
+//#endif
+//
+//void Context::Destroy()
+//{
+//    if( initialized == false )
+//    {
+//        return;
+//    }
+//
+//    if( ownsContext )
+//    {
+//#if defined(OVR_OS_MAC)
+//        CGLDestroyContext( systemContext );
+//#elif defined(OVR_OS_WIN32)
+//        BOOL success = wglDeleteContext( systemContext );
+//		OVR_ASSERT( success == TRUE );
+//        OVR_UNUSED( success );
+//#elif defined(OVR_OS_LINUX)
+////        glXDestroyContext( x11Display, systemContext );
+//#endif
+//        systemContext = NULL;
+//    }
+//
+//  initialized = false;
+//  ownsContext = true;
+//
+//
+//}
+//
+//void Context::Bind()
+//{
+//#if defined(OVR_OS_MAC)
+//    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
+//    CGLSetCurrentContext( systemContext );
+//#elif defined(OVR_OS_WIN32)
+//    wglMakeCurrent( hdc, systemContext );
+//#elif defined(OVR_OS_LINUX)
+////    glXMakeCurrent( x11Display, x11Drawable, systemContext );
+//#endif
+//}
+//
+//void Context::Unbind()
+//{
+//#if defined(OVR_OS_MAC)
+//    glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
+//    CGLSetCurrentContext( NULL );
+//#elif defined(OVR_OS_WIN32)
+//    wglMakeCurrent( hdc, NULL );
+//#elif defined(OVR_OS_LINUX)
+////    glXMakeCurrent( x11Display, None, NULL );
+//#endif
+//}
 
 }}} // namespace OVR::CAPI::GL

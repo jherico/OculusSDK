@@ -38,6 +38,9 @@ otherwise accompanies this software in either electronic or hard copy form.
     #include <GL/glx.h>
 #endif
 
+typedef void (*ContextFunc)(void *, ovrBool);
+typedef void (*SwapFunc)(void *);
+
 
 /// Used to configure slave GL rendering (i.e. for devices created externally).
 typedef struct ovrGLConfigData_s
@@ -51,10 +54,9 @@ typedef struct ovrGLConfigData_s
     /// The optional device context. If unset, rendering will use a new context.
     HDC  DC;
 #elif defined(OVR_OS_LINUX)
-    /// The optional display. If unset, rendering will use the current display.
-    _XDisplay* Disp;
-    /// The optional window. If unset, rendering will use the current window.
-    Window     Win;
+    void *              ContextData;
+    ContextFunc         ContextSwitch;
+    SwapFunc            SwapBuffers;
 #endif
 } ovrGLConfigData;
 
