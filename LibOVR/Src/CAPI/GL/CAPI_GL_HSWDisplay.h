@@ -56,7 +56,6 @@ namespace OVR { namespace CAPI { namespace GL {
 
         OVR::CAPI::GL::RenderParams        RenderParams;
         GLVersionAndExtensions             GLVersionInfo;
-//        OVR::CAPI::GL::Context             GLContext;           // Our prive OpenGL context for drawing.
         GLuint                             FrameBuffer;         // This is a container for a texture, depth buffer, stencil buffer to be rendered to. To consider: Make a wrapper class, like the OculusWorldDemo RBuffer class. 
         Ptr<OVR::CAPI::GL::Texture>        pTexture;
         Ptr<OVR::CAPI::GL::ShaderSet>      pShaderSet;
