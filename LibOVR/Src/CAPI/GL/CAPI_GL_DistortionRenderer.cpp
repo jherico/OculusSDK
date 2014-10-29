@@ -160,12 +160,14 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     RParams.ContextSwitch  = config->OGL.ContextSwitch;
     RParams.SwapBuffers = config->OGL.SwapBuffers;
 
+#if defined(OVR_OS_LINUX)
     RotateCCW90 = false;
     if (   RState.DistortionCaps & ovrDistortionCap_LinuxDevFullscreen
         && SDKWindow::getRotation(HMD) == DistRotateCCW90)
     {
         RotateCCW90 = true;
     }
+#endif
 
     DistortionMeshVAOs[0] = 0;
     DistortionMeshVAOs[1] = 0;

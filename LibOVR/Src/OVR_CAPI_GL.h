@@ -47,17 +47,9 @@ typedef struct ovrGLConfigData_s
 {
     /// General device settings.
     ovrRenderAPIConfigHeader Header;
-
-#if defined(OVR_OS_WIN32)
-    /// The optional window handle. If unset, rendering will use the current window.
-    HWND Window;
-    /// The optional device context. If unset, rendering will use a new context.
-    HDC  DC;
-#elif defined(OVR_OS_LINUX)
     void *              ContextData;
     ContextFunc         ContextSwitch;
     SwapFunc            SwapBuffers;
-#endif
 } ovrGLConfigData;
 
 /// Contains OpenGL-specific rendering information.
