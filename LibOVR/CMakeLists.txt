@@ -48,7 +48,7 @@ elseif(APPLE)
     # Some special files that apparently don’t belong in the SDK ?!
     file(GLOB_RECURSE OSX_PRIVATE_FILES Src/Displays/OVR_OSX_Focus*)
     foreach(f ${OSX_PRIVATE_FILES}) 
-        message(“Remove” ${f})
+        list(REMOVE_ITEM SOURCE_FILES ${f})
     endforeach(f) 
 
     # Extra libs
