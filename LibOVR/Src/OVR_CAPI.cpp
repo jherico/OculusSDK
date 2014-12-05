@@ -24,6 +24,7 @@ limitations under the License.
 
 ************************************************************************************/
 
+#include "OVR_Types.h"
 #include "OVR_CAPI.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_Math.h"
