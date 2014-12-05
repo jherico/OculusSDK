@@ -1063,36 +1063,62 @@ bool Thread::MSleep(unsigned msecs)
     return 1;
 }
 
+
+
 void Thread::SetThreadName( const char* name )
 {
-#if !defined(OVR_BUILD_SHIPPING) || defined(OVR_BUILD_PROFILING)
-    // http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
-    #pragma pack(push,8)
-    struct THREADNAME_INFO {
-        DWORD dwType;     // Must be 0x1000
-        LPCSTR szName;    // Pointer to name (in user address space)
-        DWORD dwThreadID; // Thread ID (-1 for caller thread)
-        DWORD dwFlags;    // Reserved for future use; must be zero
-    };
-    #pragma pack(pop)
-
-    THREADNAME_INFO info;
-
-    info.dwType = 0x1000;
-    info.szName = name;
-    info.dwThreadID = reinterpret_cast<DWORD>(GetThreadId());
-    info.dwFlags = 0;
-
-    __try
-    {
-        RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(ULONG_PTR), reinterpret_cast<ULONG_PTR *>(&info));
-    }
-    __except( GetExceptionCode()==0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER )
-    {
-        return;
-    }
-#endif // OVR_BUILD_SHIPPING
+    if(IdValue)
+        SetThreadName(name, IdValue);
+    // Else we don't know what thread to name. We can save the name and wait until the thread is created.
 }
+
+
+void Thread::SetThreadName(const char* name, ThreadId threadId)
+{
+    #if !defined(OVR_BUILD_SHIPPING) || defined(OVR_BUILD_PROFILING)
+        // http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
+        #pragma pack(push,8)
+        struct THREADNAME_INFO {
+            DWORD  dwType;     // Must be 0x1000
+            LPCSTR szName;     // Pointer to name (in user address space)
+            DWORD  dwThreadID; // Thread ID (-1 for caller thread)
+            DWORD  dwFlags;    // Reserved for future use; must be zero
+        };
+        #pragma pack(pop)
+
+        THREADNAME_INFO info = { 0x1000, name, (DWORD)threadId, 0 };
+
+        __try
+        {
+            RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(ULONG_PTR), reinterpret_cast<ULONG_PTR*>(&info));
+        }
+        __except( GetExceptionCode()==0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER )
+        {
+            return;
+        }
+    #endif // OVR_BUILD_SHIPPING
+}
+
+
+void Thread::SetCurrentThreadName( const char* name )
+{
+    SetThreadName(name, (ThreadId)::GetCurrentThreadId());
+}
+
+
+void Thread::GetThreadName(char* name, size_t /*nameCapacity*/, ThreadId /*threadId*/)
+{
+    // Not possible on Windows.
+    name[0] = 0;
+}
+
+
+void Thread::GetCurrentThreadName(char* name, size_t /*nameCapacity*/)
+{
+    // Not possible on Windows.
+    name[0] = 0;
+}
+
 
 // static
 int  Thread::GetCPUCount()

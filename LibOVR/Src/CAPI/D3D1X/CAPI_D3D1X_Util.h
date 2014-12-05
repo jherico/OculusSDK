@@ -97,6 +97,13 @@ typedef ID3D1X(Buffer)                          ID3D1xBuffer;
 typedef ID3D1X(VertexShader)                    ID3D1xVertexShader;
 typedef ID3D1X(PixelShader)                     ID3D1xPixelShader;
 typedef ID3D1X(GeometryShader)                  ID3D1xGeometryShader;
+#if (OVR_D3D_VERSION>=11)
+typedef ID3D1X(UnorderedAccessView)             ID3D1xUnorderedAccessView;
+typedef ID3D1X(ComputeShader)                   ID3D1xComputeShader;
+#else
+// Typedeffing as int saves a lot of checking against DX version numbers when just copying around pointers.
+typedef int                                     ID3D1xUnorderedAccessView;
+#endif
 typedef ID3D1X(BlendState)                      ID3D1xBlendState;
 typedef ID3D1X(RasterizerState)                 ID3D1xRasterizerState;
 typedef ID3D1X(SamplerState)                    ID3D1xSamplerState;
@@ -114,6 +121,7 @@ static const int D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT = D3D1X_(COMMONSHADER_SAM
 static const int D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT = D3D1X_(SIMULTANEOUS_RENDER_TARGET_COUNT);
 static const int D3D1x_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT = D3D1X_(IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT);
 static const int D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT = D3D1X_(COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT);
+
 // Blob is the same
 typedef ID3D10Blob                 ID3D1xBlob;
 
@@ -136,12 +144,13 @@ class Buffer;
 // Rendering parameters/pointers describing D3DX rendering setup.
 struct RenderParams
 {
-    ID3D1xDevice*			pDevice;
-    ID3D1xDeviceContext*    pContext;
-    ID3D1xRenderTargetView* pBackBufferRT;
-    IDXGISwapChain*         pSwapChain;
-    Sizei                   RTSize;
-    int                     Multisample;
+    ID3D1xDevice*			    pDevice;
+    ID3D1xDeviceContext*        pContext;
+    ID3D1xRenderTargetView*     pBackBufferRT;
+    ID3D1xUnorderedAccessView*  pBackBufferUAV;
+    IDXGISwapChain*             pSwapChain;
+    Sizei                       BackBufferSize;
+    int                         Multisample;
 };
 
 
@@ -161,7 +170,8 @@ enum ShaderStage
     Shader_Vertex   = 0,
     Shader_Fragment = 2,
     Shader_Pixel    = 2,
-    Shader_Count    = 3,
+    Shader_Compute  = 3,        // DX11+ only
+    Shader_Count    = 4,
 };
 
 enum MapFlags
@@ -179,6 +189,7 @@ enum BufferUsage
     Buffer_Vertex   = 1,
     Buffer_Index    = 2,
     Buffer_Uniform  = 4,
+    Buffer_Compute  = 8,
     Buffer_TypeMask = 0xff,
     Buffer_ReadOnly = 0x100, // Buffer must be created with Data().
 };
@@ -305,6 +316,13 @@ public:
         Matrix4f mt = m.Transposed();
         return SetUniform(name, 16, &mt.M[0][0]);
     }
+    virtual bool SetUniform3x3f(const char* name, const Matrix4f& m)
+    {
+        // float3x3 is actually stored the same way as float4x3, with the last items ignored by the code.
+        Matrix4f mt = m.Transposed();
+        return SetUniform(name, 12, &mt.M[0][0]);
+    }
+
 };
 
 
@@ -313,7 +331,9 @@ public:
 class ShaderFill : public RefCountBase<ShaderFill>
 {
     Ptr<ShaderSet>     Shaders;
-    Ptr<class Texture> Textures[8];
+    Ptr<class Texture> PsTextures[8];
+    Ptr<class Texture> VsTextures[8];
+    Ptr<class Texture> CsTextures[8];
     void*              InputLayout; // HACK this should be abstracted
 
 public:
@@ -324,7 +344,17 @@ public:
     void*       GetInputLayout() const  { return InputLayout; }
 
     virtual void Set(PrimitiveType prim = Prim_Unknown) const;   
-    virtual void SetTexture(int i, class Texture* tex) { if (i < 8) Textures[i] = tex; }
+
+    virtual void SetTexture(int i, class Texture* tex, ShaderStage stage)
+    {
+        if (i < 8)
+        {
+                 if(stage == Shader_Pixel)  PsTextures[i] = tex;
+            else if(stage == Shader_Vertex) VsTextures[i] = tex;
+            else if(stage == Shader_Compute) CsTextures[i] = tex;
+            else OVR_ASSERT(false);
+        }
+    }
     void SetInputLayout(void* newIL) { InputLayout = (void*)newIL; }
 };
 
@@ -391,27 +421,53 @@ public:
 
 typedef ShaderImpl<Shader_Vertex,  ID3D1xVertexShader> VertexShader;
 typedef ShaderImpl<Shader_Fragment, ID3D1xPixelShader> PixelShader;
+#if (OVR_D3D_VERSION>=11)
+typedef ShaderImpl<Shader_Compute, ID3D1xComputeShader> ComputeShader;
+#endif
 
 
 class Buffer : public RefCountBase<Buffer>
 {
 public:
-    RenderParams*     pParams;
-    Ptr<ID3D1xBuffer> D3DBuffer;
+    RenderParams*                   pParams;
+    Ptr<ID3D1xBuffer>               D3DBuffer;
+    Ptr<ID3D1xShaderResourceView>   D3DSrv;
+#if (OVR_D3D_VERSION >= 11)
+    Ptr<ID3D1xUnorderedAccessView>  D3DUav;
+#endif
     size_t            Size;
     int               Use;
     bool              Dynamic;
 
 public:
-    Buffer(RenderParams* rp) : pParams(rp), D3DBuffer(), Size(0), Use(0), Dynamic(false) {}
+    Buffer(RenderParams* rp) : pParams(rp), D3DBuffer(), D3DSrv(),
+#if (OVR_D3D_VERSION >= 11)
+                               D3DUav(),
+#endif
+                               Size(0), Use(0), Dynamic(false) {}
     ~Buffer();
 
-    ID3D1xBuffer* GetBuffer() const { return D3DBuffer; }
+    ID3D1xBuffer* GetBuffer() const
+    {
+        return D3DBuffer;
+    }
+
+    ID3D1xShaderResourceView* GetSrv() const
+    {
+        return D3DSrv;
+    }
+
+#if (OVR_D3D_VERSION >= 11)
+    ID3D1xUnorderedAccessView* GetUav() const
+    {
+        return D3DUav;
+    }
+#endif
 
     virtual size_t GetSize()        { return Size; }
     virtual void*  Map(size_t start, size_t size, int flags = 0);
     virtual bool   Unmap(void *m);
-    virtual bool   Data(int use, const void* buffer, size_t size);
+    virtual bool   Data(int use, const void* buffer, size_t size, int computeBufferStride = -1);
 };
 
 
@@ -423,6 +479,7 @@ public:
     Ptr<ID3D1xShaderResourceView>   TexSv;
     Ptr<ID3D1xRenderTargetView>     TexRtv;
     Ptr<ID3D1xDepthStencilView>     TexDsv;
+    // TODO: add UAV...
     mutable Ptr<ID3D1xSamplerState> Sampler;
     Sizei                           TextureSize;
     int                             Samples;

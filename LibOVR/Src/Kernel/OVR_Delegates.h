@@ -87,7 +87,7 @@ class Delegate0
 	// Stubs
 
 	template <ret_type (*F)()>
-	static OVR_FORCE_INLINE ret_type FreeStub(void *object)
+	static OVR_FORCE_INLINE ret_type FreeStub(void * /*object*/)
 	{
 		return (F)();
 	}
@@ -203,7 +203,7 @@ class Delegate1
 	// Stubs
 
 	template <ret_type (*F)(arg1_type)>
-	static OVR_FORCE_INLINE ret_type FreeStub(void *object, arg1_type a1)
+	static OVR_FORCE_INLINE ret_type FreeStub(void * /*object*/, arg1_type a1)
 	{
 		return (F)(a1);
 	}
@@ -319,7 +319,7 @@ class Delegate2
 	// Stubs
 
 	template <ret_type (*F)(arg1_type, arg2_type)>
-	static OVR_FORCE_INLINE ret_type FreeStub(void *object, arg1_type a1, arg2_type a2)
+	static OVR_FORCE_INLINE ret_type FreeStub(void * /*object*/, arg1_type a1, arg2_type a2)
 	{
 		return (F)(a1, a2);
 	}
@@ -435,7 +435,7 @@ class Delegate3
 	// Stubs
 
 	template <ret_type (*F)(arg1_type, arg2_type, arg3_type)>
-	static OVR_FORCE_INLINE ret_type FreeStub(void *object, arg1_type a1, arg2_type a2, arg3_type a3)
+	static OVR_FORCE_INLINE ret_type FreeStub(void * /*object*/, arg1_type a1, arg2_type a2, arg3_type a3)
 	{
 		return (F)(a1, a2, a3);
 	}

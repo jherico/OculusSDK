@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation for OpenGL
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,172 +24,65 @@ limitations under the License.
 #include "../Render/Render_GL_Device.h"
 #include "Kernel/OVR_Log.h"
 #include "OVR_CAPI_GL.h"
+#include <CAPI/GL/CAPI_GL_Util.h>
+
 
 namespace OVR { namespace Render { namespace GL {
 
 
-#if !defined(OVR_OS_MAC)
-
-// GL Hooks for PC.
-#if defined(OVR_OS_WIN32)
-    
-PFNWGLCHOOSEPIXELFORMATARBPROC           wglChoosePixelFormatARB;
-PFNWGLCREATECONTEXTATTRIBSARBPROC        wglCreateContextAttribsARB;
-PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
-PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
-    
-void* GetFunction(const char* functionName)
-{
-    return wglGetProcAddress(functionName);
-}
-
-#else
-
-PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
-
-void (*GetFunction(const char *functionName))( void )
-{
-    return glXGetProcAddress((GLubyte*)functionName);
-}
-
-#endif
-
-PFNGLGETSTRINGIPROC                      glGetStringi;
-PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
-PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
-PFNGLDELETESHADERPROC                    glDeleteShader;
-PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
-PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
-PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
-PFNGLBINDFRAMEBUFFERPROC                 glBindFramebuffer;
-PFNGLACTIVETEXTUREPROC                   glActiveTexture;
-PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
-PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
-PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
-PFNGLBINDBUFFERPROC                      glBindBuffer;
-PFNGLUNIFORMMATRIX3FVPROC                glUniformMatrix3fv;
-PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
-PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
-PFNGLBUFFERDATAPROC                      glBufferData;
-PFNGLGENBUFFERSPROC                      glGenBuffers;
-PFNGLMAPBUFFERPROC                       glMapBuffer;
-PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
-PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
-PFNGLGETSHADERIVPROC                     glGetShaderiv;
-PFNGLCOMPILESHADERPROC                   glCompileShader;
-PFNGLSHADERSOURCEPROC                    glShaderSource;
-PFNGLCREATESHADERPROC                    glCreateShader;
-PFNGLCREATEPROGRAMPROC                   glCreateProgram;
-PFNGLATTACHSHADERPROC                    glAttachShader;
-PFNGLDETACHSHADERPROC                    glDetachShader;
-PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
-PFNGLUNIFORM1IPROC                       glUniform1i;
-PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
-PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
-PFNGLUSEPROGRAMPROC                      glUseProgram;
-PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
-PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
-PFNGLLINKPROGRAMPROC                     glLinkProgram;
-PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
-PFNGLUNIFORM4FVPROC                      glUniform4fv;
-PFNGLUNIFORM3FVPROC                      glUniform3fv;
-PFNGLUNIFORM2FVPROC                      glUniform2fv;
-PFNGLUNIFORM1FVPROC                      glUniform1fv;
-PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
-PFNGLTEXIMAGE2DMULTISAMPLEPROC           glTexImage2DMultisample;
-PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
-PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
-PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
-PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
-PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
-PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
-PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
-PFNGLBLITFRAMEBUFFEREXTPROC              glBlitFramebuffer;
 
 void InitGLExtensions()
 {
-    if (glGenFramebuffers)
-        return;
-
-#if defined(OVR_OS_WIN32)
-    wglGetSwapIntervalEXT =             (PFNWGLGETSWAPINTERVALEXTPROC)             GetFunction("wglGetSwapIntervalEXT");
-    wglSwapIntervalEXT =                (PFNWGLSWAPINTERVALEXTPROC)                GetFunction("wglSwapIntervalEXT");
-#else
-    glXSwapIntervalEXT =                (PFNGLXSWAPINTERVALEXTPROC)                GetFunction("glXSwapIntervalEXT");
-#endif
-
-    glGetStringi =                      (PFNGLGETSTRINGIPROC)                      GetFunction("glGetStringi");
-    glGenFramebuffers =                 (PFNGLGENFRAMEBUFFERSPROC)                 GetFunction("glGenFramebuffersEXT");
-    glDeleteFramebuffers =              (PFNGLDELETEFRAMEBUFFERSPROC)              GetFunction("glDeleteFramebuffersEXT");
-    glDeleteShader =                    (PFNGLDELETESHADERPROC)                    GetFunction("glDeleteShader");
-    glCheckFramebufferStatus =          (PFNGLCHECKFRAMEBUFFERSTATUSPROC)          GetFunction("glCheckFramebufferStatusEXT");
-    glFramebufferRenderbuffer =         (PFNGLFRAMEBUFFERRENDERBUFFERPROC)         GetFunction("glFramebufferRenderbufferEXT");
-    glFramebufferTexture2D =            (PFNGLFRAMEBUFFERTEXTURE2DPROC)            GetFunction("glFramebufferTexture2DEXT");
-    glBindFramebuffer =                 (PFNGLBINDFRAMEBUFFERPROC)                 GetFunction("glBindFramebufferEXT");
-    glActiveTexture =                   (PFNGLACTIVETEXTUREPROC)                   GetFunction("glActiveTexture");
-    glDisableVertexAttribArray =        (PFNGLDISABLEVERTEXATTRIBARRAYPROC)        GetFunction("glDisableVertexAttribArray");
-    glVertexAttribPointer =             (PFNGLVERTEXATTRIBPOINTERPROC)             GetFunction("glVertexAttribPointer");
-    glEnableVertexAttribArray =         (PFNGLENABLEVERTEXATTRIBARRAYPROC)         GetFunction("glEnableVertexAttribArray");
-    glBindBuffer =                      (PFNGLBINDBUFFERPROC)                      GetFunction("glBindBuffer");
-    glUniformMatrix3fv =                (PFNGLUNIFORMMATRIX3FVPROC)                GetFunction("glUniformMatrix3fv");
-    glUniformMatrix4fv =                (PFNGLUNIFORMMATRIX4FVPROC)                GetFunction("glUniformMatrix4fv");
-    glDeleteBuffers =                   (PFNGLDELETEBUFFERSPROC)                   GetFunction("glDeleteBuffers");
-    glBufferData =                      (PFNGLBUFFERDATAPROC)                      GetFunction("glBufferData");
-    glGenBuffers =                      (PFNGLGENBUFFERSPROC)                      GetFunction("glGenBuffers");
-    glMapBuffer =                       (PFNGLMAPBUFFERPROC)                       GetFunction("glMapBuffer");
-    glUnmapBuffer =                     (PFNGLUNMAPBUFFERPROC)                     GetFunction("glUnmapBuffer");
-    glGetShaderInfoLog =                (PFNGLGETSHADERINFOLOGPROC)                GetFunction("glGetShaderInfoLog");
-    glGetShaderiv =                     (PFNGLGETSHADERIVPROC)                     GetFunction("glGetShaderiv");
-    glCompileShader =                   (PFNGLCOMPILESHADERPROC)                   GetFunction("glCompileShader");
-    glShaderSource =                    (PFNGLSHADERSOURCEPROC)                    GetFunction("glShaderSource");
-    glCreateShader =                    (PFNGLCREATESHADERPROC)                    GetFunction("glCreateShader");
-    glCreateProgram =                   (PFNGLCREATEPROGRAMPROC)                   GetFunction("glCreateProgram");
-    glAttachShader =                    (PFNGLATTACHSHADERPROC)                    GetFunction("glAttachShader");
-    glDetachShader =                    (PFNGLDETACHSHADERPROC)                    GetFunction("glDetachShader");
-    glDeleteProgram =                   (PFNGLDELETEPROGRAMPROC)                   GetFunction("glDeleteProgram");
-    glUniform1i =                       (PFNGLUNIFORM1IPROC)                       GetFunction("glUniform1i");
-    glGetUniformLocation =              (PFNGLGETUNIFORMLOCATIONPROC)              GetFunction("glGetUniformLocation");
-    glGetActiveUniform =                (PFNGLGETACTIVEUNIFORMPROC)                GetFunction("glGetActiveUniform");
-    glUseProgram =                      (PFNGLUSEPROGRAMPROC)                      GetFunction("glUseProgram");
-    glGetProgramInfoLog =               (PFNGLGETPROGRAMINFOLOGPROC)               GetFunction("glGetProgramInfoLog");
-    glGetProgramiv =                    (PFNGLGETPROGRAMIVPROC)                    GetFunction("glGetProgramiv");
-    glLinkProgram =                     (PFNGLLINKPROGRAMPROC)                     GetFunction("glLinkProgram");
-    glBindAttribLocation =              (PFNGLBINDATTRIBLOCATIONPROC)              GetFunction("glBindAttribLocation");
-    glUniform4fv =                      (PFNGLUNIFORM4FVPROC)                      GetFunction("glUniform4fv");
-    glUniform3fv =                      (PFNGLUNIFORM3FVPROC)                      GetFunction("glUniform3fv");
-    glUniform2fv =                      (PFNGLUNIFORM2FVPROC)                      GetFunction("glUniform2fv");
-    glUniform1fv =                      (PFNGLUNIFORM1FVPROC)                      GetFunction("glUniform1fv");
-    glCompressedTexImage2D =            (PFNGLCOMPRESSEDTEXIMAGE2DPROC)            GetFunction("glCompressedTexImage2D");
-    glTexImage2DMultisample =           (PFNGLTEXIMAGE2DMULTISAMPLEPROC)           GetFunction("glTexImage2DMultisample");
-    glRenderbufferStorage =             (PFNGLRENDERBUFFERSTORAGEPROC)             GetFunction("glRenderbufferStorageEXT");
-    glBindRenderbuffer =                (PFNGLBINDRENDERBUFFERPROC)                GetFunction("glBindRenderbufferEXT");
-    glGenRenderbuffers =                (PFNGLGENRENDERBUFFERSPROC)                GetFunction("glGenRenderbuffersEXT");
-    glDeleteRenderbuffers =             (PFNGLDELETERENDERBUFFERSPROC)             GetFunction("glDeleteRenderbuffersEXT");
-    glGenVertexArrays =                 (PFNGLGENVERTEXARRAYSPROC)                 GetFunction("glGenVertexArrays");
-    glDeleteVertexArrays =              (PFNGLDELETEVERTEXARRAYSPROC)              GetFunction("glDeleteVertexArrays");
-    glBindVertexArray =                 (PFNGLBINDVERTEXARRAYPROC)                 GetFunction("glBindVertexArray");
-    glBlitFramebuffer =                 (PFNGLBLITFRAMEBUFFEREXTPROC)              GetFunction("glBlitFramebufferEXT");
+    // Get the GLEContext instance from libOVR. We use that shared version instead of declaring our own.
+    OVR::GLEContext* pGLEContext = OVR::GetGLEContext();
+    OVR_ASSERT(pGLEContext);
+    if(!pGLEContext->IsInitialized())
+    {
+        OVR::GLEContext::SetCurrentContext(pGLEContext);
+        pGLEContext->Init();
+    }
 }
 
-#endif
+
+// glsl2Prefix / glsl3Prefix
+// These provide #defines for shader types that differ between GLSL 1.5 (OpenGL 3.2) and earlier versions.
+static const char glsl2Prefix[] =
+"#version 110\n"
+"#extension GL_ARB_shader_texture_lod : enable\n"
+"#define _FRAGCOLOR_DECLARATION\n"
+"#define _VS_IN attribute\n"
+"#define _VS_OUT varying\n"
+"#define _FS_IN varying\n"
+"#define _TEXTURELOD texture2DLod\n"
+"#define _TEXTURE texture2D\n"
+"#define _FRAGCOLOR gl_FragColor\n";
+
+static const char glsl3Prefix[] =
+"#version 150\n"
+"#define _FRAGCOLOR_DECLARATION out vec4 FragColor;\n"
+"#define _VS_IN in\n"
+"#define _VS_OUT out\n"
+"#define _FS_IN in\n"
+"#define _TEXTURELOD textureLod\n"
+"#define _TEXTURE texture\n"
+"#define _FRAGCOLOR FragColor\n";
+
 
 static const char* StdVertexShaderSrc =
-"#version 110\n"
-
     "uniform mat4 Proj;\n"
     "uniform mat4 View;\n"
     
-    "attribute vec4 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec3 Normal;\n"
+    "_VS_IN vec4 Position;\n"
+    "_VS_IN vec4 Color;\n"
+    "_VS_IN vec2 TexCoord;\n"
+    "_VS_IN vec2 TexCoord1;\n"
+    "_VS_IN vec3 Normal;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec3 oNormal;\n"
-    "varying vec3 oVPos;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord;\n"
+    "_VS_OUT vec2 oTexCoord1;\n"
+    "_VS_OUT vec3 oNormal;\n"
+    "_VS_OUT vec3 oVPos;\n"
     
     "void main()\n"
     "{\n"
@@ -202,18 +95,16 @@ static const char* StdVertexShaderSrc =
     "}\n";
 
 static const char* DirectVertexShaderSrc =
-    "#version 110\n"
-    
     "uniform mat4 View;\n"
     
-    "attribute vec4 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord;\n"
-    "attribute vec3 Normal;\n"
+    "_VS_IN vec4 Position;\n"
+    "_VS_IN vec4 Color;\n"
+    "_VS_IN vec2 TexCoord;\n"
+    "_VS_IN vec3 Normal;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
-    "varying vec3 oNormal;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord;\n"
+    "_VS_OUT vec3 oNormal;\n"
     
     "void main()\n"
     "{\n"
@@ -224,50 +115,49 @@ static const char* DirectVertexShaderSrc =
     "}\n";
 
 static const char* SolidFragShaderSrc =
-    "#version 110\n"
-    
     "uniform vec4 Color;\n"
+    
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "   gl_FragColor = Color;\n"
+    "   _FRAGCOLOR = Color;\n"
     "}\n";
 
 static const char* GouraudFragShaderSrc =
-    "#version 110\n"
+    "_FS_IN vec4 oColor;\n"
     
-    "varying vec4 oColor;\n"
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "   gl_FragColor = oColor;\n"
+    "   _FRAGCOLOR = oColor;\n"
     "}\n";
 
 static const char* TextureFragShaderSrc =
-    "#version 110\n"
-    
     "uniform sampler2D Texture0;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
+    "_FS_IN vec4 oColor;\n"
+    "_FS_IN vec2 oTexCoord;\n"
+    
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "   gl_FragColor = oColor * texture2D(Texture0, oTexCoord);\n"
-    "   if (gl_FragColor.a < 0.4)\n"
+    "   _FRAGCOLOR = oColor * _TEXTURE(Texture0, oTexCoord);\n"
+    "   if (_FRAGCOLOR.a < 0.4)\n"
     "       discard;\n"
     "}\n";
 
 #define LIGHTING_COMMON                                                          \
-    "#version 110\n"                                                    \
     "uniform   vec3 Ambient;\n"                                                   \
     "uniform   vec4 LightPos[8];\n"                                                \
     "uniform   vec4 LightColor[8];\n"                                               \
     "uniform   float LightCount;\n"                                                  \
-    "varying   vec4 oColor;\n"                                                  \
-    "varying   vec2 oTexCoord;\n"                                               \
-    "varying   vec3 oNormal;\n"                                                 \
-    "varying   vec3 oVPos;\n"                                                   \
+    "_FS_IN    vec4 oColor;\n"                                                        \
+    "_FS_IN    vec2 oTexCoord;\n"                                                      \
+    "_FS_IN    vec3 oNormal;\n"                                                         \
+    "_FS_IN    vec3 oVPos;\n"                                                            \
     "vec4 DoLight()\n"                                                                    \
     "{\n"                                                                                  \
     "   vec3 norm = normalize(oNormal);\n"                                                  \
@@ -285,9 +175,11 @@ static const char* TextureFragShaderSrc =
 static const char* LitSolidFragShaderSrc =
     LIGHTING_COMMON
     
+    "_FRAGCOLOR_DECLARATION\n"
+    
     "void main()\n"
     "{\n"
-    "   gl_FragColor = DoLight() * oColor;\n"
+    "   _FRAGCOLOR = DoLight() * oColor;\n"
     "}\n";
 
 static const char* LitTextureFragShaderSrc =
@@ -295,80 +187,82 @@ static const char* LitTextureFragShaderSrc =
     
     "uniform sampler2D Texture0;\n"
     
+    "_FRAGCOLOR_DECLARATION\n"
+    
     "void main()\n"
     "{\n"
-    "   gl_FragColor = DoLight() * texture2D(Texture0, oTexCoord);\n"
+    "   _FRAGCOLOR = DoLight() * _TEXTURE(Texture0, oTexCoord);\n"
     "}\n";
 
 static const char* AlphaTextureFragShaderSrc =
-    "#version 110\n"
-    
     "uniform sampler2D Texture0;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
+    "_FS_IN vec4 oColor;\n"
+    "_FS_IN vec2 oTexCoord;\n"
+    
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "   gl_FragColor = oColor * vec4(1,1,1,texture2D(Texture0, oTexCoord).r);\n"
+    "   _FRAGCOLOR = oColor * vec4(1,1,1,_TEXTURE(Texture0, oTexCoord).r);\n"
     "}\n";
 
 static const char* AlphaBlendedTextureFragShaderSrc =
-    "#version 110\n"
-
     "uniform sampler2D Texture0;\n"
 
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
+    "_FS_IN vec4 oColor;\n"
+    "_FS_IN vec2 oTexCoord;\n"
+
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
     "   vec4 finalColor = oColor;\n"
-    "   finalColor *= texture2D(Texture0, oTexCoord);\n"
+    "   finalColor *= _TEXTURE(Texture0, oTexCoord);\n"
     // Blend state expects premultiplied alpha
     "   finalColor.rgb *= finalColor.a;\n"
-    "   gl_FragColor = finalColor;\n"
+    "   _FRAGCOLOR = finalColor;\n"
     "}\n";
 
 static const char* MultiTextureFragShaderSrc =
-    "#version 110\n"
-    
     "uniform sampler2D Texture0;\n"
     "uniform sampler2D Texture1;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord;\n"
-    "varying vec2 oTexCoord1;\n"
+    "_FS_IN vec4 oColor;\n"
+    "_FS_IN vec2 oTexCoord;\n"
+    "_FS_IN vec2 oTexCoord1;\n"
+    
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "    vec4 color = texture2D(Texture0, oTexCoord);\n"
+    "    vec4 color = _TEXTURE(Texture0, oTexCoord);\n"
     
-    "    gl_FragColor = texture2D(Texture1, oTexCoord1);\n"
-    "    gl_FragColor.rgb = gl_FragColor.rgb * mix(1.9, 1.2, clamp(length(gl_FragColor.rgb),0.0,1.0));\n"
+    "    _FRAGCOLOR = _TEXTURE(Texture1, oTexCoord1);\n"
+    "    _FRAGCOLOR.rgb = _FRAGCOLOR.rgb * mix(1.9, 1.2, clamp(length(_FRAGCOLOR.rgb),0.0,1.0));\n"
     
-    "    gl_FragColor = color * gl_FragColor;\n"
+    "    _FRAGCOLOR = color * _FRAGCOLOR;\n"
     
-    "   if (gl_FragColor.a <= 0.6)\n"
+    "   if (_FRAGCOLOR.a <= 0.6)\n"
     "        discard;\n"
     "}\n";
 
 static const char* PostProcessMeshFragShaderSrc =
-    "#version 110\n"
-    
     "uniform sampler2D Texture;\n"
     
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "_FS_IN vec4 oColor;\n"
+    "_FS_IN vec2 oTexCoord0;\n"
+    "_FS_IN vec2 oTexCoord1;\n"
+    "_FS_IN vec2 oTexCoord2;\n"
+    
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
-    "   gl_FragColor.r = oColor.r * texture2D(Texture, oTexCoord0).r;\n"
-    "   gl_FragColor.g = oColor.g * texture2D(Texture, oTexCoord1).g;\n"
-    "   gl_FragColor.b = oColor.b * texture2D(Texture, oTexCoord2).b;\n"
-    "   gl_FragColor.a = 1.0;\n"
+    "   _FRAGCOLOR.r = oColor.r * _TEXTURE(Texture, oTexCoord0).r;\n"
+    "   _FRAGCOLOR.g = oColor.g * _TEXTURE(Texture, oTexCoord1).g;\n"
+    "   _FRAGCOLOR.b = oColor.b * _TEXTURE(Texture, oTexCoord2).b;\n"
+    "   _FRAGCOLOR.a = 1.0;\n"
     "}\n";
 
 static const char* PostProcessMeshTimewarpFragShaderSrc = PostProcessMeshFragShaderSrc;
@@ -376,15 +270,13 @@ static const char* PostProcessMeshPositionalTimewarpFragShaderSrc = PostProcessM
 static const char* PostProcessHeightmapTimewarpFragShaderSrc = PostProcessMeshFragShaderSrc;
 
 static const char* PostProcessVertexShaderSrc =
-    "#version 110\n"
-    
     "uniform mat4 View;\n"
     "uniform mat4 Texm;\n"
     
-    "attribute vec4 Position;\n"
-    "attribute vec2 TexCoord;\n"
+    "_VS_IN vec4 Position;\n"
+    "_VS_IN vec2 TexCoord;\n"
     
-    "varying vec2 oTexCoord;\n"
+    "_VS_OUT vec2 oTexCoord;\n"
     
     "void main()\n"
     "{\n"
@@ -393,21 +285,19 @@ static const char* PostProcessVertexShaderSrc =
     "}\n";
 
 static const char* PostProcessMeshVertexShaderSrc =
-    "#version 110\n"
-    
     "uniform vec2 EyeToSourceUVScale;\n"
     "uniform vec2 EyeToSourceUVOffset;\n"
 
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
+    "_VS_IN vec2 Position;\n"
+    "_VS_IN vec4 Color;\n"
+    "_VS_IN vec2 TexCoord0;\n"
+    "_VS_IN vec2 TexCoord1;\n"
+    "_VS_IN vec2 TexCoord2;\n"
 
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
+    "_VS_OUT vec2 oTexCoord1;\n"
+    "_VS_OUT vec2 oTexCoord2;\n"
 
     "void main()\n"
     "{\n"
@@ -427,23 +317,21 @@ static const char* PostProcessMeshVertexShaderSrc =
     "}\n";
 
 static const char* PostProcessMeshTimewarpVertexShaderSrc =
-    "#version 110\n"
-    
     "uniform vec2 EyeToSourceUVScale;\n"
     "uniform vec2 EyeToSourceUVOffset;\n"
     "uniform mat4 EyeRotationStart;\n"
     "uniform mat4 EyeRotationEnd;\n"
 
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
+    "_VS_IN vec2 Position;\n"
+    "_VS_IN vec4 Color;\n"
+    "_VS_IN vec2 TexCoord0;\n"
+    "_VS_IN vec2 TexCoord1;\n"
+    "_VS_IN vec2 TexCoord2;\n"
 
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
+    "_VS_OUT vec2 oTexCoord1;\n"
+    "_VS_OUT vec2 oTexCoord2;\n"
 
     "void main()\n"
     "{\n"
@@ -517,22 +405,22 @@ PostProcessMeshTimewarpVertexShaderSrc;
     "uniform mat4 EyeRotationStart;\n"
     "uniform mat4 EyeRotationEnd;\n"
 
-    "attribute vec2 Position;\n"
-    "attribute vec4 Color;\n"
-    "attribute vec2 TexCoord0;\n"
-    "attribute vec2 TexCoord1;\n"
-    "attribute vec2 TexCoord2;\n"
+    "_VS_IN vec2 Position;\n"
+    "_VS_IN vec4 Color;\n"
+    "_VS_IN vec2 TexCoord0;\n"
+    "_VS_IN vec2 TexCoord1;\n"
+    "_VS_IN vec2 TexCoord2;\n"
 
-    "varying vec4 oColor;\n"
-    "varying vec2 oTexCoord0;\n"
-    "varying vec2 oTexCoord1;\n"
-    "varying vec2 oTexCoord2;\n"
+    "_VS_OUT vec4 oColor;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
+    "_VS_OUT vec2 oTexCoord1;\n"
+    "_VS_OUT vec2 oTexCoord2;\n"
 
     "vec4 PositionFromDepth(vec2 inTexCoord)\n"
     "{\n"
     "   vec2 eyeToSourceTexCoord = inTexCoord * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
     "   eyeToSourceTexCoord.y = 1.0 - eyeToSourceTexCoord.y;\n"
-    "   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use Texture2DLod for #version 110 support.
+    "   float depth = texelFetch(Texture0, ivec2(eyeToSourceTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use _TEXTURELOD for #version 110 support.
     "   float linearDepth = DepthProjector.y / (depth - DepthProjector.x);\n"
     "   vec4 retVal = vec4(inTexCoord, 1, 1);\n"
     "   retVal.xyz *= linearDepth;\n"
@@ -550,7 +438,7 @@ PostProcessMeshTimewarpVertexShaderSrc;
     "   vec2 flattened = transformed.xy / transformed.z;\n"
     // Scale them into ([0,0.5],[0,1]) or ([0.5,0],[0,1]) UV lookup space (depending on eye)
     "   vec2 noDepthUV = flattened * EyeToSourceUVScale + EyeToSourceUVOffset;\n"
-    //"   float depth = texture2D(Texture0, noDepthUV).r;\n"
+    //"   float depth = _TEXTURE(Texture0, noDepthUV).r;\n"
     "   return noDepthUV.xy;\n"
     "}\n"
 
@@ -592,11 +480,11 @@ PostProcessMeshTimewarpVertexShaderSrc;
     "attribute vec2 Position;\n"
     "attribute vec3 TexCoord0;\n"
 
-    "varying vec2 oTexCoord0;\n"
+    "_VS_OUT vec2 oTexCoord0;\n"
 
     "vec4 PositionFromDepth(vec2 position, vec2 inTexCoord)\n"
     "{\n"
-    "   float depth = texelFetch(Texture0, ivec2(inTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use Texture2DLod for #version 110 support.
+    "   float depth = texelFetch(Texture0, ivec2(inTexCoord * DepthDimSize), 0).x;\n" //FIXME: Use _TEXTURELOD for #version 110 support.
     "   vec4 retVal = vec4(position, depth, 1);\n"
     "   return retVal;\n"
     "}\n"
@@ -631,8 +519,6 @@ PostProcessMeshTimewarpVertexShaderSrc;
     
 // Shader with lens distortion and chromatic aberration correction.
 static const char* PostProcessFragShaderWithChromAbSrc =
-    "#version 110\n"
-    
     "uniform sampler2D Texture;\n"
     "uniform vec3 DistortionClearColor;\n"
     "uniform float EdgeFadeScale;\n"
@@ -645,8 +531,10 @@ static const char* PostProcessFragShaderWithChromAbSrc =
     "uniform vec4 HmdWarpParam;\n"
     "uniform vec4 ChromAbParam;\n"
 
-    "varying vec4 oPosition;\n"
-    "varying vec2 oTexCoord;\n"
+    "_FS_IN vec4 oPosition;\n"
+    "_FS_IN vec2 oTexCoord;\n"
+
+    "_FRAGCOLOR_DECLARATION\n"
     
     "void main()\n"
     "{\n"
@@ -678,17 +566,17 @@ static const char* PostProcessFragShaderWithChromAbSrc =
     "   float EdgeFadeIn = clamp ( EdgeFadeScale, 0.0, 1e5 ) * ( 1.0 - max ( abs ( NDCCoord.x ), abs ( NDCCoord.y ) ) );\n"
     "   if ( EdgeFadeIn < 0.0 )\n"
     "   {\n"
-    "       gl_FragColor = vec4(DistortionClearColor.r, DistortionClearColor.g, DistortionClearColor.b, 1.0);\n"
+    "       _FRAGCOLOR = vec4(DistortionClearColor.r, DistortionClearColor.g, DistortionClearColor.b, 1.0);\n"
     "       return;\n"
     "   }\n"
     "   EdgeFadeIn = clamp ( EdgeFadeIn, 0.0, 1.0 );\n"
 
     // Actually do the lookups.
-    "   float ResultR = texture2D(Texture, SourceCoordR).r;\n"
-    "   float ResultG = texture2D(Texture, SourceCoordG).g;\n"
-    "   float ResultB = texture2D(Texture, SourceCoordB).b;\n"
+    "   float ResultR = _TEXTURE(Texture, SourceCoordR).r;\n"
+    "   float ResultG = _TEXTURE(Texture, SourceCoordG).g;\n"
+    "   float ResultB = _TEXTURE(Texture, SourceCoordB).b;\n"
 
-    "   gl_FragColor = vec4(ResultR * EdgeFadeIn, ResultG * EdgeFadeIn, ResultB * EdgeFadeIn, 1.0);\n"
+    "   _FRAGCOLOR = vec4(ResultR * EdgeFadeIn, ResultG * EdgeFadeIn, ResultB * EdgeFadeIn, 1.0);\n"
     "}\n";
 
 
@@ -735,24 +623,44 @@ RenderDevice::RenderDevice(const RendererParams&)
     DebugCallbackControl(),
     Lighting(NULL)
 {
+    InitGLExtensions();
     DebugCallbackControl.Initialize();
 
     GetGLVersionAndExtensions(GLVersionInfo);
 
     OVR_ASSERT(GLVersionInfo.MajorVersion >= 2);
+    const char* shaderPrefix = (GLVersionInfo.WholeVersion >= 302) ? glsl3Prefix : glsl2Prefix;
+    const size_t shaderPrefixSize = strlen(shaderPrefix);
     
     for (int i = 0; i < VShader_Count; i++)
     {
         OVR_ASSERT ( VShaderSrcs[i] != NULL );      // You forgot a shader!
-        VertexShaders[i] = *new Shader(this, Shader_Vertex, VShaderSrcs[i]);
+        const size_t shaderSize = strlen(VShaderSrcs[i]);
+		const size_t sizeSum = shaderPrefixSize + shaderSize;
+		char* pShaderSource = new char[sizeSum + 1];
+		OVR_strcpy(pShaderSource, sizeSum + 1, shaderPrefix);
+		OVR_strcpy(pShaderSource + shaderPrefixSize, shaderSize + 1, VShaderSrcs[i]);
+    
+        VertexShaders[i] = *new Shader(this, Shader_Vertex, pShaderSource);
+        
+        delete[] pShaderSource;
     }
 
     for (int i = 0; i < FShader_Count; i++)
     {
+        const size_t shaderSize = strlen(FShaderSrcs[i]);
+		const size_t sizeSum = shaderPrefixSize + shaderSize;
+		char* pShaderSource = new char[sizeSum + 1];
+		OVR_strcpy(pShaderSource, sizeSum + 1, shaderPrefix);
+		OVR_strcpy(pShaderSource + shaderPrefixSize, shaderSize + 1, FShaderSrcs[i]);
+
         OVR_ASSERT ( FShaderSrcs[i] != NULL );      // You forgot a shader!
-        FragShaders[i] = *new Shader(this, Shader_Fragment, FShaderSrcs[i]);
+
+        FragShaders[i] = *new Shader(this, Shader_Fragment, pShaderSource);
+        
+        delete[] pShaderSource;
     }
-    
+
     Ptr<ShaderSet> gouraudShaders = *new ShaderSet();
     gouraudShaders->SetShader(VertexShaders[VShader_MVP]);
     gouraudShaders->SetShader(FragShaders[FShader_Gouraud]);
@@ -910,7 +818,7 @@ void RenderDevice::ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Textu
                        0, 0, outputTex->GetWidth(), outputTex->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST );
     glBindFramebuffer( GL_FRAMEBUFFER, 0 );
     GLint err = glGetError();
-    OVR_ASSERT(!err); OVR_UNUSED(err);
+    OVR_ASSERT_AND_UNUSED(!err, err);
 }
 
 void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* depth, Render::Texture* stencil)
@@ -1035,24 +943,24 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
     switch (meshType)
     {
     case Mesh_Distortion:
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, Pos));
-        glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, Col));
-        glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, TexR));
-        glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, TexG));
-        glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + offsetof(DistortionVertex, TexB));
+        glVertexAttribPointer(0, 2, GL_FLOAT,         false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(DistortionVertex, Pos));
+        glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true,  sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(DistortionVertex, Col));
+        glVertexAttribPointer(2, 2, GL_FLOAT,         false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(DistortionVertex, TexR));
+        glVertexAttribPointer(3, 2, GL_FLOAT,         false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(DistortionVertex, TexG));
+        glVertexAttribPointer(4, 2, GL_FLOAT,         false, sizeof(DistortionVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(DistortionVertex, TexB));
         break;
 
     case Mesh_Heightmap:
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(HeightmapVertex), reinterpret_cast<char*>(offset) + offsetof(HeightmapVertex, Pos));
-        glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(HeightmapVertex), reinterpret_cast<char*>(offset) + offsetof(HeightmapVertex, Tex));
+        glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(HeightmapVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(HeightmapVertex, Pos));
+        glVertexAttribPointer(1, 2, GL_FLOAT, false, sizeof(HeightmapVertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(HeightmapVertex, Tex));
         break;
 
     default:
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<char*>(offset) + offsetof(Vertex, Pos));
-        glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true, sizeof(Vertex), reinterpret_cast<char*>(offset) + offsetof(Vertex, C));
-        glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<char*>(offset) + offsetof(Vertex, U));
-        glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<char*>(offset) + offsetof(Vertex, U2));
-        glVertexAttribPointer(4, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<char*>(offset) + offsetof(Vertex, Norm));
+        glVertexAttribPointer(0, 3, GL_FLOAT,         false, sizeof(Vertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(Vertex, Pos));
+        glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, true,  sizeof(Vertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(Vertex, C));
+        glVertexAttribPointer(2, 2, GL_FLOAT,         false, sizeof(Vertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(Vertex, U));
+        glVertexAttribPointer(3, 2, GL_FLOAT,         false, sizeof(Vertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(Vertex, U2));
+        glVertexAttribPointer(4, 3, GL_FLOAT,         false, sizeof(Vertex), reinterpret_cast<char*>(offset) + OVR_OFFSETOF(Vertex, Norm));
     }
 
     if (indices)
@@ -1075,6 +983,14 @@ void RenderDevice::RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, R
     //glEnable(GL_BLEND);
     Render(fill, vertices, indices, matrix, offset, count, rprim);
     //glDisable(GL_BLEND);
+}
+
+void RenderDevice::RenderCompute(const Fill* fill, Render::Buffer* buffer, int invocationSizeInPixels )
+{
+    OVR_UNUSED ( fill );
+    OVR_UNUSED ( buffer );
+    OVR_UNUSED ( invocationSizeInPixels );
+    OVR_ASSERT ( !"Compute shaders not implemented yet" );
 }
 
 void RenderDevice::SetLighting(const LightingParams* lt)
@@ -1341,19 +1257,22 @@ void Texture::SetSampleMode(int sm)
     case Sample_Linear:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
+        if(GLE_EXT_texture_filter_anisotropic)
+        	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
 
     case Sample_Anisotropic:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4);
+        if(GLE_EXT_texture_filter_anisotropic)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 4);
         break;
 
     case Sample_Nearest:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
+        if(GLE_EXT_texture_filter_anisotropic)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1);
         break;
     }
 
@@ -1405,8 +1324,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         return NULL;
     }
     int samples = format & Texture_SamplesMask;
-    if(samples < 1 ||
-        GLVersionInfo.WholeVersion < 302) // disallow MSAA for low GL context versions
+    if(samples < 1 || !GLE_ARB_texture_multisample) // disallow MSAA for OpenGL versions that don't support it.
     {
         samples = 1;
     }
@@ -1428,25 +1346,46 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     
     if (format & Texture_Compressed)
     {
-        const unsigned char* level = (const unsigned char*)data;
-        int w = width, h = height;
-        for (int i = 0; i < mipcount; i++)
-        {
-            int mipsize = GetTextureSize(format, w, h);
-            glCompressedTexImage2D(GL_TEXTURE_2D, i, glformat, w, h, 0, mipsize, level);
+    	if(GLE_EXT_texture_compression_s3tc) // If compressed textures are supported (they typically are)...
+    	{
+			const unsigned char* level = (const unsigned char*)data;
+			int w = width, h = height;
+			for (int i = 0; i < mipcount; i++)
+			{
+				int mipsize = GetTextureSize(format, w, h);
+				glCompressedTexImage2D(GL_TEXTURE_2D, i, glformat, w, h, 0, mipsize, level);
 
-            level += mipsize;
-            w >>= 1;
-            h >>= 1;
-            if (w < 1) w = 1;
-            if (h < 1) h = 1;
-        }
+				level += mipsize;
+				w >>= 1;
+				h >>= 1;
+				if (w < 1) w = 1;
+				if (h < 1) h = 1;
+			}
+    	}
+    	else
+    	{
+			int w = width, h = height;
+			unsigned char r = 64 + (rand() % (256 - 64));
+
+			for (int i = 0; i < mipcount; i++)
+			{
+			    unsigned char* redData = new unsigned char[w * h];
+	    		memset(redData, r, w * h);
+	            glTexImage2D(GL_TEXTURE_2D, i, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, redData);
+	    		delete[] redData;
+
+				w >>= 1;
+				h >>= 1;
+				if (w < 1) w = 1;
+				if (h < 1) h = 1;
+			}
+    	}
     }
     else
     {
         bool isSRGB = ((format & Texture_TypeMask) == Texture_RGBA && (format & Texture_SRGB) != 0);
         bool isDepth = ((format & Texture_Depth) != 0);
-        GLenum internalFormat = (isSRGB) ? GL_SRGB8_ALPHA8 : (isDepth) ? GL_DEPTH_COMPONENT32F : glformat;
+        GLenum internalFormat = (isSRGB) ? GL_SRGB8_ALPHA8 : (isDepth) ? (GLE_ARB_depth_buffer_float ? GL_DEPTH_COMPONENT32F : GL_DEPTH_COMPONENT) : glformat;
 
         if (samples > 1)
             glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, width, height, false);
@@ -1513,13 +1452,13 @@ RBuffer::~RBuffer()
 DebugCallback::DebugCallback()
   : Initialized(false),
     MinLogSeverity(SeverityHigh),
-    MinAssertSeverity(SeverityHigh),
-    glDebugMessageCallback(NULL),
-    glDebugMessageControl(NULL),
-    glDebugMessageCallbackARB(NULL),
-    glDebugMessageControlARB(NULL),
-    glDebugMessageCallbackAMD(NULL),
-    glDebugMessageControlAMD(NULL)
+    MinAssertSeverity(SeverityHigh)
+  //glDebugMessageCallback(NULL),
+  //glDebugMessageControl(NULL),
+  //glDebugMessageCallbackARB(NULL),
+  //glDebugMessageControlARB(NULL),
+  //glDebugMessageCallbackAMD(NULL),
+  //glDebugMessageControlAMD(NULL)
 {
 }
 
@@ -1535,16 +1474,14 @@ bool DebugCallback::GetGLDebugCallback(PFNGLDEBUGMESSAGECALLBACKPROC* debugCallb
     // Curiously, the KHR and ARB callbacks use the same glGetPointerv defines, which means you can only have 
     // one of them active concurrently. This also implies that an OpenGL implementation which implements both
     // KHR and ARB implements the latter as simply a passthrough (or alias) of the former.
-    #if defined(GL_ARB_debug_output) || defined(GL_KHR_debug)
+    if(GLE_ARB_debug_output || GLE_KHR_debug)
+    {
         // glGetPointerv requires at least OpenGL 4.3 headers and implementation, 
         // but will be present in the headers if GL_ARB_debug_output or GL_KHR_debug are.
-        if(glDebugMessageCallback || glDebugMessageCallbackARB)
-        {
-            glGetPointerv(GL_DEBUG_CALLBACK_FUNCTION, reinterpret_cast<GLvoid**>(debugCallback));
-            glGetPointerv(GL_DEBUG_CALLBACK_USER_PARAM, const_cast<GLvoid**>(userParam));
-            return true;
-        }
-    #endif
+        glGetPointerv(GL_DEBUG_CALLBACK_FUNCTION, reinterpret_cast<GLvoid**>(debugCallback));
+        glGetPointerv(GL_DEBUG_CALLBACK_USER_PARAM, const_cast<GLvoid**>(userParam));
+        return true;
+    }
 
     // AMD_debug_output doesn't provide an option to get the debug callback.
     debugCallback = NULL;
@@ -1580,27 +1517,17 @@ void DebugCallback::Initialize()
         PFNGLDEBUGMESSAGECALLBACKPROC debugCallbackPrev = NULL;
         const void* userParamPrev = NULL;
 
-        // Try getting the KHR interface.
-        #if defined(OVR_OS_MAC) // With Mac OpenGL, functions aren't dynamically linked. They are only directly called.
-          //glDebugMessageCallback = ::glDebugMessageCallback; // We can enable this some day when Apple includes support 
-          //glDebugMessageControl  = ::glDebugMessageControl;  // for glDebugMessageCallback in their headers and SDK.
-        #else
-            glDebugMessageCallback = (PFNGLDEBUGMESSAGECALLBACKPROC) GetFunction("glDebugMessageCallback");
-            glDebugMessageControl  = (PFNGLDEBUGMESSAGECONTROLPROC) GetFunction("glDebugMessageControl");
-        #endif
+        GetGLDebugCallback(&debugCallbackPrev, &userParamPrev);
 
-        if(glDebugMessageCallback) 
+        if(!debugCallbackPrev) // If a callback isn't already registered...
         {
-            GetGLDebugCallback(&debugCallbackPrev, &userParamPrev);
-
-            if(!debugCallbackPrev) // If a callback isn't already registered...
+            // Try getting the KHR interface.
+            if(GLE_KHR_debug) 
             {
                 glDebugMessageCallback(GLDEBUGPROC(DebugMessageCallback), this);
                 err = glGetError();
                 if(err)
                 {
-                	glDebugMessageCallback = NULL;
-                	glDebugMessageControl = NULL;
                 	OVR_DEBUG_LOG(("glDebugMessageCallback error: %x (%d)\n", err, err));
             	}
 
@@ -1616,68 +1543,40 @@ void DebugCallback::Initialize()
                 // glDebugMessageControl(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_PUSH_GROUP, GL_DONT_CARE, 0, NULL, GL_FALSE);
                 // glDebugMessageControl(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_POP_GROUP,  GL_DONT_CARE, 0, NULL, GL_FALSE);
             }
-        }
-
-        if(!glDebugMessageCallback) // If KHR_debug wasn't found, try ARB_debug_output.
-        {
-            #if !defined(OVR_OS_MAC)
-                glDebugMessageCallbackARB = (PFNGLDEBUGMESSAGECALLBACKARBPROC) GetFunction("glDebugMessageCallbackARB");
-                glDebugMessageControlARB  = (PFNGLDEBUGMESSAGECONTROLARBPROC) GetFunction("glDebugMessageControlARB");
-            #endif
-
-            if(glDebugMessageCallbackARB)
+            else if(GLE_ARB_debug_output) // If KHR_debug wasn't found, try ARB_debug_output.
             {
                 GetGLDebugCallback(&debugCallbackPrev, &userParamPrev);
 
-                if(!debugCallbackPrev) // If a callback isn't already registered...
+                glDebugMessageCallbackARB(GLDEBUGPROCARB(DebugMessageCallback), this);
+                err = glGetError();
+                if(err)
                 {
-                    glDebugMessageCallbackARB(GLDEBUGPROCARB(DebugMessageCallback), this);
-                    err = glGetError();
-                    if(err)
-                    {
-                    	glDebugMessageCallbackARB = NULL;
-                    	glDebugMessageControlARB = NULL;
-                    	OVR_DEBUG_LOG(("glDebugMessageCallbackARB error: %x (%d)\n", err, err));
-                	}
-
-                    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-                    err = glGetError();
-                    if(err)
-                    {
-                    	OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
-                    }
-
-                    // To consider: disable marker/push/pop
-                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_MARKER,     GL_DONT_CARE, 0, NULL, GL_FALSE);
-                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_PUSH_GROUP, GL_DONT_CARE, 0, NULL, GL_FALSE);
-                    // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_POP_GROUP,  GL_DONT_CARE, 0, NULL, GL_FALSE);
+                    OVR_DEBUG_LOG(("glDebugMessageCallbackARB error: %x (%d)\n", err, err));
                 }
+
+                glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+                err = glGetError();
+                if(err)
+                {
+                    OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
+                }
+
+                // To consider: disable marker/push/pop
+                // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_MARKER,     GL_DONT_CARE, 0, NULL, GL_FALSE);
+                // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_PUSH_GROUP, GL_DONT_CARE, 0, NULL, GL_FALSE);
+                // glDebugMessageControlARB(GL_DEBUG_SOURCE_APPLICATION, GL_DEBUG_TYPE_POP_GROUP,  GL_DONT_CARE, 0, NULL, GL_FALSE);
             }
+            else if(GLE_AMD_debug_output) // If ARB_debug_output also wasn't found, try AMD_debug_output.
+		    {
+				glDebugMessageCallbackAMD(GLDEBUGPROCAMD(DebugMessageCallbackAMD), this);
+                err = glGetError();
+                if(err)
+                {
+                    OVR_DEBUG_LOG(("glDebugMessageCallbackAMD error: %x (%d)\n", err, err));
+                }
+				// There is no control for synchronous/asynchronous with AMD_debug_output.
+		    }
         }
-
-		if(!glDebugMessageCallback && !glDebugMessageCallbackARB)// If ARB_debug_output also wasn't found, try AMD_debug_output.
-		{
-			#if !defined(OVR_OS_MAC)
-				glDebugMessageCallbackAMD = (PFNGLDEBUGMESSAGECALLBACKAMDPROC) GetFunction("glDebugMessageCallbackAMD");
-				glDebugMessageControlAMD  = (PFNGLDEBUGMESSAGEENABLEAMDPROC) GetFunction("glDebugMessageControlAMD");
-			#endif
-
-			if(glDebugMessageCallbackAMD)
-			{
-				if(!debugCallbackPrev) // If a callback isn't already registered...
-				{
-					glDebugMessageCallbackAMD(GLDEBUGPROCAMD(DebugMessageCallbackAMD), this);
-                    err = glGetError();
-                    if(err)
-                    {
-                    	glDebugMessageCallbackAMD = NULL;
-                    	glDebugMessageControlAMD = NULL;
-                    	OVR_DEBUG_LOG(("glDebugMessageCallbackAMD error: %x (%d)\n", err, err));
-                	}
-					// There is no control for synchronous/asynchronous with AMD_debug_output.
-				}
-			}
-		}
     }
 }
 
@@ -1686,24 +1585,7 @@ void DebugCallback::Shutdown()
 {
     if(Initialized)
     {
-        if(glDebugMessageCallbackAMD)
-        {
-            glDebugMessageCallbackAMD(NULL, NULL);
-            glDebugMessageCallbackAMD = NULL;
-        }
-
-        if(glDebugMessageCallbackARB)
-        {
-            glDebugMessageCallbackARB(NULL, NULL);
-            glDebugMessageCallbackARB = NULL;
-        }
-
-        if(glDebugMessageCallback)
-        {
-            glDebugMessageCallback(NULL, NULL);
-            glDebugMessageCallback = NULL;
-        }
-
+        // Nothing currently required.
         Initialized = false;
     }
 }
@@ -1718,13 +1600,13 @@ void DebugCallback::SetMinSeverity(Severity minLogSeverity, Severity minAssertSe
 
 DebugCallback::Implementation DebugCallback::GetImplementation() const
 {
-    if(glDebugMessageCallbackAMD)
+    if(GLE_KHR_debug)
         return ImplementationAMD;
 
-    if(glDebugMessageCallbackARB)
+    if(GLE_ARB_debug_output)
         return ImplementationARB;
 
-    if(glDebugMessageCallback)
+    if(GLE_AMD_debug_output)
         return ImplementationKHR;
 
     return ImplementationNone;

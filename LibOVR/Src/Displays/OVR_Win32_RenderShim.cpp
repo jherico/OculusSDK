@@ -14,6 +14,8 @@ otherwise accompanies this software in either electronic or hard copy form.
 
 ************************************************************************************/
 
+#include "../../Include/OVR_Version.h"
+
 #ifndef AVOID_LIB_OVR
 #include "../Kernel/OVR_Types.h" // Without this we can get warnings (due to VC++ bugs) about _malloca being redefined, and miss LibOVR overrides.
 #endif
@@ -23,6 +25,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #include <malloc.h>
 
 #include "OVR_Win32_Dxgi_Display.h"
+#include "OVR_Win32_ShimVersion.h"
 
 #if AVOID_LIB_OVR
 #define IN_COMPATIBILITY_MODE() (0)
@@ -189,13 +192,13 @@ static bool checkForOverride( LPCSTR libFileName, OVRTargetAPI& targetApi )
 
 		sprintf_s( keyString, 256, GFX_DRIVER_KEY_FMT, i );
 
-		CHAR* providerName = ReadRegStr( HKEY_LOCAL_MACHINE, keyString, "ProviderName" );
+		CHAR* infSection = ReadRegStr( HKEY_LOCAL_MACHINE, keyString, "InfSection" );
 
 		// No provider name means we're out of display enumerations
-		if( providerName == NULL )
+		if( infSection == NULL )
 			break;
 
-		free( providerName );
+		free(infSection);
 
 		// Check 64-bit driver names followed by 32-bit driver names
 		const char* driverKeys[] = {"UserModeDriverName", "UserModeDriverNameWoW", "OpenGLDriverName", "OpenGLDriverNameWoW", "InstalledDisplayDrivers" };
@@ -273,7 +276,7 @@ static HMODULE createShim( LPCSTR lpLibFileName, OVRTargetAPI targetAPI )
 
 	if( !result )
 	{
-		OutputDebugString( L"createShim:  unable to load usermode filter\n" );
+        MessageBox(nullptr, L"Unable to find the Rift Display Driver.", L"Configuration Error", MB_OK | MB_ICONERROR);
 		result = (*oldProcA)( lpLibFileName );
 	}
 	return result;
@@ -711,138 +714,167 @@ static PROC SetProcAddressA(
 }
 
 
-void checkUMDriverOverrides(void* context)
+bool checkUMDriverOverrides(void* context)
 {
 	lastContext = context;
-	if( oldProcA == NULL )
+	if (oldProcA != NULL)
+        return true;
+
+	PreloadLibraryRTFn loadFunc = NULL;
+	for( int i = 0; i < ShimCountMax; ++i )
 	{
-		PreloadLibraryRTFn loadFunc = NULL;
-
-		for( int i = 0; i < ShimCountMax; ++i )
+        HINSTANCE hInst = NULL;
+		try
 		{
-            HINSTANCE hInst = NULL;
-			try
-			{
-				hInst = LoadLibraryA(dllList[i]);
-			}
-			catch(...)
-			{
-			}
-
-            oldLoaderInstances[i] = hInst;
-
-			if( hInst )
-			{
-				ShimedLibraries libCount = (ShimedLibraries)i;
-				switch( libCount )
-				{
-					case ShimLibDXGI:
-						oldCreateDXGIFactory = (WinCreateDXGIFactory)SetProcAddressDirect( hInst, "CreateDXGIFactory", (PROC)OVRCreateDXGIFactory, oldCreateDXGIFactoryData );
-						oldCreateDXGIFactory1 = (WinCreateDXGIFactory1)SetProcAddressDirect( hInst, "CreateDXGIFactory1", (PROC)OVRCreateDXGIFactory1, oldCreateDXGIFactory1Data );
-						oldCreateDXGIFactory2 = (WinCreateDXGIFactory2)SetProcAddressDirect( hInst, "CreateDXGIFactory2", (PROC)OVRCreateDXGIFactory2, oldCreateDXGIFactory2Data );
-						break;
-					case ShimLibD3D9:
-						oldDirectX9Create = (WinDirect3DCreate9)SetProcAddressDirect( hInst, "Direct3DCreate9", (PROC)OVRDirect3DCreate9, oldDirectX9CreateData );
-						oldDirectX9ExCreate = (WinDirect3DCreate9Ex)SetProcAddressDirect( hInst, "Direct3DCreate9Ex", (PROC)OVRDirect3DCreate9Ex, oldDirectX9ExCreateData );
-						break;
-					default:
-						break;
-				}
-
-                for (int j = 0; j < NUM_LOADER_LIBS; ++j)
-                {
-                    const char* loaderLibrary = loaderLibraryList[j];
-
-					PROC temp = NULL;
-                    temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryA", (PROC)OVRLoadLibraryA);
-                    if (!oldProcA)
-                    {
-                        oldProcA = (WinLoadLibraryA)temp;
-                    }
-                    oldLoaderProcA[i][j] = temp;
-
-                    temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryW", (PROC)OVRLoadLibraryW);
-                    if (!oldProcW)
-                    {
-                        oldProcW = (WinLoadLibraryW)temp;
-                    }
-                    oldLoaderProcW[i][j] = temp;
-
-                    temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryExA", (PROC)OVRLoadLibraryExA);
-                    if (!oldProcExA)
-                    {
-                        oldProcExA = (WinLoadLibraryExA)temp;
-                    }
-                    oldLoaderProcExA[i][j] = temp;
-
-                    temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryExW", (PROC)OVRLoadLibraryExW);
-                    if (!oldProcExW)
-                    {
-                        oldProcExW = (WinLoadLibraryExW)temp;
-                    }
-                    oldLoaderProcExW[i][j] = temp;
-
-                    temp = SetProcAddressA(hInst, loaderLibrary, "GetModuleHandleExA", (PROC)OVRGetModuleHandleExA);
-                    if (!oldProcModExA)
-                    {
-                        oldProcModExA = (WinGetModuleHandleExA)temp;
-                    }
-                    oldLoaderProcModExA[i][j] = temp;
-
-                    temp = SetProcAddressA(hInst, loaderLibrary, "GetModuleHandleExW", (PROC)OVRGetModuleHandleExW);
-                    if (!oldProcModExW)
-                    {
-                        oldProcModExW = (WinGetModuleHandleExW)temp;
-                    }
-                    oldLoaderProcModExW[i][j] = temp;
-                }
-
-                if (loadFunc == NULL)
-                {
-                    loadFunc = (PreloadLibraryRTFn)GetProcAddress(hInst, "PreloadLibraryRT");
-                }
-			}
+			hInst = LoadLibraryA(dllList[i]);
+		}
+		catch(...)
+		{
 		}
 
-        rtFilterModule = oldProcA ? (*oldProcA)(RTFilter) : NULL;
+        oldLoaderInstances[i] = hInst;
 
-        IsCreatingBackBuffer backBufferFunc = NULL;
-        ShouldVSync	shouldVSyncFunc = NULL;
+		if (hInst == NULL)
+            continue;
 
-        if (rtFilterModule != NULL)
+		ShimedLibraries libCount = (ShimedLibraries)i;
+		switch( libCount )
+		{
+			case ShimLibDXGI:
+				oldCreateDXGIFactory = (WinCreateDXGIFactory)SetProcAddressDirect( hInst, "CreateDXGIFactory", (PROC)OVRCreateDXGIFactory, oldCreateDXGIFactoryData );
+				oldCreateDXGIFactory1 = (WinCreateDXGIFactory1)SetProcAddressDirect( hInst, "CreateDXGIFactory1", (PROC)OVRCreateDXGIFactory1, oldCreateDXGIFactory1Data );
+				oldCreateDXGIFactory2 = (WinCreateDXGIFactory2)SetProcAddressDirect( hInst, "CreateDXGIFactory2", (PROC)OVRCreateDXGIFactory2, oldCreateDXGIFactory2Data );
+				break;
+			case ShimLibD3D9:
+				oldDirectX9Create = (WinDirect3DCreate9)SetProcAddressDirect( hInst, "Direct3DCreate9", (PROC)OVRDirect3DCreate9, oldDirectX9CreateData );
+				oldDirectX9ExCreate = (WinDirect3DCreate9Ex)SetProcAddressDirect( hInst, "Direct3DCreate9Ex", (PROC)OVRDirect3DCreate9Ex, oldDirectX9ExCreateData );
+				break;
+			default:
+				break;
+		}
+
+        for (int j = 0; j < NUM_LOADER_LIBS; ++j)
         {
-            loadFunc = (PreloadLibraryRTFn)GetProcAddress(rtFilterModule, "PreloadLibraryRT");
-            backBufferFunc = (IsCreatingBackBuffer)GetProcAddress(rtFilterModule, "OVRIsCreatingBackBuffer");
-            shouldVSyncFunc = (ShouldVSync)GetProcAddress(rtFilterModule, "OVRShouldVSync");
+            const char* loaderLibrary = loaderLibraryList[j];
+
+            PROC temp = NULL;
+            temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryA", (PROC)OVRLoadLibraryA);
+            if (!oldProcA)
+            {
+                oldProcA = (WinLoadLibraryA)temp;
+            }
+            oldLoaderProcA[i][j] = temp;
+
+            temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryW", (PROC)OVRLoadLibraryW);
+            if (!oldProcW)
+            {
+                oldProcW = (WinLoadLibraryW)temp;
+            }
+            oldLoaderProcW[i][j] = temp;
+
+            temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryExA", (PROC)OVRLoadLibraryExA);
+            if (!oldProcExA)
+            {
+                oldProcExA = (WinLoadLibraryExA)temp;
+            }
+            oldLoaderProcExA[i][j] = temp;
+
+            temp = SetProcAddressA(hInst, loaderLibrary, "LoadLibraryExW", (PROC)OVRLoadLibraryExW);
+            if (!oldProcExW)
+            {
+                oldProcExW = (WinLoadLibraryExW)temp;
+            }
+            oldLoaderProcExW[i][j] = temp;
+
+            temp = SetProcAddressA(hInst, loaderLibrary, "GetModuleHandleExA", (PROC)OVRGetModuleHandleExA);
+            if (!oldProcModExA)
+            {
+                oldProcModExA = (WinGetModuleHandleExA)temp;
+            }
+            oldLoaderProcModExA[i][j] = temp;
+
+            temp = SetProcAddressA(hInst, loaderLibrary, "GetModuleHandleExW", (PROC)OVRGetModuleHandleExW);
+            if (!oldProcModExW)
+            {
+                oldProcModExW = (WinGetModuleHandleExW)temp;
+            }
+            oldLoaderProcModExW[i][j] = temp;
         }
 
-        if (loadFunc != NULL)
+        if (loadFunc == NULL)
         {
-			appDriver.version = 1;
-			appDriver.context = lastContext;
+            loadFunc = (PreloadLibraryRTFn)GetProcAddress(hInst, "PreloadLibraryRT");
+        }
+	}
+
+    rtFilterModule = oldProcA ? (*oldProcA)(RTFilter) : NULL;
+
+    IsCreatingBackBuffer backBufferFunc = NULL;
+    ShouldVSync	shouldVSyncFunc = NULL;
+    GetRTFilterVersion getRTFilterVersionFunc = NULL;
+
+    if (rtFilterModule != NULL)
+    {
+        loadFunc = (PreloadLibraryRTFn)GetProcAddress(rtFilterModule, "PreloadLibraryRT");
+        backBufferFunc = (IsCreatingBackBuffer)GetProcAddress(rtFilterModule, "OVRIsCreatingBackBuffer");
+        shouldVSyncFunc = (ShouldVSync)GetProcAddress(rtFilterModule, "OVRShouldVSync");
+        getRTFilterVersionFunc = (GetRTFilterVersion)GetProcAddress(rtFilterModule, "OVRGetRTFilterVersion");
+    }
+
+    if (loadFunc == NULL)
+    {
+        MessageBox(nullptr, L"Unable to load the Oculus Display Driver. Please reinstall the Oculus Runtime.", L"Configuration Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
+    if (getRTFilterVersionFunc == NULL)
+    {
+        WCHAR message[1000] = {};
+		swprintf_s(message, L"This app requires the %d.%d.%d version of the Oculus Runtime.", OVR_MAJOR_VERSION, OVR_MINOR_VERSION, OVR_BUILD_VERSION);
+        MessageBox(nullptr, message, L"Configuration Error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+
+    // Verify that we are running with the appropriate display driver
+    {
+        const ULONG rtFilterVersion = (*getRTFilterVersionFunc)();
+        const ULONG rtFilterMajor = OVR_GET_VERSION_MAJOR(rtFilterVersion);
+        const ULONG rtFilterMinor = OVR_GET_VERSION_MINOR(rtFilterVersion);
+        
+        if ((rtFilterMajor != OVR_RTFILTER_VERSION_MAJOR) || (rtFilterMinor < OVR_RTFILTER_VERSION_MINOR))
+        {
+            WCHAR message[1000] = {};
+			swprintf_s(message, L"This app requires the %d.%d.%d version of the Oculus Runtime.", OVR_MAJOR_VERSION, OVR_MINOR_VERSION, OVR_BUILD_VERSION);
+            MessageBox(nullptr, message, L"Configuration Error", MB_OK | MB_ICONERROR);
+            return false;
+        }
+    }
+
+    appDriver.version = OVR_RENDER_SHIM_VERSION_MAJOR;
+	appDriver.context = lastContext;
 
 //			appDriver.pfnInitializingDisplay        = OVRIsInitializingDisplay;
-			appDriver.pfnInitializingDisplay        = OVRLocalIsInitializingDisplay;
-			appDriver.pfnRiftForContext             = OVRRiftForContext;
-			appDriver.pfnCloseRiftForContext        = OVRCloseRiftForContext;
-			appDriver.pfnWindowDisplayResolution    = OVRWindowDisplayResolution;
-			appDriver.pfnShouldEnableDebug          = OVRShouldEnableDebug;
-			appDriver.pfnIsCreatingBackBuffer       = (backBufferFunc == NULL) ? OVRIsCreatingBackBuffer : backBufferFunc;
-			appDriver.pfnShouldVSync                = (shouldVSyncFunc == NULL) ? OVRShouldVSync : shouldVSyncFunc;
-			appDriver.pfnExpectedResolution			= OVRExpectedResolution;
-			appDriver.pfnMirroringEnabled			= OVRMirroringEnabled;
-			appDriver.pfnGetWindowForContext		= OVRGetWindowForContext;
-			appDriver.pfnPresentRiftOnContext		= OVRShouldPresentOnContext;
+	appDriver.pfnInitializingDisplay        = OVRLocalIsInitializingDisplay;
+	appDriver.pfnRiftForContext             = OVRRiftForContext;
+	appDriver.pfnCloseRiftForContext        = OVRCloseRiftForContext;
+	appDriver.pfnWindowDisplayResolution    = OVRWindowDisplayResolution;
+	appDriver.pfnShouldEnableDebug          = OVRShouldEnableDebug;
+	appDriver.pfnIsCreatingBackBuffer       = (backBufferFunc == NULL) ? OVRIsCreatingBackBuffer : backBufferFunc;
+	appDriver.pfnShouldVSync                = (shouldVSyncFunc == NULL) ? OVRShouldVSync : shouldVSyncFunc;
+	appDriver.pfnExpectedResolution			= OVRExpectedResolution;
+	appDriver.pfnMirroringEnabled			= OVRMirroringEnabled;
+	appDriver.pfnGetWindowForContext		= OVRGetWindowForContext;
+	appDriver.pfnPresentRiftOnContext		= OVRShouldPresentOnContext;
 
-			appDriver.pfnDirect3DCreate9    = oldDirectX9Create;
-			appDriver.pfnDirect3DCreate9Ex  = oldDirectX9ExCreate;
-			appDriver.pfnCreateDXGIFactory  = oldCreateDXGIFactory;
-			appDriver.pfnCreateDXGIFactory1 = oldCreateDXGIFactory1;
-			appDriver.pfnCreateDXGIFactory2 = oldCreateDXGIFactory2;
+	appDriver.pfnDirect3DCreate9    = oldDirectX9Create;
+	appDriver.pfnDirect3DCreate9Ex  = oldDirectX9ExCreate;
+	appDriver.pfnCreateDXGIFactory  = oldCreateDXGIFactory;
+	appDriver.pfnCreateDXGIFactory1 = oldCreateDXGIFactory1;
+	appDriver.pfnCreateDXGIFactory2 = oldCreateDXGIFactory2;
 
-			(*loadFunc)( &appDriver );
-		}
-	}
+	(*loadFunc)( &appDriver );
+
+    return true;
 }
 
 void clearUMDriverOverrides()

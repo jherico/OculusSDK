@@ -5,7 +5,7 @@ Content     :   Profiling for render.
 Created     :   March 10, 2014
 Authors     :   Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

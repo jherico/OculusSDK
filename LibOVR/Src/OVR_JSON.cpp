@@ -60,6 +60,10 @@ limitations under the License.
 #include "Kernel/OVR_SysFile.h"
 #include "Kernel/OVR_Log.h"
 
+#ifdef OVR_OS_LINUX
+#include <locale.h>
+#endif
+
 namespace OVR {
 
 
@@ -157,8 +161,17 @@ const char* JSON::parseNumber(const char *num)
     int         subscale     = 0,
                 signsubscale = 1;
     bool positiveSign = true;
+    char localeSeparator = '.';
 
-	// Could use sscanf for this?
+#ifdef OVR_OS_LINUX
+    // We should switch to a locale aware parsing function, such as atof. We
+    // will probably want to go farther and enforce the 'C' locale on all JSON
+    // output/input.
+    struct lconv* localeConv = localeconv();
+    localeSeparator = localeConv->decimal_point[0];
+#endif
+
+    // Could use sscanf for this?
     if (*num == '-')
     {
         positiveSign = false;
@@ -178,7 +191,7 @@ const char* JSON::parseNumber(const char *num)
         while (*num>='0' && *num<='9');	// Number?
     }
 
-	if (*num=='.' && num[1]>='0' && num[1]<='9')
+    if ((*num=='.' || *num==localeSeparator) && num[1]>='0' && num[1]<='9')
     {
         num++;
         do

@@ -31,6 +31,14 @@ limitations under the License.
  #include <malloc.h>
 #endif
 
+#if defined(OVR_OS_MS)
+ #include <Windows.h>
+#elif defined(OVR_OS_MAC) || defined(OVR_OS_UNIX)
+ #include <unistd.h>
+ #include <sys/mman.h>
+#endif
+
+
 namespace OVR {
 
 //-----------------------------------------------------------------------------------
@@ -74,10 +82,10 @@ void* DefaultAllocator::Alloc(size_t size)
 }
 void* DefaultAllocator::AllocDebug(size_t size, const char* file, unsigned line)
 {
+	OVR_UNUSED2(file, line); // should be here for debugopt config
 #if defined(OVR_CC_MSVC) && defined(_CRTDBG_MAP_ALLOC)
     return _malloc_dbg(size, _NORMAL_BLOCK, file, line);
 #else
-    OVR_UNUSED2(file, line);
     return malloc(size);
 #endif
 }
@@ -90,6 +98,44 @@ void DefaultAllocator::Free(void *p)
 {
     return free(p);
 }
+
+
+
+
+void* MMapAlloc(size_t size)
+{
+    #if defined(OVR_OS_MS)
+        return VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); // size is rounded up to a page. // Returned memory is 0-filled.
+
+    #elif defined(OVR_OS_MAC) || defined(OVR_OS_UNIX)
+        #if !defined(MAP_FAILED)
+            #define MAP_FAILED ((void*)-1)
+        #endif
+
+        void* result = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0); // Returned memory is 0-filled.
+        if(result == MAP_FAILED) // mmap returns MAP_FAILED (-1) upon failure.
+            result = NULL;
+        return result;
+    #endif
+}
+
+
+
+
+void MMapFree(void* memory, size_t size)
+{
+    #if defined(OVR_OS_MS)
+        OVR_UNUSED(size);
+        VirtualFree(memory, 0, MEM_RELEASE);
+
+    #elif defined(OVR_OS_MAC) || defined(OVR_OS_UNIX)
+        size_t pageSize = getpagesize();
+        size = (((size + (pageSize - 1)) / pageSize) * pageSize);
+        munmap(memory, size); // Must supply the size to munmap.
+    #endif
+}
+
+
 
 
 } // OVR

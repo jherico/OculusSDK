@@ -5,7 +5,7 @@ Content     :   Platform renderer for simple scene graph - implementation
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -487,6 +487,9 @@ namespace OVR { namespace Render {
 		for(int i = 0; i < 8 && VtxTextures[i] != NULL; ++i)
 			VtxTextures[i]->Set(i, Shader_Vertex);
 
+		for(int i = 0; i < 8 && CsTextures[i] != NULL; ++i)
+			CsTextures[i]->Set(i, Shader_Compute);
+
 		for (int i = 0; i < 8 && Textures[i] != NULL; ++i)
 			Textures[i]->Set(i);
 	}
@@ -517,6 +520,8 @@ namespace OVR { namespace Render {
         pDistortionMeshVertexBuffer[1].Clear();
         pDistortionMeshIndexBuffer[0].Clear();
         pDistortionMeshIndexBuffer[1].Clear();
+        pDistortionComputePinBuffer[0].Clear();
+        pDistortionComputePinBuffer[1].Clear();
         LightingBuffer.Clear();
     }
 
@@ -582,7 +587,7 @@ namespace OVR { namespace Render {
 			}
 			else
 			{
-				const Font::Char* ch = &font->chars[str[i]];
+				const Font::Char* ch = &font->chars[(int)str[i]];
 				xp += ch->advance;
 			}
 
@@ -679,7 +684,7 @@ namespace OVR { namespace Render {
 				continue;
 			}
 
-			const Font::Char* ch = &font->chars[str[i]];
+			const Font::Char* ch = &font->chars[(int)str[i]];
 			Vertex* chv = &vertices[ivertex];
 			for(int j = 0; j < 6; j++)
 			{
@@ -791,11 +796,7 @@ namespace OVR { namespace Render {
 			}
 		}
 
-		static Fill *fill = NULL;
-		if ( fill == NULL )
-		{
-			fill = CreateTextureFill(tex, false);
-		}
+	    Fill *fill = CreateTextureFill(tex, false);
 		fill->SetTexture ( 0, tex );
 
 		pTextVertexBuffer->Data(Buffer_Vertex, NULL, 6 * sizeof(Vertex));
@@ -909,6 +910,8 @@ namespace OVR { namespace Render {
 		{
 			Shader *vs = NULL;
 			Shader *ppfs = NULL;
+			Shader *cs = NULL;
+            bool isCompute = false;
 
 			if (PostProcessShaderActive == PostProcessShader_DistortionAndChromAb)
 			{
@@ -931,16 +934,29 @@ namespace OVR { namespace Render {
                 ppfs = LoadBuiltinShader(Shader_Fragment, FShader_PostProcessMeshWithChromAbPositionalTimewarp);
                 vs   = LoadBuiltinShader(Shader_Vertex, VShader_PostProcessMeshPositionalTimewarp);
             }
+            else if (PostProcessShaderActive == PostProcessShader_Compute2x2)
+            {
+                cs = LoadBuiltinShader(Shader_Compute, CShader_PostProcess2x2);
+                isCompute = true;
+            }
 			else
 			{
 				OVR_ASSERT(false);
 			}
-			OVR_ASSERT(ppfs); // Means the shader failed to compile - look in the debug spew.
-			OVR_ASSERT(vs);
 
 			pPostProcessShader = *CreateShaderSet();
-			pPostProcessShader->SetShader(vs);
-			pPostProcessShader->SetShader(ppfs);
+            if ( isCompute )
+            {
+                OVR_ASSERT ( cs );  // Means the shader failed to compile - look in the debug spew.
+    			pPostProcessShader->SetShader(cs);
+            }
+            else
+            {
+			    OVR_ASSERT(ppfs); // Means the shader failed to compile - look in the debug spew.
+			    OVR_ASSERT(vs);
+			    pPostProcessShader->SetShader(vs);
+    			pPostProcessShader->SetShader(ppfs);
+            }
 		}
 
         // Heightmap method does the timewarp on the first pass
@@ -1093,6 +1109,58 @@ namespace OVR { namespace Render {
                 }
             }
 		}
+        else if ( pptype == PostProcess_Compute2x2 )
+        {
+			for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+			{
+                // Compute shader setup of regular grid.
+
+				const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft : stereoParamsRight;
+                const int tileSizeInPixels = 16;
+                const int vertsPerEdge = 128;       // Should be a power of two.
+                OVR_ASSERT ( tileSizeInPixels * (vertsPerEdge-1) > stereoParams.DistortionViewport.w );
+                OVR_ASSERT ( tileSizeInPixels * (vertsPerEdge-1) > stereoParams.DistortionViewport.h );
+                DistortionComputePin Verts[vertsPerEdge*vertsPerEdge];
+                // Vertices are laid out in a vertical scanline pattern,
+                // scanning right to left, then within each scan going top to bottom, like DK2.
+                // If we move to a different panel orientation, we may need to flip this around.
+                int vertexNum = 0;
+                for ( int x = 0; x < vertsPerEdge; x++ )
+                {
+                    for ( int y = 0; y < vertsPerEdge; y++ )
+                    {
+                        int pixX = x * tileSizeInPixels;
+                        int pixY = y * tileSizeInPixels;
+                        Vector2f screenPosNdc;
+                        screenPosNdc.x = 2.0f * (  0.5f - ( (float)pixX / stereoParams.DistortionViewport.w ) );      // Note signs!
+                        screenPosNdc.y = 2.0f * ( -0.5f + ( (float)pixY / stereoParams.DistortionViewport.h ) );      // Note signs!
+
+                        DistortionMeshVertexData vertex = DistortionMeshMakeVertex ( screenPosNdc,
+                                                                                        ( eyeNum == 1 ),
+                                                                                        hmdRenderInfo,
+                                                                                        stereoParams.Distortion,
+                                                                                        stereoParams.EyeToSourceNDC );
+                        DistortionComputePin *pCurVert = &(Verts[vertexNum]);
+                        //pCurVert->Pos = vertex.ScreenPosNDC;
+                        pCurVert->TanEyeAnglesR = vertex.TanEyeAnglesR;
+                        pCurVert->TanEyeAnglesG = vertex.TanEyeAnglesG;
+                        pCurVert->TanEyeAnglesB = vertex.TanEyeAnglesB;
+						// vertex.Shade will go negative beyond the edges to produce correct intercept with the 0.0 plane.
+						// We want to preserve this, so bias and offset to fit [-1,+1] in a byte.
+						// The reverse wll be done in the shader.
+						float shade = Alg::Clamp ( vertex.Shade * 0.5f + 0.5f, 0.0f, 1.0f );
+					    pCurVert->Col.R = (OVR::UByte)( floorf ( shade * 255.999f ) );
+					    pCurVert->Col.G = pCurVert->Col.R;
+					    pCurVert->Col.B = pCurVert->Col.R;
+					    pCurVert->Col.A = (OVR::UByte)( floorf ( vertex.TimewarpLerp * 255.999f ) );
+
+                        vertexNum++;
+                    }
+                }
+                pDistortionComputePinBuffer[eyeNum] = *CreateBuffer();
+                pDistortionComputePinBuffer[eyeNum]->Data ( Buffer_Compute, Verts, vertexNum * sizeof(Verts[0]) );
+            }
+        }
 		else
 		{
 			// ...no setup needed for other distortion types.
@@ -1497,6 +1565,63 @@ namespace OVR { namespace Render {
 						Color(255,255,255,255), pTex );
 				}
 			}
+            break;
+
+        case PostProcess_Compute2x2:
+            {
+                Recti vp ( 0, 0, WindowWidth, WindowHeight );
+                SetViewport(vp);
+                float r, g, b, a;
+                DistortionClearColor.GetRGBA(&r, &g, &b, &a);
+                Clear(r, g, b, a);
+                
+                ShaderFill fill(pPostProcessShader);
+
+			    fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetLeftOrBothEyes->pColorTex, Shader_Compute );
+                fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetLeftOrBothEyes->pColorTex : NULL), Shader_Compute);
+
+			    for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+			    {
+				    Matrix4f const &matRenderFromWorld  = ( eyeNum == 0 ) ? matRenderFromWorldLeft : matRenderFromWorldRight;
+				    const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft       : stereoParamsRight;
+
+				    Matrix4f matRenderFromNowStart = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldStart, stereoParams.HmdToEyeViewOffset );
+				    Matrix4f matRenderFromNowEnd   = TimewarpComputePoseDelta ( matRenderFromWorld, matNowFromWorldEnd,   stereoParams.HmdToEyeViewOffset );
+
+				    pPostProcessShader->SetUniform2f("EyeToSourceUVScale",   stereoParams.EyeToSourceUV.Scale.x, stereoParams.EyeToSourceUV.Scale.y );
+				    pPostProcessShader->SetUniform2f("EyeToSourceUVOffset",  stereoParams.EyeToSourceUV.Offset.x, stereoParams.EyeToSourceUV.Offset.y );
+				    pPostProcessShader->SetUniform3x3f("EyeRotationStart", matRenderFromNowStart);
+				    pPostProcessShader->SetUniform3x3f("EyeRotationEnd",   matRenderFromNowEnd);
+                    pPostProcessShader->SetUniform1f("RightEye", (float)eyeNum);
+                    pPostProcessShader->SetUniform1f("UseOverlay", usingOverlay ? 1.0f : 0.0f);
+                    pPostProcessShader->SetUniform1f("FbSizePixelsX", (float)WindowWidth);
+
+				    Matrix4f dummy;
+				    if ( ( pHmdSpaceLayerRenderTargetRight != NULL ) && ( eyeNum == 1 ) )
+				    {
+					    fill.SetTexture ( 0, pHmdSpaceLayerRenderTargetRight->pColorTex, Shader_Compute );
+                        fill.SetTexture ( 1, (usingOverlay ? pOverlayLayerRenderTargetRight->pColorTex : NULL), Shader_Compute);
+				    }
+
+
+					int invocationSizeInPixels = 1;
+					switch( PostProcessingType )
+					{
+					case PostProcess_Compute2x2:
+						{
+							// These need to match the values used for shader compile.
+							const int nxnBlockSizeInPixels = 8;		// NXN_BLOCK_SIZE_PIXELS
+							const int simdSquareSize = 16;			// SIMD_SQUARE_SIZE
+							invocationSizeInPixels = nxnBlockSizeInPixels * simdSquareSize;
+						}
+						break;
+					default: OVR_ASSERT ( false );
+						break;
+					}
+
+                    RenderCompute ( &fill, pDistortionComputePinBuffer[eyeNum], invocationSizeInPixels );
+			    }
+            }
             break;
 
         default:

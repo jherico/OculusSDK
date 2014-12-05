@@ -336,6 +336,18 @@ public:
 };
 
 
+//------------------------------------------------------------------------
+// ***** Mapped memory allocation
+//
+// Equates to VirtualAlloc/VirtualFree on Windows, mmap/munmap on Unix.
+// These are useful for when you need system-supplied memory pages. 
+// These are also useful for when you need to allocate memory in a way 
+// that doesn't affect the application heap.
+
+void* MMapAlloc(size_t size);
+void  MMapFree(void* memory, size_t size);
+
+
 } // OVR
 
 

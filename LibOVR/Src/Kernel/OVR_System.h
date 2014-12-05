@@ -153,6 +153,7 @@ public:
     }
 
 	static void OVR_CDECL DirectDisplayInitialize();
+    static bool OVR_CDECL DirectDisplayEnabled();
 
     // Returns 'true' if system was properly initialized.
     static bool OVR_CDECL IsInitialized();

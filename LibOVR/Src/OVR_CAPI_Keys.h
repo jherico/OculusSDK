@@ -26,19 +26,19 @@ limitations under the License.
 
 
 
-#define OVR_KEY_USER                        "User"
-#define OVR_KEY_NAME                        "Name"
-#define OVR_KEY_GENDER                      "Gender"
-#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"
-#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"
-#define OVR_KEY_IPD                         "IPD"
-#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"
-#define OVR_KEY_EYE_RELIEF_DIAL             "EyeReliefDial"
-#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"
-#define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist"
-#define OVR_KEY_EYE_CUP                     "EyeCup"
-#define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"
-#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld"
+#define OVR_KEY_USER                        "User"              // string
+#define OVR_KEY_NAME                        "Name"              // string
+#define OVR_KEY_GENDER                      "Gender"            // string
+#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"      // float
+#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"         // float
+#define OVR_KEY_IPD                         "IPD"               // float
+#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"   // float[2]
+#define OVR_KEY_EYE_RELIEF_DIAL             "EyeReliefDial"     // int
+#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"     // float[2]
+#define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist" // float[2]
+#define OVR_KEY_EYE_CUP                     "EyeCup"            // char[16]
+#define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"   // bool
+#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld" // double[7]
 
 // Default measurements empirically determined at Oculus to make us happy
 // The neck model numbers were derived as an average of the male and female averages from ANSUR-88

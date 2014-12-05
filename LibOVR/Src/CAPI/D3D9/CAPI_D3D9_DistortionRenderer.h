@@ -126,7 +126,7 @@ private:
 
 	struct FOR_EACH_EYE
 	{
-        FOR_EACH_EYE() : TextureSize(0), RenderViewport(Sizei(0)) { }
+        FOR_EACH_EYE() : dxVerts(NULL), dxIndices(NULL), numVerts(0), numIndices(0), texture(NULL), /*UVScaleOffset[],*/ TextureSize(0, 0), RenderViewport(0, 0, 0, 0) { }
 
 		IDirect3DVertexBuffer9  * dxVerts;
 		IDirect3DIndexBuffer9   * dxIndices;

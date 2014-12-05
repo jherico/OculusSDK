@@ -643,6 +643,8 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
         info.ScreenGapSizeInMeters                  = 0.0f;
         info.CenterFromTopInMeters                  = 0.0468f;
         info.LensSeparationInMeters                 = 0.0635f;
+        info.PelOffsetR                             = Vector2f ( 0.0f, 0.0f );
+        info.PelOffsetB                             = Vector2f ( 0.0f, 0.0f );
         info.Shutter.Type                           = HmdShutter_RollingTopToBottom;
         info.Shutter.VsyncToNextVsync               = ( 1.0f / 60.0f );
         info.Shutter.VsyncToFirstScanline           = 0.000052f;
@@ -658,6 +660,8 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
         info.ScreenGapSizeInMeters                  = 0.0f;
         info.CenterFromTopInMeters                  = info.ScreenSizeInMeters.h * 0.5f;
         info.LensSeparationInMeters                 = 0.0635f;
+        info.PelOffsetR                             = Vector2f ( 0.0f, 0.0f );
+        info.PelOffsetB                             = Vector2f ( 0.0f, 0.0f );
         info.Shutter.Type                           = HmdShutter_RollingRightToLeft;
         info.Shutter.VsyncToNextVsync               = ( 1.0f / 76.0f );
         info.Shutter.VsyncToFirstScanline           = 0.0000273f;
@@ -673,6 +677,8 @@ HMDInfo CreateDebugHMDInfo(HmdTypeEnum hmdType)
         info.ScreenGapSizeInMeters                  = 0.0f;
         info.CenterFromTopInMeters                  = info.ScreenSizeInMeters.h * 0.5f;
         info.LensSeparationInMeters                 = 0.0635f;
+        info.PelOffsetR                             = Vector2f ( 0.5f, 0.5f );
+        info.PelOffsetB                             = Vector2f ( 0.5f, 0.5f );
         info.Shutter.Type                           = HmdShutter_RollingRightToLeft;
         info.Shutter.VsyncToNextVsync               = ( 1.0f / 76.0f );
         info.Shutter.VsyncToFirstScanline           = 0.0000273f;
@@ -706,6 +712,8 @@ HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
     renderInfo.CenterFromTopInMeters                = hmdInfo.CenterFromTopInMeters;
     renderInfo.ScreenGapSizeInMeters                = hmdInfo.ScreenGapSizeInMeters;
     renderInfo.LensSeparationInMeters               = hmdInfo.LensSeparationInMeters;
+    renderInfo.PelOffsetR                           = hmdInfo.PelOffsetR;
+    renderInfo.PelOffsetB                           = hmdInfo.PelOffsetB;
 
     OVR_ASSERT ( sizeof(renderInfo.Shutter) == sizeof(hmdInfo.Shutter) );   // Try to keep the files in sync!
     renderInfo.Shutter.Type                         = hmdInfo.Shutter.Type;
@@ -1481,7 +1489,7 @@ FovPort GetPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &di
     struct FunctionHider
     {
         static FovPort FindRange ( Vector2f from, Vector2f to, int numSteps,
-                                          DistortionRenderDesc const &distortion )
+                                          DistortionRenderDesc const &distortionL )
         {
             FovPort result;
             result.UpTan    = 0.0f;
@@ -1494,7 +1502,7 @@ FovPort GetPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &di
             {
                 float    lerpFactor  = stepScale * (float)step;
                 Vector2f sample      = from + (to - from) * lerpFactor;
-                Vector2f tanEyeAngle = TransformScreenNDCToTanFovSpace ( distortion, sample );
+                Vector2f tanEyeAngle = TransformScreenNDCToTanFovSpace ( distortionL, sample );
 
                 result.LeftTan  = Alg::Max ( result.LeftTan,  -tanEyeAngle.x );
                 result.RightTan = Alg::Max ( result.RightTan,  tanEyeAngle.x );

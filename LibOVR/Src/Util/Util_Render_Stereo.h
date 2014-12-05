@@ -429,6 +429,10 @@ public:
     // The only reliable time in most engines is directly after the frame-present and GPU flush-and-wait.
     // This call should be done right after that to give this system the timing info it needs.
     void        AfterPresentAndFlush(double timeNow);
+    // But some engines queue up the frame-present and only later find out when it actually happened.
+    // They should call these two at those times.
+    void        AfterPresentWithoutFlush();
+    void        AfterPresentFinishes(double timeNow);
 
     // The "average" time the rendered frame will show up,
     // and the predicted pose of the HMD at that time.

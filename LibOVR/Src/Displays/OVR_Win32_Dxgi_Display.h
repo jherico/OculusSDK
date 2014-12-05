@@ -18,6 +18,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #ifndef OVR_dxgi_ovr_filter_h
 #define OVR_dxgi_ovr_filter_h
 
+#include <Windows.h>
 #include <InitGuid.h>
 
 #define USERMODE_TEST_ROTATION 1
@@ -145,6 +146,9 @@ typedef BOOL (WINAPI* PresentRiftOnContext)( PVOID );
 // 9 = DirectX 9
 // 10 = DirectX 1X
 typedef int (WINAPI* ActiveAPIVersion)( PVOID );
+
+// Get the version of the runtime filter.
+typedef ULONG (WINAPI* GetRTFilterVersion)();
 
 #pragma warning(push)
 #pragma warning(disable: 4201)

@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for OpenGL
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse, David Borel
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, Inc. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,92 +31,25 @@ limitations under the License.
     #include <WS2tcpip.h>
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
-    #include <GL/gl.h>
-    #include <GL/glext.h>
-    #include <GL/wglext.h>
+    #include <CAPI/GL/CAPI_GLE.h>
+    //#include <GL/gl.h>
+    //#include <GL/glext.h>
+    //#include <GL/wglext.h>
 #elif defined(OVR_OS_MAC)
-    #include <OpenGL/gl3.h>
-    #include <OpenGL/gl3ext.h>
+    #include <CAPI/GL/CAPI_GLE.h>
+    //#include <OpenGL/gl3.h>
+    //#include <OpenGL/gl3ext.h>
 #else
-    #include <GL/gl.h>
-    #include <GL/glext.h>
+    #include <CAPI/GL/CAPI_GLE.h>
+    //#include <GL/gl.h>
+    //#include <GL/glext.h>
     #include <GL/glx.h>
 #endif
 
 namespace OVR { namespace Render { namespace GL {
 
 
-#if !defined(OVR_OS_MAC)
-
-// GL extension Hooks for PC.
-#if defined(OVR_OS_WIN32)
-
-extern PFNWGLGETSWAPINTERVALEXTPROC             wglGetSwapIntervalEXT;
-extern PFNWGLSWAPINTERVALEXTPROC                wglSwapIntervalEXT;
-extern PFNWGLCHOOSEPIXELFORMATARBPROC           wglChoosePixelFormatARB;
-extern PFNWGLCREATECONTEXTATTRIBSARBPROC        wglCreateContextAttribsARB;
-
-#elif defined(OVR_OS_LINUX)
-
-extern PFNGLXSWAPINTERVALEXTPROC                glXSwapIntervalEXT;
-
-#endif
-
-extern PFNGLGETSTRINGIPROC                      glGetStringi;
-extern PFNGLGENFRAMEBUFFERSPROC                 glGenFramebuffers;
-extern PFNGLDELETEFRAMEBUFFERSPROC              glDeleteFramebuffers;
-extern PFNGLDELETESHADERPROC                    glDeleteShader;
-extern PFNGLCHECKFRAMEBUFFERSTATUSPROC          glCheckFramebufferStatus;
-extern PFNGLFRAMEBUFFERRENDERBUFFERPROC         glFramebufferRenderbuffer;
-extern PFNGLFRAMEBUFFERTEXTURE2DPROC            glFramebufferTexture2D;
-extern PFNGLBINDFRAMEBUFFEREXTPROC              glBindFramebuffer;
-extern PFNGLACTIVETEXTUREPROC                   glActiveTexture;
-extern PFNGLDISABLEVERTEXATTRIBARRAYPROC        glDisableVertexAttribArray;
-extern PFNGLVERTEXATTRIBPOINTERPROC             glVertexAttribPointer;
-extern PFNGLENABLEVERTEXATTRIBARRAYPROC         glEnableVertexAttribArray;
-extern PFNGLBINDBUFFERPROC                      glBindBuffer;
-extern PFNGLUNIFORMMATRIX4FVPROC                glUniformMatrix4fv;
-extern PFNGLDELETEBUFFERSPROC                   glDeleteBuffers;
-extern PFNGLBUFFERDATAPROC                      glBufferData;
-extern PFNGLGENBUFFERSPROC                      glGenBuffers;
-extern PFNGLMAPBUFFERPROC                       glMapBuffer;
-extern PFNGLUNMAPBUFFERPROC                     glUnmapBuffer;
-extern PFNGLGETSHADERINFOLOGPROC                glGetShaderInfoLog;
-extern PFNGLGETSHADERIVPROC                     glGetShaderiv;
-extern PFNGLCOMPILESHADERPROC                   glCompileShader;
-extern PFNGLSHADERSOURCEPROC                    glShaderSource;
-extern PFNGLCREATESHADERPROC                    glCreateShader;
-extern PFNGLCREATEPROGRAMPROC                   glCreateProgram;
-extern PFNGLATTACHSHADERPROC                    glAttachShader;
-extern PFNGLDETACHSHADERPROC                    glDetachShader;
-extern PFNGLDELETEPROGRAMPROC                   glDeleteProgram;
-extern PFNGLUNIFORM1IPROC                       glUniform1i;
-extern PFNGLGETUNIFORMLOCATIONPROC              glGetUniformLocation;
-extern PFNGLGETACTIVEUNIFORMPROC                glGetActiveUniform;
-extern PFNGLUSEPROGRAMPROC                      glUseProgram;
-extern PFNGLGETPROGRAMINFOLOGPROC               glGetProgramInfoLog;
-extern PFNGLGETPROGRAMIVPROC                    glGetProgramiv;
-extern PFNGLLINKPROGRAMPROC                     glLinkProgram;
-extern PFNGLBINDATTRIBLOCATIONPROC              glBindAttribLocation;
-extern PFNGLUNIFORM4FVPROC                      glUniform4fv;
-extern PFNGLUNIFORM3FVPROC                      glUniform3fv;
-extern PFNGLUNIFORM2FVPROC                      glUniform2fv;
-extern PFNGLUNIFORM1FVPROC                      glUniform1fv;
-extern PFNGLCOMPRESSEDTEXIMAGE2DPROC            glCompressedTexImage2D;
-extern PFNGLTEXIMAGE2DMULTISAMPLEPROC           glTexImage2DMultisample;
-extern PFNGLRENDERBUFFERSTORAGEPROC             glRenderbufferStorage;
-extern PFNGLBINDRENDERBUFFERPROC                glBindRenderbuffer;
-extern PFNGLGENRENDERBUFFERSPROC                glGenRenderbuffers;
-extern PFNGLDELETERENDERBUFFERSPROC             glDeleteRenderbuffers;
-extern PFNGLGENVERTEXARRAYSPROC                 glGenVertexArrays;
-extern PFNGLDELETEVERTEXARRAYSPROC              glDeleteVertexArrays;
-extern PFNGLBINDVERTEXARRAYPROC                 glBindVertexArray;
-extern PFNGLBLITFRAMEBUFFEREXTPROC              glBlitFramebuffer;
-
 extern void InitGLExtensions();
-
-#endif
-
 
 
 //// GLVersionAndExtensions
@@ -151,8 +84,8 @@ public:
         WholeVersion(0),
         IsGLES(false),
         IsCoreProfile(false),
-        SupportsDrawBuffers(false),
         SupportsVAO(false),
+        SupportsDrawBuffers(false),
         Extensions("")
     {
     }
@@ -204,49 +137,6 @@ void GetGLVersionAndExtensions(GLVersionAndExtensions& versionInfo);
 // The KHR_debug functionality requires that the OpenGL context be created with the CONTEXT_FLAG_DEBUG_BIT.
 //     Windows wglCreateContextAttribsARB should be done with WGL_CONTEXT_DEBUG_BIT_ARB with in WGL_CONTEXT_FLAGS.
 //     Linux glXCreateContext should be done with GLX_CONTEXT_DEBUG_BIT_ARB set in GLX_CONTEXT_FLAGS.
-
-// We manually declare types and define values that aren't already declared and defined. This is because this functionality
-// is fairly recent (2010 through 2014) and isn't present in all OpenGL headers and implementations.
-#ifndef GL_AMD_debug_output
-    typedef void   (APIENTRY *GLDEBUGPROCAMD)(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGEENABLEAMDPROC)  (GLenum category, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKAMDPROC)(GLDEBUGPROCAMD callback, GLvoid *userParam);
-
-    #define GL_DEBUG_CATEGORY_API_ERROR_AMD 0x9149
-    #define GL_DEBUG_CATEGORY_OTHER_AMD     0x9150
-    #define GL_DEBUG_SEVERITY_LOW_AMD       0x9148
-#endif
-
-#ifndef GL_ARB_debug_output
-    typedef void   (APIENTRY *GLDEBUGPROCARB)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECONTROLARBPROC) (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKARBPROC)(GLDEBUGPROCARB callback, const void *userParam);
-
-    // We don't define anything here because the defines are the same as the KHR defines below (aside from the _ARB suffix).
-#endif
-
-#ifndef GL_KHR_debug // The following defines were added to OpenGL 4.3+ headers.
-    typedef void   (APIENTRY *GLDEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECONTROLPROC) (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
-    typedef void   (APIENTRYP PFNGLDEBUGMESSAGECALLBACKPROC)(GLDEBUGPROC callback, const void *userParam);
-
-    #define GL_DEBUG_CALLBACK_FUNCTION          0x8244
-    #define GL_DEBUG_CALLBACK_USER_PARAM        0x8245
-    #define GL_DEBUG_TYPE_MARKER                0x8268
-    #define GL_DEBUG_TYPE_PUSH_GROUP            0x8269
-    #define GL_DEBUG_TYPE_POP_GROUP             0x826A
-    #define GL_DEBUG_OUTPUT_SYNCHRONOUS         0x8242
-    #define GL_DEBUG_SEVERITY_NOTIFICATION      0x826b
-    #define GL_DEBUG_SEVERITY_LOW               0x9148
-    #define GL_DEBUG_SEVERITY_MEDIUM            0x9147
-    #define GL_DEBUG_SEVERITY_HIGH              0x9146
-    #define GL_DEBUG_SOURCE_APPLICATION         0x824A
-    #define GL_DEBUG_SOURCE_OTHER               0x824b
-    #define GL_DEBUG_SOURCE_API                 0x8246
-    #define GL_DEBUG_TYPE_ERROR                 0x824C
-    #define GL_DEBUG_TYPE_OTHER                 0x8251
-    #define GL_DEBUG_OUTPUT                     0x92E0
-#endif
 
 
 class DebugCallback
@@ -300,25 +190,25 @@ protected:
     void DebugCallbackInternal(Severity s, const char* pSource, const char* pType, GLuint id, const char* pSeverity, const char* message);
 
     // ARB and KHR debug handler
-    static void APIENTRY DebugMessageCallback(GLenum Source, GLenum Type, GLuint Id, GLenum Severity, GLsizei Length, const GLchar* Message, GLvoid* UserParam);
+    static void GLAPIENTRY DebugMessageCallback(GLenum Source, GLenum Type, GLuint Id, GLenum Severity, GLsizei Length, const GLchar* Message, GLvoid* UserParam);
     static const char*   GetSource(GLenum Source);
     static const char*   GetType(GLenum Type);
     static const char*   GetSeverity(GLenum Severity);
 
     // AMD handler 
-    static void APIENTRY DebugMessageCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
+    static void GLAPIENTRY DebugMessageCallbackAMD(GLuint id, GLenum category, GLenum severity, GLsizei length, const GLchar *message, GLvoid *userParam);
     static const char*   GetCategoryAMD(GLenum Category);
 
 protected:
     bool                             Initialized;
     int                              MinLogSeverity;                // Minimum severity for us to log the event.
     int                              MinAssertSeverity;             // Minimum severity for us to assertion-fail the event.
-    PFNGLDEBUGMESSAGECALLBACKPROC    glDebugMessageCallback;
-    PFNGLDEBUGMESSAGECONTROLPROC     glDebugMessageControl;
-    PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB;     // glDebugMessageCallbackARB is the same as glDebugMessageCallback and may not need to be a separate variable.
-    PFNGLDEBUGMESSAGECONTROLARBPROC  glDebugMessageControlARB;
-    PFNGLDEBUGMESSAGECALLBACKAMDPROC glDebugMessageCallbackAMD;
-    PFNGLDEBUGMESSAGEENABLEAMDPROC   glDebugMessageControlAMD;
+  //PFNGLDEBUGMESSAGECALLBACKPROC    glDebugMessageCallback;
+  //PFNGLDEBUGMESSAGECONTROLPROC     glDebugMessageControl;
+  //PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB;     // glDebugMessageCallbackARB is the same as glDebugMessageCallback and may not need to be a separate variable.
+  //PFNGLDEBUGMESSAGECONTROLARBPROC  glDebugMessageControlARB;
+  //PFNGLDEBUGMESSAGECALLBACKAMDPROC glDebugMessageCallbackAMD;
+  //PFNGLDEBUGMESSAGEENABLEAMDPROC   glDebugMessageControlAMD;
 };
 
 
@@ -498,6 +388,7 @@ public:
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                  const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
+    virtual void RenderCompute(const Fill* fill, Render::Buffer* buffer, int invocationSizeInPixels );
 
     virtual Buffer* CreateBuffer();
     virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount=1);

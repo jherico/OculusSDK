@@ -5,7 +5,7 @@ Content     :   Win32 OpenGL Device implementation
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse, Michael Antonov, David Borel
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,14 +24,13 @@ limitations under the License.
 #include "Render_GL_Win32_Device.h"
 #include "OVR_CAPI_GL.h"
 
+#include <stdlib.h>
 #include <dwmapi.h>
 
 namespace OVR { namespace Render { namespace GL { namespace Win32 {
 
-typedef HRESULT (WINAPI *PFNDWMENABLECOMPOSITIONPROC) (UINT);
+#pragma warning(disable : 4995) // The compiler encountered a function that was marked with pragma deprecated.
 
-#pragma warning(disable : 4995)
-PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition = NULL;
 
 
 // ***** GL::Win32::RenderDevice
@@ -41,11 +40,12 @@ RenderDevice::RenderDevice(const Render::RendererParams& p, HWND win, HGLRC gl)
     , Window(win)
     , WglContext(gl)
 	, PreFullscreen(0, 0, 0, 0)
-    , HMonitor(0)
 	, FSDesktop(0, 0, 0, 0)
+    , HMonitor(0)
 {
     OVR_UNUSED(p);
 }
+
 
 // Implement static initializer function to create this class.
 Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void* oswnd)
@@ -53,58 +53,89 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
     HWND hwnd = (HWND)oswnd;
 	HDC dc = GetDC(hwnd);
     
-    if (!DwmEnableComposition)
-    {
-	    HINSTANCE hInst = LoadLibraryA( "dwmapi.dll" );
-	    OVR_ASSERT(hInst);
-        DwmEnableComposition = (PFNDWMENABLECOMPOSITIONPROC)GetProcAddress( hInst, "DwmEnableComposition" );
-        OVR_ASSERT(DwmEnableComposition);
-    }
-
+    // Under OpenGL we call DwmEnableComposition(DWM_EC_DISABLECOMPOSITION).
     // Why do we need to disable composition for OpenGL rendering?
-    // "Enabling DWM in extended mode causes 60Hz judder on NVIDIA cards unless the Rift is the main display. "
-    // "Maybe the confusion is that GL goes through the same compositional pipeline as DX. To the kernel and DWM there is no difference between the two."
-    // "The judder does not occur with DX. My understanding is that for DWM, GL actually requires an additional blt whose timing is dependent on the main monitor."
-    DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
+    // Response 1: "Enabling DWM in extended mode causes 60Hz judder on NVIDIA cards unless the Rift is the main display. "
+    // Response 2: "Maybe the confusion is that GL goes through the same compositional pipeline as DX. To the kernel and DWM there is no difference between the two."
+    // Response 3: "The judder does not occur with DX. My understanding is that for DWM, GL actually requires an additional blt whose timing is dependent on the main monitor."
+    bool dwmCompositionEnabled = false;
+
+    #if defined(OVR_BUILD_DEBUG) && !defined(OVR_OS_CONSOLE) // Console platforms have no getenv function.
+        OVR_DISABLE_MSVC_WARNING(4996) // "This function or variable may be unsafe..."
+        const char* value = getenv("Oculus_LibOVR_DwmCompositionEnabled"); // Composition is temporarily configurable via an environment variable for the purposes of testing.
+        if(value && (strcmp(value, "1") == 0))
+            dwmCompositionEnabled = true;
+        OVR_RESTORE_MSVC_WARNING()
+    #endif
+
+    if (!dwmCompositionEnabled)
     {
-		PIXELFORMATDESCRIPTOR pfd;
-		memset(&pfd, 0, sizeof(pfd));
+        // To consider: Make a generic helper macro/class for managing the loading of libraries and functions.
+        typedef HRESULT (WINAPI *PFNDWMENABLECOMPOSITIONPROC) (UINT);
+        PFNDWMENABLECOMPOSITIONPROC DwmEnableComposition;
 
-		pfd.nSize       = sizeof(pfd);
-		pfd.nVersion    = 1;
-		pfd.iPixelType  = PFD_TYPE_RGBA;
-		pfd.dwFlags     = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-		pfd.cColorBits  = 32;
-		pfd.cDepthBits  = 16;
+	    HINSTANCE HInstDwmapi = LoadLibraryW( L"dwmapi.dll" );
+	    OVR_ASSERT(HInstDwmapi);
 
-		int pf = ChoosePixelFormat(dc, &pfd);
-		if (!pf)
-		{
-			ReleaseDC(hwnd, dc);
-			return NULL;
-		}
-		
-		if (!SetPixelFormat(dc, pf, &pfd))
-		{
-			ReleaseDC(hwnd, dc);
-			return NULL;
-		}
+        if (HInstDwmapi)
+        {
+            DwmEnableComposition = (PFNDWMENABLECOMPOSITIONPROC)GetProcAddress( HInstDwmapi, "DwmEnableComposition" );
+            OVR_ASSERT(DwmEnableComposition);
 
-		HGLRC context = wglCreateContext(dc);
-		if (!wglMakeCurrent(dc, context))
-		{
-			wglDeleteContext(context);
-			ReleaseDC(hwnd, dc);
-			return NULL;
-		}
-		
-		wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
-		wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+            if (DwmEnableComposition)
+            {
+                DwmEnableComposition(DWM_EC_DISABLECOMPOSITION);
+            }
 
-		wglDeleteContext(context);
+            FreeLibrary(HInstDwmapi);
+	        HInstDwmapi = NULL;
+        }
     }
 
+	PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARBFunc = NULL;
+	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARBFunc = NULL;
 
+    {
+        // First create a context for the purpose of getting access to wglChoosePixelFormatARB / wglCreateContextAttribsARB.
+	    PIXELFORMATDESCRIPTOR pfd;
+	    memset(&pfd, 0, sizeof(pfd));
+
+	    pfd.nSize       = sizeof(pfd);
+	    pfd.nVersion    = 1;
+	    pfd.iPixelType  = PFD_TYPE_RGBA;
+	    pfd.dwFlags     = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+	    pfd.cColorBits  = 32;
+	    pfd.cDepthBits  = 16;
+
+	    int pf = ChoosePixelFormat(dc, &pfd);
+	    if (!pf)
+	    {
+		    ReleaseDC(hwnd, dc);
+		    return NULL;
+	    }
+		
+	    if (!SetPixelFormat(dc, pf, &pfd))
+	    {
+		    ReleaseDC(hwnd, dc);
+		    return NULL;
+	    }
+
+	    HGLRC context = wglCreateContext(dc);
+	    if (!wglMakeCurrent(dc, context))
+	    {
+		    wglDeleteContext(context);
+		    ReleaseDC(hwnd, dc);
+		    return NULL;
+	    }
+
+	    wglChoosePixelFormatARBFunc = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress("wglChoosePixelFormatARB");
+	    wglCreateContextAttribsARBFunc = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+        OVR_ASSERT(wglChoosePixelFormatARBFunc && wglCreateContextAttribsARBFunc);
+
+	    wglDeleteContext(context);
+    }
+
+    // Now create the real context that we will be using.
 	int iAttributes[] = {
 		//WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
         WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
@@ -115,11 +146,10 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
         0, 0};
 
     float fAttributes[] = {0,0};
+	int   pf = 0;
+	UINT  numFormats = 0;
 
-	int pf = 0;
-	UINT numFormats = 0;
-
-	if (!wglChoosePixelFormatARB(dc, iAttributes, fAttributes, 1, &pf, &numFormats))
+	if (!wglChoosePixelFormatARBFunc(dc, iAttributes, fAttributes, 1, &pf, &numFormats))
     {
         ReleaseDC(hwnd, dc);
         return NULL;
@@ -134,15 +164,45 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
         return NULL;
     }
 
-	GLint attribs[] =
-	{
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 2,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 1,
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-		0
-	};
+    GLint attribs[16];
+    int   attribCount = 0;
+    int   flags = 0;
+    int   profileFlags = 0;
 
-	HGLRC context = wglCreateContextAttribsARB(dc, 0, attribs);
+    // Version
+    if(rp.GLMajorVersion)
+    {
+        attribs[attribCount++] = WGL_CONTEXT_MAJOR_VERSION_ARB;
+        attribs[attribCount++] = rp.GLMajorVersion;
+        attribs[attribCount++] = WGL_CONTEXT_MINOR_VERSION_ARB;
+        attribs[attribCount++] = rp.GLMinorVersion;
+    }
+
+    // Flags
+    if(rp.DebugEnabled)
+        flags |= WGL_CONTEXT_DEBUG_BIT_ARB;
+    if(rp.GLForwardCompatibleProfile)
+        flags |= WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
+    if(flags)
+    {
+        attribs[attribCount++] = WGL_CONTEXT_FLAGS_ARB;
+        attribs[attribCount++] = flags;
+    }
+    
+    // Profile flags
+    if(rp.GLCoreProfile)
+        profileFlags |= WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
+    else if(rp.GLCompatibilityProfile)
+        profileFlags |= WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
+    if(profileFlags)
+    {
+        attribs[attribCount++] = WGL_CONTEXT_PROFILE_MASK_ARB;
+        attribs[attribCount++] = profileFlags;
+    }
+
+    attribs[attribCount] = 0;
+
+	HGLRC context = wglCreateContextAttribsARBFunc(dc, 0, attribs);
 	if (!wglMakeCurrent(dc, context))
 	{
 		wglDeleteContext(context);
@@ -158,10 +218,10 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
 	static ovrGLConfig cfg;
-	cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
-	cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-	cfg.OGL.Header.Multisample = Params.Multisample;
-	cfg.OGL.Window             = Window;
+	cfg.OGL.Header.API              = ovrRenderAPI_OpenGL;
+	cfg.OGL.Header.BackBufferSize   = Sizei(WindowWidth, WindowHeight);
+	cfg.OGL.Header.Multisample      = Params.Multisample;
+	cfg.OGL.Window                  = Window;
 
 	return cfg.Config;
 }

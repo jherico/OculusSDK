@@ -1,8 +1,6 @@
-Oculus VR Rift SDK Software License
-
 Oculus VR, LLC Software Development Kit License Agreement
 
-Copyright © 2014 Oculus VR, LLC. All rights reserved.
+Copyright © 2014 Oculus VR, LLC All rights reserved.
 
 The text of this may be found at: http://www.oculusvr.com/licenses/LICENSE-3.2
 

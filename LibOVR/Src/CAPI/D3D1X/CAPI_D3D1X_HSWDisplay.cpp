@@ -247,16 +247,18 @@ bool HSWDisplay::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     if(config)
     {
-        RenderParams.pDevice	   = config->D3D_NS.pDevice;
-        #if (OVR_D3D_VERSION == 10)    
-        RenderParams.pContext      = config->D3D10.pDevice;
-        #else
-        RenderParams.pContext      = config->D3D11.pDeviceContext;
-        #endif
-        RenderParams.pBackBufferRT = config->D3D_NS.pBackBufferRT;
-        RenderParams.pSwapChain    = config->D3D_NS.pSwapChain;
-        RenderParams.RTSize        = config->D3D_NS.Header.RTSize;
-        RenderParams.Multisample   = config->D3D_NS.Header.Multisample;
+        RenderParams.pDevice	    = config->D3D_NS.pDevice;
+#if (OVR_D3D_VERSION == 10)
+        RenderParams.pContext       = config->D3D10.pDevice;
+        RenderParams.pBackBufferUAV = NULL;
+#else
+        RenderParams.pContext       = config->D3D11.pDeviceContext;
+        RenderParams.pBackBufferUAV = config->D3D_NS.pBackBufferUAV;
+#endif
+        RenderParams.pBackBufferRT  = config->D3D_NS.pBackBufferRT;
+        RenderParams.pSwapChain     = config->D3D_NS.pSwapChain;
+        RenderParams.BackBufferSize = config->D3D_NS.Header.BackBufferSize;
+        RenderParams.Multisample    = config->D3D_NS.Header.Multisample;
 
         // We may want to create RasterizerState, or alternatively let the DistortionRenderer handle it.
     }
@@ -528,7 +530,7 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
             ShaderFill fill(pShaderSet);
             fill.SetInputLayout(pVertexInputLayout);
             if(pTexture)
-                fill.SetTexture(0, pTexture);
+                fill.SetTexture(0, pTexture, Shader_Pixel);
 
             const float scale  = HSWDISPLAY_SCALE * ((RenderState.OurHMDInfo.HmdType == HmdType_DK1) ? 0.70f : 1.f);
             pShaderSet->SetUniform2f("Scale", scale, scale / 2.f); // X and Y scale. Y is a fixed proportion to X in order to give a certain aspect ratio.

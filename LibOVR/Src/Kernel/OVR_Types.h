@@ -62,6 +62,7 @@ limitations under the License.
 //    APPLE     - Any OS by Apple (e.g. iOS, OS X)
 //    UNIX      - Linux, BSD, Mac OS X.
 //    MOBILE    - iOS, Android, Microsoft phone
+//    CONSOLE   - Console platforms
 //
 
 #if (defined(__APPLE__) && (defined(__GNUC__) ||\
@@ -88,7 +89,6 @@ limitations under the License.
 #else
 #  define OVR_OS_OTHER
 #endif
-
 
 #if !defined(OVR_OS_MS_MOBILE)
 #   if (defined(_M_ARM) || defined(_M_IX86) || defined(_M_AMD64)) && !defined(OVR_OS_WIN32) && !defined(OVR_OS_CONSOLE)
@@ -546,67 +546,152 @@ struct OVR_GUID
 
 
 //-----------------------------------------------------------------------------------
-// ***** OVR_DEBUG_BREAK, OVR_ASSERT
+// ***** OVR_DEBUG_BREAK, OVR_DEBUG_CODE, 
+//       OVR_ASSERT, OVR_ASSERT_M, OVR_ASSERT_AND_UNUSED
 //
-// If not in debug build, macros do nothing
-#ifndef OVR_BUILD_DEBUG
+// Macros have effect only in debug builds.
+//
+// Example OVR_DEBUG_BREAK usage (note the lack of parentheses):
+//     #define MY_ASSERT(expression) do { if (!(expression)) { OVR_DEBUG_BREAK; } } while(0)
+//
+// Example OVR_DEBUG_CODE usage:
+//     OVR_DEBUG_CODE(printf("debug test\n");)
+//       or
+//     OVR_DEBUG_CODE(printf("debug test\n"));
+//
+// Example OVR_ASSERT usage:
+//     OVR_ASSERT(count < 100);
+//     OVR_ASSERT_M(count < 100, "count is too high");
+//
+#if defined(OVR_BUILD_DEBUG)
+	// Causes a debugger breakpoint in debug builds. Has no effect in release builds.
+	// Microsoft Win32 specific debugging support
+	#if defined(OVR_CC_MSVC)
+		#define OVR_DEBUG_BREAK __debugbreak()
+	#elif defined(OVR_CC_GNU) || defined(OVR_CC_CLANG)
+		#if defined(OVR_CPU_X86) || defined(OVR_CPU_X86_64)
+			#define OVR_DEBUG_BREAK do { OVR_ASM("int $3\n\t"); } while(0)
+		#else
+			#define OVR_DEBUG_BREAK __builtin_trap()
+		#endif
+	#else
+		#define OVR_DEBUG_BREAK do { *((int *) 0) = 1; } while(0)
+	#endif
 
-// The expresssion is defined only in debug builds. It is defined away in release builds.
-#  define OVR_DEBUG_CODE(c)
+	// The expresssion is defined only in debug builds. It is defined away in release builds.
+	#define OVR_DEBUG_CODE(c) c
 
-// Causes a debugger breakpoint in debug builds. Has no effect in release builds.
-#  define OVR_DEBUG_BREAK  ((void)0)
+	// In debug builds this tests the given expression; if false then executes OVR_DEBUG_BREAK,
+	// if true then no action. Has no effect in release builds.
+	#if defined(__clang_analyzer__) // During static analysis, make it so the analyzer thinks that failed asserts result in program exit. Reduced false positives.
+		#include <stdlib.h>
+		#define OVR_ASSERT_M(p, message) do { if (!(p))  { OVR_DEBUG_BREAK; exit(0); } } while(0)
+		#define OVR_ASSERT(p)            do { if (!(p))  { OVR_DEBUG_BREAK; exit(0); } } while(0)
+	#else
+		// void OVR_ASSERT_M(bool expression, const char message);
+		// Note: The expresion below is expanded into all usage of this assertion macro. 
+		// We should try to minimize the size of the expanded code to the extent possible.
+		#define OVR_ASSERT_M(p, message) do                                                               \
+		{                                                                                                 \
+			if (!(p))                                                                                     \
+			{                                                                                             \
+				intptr_t ovrAssertUserParam;                                                              \
+				OVRAssertionHandler ovrAssertUserHandler = OVR::GetAssertionHandler(&ovrAssertUserParam); \
+																							              \
+				if(ovrAssertUserHandler && !OVRIsDebuggerPresent())                                       \
+				{                                                                                         \
+					ovrAssertUserHandler(ovrAssertUserParam, "Assertion failure", message);               \
+				}                                                                                         \
+				else                                                                                      \
+				{                                                                                         \
+					OVR_DEBUG_BREAK;                                                                      \
+				}                                                                                         \
+			}                                                                                             \
+		} while(0)
 
-// In debug builds this tests the given expression; if false then executes OVR_DEBUG_BREAK,
-// if true then no action. Has no effect in release builds.
-#  define OVR_ASSERT(p)    ((void)0)
+		// void OVR_ASSERT(bool expression);
+		#define OVR_ASSERT(p) OVR_ASSERT_M((p), (#p))
+	#endif
 
-// Acts the same as OVR_ASSERT in debug builds. Acts the same as OVR_UNUSED in release builds.
-// Example usage: OVR_ASSERT_AND_UNUSED(x < 30, x);
-#define OVR_ASSERT_AND_UNUSED(expression, value) OVR_UNUSED(value)
+	// Acts the same as OVR_ASSERT in debug builds. Acts the same as OVR_UNUSED in release builds.
+	// Example usage: OVR_ASSERT_AND_UNUSED(x < 30, x);
+	#define OVR_ASSERT_AND_UNUSED(expression, value) OVR_ASSERT(expression); OVR_UNUSED(value)
 
 #else 
 
-// Causes a debugger breakpoint in debug builds. Has no effect in release builds.
-// Microsoft Win32 specific debugging support
-#if defined(OVR_OS_MS)
-#  ifdef OVR_CPU_X86
-#    if defined(__cplusplus_cli)
-#      define OVR_DEBUG_BREAK   do { __debugbreak(); } while(0)
-#    elif defined(OVR_CC_GNU)
-#      define OVR_DEBUG_BREAK   do { OVR_ASM("int $3\n\t"); } while(0)
-#    else
-#      define OVR_DEBUG_BREAK   do { OVR_ASM int 3 } while (0)
-#    endif
-#  else
-#    define OVR_DEBUG_BREAK     do { __debugbreak(); } while(0)
-#  endif
-// Unix specific debugging support
-#elif defined(OVR_CPU_X86) || defined(OVR_CPU_X86_64)
-#  define OVR_DEBUG_BREAK       do { OVR_ASM("int $3\n\t"); } while(0)
-#else
-#  define OVR_DEBUG_BREAK       do { *((int *) 0) = 1; } while(0)
-#endif
+	// The expresssion is defined only in debug builds. It is defined away in release builds.
+	#define OVR_DEBUG_CODE(c)
 
-// The expresssion is defined only in debug builds. It is defined away in release builds.
-#define OVR_DEBUG_CODE(c) c
+	// Causes a debugger breakpoint in debug builds. Has no effect in release builds.
+	#define OVR_DEBUG_BREAK  ((void)0)
 
-// In debug builds this tests the given expression; if false then executes OVR_DEBUG_BREAK,
-// if true then no action. Has no effect in release builds.
-#if defined(__clang_analyzer__) // During static analysis, make it so the analyzer thinks that failed asserts result in program exit. Reduced false positives.
-    #include <stdlib.h>
-    #define OVR_ASSERT(p)        do { if (!(p))  { OVR_DEBUG_BREAK; exit(0); } } while(0)
-#else
-    #define OVR_ASSERT(p)        do { if (!(p))  { OVR_DEBUG_BREAK; } } while(0)
-#endif
+	// In debug builds this tests the given expression; if false then executes OVR_DEBUG_BREAK,
+	// if true then no action. Has no effect in release builds.
+	#define OVR_ASSERT(p)      ((void)0)
+	#define OVR_ASSERT_M(p, m) ((void)0)
 
-
-
-// Acts the same as OVR_ASSERT in debug builds. Acts the same as OVR_UNUSED in release builds.
-// Example usage: OVR_ASSERT_AND_UNUSED(x < 30, x);
-#define OVR_ASSERT_AND_UNUSED(expression, value) OVR_ASSERT(expression); OVR_UNUSED(value)
+	// Acts the same as OVR_ASSERT in debug builds. Acts the same as OVR_UNUSED in release builds.
+	// Example usage: OVR_ASSERT_AND_UNUSED(x < 30, x);
+	#define OVR_ASSERT_AND_UNUSED(expression, value) OVR_UNUSED(value)
 
 #endif // OVR_BUILD_DEBUG
+
+
+
+// Assert handler
+// The user of this library can override the default assertion handler and provide their own.
+namespace OVR
+{
+    // The return value meaning is reserved for future definition and currently has no effect.
+    typedef intptr_t (*OVRAssertionHandler)(intptr_t userParameter, const char* title, const char* message);
+
+    // Returns the current assertion handler.
+    OVRAssertionHandler GetAssertionHandler(intptr_t* userParameter = NULL);
+
+    // Sets the current assertion handler.
+    // The default assertion handler if none is set simply issues a debug break.
+    // Example usage:
+    //     intptr_t CustomAssertionHandler(intptr_t /*userParameter*/, const char* title, const char* message)) { 
+    //         MessageBox(title, message);
+    //         OVR_DEBUG_BREAK;
+    //     }
+    void SetAssertionHandler(OVRAssertionHandler assertionHandler, intptr_t userParameter = 0);
+
+    // Implements the default assertion handler.
+    intptr_t DefaultAssertionHandler(intptr_t userParameter, const char* title, const char* message);
+
+    // Currently defined in OVR_DebugHelp.cpp
+    bool OVRIsDebuggerPresent();
+}
+
+
+// ------------------------------------------------------------------------
+// ***** static_assert
+//
+// Portable support for C++11 static_assert.
+// Acts as if the following were declared:
+//     void static_assert(bool const_expression, const char* msg);
+//
+// Example usage:
+//     static_assert(sizeof(int32_t) == 4, "int32_t expected to be 4 bytes.");
+
+#if defined(OVR_CPP_NO_STATIC_ASSERT) // If the compiler doesn't provide it intrinsically...
+    #if !defined(OVR_SA_UNUSED)
+        #if defined(OVR_CC_GNU) || defined(OVR_CC_CLANG)
+            #define OVR_SA_UNUSED __attribute__((unused))
+        #else
+            #define OVR_SA_UNUSED
+        #endif
+        #define OVR_SA_PASTE(a,b) a##b
+        #define OVR_SA_HELP(a,b)  OVR_SA_PASTE(a,b)
+    #endif
+
+    #if defined(__COUNTER__)
+        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __COUNTER__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
+    #else
+        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __LINE__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
+    #endif
+#endif
 
 
 // ------------------------------------------------------------------------
@@ -620,37 +705,9 @@ struct OVR_GUID
 // Example usage:
 //     OVR_COMPILER_ASSERT(sizeof(int32_t == 4));
 
-#if OVR_CPP_NO_STATIC_ASSERT
-    #define OVR_COMPILER_ASSERT(x)  { int zero = 0; switch(zero) {case 0: case x:;} }
-#else
-    #define OVR_COMPILER_ASSERT(x)  static_assert((x), #x)
-#endif
-
-
-// ------------------------------------------------------------------------
-// ***** static_assert
-//
-// Portable support for C++11 static_assert.
-// Acts as if the following were declared:
-//     void static_assert(bool const_expression, const char* msg);
-//
-// Example usage:
-//     static_assert(sizeof(int32_t) == 4, "int32_t expected to be 4 bytes.");
-
-#if defined(OVR_CPP_NO_STATIC_ASSERT)
-    #if defined(OVR_CC_GNU) || defined(OVR_CC_CLANG)
-        #define OVR_SA_UNUSED __attribute__((unused))
-    #else
-        #define OVR_SA_UNUSED
-    #endif
-    #define OVR_SA_PASTE(a,b) a##b
-    #define OVR_SA_HELP(a,b)  OVR_SA_PASTE(a,b)
-
-    #if defined(__COUNTER__)
-        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __COUNTER__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
-    #else
-        #define static_assert(expression, msg) typedef char OVR_SA_HELP(compileTimeAssert, __LINE__) [((expression) != 0) ? 1 : -1] OVR_SA_UNUSED
-    #endif
+#if !defined(OVR_COMPILER_ASSERT)
+    #define OVR_COMPILER_ASSERT(expression)        static_assert(expression, #expression)
+    #define OVR_COMPILER_ASSERT_M(expression, msg) static_assert(expression, msg)
 #endif
 
 
@@ -842,6 +899,10 @@ inline void* operator new (size_t size, const char* filename, int line)
 #define new new(__FILE__, __LINE__)
 
 #endif // OVR_FIND_NORMAL_ALLOCATIONS
+
+
+#include "OVR_Nullptr.h"
+
 
 
 

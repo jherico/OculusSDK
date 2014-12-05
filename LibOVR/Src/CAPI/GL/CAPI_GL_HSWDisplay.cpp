@@ -232,7 +232,6 @@ Texture* LoadTextureTga(RenderParams& rParams, int samplerMode, const uint8_t* p
 HSWDisplay::HSWDisplay(ovrRenderAPIType api, ovrHmd hmd, const HMDRenderState& renderState)
   : OVR::CAPI::HSWDisplay(api, hmd, renderState)
   , RenderParams()
-  , GLVersionInfo()
   , GLContext()
   , FrameBuffer(0)
   , pTexture()
@@ -256,30 +255,23 @@ bool HSWDisplay::Initialize(const ovrRenderAPIConfig* apiConfig)
         // The following is essentially copied from CAPI_GL_DistortionRender.cpp's 
         // Initialize function. To do: Merge this to a central location.
         RenderParams.Multisample = config->OGL.Header.Multisample;
-        RenderParams.RTSize      = config->OGL.Header.RTSize;
+        RenderParams.BackBufferSize     = config->OGL.Header.BackBufferSize;
 
         #if defined(OVR_OS_WIN32)
             RenderParams.Window = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
             RenderParams.DC     = config->OGL.DC;
         #elif defined(OVR_OS_LINUX)
             if (config->OGL.Disp)
+            {
                 RenderParams.Disp = config->OGL.Disp;
-            if (!RenderParams.Disp)
-                RenderParams.Disp = XOpenDisplay(NULL);
-            if (!RenderParams.Disp)
-            {
-                OVR_DEBUG_LOG(("XOpenDisplay failed."));
-                return false;
             }
-
-            if (config->OGL.Win)
-                RenderParams.Win= config->OGL.Win;
-            if (!RenderParams.Win)
-                RenderParams.Win = glXGetCurrentDrawable();
-
-            if (!RenderParams.Win)
+            if (!RenderParams.Disp)
             {
-                OVR_DEBUG_LOG(("XGetInputFocus failed."));
+                RenderParams.Disp = glXGetCurrentDisplay();
+            }
+            if (!RenderParams.Disp)
+            {
+                OVR_DEBUG_LOG(("glXGetCurrentDisplay failed."));
                 return false;
             }
         #endif
@@ -321,36 +313,24 @@ void HSWDisplay::UnloadGraphics()
         currentGLContext.InitFromCurrent();
         GLContext.Bind();
 
-        // RenderParams: No need to clear.
-        if(FrameBuffer != 0)
-        {
-            glDeleteFramebuffers(1, &FrameBuffer);
-            FrameBuffer = 0;
-        }
-        pTexture.Clear();
-        pShaderSet.Clear();
-        pVertexShader.Clear();
-        pFragmentShader.Clear();
-        pVB.Clear();
-        if(VAO)
-        {
-            #ifdef OVR_OS_MAC
-                if(GLVersionInfo.WholeVersion >= 302)
-                    glDeleteVertexArrays(1, &VAO);
-                else
-                    glDeleteVertexArraysAPPLE(1, &VAO);
-            #else
-                glDeleteVertexArrays(1, &VAO);
-            #endif
-            
-            VAO = 0;
-            VAOInitialized = false;
-        }
-        // OrthoProjection: No need to clear.
-        
+    // RenderParams: No need to clear.
+    if(FrameBuffer != 0)
+    {
+        glDeleteFramebuffers(1, &FrameBuffer);
+        FrameBuffer = 0;
+    }
+    pTexture.Clear();
+    pShaderSet.Clear();
+    pVertexShader.Clear();
+    pFragmentShader.Clear();
+    pVB.Clear();
+    if(VAO)
+    {
+            glDeleteVertexArrays(1, &VAO);
         currentGLContext.Bind();
         GLContext.Destroy();
     }
+}
 }
 
 
@@ -358,9 +338,6 @@ void HSWDisplay::LoadGraphics()
 {
     // We assume here that the current GL context is the one our resources will be associated with.
 
-    if(GLVersionInfo.MajorVersion == 0)
-        GetGLVersionAndExtensions(GLVersionInfo);
-    
     if (FrameBuffer == 0)
     {
         glGenFramebuffers(1, &FrameBuffer);
@@ -380,7 +357,7 @@ void HSWDisplay::LoadGraphics()
 
     if(!pVertexShader)
     {
-        OVR::String strShader((GLVersionInfo.MajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
+        OVR::String strShader((GLEContext::GetCurrentContext()->WholeVersion >= 302) ? glsl3Prefix : glsl2Prefix);
         strShader += SimpleTexturedQuad_vs;
 
         pVertexShader = *new VertexShader(&RenderParams, const_cast<char*>(strShader.ToCStr()), strShader.GetLength(), SimpleTexturedQuad_vs_refl, OVR_ARRAY_COUNT(SimpleTexturedQuad_vs_refl));
@@ -389,7 +366,7 @@ void HSWDisplay::LoadGraphics()
 
     if(!pFragmentShader)
     {
-        OVR::String strShader((GLVersionInfo.MajorVersion >= 3) ? glsl3Prefix : glsl2Prefix);
+        OVR::String strShader((GLEContext::GetCurrentContext()->WholeVersion >= 302) ? glsl3Prefix : glsl2Prefix);
         strShader += SimpleTexturedQuad_ps;
 
         pFragmentShader = *new FragmentShader(&RenderParams, const_cast<char*>(strShader.ToCStr()), strShader.GetLength(), SimpleTexturedQuad_ps_refl, OVR_ARRAY_COUNT(SimpleTexturedQuad_ps_refl));
@@ -421,19 +398,11 @@ void HSWDisplay::LoadGraphics()
         }
     }
 
-    // We don't generate the vertex arrays here
-    if (!VAO && GLVersionInfo.SupportsVAO)
+    // We don't bind or initialize the vertex arrays here.
+    if (!VAO && GLE_ARB_vertex_array_object)
     {
         OVR_ASSERT(!VAOInitialized);
-        
-        #ifdef OVR_OS_MAC
-            if(GLVersionInfo.WholeVersion >= 302)
-                glGenVertexArrays(1, &VAO);
-            else
-                glGenVertexArraysAPPLE(1, &VAO);
-        #else
             glGenVertexArrays(1, &VAO);
-        #endif
     }
 }
 
@@ -447,18 +416,7 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         ovrGLTexture* eyeTextureGL = const_cast<ovrGLTexture*>(reinterpret_cast<const ovrGLTexture*>(eyeTexture));
         OVR_ASSERT(eyeTextureGL->Texture.Header.API == ovrRenderAPI_OpenGL);
 
-        // We init a temporary Context, Bind our own context, then Bind the temporary context below before exiting.
-        // It's more exensive to have a temp context copy made here instead of having it as a saved member variable,
-        // but we can't have a saved member variable because the app might delete the saved member behind our back
-        // or associate it with another thread, which would cause our bind of it before exiting to be a bad operation.
-        Context currentGLContext; // To do: Change this to use the AutoContext class that was recently created.
-        currentGLContext.InitFromCurrent();
-        if(GLContext.GetIncarnation() == 0) // If not yet initialized...
-            GLContext.CreateShared(currentGLContext);
-        GLContext.Bind();
-        #if defined(OVR_OS_MAC) // To consider: merge the following into the Bind function.
-            GLContext.SetSurface(currentGLContext);
-        #endif
+        GL::AutoContext autoGLContext(GLContext); // Saves the current GL context, binds our GLContext, then at the end of scope re-binds the current GL context.
 
         // Load the graphics if not loaded already.
         if (!pTexture)
@@ -500,7 +458,7 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
         pShaderSet->SetUniform2f("PositionOffset", OrthoProjection[eye].GetTranslation().x, 0.0f);
 
         // Set vertex attributes
-        if (GLVersionInfo.SupportsVAO)
+        if (GLE_ARB_vertex_array_object)
         {
             OVR_ASSERT(VAO != 0);
             glBindVertexArray(VAO);
@@ -530,13 +488,11 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        if (GLVersionInfo.SupportsVAO)
+        if (GLE_ARB_vertex_array_object)
         {
             VAOInitialized = true;
             glBindVertexArray(0);
         }
-        
-        currentGLContext.Bind();
     }
 }
 

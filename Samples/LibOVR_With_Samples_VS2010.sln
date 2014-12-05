@@ -1,6 +1,9 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVR", "..\LibOVR\Projects\Win32\VS2010\LibOVR.vcxproj", "{934B40C7-F40A-4E4C-97A7-B9659BE0A441}"
+	ProjectSection(ProjectDependencies) = postProject
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D} = {ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusRoomTiny", "OculusRoomTiny\Projects\Win\VS2010\OculusRoomTiny.vcxproj", "{80523489-2881-4F64-8C3B-FAF88B60ABCD}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -11,6 +14,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusWorldDemo", "OculusWo
 	ProjectSection(ProjectDependencies) = postProject
 		{934B40C7-F40A-4E4C-97A7-B9659BE0A441} = {934B40C7-F40A-4E4C-97A7-B9659BE0A441}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderReflector", "..\Tools\ShaderReflector\ShaderReflector\ShaderReflector_VS2010.vcxproj", "{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tools", "Tools", "{B180FF61-F857-4F20-ABD3-D9493C72732C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,8 +51,19 @@ Global
 		{8051B877-2992-4F64-8C3B-FAF88B6D83AA}.Release|Win32.Build.0 = Release|Win32
 		{8051B877-2992-4F64-8C3B-FAF88B6D83AA}.Release|x64.ActiveCfg = Release|x64
 		{8051B877-2992-4F64-8C3B-FAF88B6D83AA}.Release|x64.Build.0 = Release|x64
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Debug|Win32.ActiveCfg = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Debug|Win32.Build.0 = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Debug|x64.ActiveCfg = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Debug|x64.Build.0 = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Release|Win32.ActiveCfg = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Release|Win32.Build.0 = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Release|x64.ActiveCfg = Release|Win32
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D}.Release|x64.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{ADCFC940-8E3E-40BB-A47A-A10CC311BC0D} = {B180FF61-F857-4F20-ABD3-D9493C72732C}
 	EndGlobalSection
 EndGlobal

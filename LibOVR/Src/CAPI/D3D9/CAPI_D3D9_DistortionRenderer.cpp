@@ -28,6 +28,9 @@ limitations under the License.
 #define OVR_D3D_VERSION 9
 #include "../../OVR_CAPI_D3D.h"
 
+#include <initguid.h>
+DEFINE_GUID(IID_OVRDirect3DDevice9EX, 0xe6d58f10, 0xffa1, 0x4748, 0x85, 0x9f, 0xbc, 0xd7, 0xea, 0xe8, 0xfc, 0x1);
+
 namespace OVR { namespace CAPI { namespace D3D9 {
 
 
@@ -55,17 +58,35 @@ DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager
     ScreenSize.w = 0;
     ScreenSize.h = 0;
     InitLatencyTester(renderState);
+
+    for (int i = 0; i < 2; ++i)
+    {
+        eachEye[i].dxIndices = nullptr;
+        eachEye[i].dxVerts = nullptr;
+    }
 }
 
 
 /**********************************************/
 DistortionRenderer::~DistortionRenderer()
 {
-	//Release any memory 
-	eachEye[0].dxIndices->Release();
-	eachEye[0].dxVerts->Release();
-	eachEye[1].dxIndices->Release();
-	eachEye[1].dxVerts->Release();
+	//Release any memory
+    if (eachEye[0].dxIndices)
+    {
+        eachEye[0].dxIndices->Release();
+    }
+    if (eachEye[0].dxVerts)
+    {
+        eachEye[0].dxVerts->Release();
+    }
+    if (eachEye[1].dxIndices)
+    {
+        eachEye[1].dxIndices->Release();
+    }
+    if (eachEye[1].dxVerts)
+    {
+        eachEye[1].dxVerts->Release();
+    }
 }
 
 
@@ -77,10 +98,19 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     if (!config)                return true; 
     if (!config->D3D9.pDevice)  return false;
 
+    if (System::DirectDisplayEnabled())
+    {
+        Ptr<IUnknown> ovrDevice;
+        if (config->D3D9.pDevice->QueryInterface(IID_OVRDirect3DDevice9EX, (void**)&ovrDevice.GetRawRef()) == E_NOINTERFACE)
+        {
+            OVR_DEBUG_LOG_TEXT(("ovr_Initialize() or ovr_InitializeRenderingShim() wasn't called before the D3D9 device was created."));
+        }
+    }
+
 	//Glean all the required variables from the input structures
 	Device         = config->D3D9.pDevice;
     SwapChain      = config->D3D9.pSwapChain;
-	ScreenSize     = config->D3D9.Header.RTSize;
+	ScreenSize     = config->D3D9.Header.BackBufferSize;
 
 	GfxState = *new GraphicsState(Device, RState.DistortionCaps);
 

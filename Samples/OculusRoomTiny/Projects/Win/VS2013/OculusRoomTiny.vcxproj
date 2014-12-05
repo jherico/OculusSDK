@@ -190,18 +190,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="../../../OculusRoomModel.cpp" />
-    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.cpp" />
-    <ClCompile Include="..\..\..\RenderTiny_D3D11_Device.cpp" />
-    <ClCompile Include="..\..\..\Win32_OculusRoomTiny.cpp" />
-    <ClCompile Include="..\..\..\Win32_OculusRoomTiny_Util.cpp" />
+    <ClInclude Include="..\..\..\Win32_DX11AppUtil.h" />
+    <ClInclude Include="..\..\..\Win32_RoomTiny_AppRender.h" />
+    <ClInclude Include="..\..\..\Win32_RoomTiny_ExampleFeatures.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="../../../OculusRoomTiny2.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h" />
-    <ClInclude Include="..\..\..\RenderTiny_D3D11_Device.h" />
+    <ClCompile Include="..\..\..\Win32_RoomTiny_Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

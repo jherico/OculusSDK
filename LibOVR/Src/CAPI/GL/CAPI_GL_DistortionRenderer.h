@@ -44,7 +44,7 @@ public:
     DistortionRenderer(ovrHmd hmd,
                        FrameTimeManager& timeManager,
                        const HMDRenderState& renderState);
-    ~DistortionRenderer();
+    virtual ~DistortionRenderer();
 
     
     // Creation function for the device.    
@@ -68,61 +68,11 @@ public:
 	double       FlushGpuAndWaitTillTime(double absTime);
 
 protected:
-    
-    
-    class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
-    {
-    public:
-        GraphicsState();
-        virtual void Save();
-        virtual void Restore();
-        
-#ifdef OVR_OS_MAC
-        // Asking for Core Profile is equivalent to asking whether we have a
-        // 3.2+ context on mac.
-        bool isAtLeastOpenGL3();
-#endif
-
-    protected:
-        void ApplyBool(GLenum Name, GLint Value, GLint index = -1);
-        
-    public:
-        GLVersionAndExtensions GLVersionInfo;
-        
-        GLint Viewport[4];
-        GLfloat ClearColor[4];
-        GLint DepthTest;
-        GLint CullFace;
-        GLint SRGB;
-        GLint Program;
-        GLint ActiveTexture;
-        GLint TextureBinding;
-        GLint VertexArrayBinding;
-        GLint ElementArrayBufferBinding;
-        GLint ArrayBufferBinding;
-        GLint FrameBufferBinding;
-        
-        GLint Blend;
-        GLint ColorWritemask[4];
-        GLint Dither;
-        GLint Fog;
-        GLint Lighting;
-        GLint RasterizerDiscard;
-        GLint RenderMode;
-        GLint SampleMask;
-        GLint ScissorTest;
-        GLfloat ZoomX;
-        GLfloat ZoomY;
-    };
 
 	struct FOR_EACH_EYE
 	{
-        FOR_EACH_EYE() : TextureSize(0), RenderViewport(Sizei(0)) { }
+        FOR_EACH_EYE() : numVerts(0), numIndices(0), texture(0), /*UVScaleOffset[],*/ TextureSize(0, 0), RenderViewport(0, 0, 0, 0) { }
 
-#if 0
-		IDirect3DVertexBuffer9  * dxVerts;
-		IDirect3DIndexBuffer9   * dxIndices;
-#endif
 		int                       numVerts;
 		int                       numIndices;
 
@@ -138,7 +88,7 @@ protected:
 
     // GL context and utility variables.
     RenderParams        RParams;
-    Context             distortionContext;
+    Context             distortionContext;  // We are currently using this private OpenGL context instead of using the CAPI SaveGraphicsState/RestoreGraphicsState mechanism. To consider: Move this Context into SaveGraphicsState/RestoreGraphicState so there's consistency between DirectX and OpenGL.
 
 	// Helpers
     void initOverdrive();

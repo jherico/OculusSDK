@@ -155,6 +155,27 @@ void NetSessionCommon::SerializeHMDInfo(Net::BitStream *bitStream, HMDInfo* hmdI
 
     w = hmdInfo->FirmwareMinor;
     bitStream->Write(w);
+
+    bitStream->Write(hmdInfo->PelOffsetR.x);
+    bitStream->Write(hmdInfo->PelOffsetR.y);
+    bitStream->Write(hmdInfo->PelOffsetB.x);
+    bitStream->Write(hmdInfo->PelOffsetB.y);
+
+    // Important please read before modifying!
+    // ----------------------------------------------------
+    // Please add new serialized data to the end, here.
+    // Otherwise we will break backwards compatibility
+    // and e.g. 0.4.4 runtime will not work with 0.4.3 SDK.
+
+    // Please also update the DeserializeHMDInfo() function
+    // below also and make sure that the members you added
+    // are initialized properly in the HMDInfo constructor.
+
+    // Note that whenever new fields are added here you
+    // should also update the minor version of the RPC
+    // protocol in OVR_Session.h so that clients fail at
+    // a version check instead of when this data is
+    // found to be truncated from the server.
 }
 
 bool NetSessionCommon::DeserializeHMDInfo(Net::BitStream *bitStream, HMDInfo* hmdInfo)
@@ -242,6 +263,24 @@ bool NetSessionCommon::DeserializeHMDInfo(Net::BitStream *bitStream, HMDInfo* hm
         return false;
     }
     hmdInfo->FirmwareMinor = w;
+
+    bitStream->Read(hmdInfo->PelOffsetR.x);
+    bitStream->Read(hmdInfo->PelOffsetR.y);
+    bitStream->Read(hmdInfo->PelOffsetB.x);
+    if (!bitStream->Read(hmdInfo->PelOffsetB.y))
+    {
+        OVR_ASSERT(false);
+        return false;
+    }
+
+    // Important please read before modifying!
+    // ----------------------------------------------------
+    // Please add new serialized data to the end, here.
+    // Otherwise we will break backwards compatibility
+    // and e.g. 0.4.4 runtime will not work with 0.4.3 SDK.
+
+    // Be sure to check that the very last one read properly
+    // since HMD Info truncation should be caught here.
 
     return true;
 }

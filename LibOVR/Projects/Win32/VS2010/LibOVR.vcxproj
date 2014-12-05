@@ -33,6 +33,8 @@
     <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D1X_Util.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.h" />
     <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GLE.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GLE_GL.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h" />
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.h" />
@@ -50,6 +52,7 @@
     <ClInclude Include="..\..\..\Src\Kernel\OVR_Compiler.h" />
     <ClInclude Include="..\..\..\Src\Kernel\OVR_ContainerAllocator.h" />
     <ClInclude Include="..\..\..\Src\Kernel\OVR_CRC32.h" />
+    <ClInclude Include="..\..\..\Src\Kernel\OVR_DebugHelp.h" />
     <ClInclude Include="..\..\..\Src\Kernel\OVR_Delegates.h" />
     <ClInclude Include="..\..\..\Src\Kernel\OVR_Deque.h" />
     <ClInclude Include="..\..\..\Src\Kernel\OVR_File.h" />
@@ -97,6 +100,7 @@
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_SystemGUI.h" />
     <ClInclude Include="..\..\..\Src\Util\Util_SystemInfo.h" />
   </ItemGroup>
   <ItemGroup>
@@ -125,6 +129,7 @@
     <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GLE.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.cpp" />
     <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp" />
@@ -136,6 +141,7 @@
     <ClCompile Include="..\..\..\Src\Kernel\OVR_Allocator.cpp" />
     <ClCompile Include="..\..\..\Src\Kernel\OVR_Atomic.cpp" />
     <ClCompile Include="..\..\..\Src\Kernel\OVR_CRC32.cpp" />
+    <ClCompile Include="..\..\..\Src\Kernel\OVR_DebugHelp.cpp" />
     <ClCompile Include="..\..\..\Src\Kernel\OVR_File.cpp" />
     <ClCompile Include="..\..\..\Src\Kernel\OVR_FileFILE.cpp" />
     <ClCompile Include="..\..\..\Src\Kernel\OVR_Lockless.cpp" />
@@ -171,6 +177,7 @@
     <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp" />
+    <ClCompile Include="..\..\..\Src\Util\Util_SystemGUI.cpp" />
     <ClCompile Include="..\..\..\Src\Util\Util_SystemInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -283,6 +290,19 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionCS2x2.csh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
     </CustomBuild>
   </ItemGroup>
   <PropertyGroup Label="Globals">

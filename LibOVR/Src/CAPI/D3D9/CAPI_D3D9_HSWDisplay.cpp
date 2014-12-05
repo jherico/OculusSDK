@@ -177,7 +177,7 @@ bool HSWDisplay::Initialize(const ovrRenderAPIConfig* apiConfig)
     {
 	    RenderParams.Device     = config->D3D9.pDevice;
         RenderParams.SwapChain  = config->D3D9.pSwapChain;
-	    RenderParams.ScreenSize = config->D3D9.Header.RTSize;
+	    RenderParams.ScreenSize = config->D3D9.Header.BackBufferSize;
     }
     else
     {

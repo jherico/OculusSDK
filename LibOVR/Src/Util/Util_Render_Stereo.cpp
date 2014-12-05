@@ -7,16 +7,16 @@ Authors     :   Michael Antonov, Andrew Reisse, Tom Forsyth
 
 Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -81,7 +81,7 @@ char const* GetDebugNameHmdType ( HmdTypeEnum hmdType )
 struct DistortionAndFov
 {
     DistortionRenderDesc    Distortion;
-    FovPort                 Fov; 
+    FovPort                 Fov;
 };
 
 static DistortionAndFov CalculateDistortionAndFovInternal ( StereoEye eyeType, HmdRenderInfo const &hmd,
@@ -199,7 +199,7 @@ static StereoEyeParams CalculateStereoEyeParamsInternal ( StereoEye eyeType, Hmd
     // this is the mapping of actual physical eye FOV (and our eyes do not zoom!)
     // to screen space.
     ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov ( fov );
-    
+
     // The size of the final FB, which is fixed and determined by the physical size of the device display.
     Recti distortedViewport   = GetFramebufferViewport ( eyeType, hmd );
     Vector3f virtualCameraOffset = CalculateEyeVirtualCameraOffset(hmd, eyeType, bMonoRenderingMode);
@@ -373,6 +373,8 @@ StereoConfig::StereoConfig(StereoMode mode)
     Hmd.ResolutionInPixels                              = Sizei(1280, 800);
     Hmd.ScreenSizeInMeters                              = Sizef(0.1498f, 0.0936f);
     Hmd.ScreenGapSizeInMeters                           = 0.0f;
+    Hmd.PelOffsetR                                      = Vector2f ( 0.0f, 0.0f );
+    Hmd.PelOffsetB                                      = Vector2f ( 0.0f, 0.0f );
     Hmd.CenterFromTopInMeters                           = 0.0468f;
     Hmd.LensSeparationInMeters                          = 0.0635f;
     Hmd.LensDiameterInMeters                            = 0.035f;
@@ -792,7 +794,7 @@ static const int DMA_NumTrisPerEye  = (DMA_GridSize)*(DMA_GridSize)*2;
 
 DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
                                                     bool rightEye,
-                                                    const HmdRenderInfo &hmdRenderInfo, 
+                                                    const HmdRenderInfo &hmdRenderInfo,
                                                     const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC )
 {
     DistortionMeshVertexData result;
@@ -806,11 +808,11 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
     Vector2f tanEyeAnglesR, tanEyeAnglesG, tanEyeAnglesB;
     TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
                                             distortion, screenNDC );
-			
+
 	result.TanEyeAnglesR = tanEyeAnglesR;
 	result.TanEyeAnglesG = tanEyeAnglesG;
 	result.TanEyeAnglesB = tanEyeAnglesB;
-			
+
     HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
     switch ( shutterType )
     {
@@ -841,9 +843,18 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
     }
 
     // When does the fade-to-black edge start? Chosen heuristically.
-    const float fadeOutBorderFractionTexture = 0.3f;
-    const float fadeOutBorderFractionTextureInnerEdge = 0.1f;
-    const float fadeOutBorderFractionScreen = 0.1f;
+    float fadeOutBorderFractionTexture = 0.1f;
+    float fadeOutBorderFractionTextureInnerEdge = 0.1f;
+    float fadeOutBorderFractionScreen = 0.1f;
+    float fadeOutFloor = 0.6f;        // the floor controls how much black is in the fade region
+
+    if (hmdRenderInfo.HmdType == HmdType_DK1)
+    {
+        fadeOutBorderFractionTexture = 0.3f;
+        fadeOutBorderFractionTextureInnerEdge = 0.075f;
+        fadeOutBorderFractionScreen = 0.075f;
+        fadeOutFloor = 0.25f;
+    }
 
     // Fade out at texture edges.
     // The furthest out will be the blue channel, because of chromatic aberration (true of any standard lens)
@@ -862,7 +873,7 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
     // Also fade out at screen edges. Since this is in pixel space, no need to do inner specially.
     float edgeFadeInScreen = ( 1.0f / fadeOutBorderFractionScreen ) *
                              ( 1.0f - Alg::Max ( Alg::Abs ( screenNDC.x ), Alg::Abs ( screenNDC.y ) ) );
-    edgeFadeIn = Alg::Min ( edgeFadeInScreen, edgeFadeIn );
+    edgeFadeIn = Alg::Min ( edgeFadeInScreen, edgeFadeIn ) + fadeOutFloor;
 
 	// Note - this is NOT clamped negatively.
 	// For rendering methods that interpolate over a coarse grid, we need the values to go negative for correct intersection with zero.
@@ -891,7 +902,7 @@ void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **pp
     // Generate mesh into allocated data and return result.
     DistortionMeshCreate(ppVertices, ppTriangleListIndices, &vertexCount, &triangleCount,
                          rightEye, hmdRenderInfo, stereoParams.Distortion, stereoParams.EyeToSourceNDC);
-    
+
     *pNumVertices  = vertexCount;
     *pNumTriangles = triangleCount;
 }
@@ -901,7 +912,7 @@ void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **pp
 void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
-                           const HmdRenderInfo &hmdRenderInfo, 
+                           const HmdRenderInfo &hmdRenderInfo,
                            const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC )
 {
     *pNumVertices  = DMA_NumVertsPerEye;
@@ -928,8 +939,8 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppT
         return;
     }
 
-      
-    
+
+
     // Populate vertex buffer info
 
     // First pass - build up raw vertex data.
@@ -961,7 +972,7 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppT
     }
 
 
-    // Populate index buffer info  
+    // Populate index buffer info
     uint16_t *pcurIndex = *ppTriangleListIndices;
 
     for ( int triNum = 0; triNum < DMA_GridSize * DMA_GridSize; triNum++ )
@@ -1094,7 +1105,7 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTri
 
     // Populate vertex buffer info
     // float xOffset = (rightEye ? 1.0f : 0.0f);  Currently disabled because its usage is disabled below.
-    
+
     // First pass - build up raw vertex data.
     HeightmapMeshVertexData* pcurVert = *ppVertices;
 
@@ -1107,7 +1118,7 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTri
             sourceCoordNDC.x = 2.0f * ( (float)x / (float)HMA_GridSize ) - 1.0f;
             sourceCoordNDC.y = 2.0f * ( (float)y / (float)HMA_GridSize ) - 1.0f;
             Vector2f tanEyeAngle = TransformRendertargetNDCToTanFovSpace ( eyeToSourceNDC, sourceCoordNDC );
-            
+
             pcurVert->TanEyeAngles = tanEyeAngle;
 
             HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
@@ -1152,7 +1163,7 @@ void HeightmapMeshCreate( HeightmapMeshVertexData **ppVertices, uint16_t **ppTri
     }
 
 
-    // Populate index buffer info  
+    // Populate index buffer info
     uint16_t *pcurIndex = *ppTriangleListIndices;
 
     for ( int triNum = 0; triNum < HMA_GridSize * HMA_GridSize; triNum++ )
@@ -1371,10 +1382,26 @@ void TimewarpMachine::Reset(HmdRenderInfo& renderInfo, bool vsyncEnabled, double
 
 void TimewarpMachine::AfterPresentAndFlush(double timeNow)
 {
+    AfterPresentWithoutFlush();
+    AfterPresentFinishes ( timeNow );
+}
+
+void TimewarpMachine::AfterPresentWithoutFlush()
+{
+    // We've only issued the Present - it hasn't actually finished (i.e. appeared)
+    // But we need to estimate when the next Present will appear, so extrapolate from previous data.
+    NextFramePresentFlushTime = LastFramePresentFlushTime + 2.0 * (double)PresentFlushToPresentFlushSeconds;
+}
+
+void TimewarpMachine::AfterPresentFinishes(double timeNow)
+{
+    // The present has now actually happened.
     PresentFlushToPresentFlushSeconds = (float)(timeNow - LastFramePresentFlushTime);
     LastFramePresentFlushTime = timeNow;
     NextFramePresentFlushTime = timeNow + (double)PresentFlushToPresentFlushSeconds;
 }
+
+
 
 double TimewarpMachine::GetViewRenderPredictionTime()
 {
@@ -1446,13 +1473,16 @@ double  TimewarpMachine::JustInTime_GetDistortionWaitUntilTime()
         return LastFramePresentFlushTime;
     }
 
-    const float fudgeFactor = 0.002f;      // Found heuristically - 1ms is too short because of timing granularity - may need further tweaking!
-    float howLongBeforePresent = DistortionTimeAverage + fudgeFactor;
+    // Note - 1-2ms fudge factor (because Windows timer granularity etc) is NOT added here,
+    // because otherwise you end up adding multiple fudge factors!
+    // So it's left for the calling app to add just one fudge factor.
+
+    float howLongBeforePresent = DistortionTimeAverage;
     // Subtlety here. Technically, the correct time is NextFramePresentFlushTime - howLongBeforePresent.
     // However, if the app drops a frame, this then perpetuates it,
     // i.e. if the display is running at 60fps, but the last frame was slow,
     // (e.g. because of swapping or whatever), then NextFramePresentFlushTime is
-    // 33ms in the future, not 16ms. Since this function supplies the 
+    // 33ms in the future, not 16ms. Since this function supplies the
     // time to wait until, the app will indeed wait until 32ms, so the framerate
     // drops to 30fps and never comes back up!
     // So we return the *ideal* framerate, not the *actual* framerate.

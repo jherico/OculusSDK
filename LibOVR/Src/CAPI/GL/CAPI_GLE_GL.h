@@ -30,7 +30,7 @@ limitations under the License.
 
 
 // Windows headers
-//     <wingdi.h>            Windows-specific OpenGL 1.1 intefaces. Long ago this was <GL/wgl.h>.
+//     <wingdi.h>            Windows-specific OpenGL 1.1 interfaces. Long ago this was <GL/wgl.h>.
 //     <GL/gl.h>             OpenGL 1.1 interface.
 //     <GL/glext.h>          OpenGL 1.2+ compatibility profile and extension interfaces. Not provided by Microsoft.
 //     <GL/wglext.h>         Windows-specific extension interfaces. Not provided by Microsoft.
@@ -40,16 +40,16 @@ limitations under the License.
 //     <OpenGL/gl.h>         OpenGL 1.1 interface.
 //     <OpenGL/glext.h>      OpenGL 1.2+ compatibility profile and extension interfaces.
 //     <OpenGL/gl3.h>        Includes only interfaces supported in a core OpenGL 3.1 implementations plus a few related extensions.
-//     <OpenGL/gl3ext.h>     Includes extensions supproted in a core OpenGL 3.1 implmentation.
-//     <OpenGL/OpenGL.h>     Apple-specific extension interfaces.
+//     <OpenGL/gl3ext.h>     Includes extensions supported in a core OpenGL 3.1 implementation.
+//     <OpenGL/OpenGL.h>     Apple-specific OpenGL interfaces.
+//     <OpenGL/NSOpenGL.h>   Apple-specific OpenGL interfaces.
 //
 // Linux headers
 //     <GL/gl.h>             OpenGL 1.1 interface.
 //     <GL/glext.h>          OpenGL 1.2+ compatibility profile and extension interfaces.
-//     <GL/glx.h>            X Windows-specific OpenGL interfaces
+//     <GL/glx.h>            X Windows-specific OpenGL interfaces.
 //     <GL/glxext.h>         X Windows 1.3+ API and GLX extension interfaces.
 //     <GL/glcorearb.h>      OpenGL core profile and ARB extension interfaces. Doesn't include interfaces found only in the compatibility profile. Overlaps with gl.h and glext.h.
-
 
 #if defined(__gl_h_) || defined(__GL_H__) || defined(__X_GL_H)
     #error gl.h should be included after this, not before.
@@ -78,22 +78,24 @@ limitations under the License.
 
 // GLE platform identification
 #if defined(_WIN32)
-    #define GLE_WINDOWS_ENABLED 1   // WGL interface
-#elif defined(__APPLE__)
-    #define GLE_APPLE_ENABLED 1     // CGL interface
+    #define GLE_WGL_ENABLED 1     // WGL interface
 #elif defined(__ANDROID__)
-    #define GLE_ANDROID_ENABLED 1   // EGL interface
+    #define GLE_EGL_ENABLED 1     // EGL interface
+#elif defined(__IPHONE__)
+    #define GLE_EAGL_ENABLED 1    // EAGL interface
+#elif defined(__APPLE__)
+    #define GLE_CGL_ENABLED 1     // CGL interface
 #else
-    #define GLE_UNIX_ENABLED        // GLX interface
+    #define GLE_GLX_ENABLED 1     // GLX interface
 #endif
 
 
 // GLAPI / GLAPIENTRY
 //
 // GLAPI is a wrapper for Microsoft __declspec(dllimport).
-// GLAPIENTRY is the calling convension (__stdcall under Microsoft).
+// GLAPIENTRY is the calling convention (__stdcall under Microsoft).
 //
-#if defined(GLE_WINDOWS_ENABLED)
+#if defined(GLE_WGL_ENABLED)
     #if !defined(WINAPI)
         #ifndef WIN32_LEAN_AND_MEAN
             #define WIN32_LEAN_AND_MEAN 1
@@ -135,7 +137,9 @@ limitations under the License.
 // When enabled, we intercept all OpenGL calls and do any useful internal processing before or after the call.
 // An example use case for this is to intercept OpenGL errors on platforms that don't support the OpenGL 
 // debug functionality (e.g. KHR_Debug).
-#define GLE_HOOKING_ENABLED 1
+#if !defined(GLE_WGL_ENABLED) && !defined(GLE_GLX_ENABLED) && defined(OVR_BUILD_DEBUG) // Windows and Unix don't need it because they have OpenGL debug extension support (e.g. KHR_Debug).
+    #define GLE_HOOKING_ENABLED 1
+#endif
 
 // When using hooking, we map all OpenGL function usage to our member functions that end with _Hook. 
 // These member hook functions will internally call the actual OpenGL functions after doing some internal processing.
@@ -146,6 +150,22 @@ limitations under the License.
     #define GLEGetCurrentFunction(x) GLEContext::GetCurrentContext()->x##_Impl
     #define GLEGetCurrentVariable(x) GLEContext::GetCurrentContext()->x
 #endif
+
+// GLE_CURRENT_FUNCTION
+// Used by hooking in debug builds.
+#if defined(OVR_BUILD_DEBUG)
+    #define GLE_CURRENT_FUNCTION __FUNCTION__
+#else
+    #define GLE_CURRENT_FUNCTION NULL
+#endif
+
+
+// GLE_WHOLE_VERSION
+// Returns the major+minor version of the current GLEContext.
+// Example usage:
+//     if(GLE_WHOLE_VERSION() >= 302) // If OpenGL 3.2 or later...
+//         ...
+#define GLE_WHOLE_VERSION() GLEContext::GetCurrentContext()->WholeVersion()
 
 
 
@@ -2549,8 +2569,6 @@ extern "C" {
     #define glPrimitiveRestartIndex GLEGetCurrentFunction(glPrimitiveRestartIndex)
     #define glTexBuffer GLEGetCurrentFunction(glTexBuffer)
 
-    #define GLE_VERSION_3_1 GLEGetCurrentVariable(gl_VERSION_3_1)
-
 #endif // GL_VERSION_3_1
 
 
@@ -2588,8 +2606,6 @@ extern "C" {
     #define glFramebufferTexture GLEGetCurrentFunction(glFramebufferTexture)
     #define glGetBufferParameteri64v GLEGetCurrentFunction(glGetBufferParameteri64v)
     #define glGetInteger64i_v GLEGetCurrentFunction(glGetInteger64i_v)
-
-    #define GLE_VERSION_3_2 GLEGetCurrentVariable(gl_VERSION_3_2)
     
 #endif // GL_VERSION_3_2
 
@@ -2715,7 +2731,7 @@ extern "C" {
     #define glDebugMessageInsertAMD   GLEGetCurrentFunction(glDebugMessageInsertAMD)
     #define glGetDebugMessageLogAMD   GLEGetCurrentFunction(glGetDebugMessageLogAMD)
 
-    #define GLE_AMD_debug_output GLEGetCurrentVariable(gl_AMD_debug_output)
+    #define GLE_AMD_debug_output GLEGetCurrentVariable(gle_AMD_debug_output)
 
 #endif // GL_AMD_debug_output
 
@@ -2757,19 +2773,19 @@ extern "C" {
     #define glGetPerfMonitorGroupsAMD GLEGetCurrentFunction(glGetPerfMonitorGroupsAMD)
     #define glSelectPerfMonitorCountersAMD GLEGetCurrentFunction(glSelectPerfMonitorCountersAMD)
 
-    #define GLE_AMD_performance_monitor GLEGetCurrentVariable(gl_AMD_performance_monitor)
+    #define GLE_AMD_performance_monitor GLEGetCurrentVariable(gle_AMD_performance_monitor)
 
 #endif // GL_AMD_performance_monitor
 */
 
 
-#if defined(GLE_APPLE_ENABLED)
+#if defined(GLE_CGL_ENABLED)
     #ifndef GL_APPLE_aux_depth_stencil
         #define GL_APPLE_aux_depth_stencil 1
 
         #define GL_AUX_DEPTH_STENCIL_APPLE 0x8A14g
 
-        #define GLE_APPLE_aux_depth_stencil GLEGetCurrentVariable(gl_APPLE_aux_depth_stencil)
+        #define GLE_APPLE_aux_depth_stencil GLEGetCurrentVariable(gle_APPLE_aux_depth_stencil)
     #endif
 
 
@@ -2779,7 +2795,7 @@ extern "C" {
 
         #define GL_UNPACK_CLIENT_STORAGE_APPLE 0x85B2
 
-        #define GLE_APPLE_client_storage GLEGetCurrentVariable(gl_APPLE_client_storage)
+        #define GLE_APPLE_client_storage GLEGetCurrentVariable(gle_APPLE_client_storage)
     #endif
 
 
@@ -2803,7 +2819,7 @@ extern "C" {
         #define glMultiDrawElementArrayAPPLE GLEGetCurrentFunction(glMultiDrawElementArrayAPPLE)
         #define glMultiDrawRangeElementArrayAPPLE GLEGetCurrentFunction(glMultiDrawRangeElementArrayAPPLE)
 
-        #define GLE_APPLE_element_array GLEGetCurrentVariable(gl_APPLE_element_array)
+        #define GLE_APPLE_element_array GLEGetCurrentVariable(gle_APPLE_element_array)
     #endif
 
 
@@ -2832,7 +2848,7 @@ extern "C" {
         #define glTestFenceAPPLE GLEGetCurrentFunction(glTestFenceAPPLE)
         #define glTestObjectAPPLE GLEGetCurrentFunction(glTestObjectAPPLE)
 
-        #define GLE_APPLE_fence GLEGetCurrentVariable(gl_APPLE_fence)
+        #define GLE_APPLE_fence GLEGetCurrentVariable(gle_APPLE_fence)
 
     #endif
 
@@ -2856,7 +2872,7 @@ extern "C" {
         #define GL_LUMINANCE_ALPHA_FLOAT16_APPLE 0x881F
         #define GL_COLOR_FLOAT_APPLE 0x8A0F
 
-        #define GLE_APPLE_float_pixels GLEGetCurrentVariable(gl_APPLE_float_pixels)
+        #define GLE_APPLE_float_pixels GLEGetCurrentVariable(gle_APPLE_float_pixels)
     #endif
 
 
@@ -2873,7 +2889,7 @@ extern "C" {
         #define glBufferParameteriAPPLE GLEGetCurrentFunction(glBufferParameteriAPPLE)
         #define glFlushMappedBufferRangeAPPLE GLEGetCurrentFunction(glFlushMappedBufferRangeAPPLE)
 
-        #define GLE_APPLE_flush_buffer_range GLEGetCurrentVariable(gl_APPLE_flush_buffer_range)
+        #define GLE_APPLE_flush_buffer_range GLEGetCurrentVariable(gle_APPLE_flush_buffer_range)
     #endif
 
 
@@ -2896,7 +2912,7 @@ extern "C" {
         #define glObjectPurgeableAPPLE GLEGetCurrentFunction(glObjectPurgeableAPPLE)
         #define glObjectUnpurgeableAPPLE GLEGetCurrentFunction(glObjectUnpurgeableAPPLE)
 
-        #define GLE_APPLE_object_purgeable GLEGetCurrentVariable(gl_APPLE_object_purgeable)
+        #define GLE_APPLE_object_purgeable GLEGetCurrentVariable(gle_APPLE_object_purgeable)
     #endif
 
 
@@ -2906,7 +2922,7 @@ extern "C" {
 
         #define GL_MIN_PBUFFER_VIEWPORT_DIMS_APPLE 0x8A10
 
-        #define GLE_APPLE_pixel_buffer GLEGetCurrentVariable(gl_APPLE_pixel_buffer)
+        #define GLE_APPLE_pixel_buffer GLEGetCurrentVariable(gle_APPLE_pixel_buffer)
     #endif
 
 
@@ -2919,7 +2935,7 @@ extern "C" {
         #define GL_RGB_422_APPLE 0x8A1F
         #define GL_RGB_RAW_422_APPLE 0x8A51
 
-        #define GLE_APPLE_rgb_422 GLEGetCurrentVariable(gl_APPLE_rgb_422)
+        #define GLE_APPLE_rgb_422 GLEGetCurrentVariable(gle_APPLE_rgb_422)
     #endif
 
 
@@ -2930,7 +2946,7 @@ extern "C" {
         #define GL_PACK_ROW_BYTES_APPLE 0x8A15
         #define GL_UNPACK_ROW_BYTES_APPLE 0x8A16
 
-        #define GLE_APPLE_row_bytes GLEGetCurrentVariable(gl_APPLE_row_bytes)
+        #define GLE_APPLE_row_bytes GLEGetCurrentVariable(gle_APPLE_row_bytes)
     #endif
 
 
@@ -2940,7 +2956,7 @@ extern "C" {
 
         #define GL_LIGHT_MODEL_SPECULAR_VECTOR_APPLE 0x85B0
 
-        #define GLE_APPLE_specular_vector GLEGetCurrentVariable(gl_APPLE_specular_vector)
+        #define GLE_APPLE_specular_vector GLEGetCurrentVariable(gle_APPLE_specular_vector)
     #endif
 
 
@@ -2961,7 +2977,7 @@ extern "C" {
         #define glGetTexParameterPointervAPPLE GLEGetCurrentFunction(glGetTexParameterPointervAPPLE)
         #define glTextureRangeAPPLE GLEGetCurrentFunction(glTextureRangeAPPLE)
 
-        #define GLE_APPLE_texture_range GLEGetCurrentVariable(gl_APPLE_texture_range)
+        #define GLE_APPLE_texture_range GLEGetCurrentVariable(gle_APPLE_texture_range)
     #endif
 
 
@@ -2970,7 +2986,7 @@ extern "C" {
 
         #define GL_TRANSFORM_HINT_APPLE 0x85B1
 
-        #define GLE_APPLE_transform_hint GLEGetCurrentVariable(gl_APPLE_transform_hint)
+        #define GLE_APPLE_transform_hint GLEGetCurrentVariable(gle_APPLE_transform_hint)
     #endif
 
 
@@ -2995,7 +3011,7 @@ extern "C" {
         #define glGenVertexArraysAPPLE    GLEGetCurrentFunction(glGenVertexArraysAPPLE)
         #define glIsVertexArrayAPPLE      GLEGetCurrentFunction(glIsVertexArrayAPPLE)
 
-        #define GLE_APPLE_vertex_array_object GLEGetCurrentVariable(gl_APPLE_vertex_array_object)
+        #define GLE_APPLE_vertex_array_object GLEGetCurrentVariable(gle_APPLE_vertex_array_object)
     #endif
 
 
@@ -3020,7 +3036,7 @@ extern "C" {
         #define glVertexArrayParameteriAPPLE GLEGetCurrentFunction(glVertexArrayParameteriAPPLE)
         #define glVertexArrayRangeAPPLE GLEGetCurrentFunction(glVertexArrayRangeAPPLE)
 
-        #define GLE_APPLE_vertex_array_range GLEGetCurrentVariable(gl_APPLE_vertex_array_range)
+        #define GLE_APPLE_vertex_array_range GLEGetCurrentVariable(gle_APPLE_vertex_array_range)
     #endif
 
 
@@ -3055,10 +3071,10 @@ extern "C" {
         #define glMapVertexAttrib2dAPPLE GLEGetCurrentFunction(glMapVertexAttrib2dAPPLE)
         #define glMapVertexAttrib2fAPPLE GLEGetCurrentFunction(glMapVertexAttrib2fAPPLE)
 
-        #define GLE_APPLE_vertex_program_evaluators GLEGetCurrentVariable(gl_APPLE_vertex_program_evaluators)
+        #define GLE_APPLE_vertex_program_evaluators GLEGetCurrentVariable(gle_APPLE_vertex_program_evaluators)
     #endif
 
-#endif // GLE_APPLE_ENABLED
+#endif // GLE_CGL_ENABLED
 
 
 #ifndef GL_ARB_debug_output
@@ -3099,11 +3115,22 @@ extern "C" {
     #define glDebugMessageInsertARB GLEGetCurrentFunction(glDebugMessageInsertARB)
     #define glGetDebugMessageLogARB GLEGetCurrentFunction(glGetDebugMessageLogARB)
 
-    #define GLE_ARB_debug_output GLEGetCurrentVariable(gl_ARB_debug_output)
+    #define GLE_ARB_debug_output GLEGetCurrentVariable(gle_ARB_debug_output)
 
 #endif // GL_ARB_debug_output
 
 
+
+#ifndef GL_ARB_depth_buffer_float
+    #define GL_ARB_depth_buffer_float 1
+
+    // Supercededs GL_NV_depth_buffer_float
+    #define GL_DEPTH_COMPONENT32F             0x8CAC
+    #define GL_DEPTH32F_STENCIL8              0x8CAD
+    #define GL_FLOAT_32_UNSIGNED_INT_24_8_REV 0x8DAD
+
+    #define GLE_ARB_depth_buffer_float GLEGetCurrentVariable(gle_ARB_depth_buffer_float)
+#endif
 
 
 /* Disabled until needed
@@ -3302,7 +3329,7 @@ extern "C" {
     #define glVertexArrayVertexBuffer GLEGetCurrentFunction(glVertexArrayVertexBuffer)
     #define glVertexArrayVertexBuffers GLEGetCurrentFunction(glVertexArrayVertexBuffers)
 
-    #define GLE_ARB_direct_state_access GLEGetCurrentVariable(gl_ARB_direct_state_access)
+    #define GLE_ARB_direct_state_access GLEGetCurrentVariable(gle_ARB_direct_state_access)
 #endif // GL_ARB_direct_state_access */
 
 
@@ -3342,7 +3369,7 @@ extern "C" {
     #define glReleaseShaderCompiler    GLEGetCurrentFunction(glReleaseShaderCompiler)
     #define glShaderBinary             GLEGetCurrentFunction(glShaderBinary)
 
-    #define GLE_ARB_ES2_compatibility GLEGetCurrentVariable(gl_ARB_ES2_compatibility)
+    #define GLE_ARB_ES2_compatibility GLEGetCurrentVariable(gle_ARB_ES2_compatibility)
 #endif
 
 
@@ -3468,7 +3495,7 @@ extern "C" {
     #define glRenderbufferStorage                 GLEGetCurrentFunction(glRenderbufferStorage)
     #define glRenderbufferStorageMultisample      GLEGetCurrentFunction(glRenderbufferStorageMultisample)
 
-    #define GLE_ARB_framebuffer_object GLEGetCurrentVariable(gl_ARB_framebuffer_object)
+    #define GLE_ARB_framebuffer_object GLEGetCurrentVariable(gle_ARB_framebuffer_object)
 
 #endif // GL_ARB_framebuffer_object
 
@@ -3480,7 +3507,7 @@ extern "C" {
     // GL_ARB_framebuffer_sRGB is part of the OpenGL 4.4 core profile.
     #define GL_FRAMEBUFFER_SRGB 0x8DB9
 
-    #define GLE_ARB_framebuffer_sRGB GLEW_GET_VAR(gle_ARB_framebuffer_sRGB)
+    #define GLE_ARB_framebuffer_sRGB GLEGetCurrentVariable(gle_ARB_framebuffer_sRGB)
 #endif
 
 
@@ -3520,7 +3547,7 @@ extern "C" {
     #define glTexImage2DMultisample GLEGetCurrentFunction(glTexImage2DMultisample)
     #define glTexImage3DMultisample GLEGetCurrentFunction(glTexImage3DMultisample)
 
-    #define GLE_ARB_texture_multisample GLEGetCurrentVariable(gl_ARB_texture_multisample)
+    #define GLE_ARB_texture_multisample GLEGetCurrentVariable(gle_ARB_texture_multisample)
 
 #endif // GL_ARB_texture_multisample
 
@@ -3529,7 +3556,27 @@ extern "C" {
 #ifndef GL_ARB_texture_non_power_of_two
     #define GL_ARB_texture_non_power_of_two 1
 
-    #define GLE_ARB_texture_non_power_of_two GLEGetCurrentVariable(gl;e_ARB_texture_non_power_of_two)
+    #define GLE_ARB_texture_non_power_of_two GLEGetCurrentVariable(gle_ARB_texture_non_power_of_two)
+#endif
+
+
+
+#ifndef GL_ARB_texture_rectangle
+    #define GL_ARB_texture_rectangle 1
+
+    // texture_rectangle was added to the OpenGL 3.1 core profile and so this extension is not needed
+    // unless using an earlier version of OpenGL.
+    // There are also the GL_EXT_texture_rectangle and GL_NV_texture_rectangle extensions. Apple reports
+    // the preseence of GL_EXT_texture_rectangle but not GL_ARB_texture_rectangle or GL_NV_texture_rectangle.
+    // You should check for GL_ARB_texture_rectangle instead of these other two.
+    #define GL_TEXTURE_RECTANGLE_ARB          0x84F5
+    #define GL_TEXTURE_BINDING_RECTANGLE_ARB  0x84F6
+    #define GL_PROXY_TEXTURE_RECTANGLE_ARB    0x84F7
+    #define GL_MAX_RECTANGLE_TEXTURE_SIZE_ARB 0x84F8
+    #define GL_SAMPLER_2D_RECT_ARB            0x8B63
+    #define GL_SAMPLER_2D_RECT_SHADOW_ARB     0x8B64
+
+    #define GLE_ARB_texture_rectangle GLEGetCurrentVariable(gle_ARB_texture_rectangle)
 #endif
 
 
@@ -3548,7 +3595,7 @@ extern "C" {
     #define glGetQueryObjectui64v GLEGetCurrentFunction(glGetQueryObjectui64v)
     #define glQueryCounter        GLEGetCurrentFunction(glQueryCounter)
 
-    #define GLE_ARB_timer_query GLEGetCurrentVariable(gl_ARB_timer_query)
+    #define GLE_ARB_timer_query GLEGetCurrentVariable(gle_ARB_timer_query)
 #endif
 
 
@@ -3568,7 +3615,7 @@ extern "C" {
     #define glGenVertexArrays    GLEGetCurrentFunction(glGenVertexArrays)
     #define glIsVertexArray      GLEGetCurrentFunction(glIsVertexArray)
 
-    #define GLE_ARB_vertex_array_object GLEGetCurrentVariable(gl_ARB_vertex_array_object)
+    #define GLE_ARB_vertex_array_object GLEGetCurrentVariable(gle_ARB_vertex_array_object)
 #endif
 
 
@@ -3612,7 +3659,7 @@ extern "C" {
     #define glVertexAttribLFormat GLEGetCurrentFunction(glVertexAttribLFormat)
     #define glVertexBindingDivisor GLEGetCurrentFunction(glVertexBindingDivisor)
 
-    #define GLE_ARB_vertex_attrib_binding GLEGetCurrentVariable(gl_ARB_vertex_attrib_binding)
+    #define GLE_ARB_vertex_attrib_binding GLEGetCurrentVariable(gle_ARB_vertex_attrib_binding)
 #endif
 */
 
@@ -3634,7 +3681,20 @@ extern "C" {
     #define glGetIntegerIndexedvEXT GLEGetCurrentFunction(glGetIntegerIndexedvEXT)
     #define glIsEnabledIndexedEXT   GLEGetCurrentFunction(glIsEnabledIndexedEXT)
 
-    #define GLE_EXT_draw_buffers2 GLEGetCurrentVariable(gl_EXT_draw_buffers2)
+    #define GLE_EXT_draw_buffers2 GLEGetCurrentVariable(gle_EXT_draw_buffers2)
+#endif
+
+
+
+#ifndef GL_EXT_texture_compression_s3tc
+    #define GL_EXT_texture_compression_s3tc 1
+
+    #define GL_COMPRESSED_RGB_S3TC_DXT1_EXT  0x83F0
+    #define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT 0x83F1
+    #define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT 0x83F2
+    #define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT 0x83F3
+
+    #define GLE_EXT_texture_compression_s3tc GLEGetCurrentVariable(gle_EXT_texture_compression_s3tc)
 #endif
 
 
@@ -3645,7 +3705,7 @@ extern "C" {
     #define GL_TEXTURE_MAX_ANISOTROPY_EXT     0x84FE
     #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
 
-    #define GLE_EXT_texture_filter_anisotropic GLEW_GET_VAR(gle_EXT_texture_filter_anisotropic)
+    #define GLE_EXT_texture_filter_anisotropic GLEGetCurrentVariable(gle_EXT_texture_filter_anisotropic)
 #endif
 
 
@@ -3654,7 +3714,7 @@ extern "C" {
 #ifndef GL_KHR_context_flush_control
     #define GL_KHR_context_flush_control 1
 
-    #define GLE_KHR_context_flush_control GLEGetCurrentVariable(gl_KHR_context_flush_control)
+    #define GLE_KHR_context_flush_control GLEGetCurrentVariable(gle_KHR_context_flush_control)
 #endif
 */
 
@@ -3728,7 +3788,7 @@ extern "C" {
     #define glPopDebugGroup GLEGetCurrentFunction(glPopDebugGroup)
     #define glPushDebugGroup GLEGetCurrentFunction(glPushDebugGroup)
 
-    #define GLE_KHR_debug GLEGetCurrentVariable(gl_KHR_debug)
+    #define GLE_KHR_debug GLEGetCurrentVariable(gle_KHR_debug)
 #endif // GL_KHR_debug
 
 
@@ -3736,7 +3796,7 @@ extern "C" {
 #ifndef GL_KHR_robust_buffer_access_behavior
     #define GL_KHR_robust_buffer_access_behavior 1
 
-    #define GLE_KHR_robust_buffer_access_behavior GLEGetCurrentVariable(gl_KHR_robust_buffer_access_behavior)
+    #define GLE_KHR_robust_buffer_access_behavior GLEGetCurrentVariable(gle_KHR_robust_buffer_access_behavior)
 #endif
 
 
@@ -3764,7 +3824,7 @@ extern "C" {
     #define glGetnUniformuiv GLEGetCurrentFunction(glGetnUniformuiv)
     #define glReadnPixels    GLEGetCurrentFunction(glReadnPixels)
 
-    #define GLE_KHR_robustness GLEGetCurrentVariable(gl_KHR_robustness)
+    #define GLE_KHR_robustness GLEGetCurrentVariable(gle_KHR_robustness)
 
 #endif // GL_KHR_robustness
 */
@@ -3778,7 +3838,7 @@ extern "C" {
 
     #define glAddSwapHintRectWIN GLEGetCurrentFunction(glAddSwapHintRectWIN)
 
-    #define GLE_WIN_swap_hint GLEGetCurrentVariable(gl_WIN_swap_hint)
+    #define GLE_WIN_swap_hint GLEGetCurrentVariable(gle_WIN_swap_hint)
 #endif
 
 
@@ -3787,7 +3847,7 @@ extern "C" {
    Windows-specific (WGL) functionality
 ************************************************************************************/
 
-#if defined(GLE_WINDOWS_ENABLED)
+#if defined(GLE_WGL_ENABLED)
     #ifdef __wglext_h_
         #error wglext.h was included before this header. This header needs to be inlcuded instead of or at least before wglext.h
     #endif
@@ -3797,7 +3857,7 @@ extern "C" {
     DECLARE_HANDLE(HPBUFFERARB); // This type is used by a couple extensions.
 
     // WGL functions from <wingdi.h>
-    #if defined(GLE_HOOKING_ENABLED)
+    #if 0 // defined(GLE_HOOKING_ENABLED) We currently don't hook these.
         #define wglCopyContext(...)              GLEGetCurrentFunction(wglCopyContext)(__VA_ARGS__)
         #define wglCreateContext(...)            GLEGetCurrentFunction(wglCreateContext)(__VA_ARGS__)
         #define wglCreateLayerContext(...)       GLEGetCurrentFunction(wglCreateLayerContext)(__VA_ARGS__)
@@ -3820,27 +3880,47 @@ extern "C" {
     #else
         // The following functions are directly declared in Microsoft's <wingdi.h> without associated typedefs, and are exported from Opengl32.dll.
         // We can link to them directly through Opengl32.lib/dll (same as OpenGL 1.1 functions) or we can dynamically link them from OpenGL32.dll at runtime.
-        /*
-        WINGDIAPI BOOL  WINAPI wglCopyContext(HGLRC, HGLRC, UINT);
-        WINGDIAPI HGLRC WINAPI wglCreateContext(HDC);
-        WINGDIAPI HGLRC WINAPI wglCreateLayerContext(HDC, int);
-        WINGDIAPI BOOL  WINAPI wglDeleteContext(HGLRC);
-        WINGDIAPI HGLRC WINAPI wglGetCurrentContext(VOID);
-        WINGDIAPI HDC   WINAPI wglGetCurrentDC(VOID);
-        WINGDIAPI PROC  WINAPI wglGetProcAddress(LPCSTR);
-        WINGDIAPI BOOL  WINAPI wglMakeCurrent(HDC, HGLRC);
-        WINGDIAPI BOOL  WINAPI wglShareLists(HGLRC, HGLRC);
-        WINGDIAPI BOOL  WINAPI wglUseFontBitmapsA(HDC, DWORD, DWORD, DWORD);
-        WINGDIAPI BOOL  WINAPI wglUseFontBitmapsW(HDC, DWORD, DWORD, DWORD);
-        WINGDIAPI BOOL  WINAPI wglUseFontOutlinesA(HDC, DWORD, DWORD, DWORD, FLOAT, FLOAT, int, LPGLYPHMETRICSFLOAT);
-        WINGDIAPI BOOL  WINAPI wglUseFontOutlinesW(HDC, DWORD, DWORD, DWORD, FLOAT, FLOAT, int, LPGLYPHMETRICSFLOAT);
-        WINGDIAPI BOOL  WINAPI wglDescribeLayerPlane(HDC, int, int, UINT, LPLAYERPLANEDESCRIPTOR);
-        WINGDIAPI int   WINAPI wglSetLayerPaletteEntries(HDC, int, int, int, CONST COLORREF *);
-        WINGDIAPI int   WINAPI wglGetLayerPaletteEntries(HDC, int, int, int, COLORREF *);
-        WINGDIAPI BOOL  WINAPI wglRealizeLayerPalette(HDC, int, BOOL);
-        WINGDIAPI BOOL  WINAPI wglSwapLayerBuffers(HDC, UINT);
-        WINGDIAPI DWORD WINAPI wglSwapMultipleBuffers(UINT, CONST WGLSWAP *);
-        */
+        typedef BOOL  (WINAPI * PFNWGLCOPYCONTEXTPROC)(HGLRC, HGLRC, UINT);
+        typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTPROC)(HDC);
+        typedef HGLRC (WINAPI * PFNWGLCREATELAYERCONTEXTPROC)(HDC, int);
+        typedef BOOL  (WINAPI * PFNWGLDELETECONTEXTPROC)(HGLRC);
+        typedef HGLRC (WINAPI * PFNWGLGETCURRENTCONTEXTPROC)(VOID);
+        typedef HDC   (WINAPI * PFNWGLGETCURRENTDCPROC)(VOID);
+        typedef PROC  (WINAPI * PFNWGLGETPROCADDRESSPROC)(LPCSTR);
+        typedef BOOL  (WINAPI * PFNWGLMAKECURRENTPROC)(HDC, HGLRC);
+        typedef BOOL  (WINAPI * PFNWGLSHARELISTSPROC)(HGLRC, HGLRC);
+        typedef BOOL  (WINAPI * PFNWGLUSEFONTBITMAPSAPROC)(HDC, DWORD, DWORD, DWORD);
+        typedef BOOL  (WINAPI * PFNWGLUSEFONTBITMAPSWPROC)(HDC, DWORD, DWORD, DWORD);
+        typedef BOOL  (WINAPI * PFNWGLUSEFONTOUTLINESAPROC)(HDC, DWORD, DWORD, DWORD, FLOAT, FLOAT, int, LPGLYPHMETRICSFLOAT);
+        typedef BOOL  (WINAPI * PFNWGLUSEFONTOUTLINESWPROC)(HDC, DWORD, DWORD, DWORD, FLOAT, FLOAT, int, LPGLYPHMETRICSFLOAT);
+        typedef BOOL  (WINAPI * PFNWGLDESCRIBELAYERPLANEPROC)(HDC, int, int, UINT, LPLAYERPLANEDESCRIPTOR);
+        typedef int   (WINAPI * PFNWGLSETLAYERPALETTEENTRIESPROC)(HDC, int, int, int, CONST COLORREF *);
+        typedef int   (WINAPI * PFNWGLGETLAYERPALETTEENTRIESPROC)(HDC, int, int, int, COLORREF *);
+        typedef BOOL  (WINAPI * PFNWGLREALIZELAYERPALETTEPROC)(HDC, int, BOOL);
+        typedef BOOL  (WINAPI * PFNWGLSWAPLAYERBUFFERSPROC)(HDC, UINT);
+        typedef DWORD (WINAPI * PFNWGLSWAPMULTIPLEBUFFERSPROC)(UINT, CONST WGLSWAP *);
+
+        #if 0
+        #define wglCopyContext             GLEContext::GetCurrentContext()->wglCopyContext_Impl
+        #define wglCreateContext           GLEContext::GetCurrentContext()->wglCreateContext_Impl
+        #define wglCreateLayerContext      GLEContext::GetCurrentContext()->wglCreateLayerContext_Impl
+        #define wglDeleteContext           GLEContext::GetCurrentContext()->wglDeleteContext_Impl
+        #define wglGetCurrentContext       GLEContext::GetCurrentContext()->wglGetCurrentContext_Impl
+        #define wglGetCurrentDC            GLEContext::GetCurrentContext()->wglGetCurrentDC_Impl
+        #define wglGetProcAddress          GLEContext::GetCurrentContext()->wglGetProcAddress_Impl
+        #define wglMakeCurrent             GLEContext::GetCurrentContext()->wglMakeCurrent_Impl
+        #define wglShareLists              GLEContext::GetCurrentContext()->wglShareLists_Impl
+        #define wglUseFontBitmapsA         GLEContext::GetCurrentContext()->wglUseFontBitmapsA_Impl
+        #define wglUseFontBitmapsW         GLEContext::GetCurrentContext()->wglUseFontBitmapsW_Impl
+        #define wglUseFontOutlinesA        GLEContext::GetCurrentContext()->wglUseFontOutlinesA_Impl
+        #define wglUseFontOutlinesW        GLEContext::GetCurrentContext()->wglUseFontOutlinesW_Impl
+        #define wglDescribeLayerPlane      GLEContext::GetCurrentContext()->wglDescribeLayerPlane_Impl
+        #define wglSetLayerPaletteEntries  GLEContext::GetCurrentContext()->wglSetLayerPaletteEntries_Impl
+        #define wglGetLayerPaletteEntries  GLEContext::GetCurrentContext()->wglGetLayerPaletteEntries_Impl
+        #define wglRealizeLayerPalette     GLEContext::GetCurrentContext()->wglRealizeLayerPalette_Impl
+        #define wglSwapLayerBuffers        GLEContext::GetCurrentContext()->wglSwapLayerBuffers_Impl
+        #define wglSwapMultipleBuffers     GLEContext::GetCurrentContext()->wglSwapMultipleBuffers_Impl
+        #endif
     #endif
 
     // Note: In order to detect the WGL extensions' availability, we need to call wglGetExtensionsStringARB or 
@@ -3863,7 +3943,7 @@ extern "C" {
         #define wglSaveBufferRegionARB    GLEGetCurrentFunction(wglSaveBufferRegionARB)
         #define wglRestoreBufferRegionARB GLEGetCurrentFunction(wglRestoreBufferRegionARB)
 
-        #define GLE_WGL_ARB_buffer_region GLEGetCurrentVariable(gl_WGL_ARB_buffer_region)
+        #define GLE_WGL_ARB_buffer_region GLEGetCurrentVariable(gle_WGL_ARB_buffer_region)
     #endif
 
 
@@ -3874,7 +3954,7 @@ extern "C" {
 
         #define wglGetExtensionsStringARB  GLEGetCurrentFunction(wglGetExtensionsStringARB)
 
-        #define GLE_WGL_ARB_extensions_string GLEGetCurrentVariable(gl_WGL_ARB_extensions_string)
+        #define GLE_WGL_ARB_extensions_string GLEGetCurrentVariable(gle_WGL_ARB_extensions_string)
     #endif
 
 
@@ -3939,7 +4019,7 @@ extern "C" {
         #define wglGetPixelFormatAttribfvARB  GLEGetCurrentFunction(wglGetPixelFormatAttribfvARB)
         #define wglChoosePixelFormatARB  GLEGetCurrentFunction(wglChoosePixelFormatARB)
 
-        #define GLE_WGL_ARB_pixel_format GLEGetCurrentVariable(gl_WGL_ARB_pixel_format)
+        #define GLE_WGL_ARB_pixel_format GLEGetCurrentVariable(gle_WGL_ARB_pixel_format)
     #endif
 
 
@@ -3955,7 +4035,7 @@ extern "C" {
         #define wglMakeContextCurrentARB  GLEGetCurrentFunction(wglMakeContextCurrentARB)
         #define wglGetCurrentReadDCARB  GLEGetCurrentFunction(wglGetCurrentReadDCARB)
 
-        #define GLE_WGL_ARB_make_current_read GLEGetCurrentVariable(gl_WGL_ARB_make_current_read)
+        #define GLE_WGL_ARB_make_current_read GLEGetCurrentVariable(gle_WGL_ARB_make_current_read)
     #endif
 
 
@@ -3982,7 +4062,7 @@ extern "C" {
         #define wglDestroyPbufferARB  GLEGetCurrentFunction(wglDestroyPbufferARB)
         #define wglQueryPbufferARB  GLEGetCurrentFunction(wglQueryPbufferARB)
 
-        #define GLE_WGL_ARB_pbuffer GLEGetCurrentVariable(gl_WGL_ARB_pbuffer)
+        #define GLE_WGL_ARB_pbuffer GLEGetCurrentVariable(gle_WGL_ARB_pbuffer)
     #endif
 
 
@@ -4031,7 +4111,7 @@ extern "C" {
         #define wglReleaseTexImageARB  GLEGetCurrentFunction(wglReleaseTexImageARB)
         #define wglSetPbufferAttribARB GLEGetCurrentFunction(wglSetPbufferAttribARB)
 
-        #define GLE_WGL_ARB_render_texture GLEGetCurrentVariable(gl_WGL_ARB_render_texture)
+        #define GLE_WGL_ARB_render_texture GLEGetCurrentVariable(gle_WGL_ARB_render_texture)
     #endif
 
 
@@ -4040,16 +4120,18 @@ extern "C" {
 
         #define WGL_TYPE_RGBA_FLOAT_ARB        0x21A0
 
-        #define GLE_WGL_TYPE_RGBA_FLOAT_ARB GLEGetCurrentVariable(gl_WGL_TYPE_RGBA_FLOAT_ARB)
+        #define GLE_WGL_ARB_pixel_format_float GLEGetCurrentVariable(gle_WGL_ARB_pixel_format_float)
     #endif
 
 
     #ifndef WGL_ARB_framebuffer_sRGB
         #define WGL_ARB_framebuffer_sRGB 1
 
+        // There is also the WGL_EXT_framebuffer_sRGB extension, which is the
+        // same as this. So use this one instead of that for checking.
         #define WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB 0x20A9
 
-        #define GLE_WGL_ARB_framebuffer_sRGB GLEGetCurrentVariable(gl_WGL_ARB_framebuffer_sRGB)
+        #define GLE_WGL_ARB_framebuffer_sRGB GLEGetCurrentVariable(gle_WGL_ARB_framebuffer_sRGB)
     #endif
 
 
@@ -4066,7 +4148,7 @@ extern "C" {
         #define wglBindVideoDeviceNV       GLEGetCurrentFunction(wglBindVideoDeviceNV)
         #define wglQueryCurrentContextNV   GLEGetCurrentFunction(wglQueryCurrentContextNV)
 
-        #define GLE_WGL_NV_present_video GLEGetCurrentVariable(gl_WGL_NV_present_video)
+        #define GLE_WGL_NV_present_video GLEGetCurrentVariable(gle_WGL_NV_present_video)
     #endif
 
 
@@ -4085,7 +4167,7 @@ extern "C" {
 
         #define wglCreateContextAttribsARB  GLEGetCurrentFunction(wglCreateContextAttribsARB)
 
-        #define GLE_WGL_ARB_create_context GLEGetCurrentVariable(gl_WGL_ARB_create_context)
+        #define GLE_WGL_ARB_create_context GLEGetCurrentVariable(gle_WGL_ARB_create_context)
     #endif
 
 
@@ -4097,7 +4179,7 @@ extern "C" {
         #define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
         #define ERROR_INVALID_PROFILE_ARB      0x2096
 
-        #define GLE_WGL_ARB_create_context_profile GLEGetCurrentVariable(gl_WGL_ARB_create_context_profile)
+        #define GLE_WGL_ARB_create_context_profile GLEGetCurrentVariable(gle_WGL_ARB_create_context_profile)
     #endif
 
 
@@ -4109,7 +4191,17 @@ extern "C" {
         #define WGL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
         #define WGL_NO_RESET_NOTIFICATION_ARB  0x8261
 
-        #define GLE_WGL_ARB_create_context_robustness GLEGetCurrentVariable(gl_WGL_ARB_create_context_robustness)
+        #define GLE_WGL_ARB_create_context_robustness GLEGetCurrentVariable(gle_WGL_ARB_create_context_robustness)
+    #endif
+
+
+
+    #ifndef WGL_ATI_render_texture_rectangle
+        #define WGL_ATI_render_texture_rectangle 1
+
+        #define WGL_TEXTURE_RECTANGLE_ATI 0x21A5
+
+        #define GLE_WGL_ATI_render_texture_rectangle GLEGetCurrentVariable(gle_WGL_ATI_render_texture_rectangle)
     #endif
 
 
@@ -4120,7 +4212,18 @@ extern "C" {
 
         #define wglGetExtensionsStringEXT  GLEGetCurrentFunction(wglGetExtensionsStringEXT)
 
-        #define GLE_WGL_EXT_extensions_string GLEGetCurrentVariable(gl_WGL_EXT_extensions_string)
+        #define GLE_WGL_EXT_extensions_string GLEGetCurrentVariable(gle_WGL_EXT_extensions_string)
+    #endif
+
+
+    #ifndef WGL_NV_render_texture_rectangle
+        #define WGL_NV_render_texture_rectangle 1
+
+        #define WGL_BIND_TO_TEXTURE_RECTANGLE_RGB_NV  0x20A0
+        #define WGL_BIND_TO_TEXTURE_RECTANGLE_RGBA_NV 0x20A1
+        #define WGL_TEXTURE_RECTANGLE_NV              0x20A2
+
+        #define GLE_WGL_NV_render_texture_rectangle GLEGetCurrentVariable(gle_WGL_NV_render_texture_rectangle)
     #endif
 
 
@@ -4133,7 +4236,7 @@ extern "C" {
         #define wglGetSwapIntervalEXT GLEGetCurrentFunction(wglGetSwapIntervalEXT)
         #define wglSwapIntervalEXT    GLEGetCurrentFunction(wglSwapIntervalEXT)
 
-        #define GLE_WGL_EXT_swap_control GLEGetCurrentVariable(gl_WGL_EXT_swap_control)
+        #define GLE_WGL_EXT_swap_control GLEGetCurrentVariable(gle_WGL_EXT_swap_control)
     #endif
 
 
@@ -4154,16 +4257,7 @@ extern "C" {
         #define wglWaitForMscOML          GLEGetCurrentFunction(wglWaitForMscOML)
         #define wglWaitForSbcOML          GLEGetCurrentFunction(wglWaitForSbcOML)
 
-        #define GLE_WGL_OML_sync_control GLEGetCurrentVariable(gl_WGL_OML_sync_control)
-    #endif
-
-
-    #ifndef WGL_EXT_framebuffer_sRGB
-        #define WGL_EXT_framebuffer_sRGB 1
-
-        #define WGL_FRAMEBUFFER_SRGB_CAPABLE_EXT 0x20A9
-
-        #define GLE_WGL_EXT_framebuffer_sRGB GLEGetCurrentVariable(gl_WGL_EXT_framebuffer_sRGB)
+        #define GLE_WGL_OML_sync_control GLEGetCurrentVariable(gle_WGL_OML_sync_control)
     #endif
 
 
@@ -4186,7 +4280,7 @@ extern "C" {
         #define wglSendPbufferToVideoNV  GLEGetCurrentFunction(wglSendPbufferToVideoNV)
         #define wglGetVideoInfoNV        GLEGetCurrentFunction(wglGetVideoInfoNV)
 
-        #define GLE_WGL_NV_video_output GLEGetCurrentVariable(gl_WGL_NV_video_output)
+        #define GLE_WGL_NV_video_output GLEGetCurrentVariable(gle_WGL_NV_video_output)
     #endif
 
 
@@ -4207,7 +4301,7 @@ extern "C" {
         #define wglQueryFrameCountNV      GLEGetCurrentFunction(wglQueryFrameCountNV)
         #define wglResetFrameCountNV      GLEGetCurrentFunction(wglResetFrameCountNV)
 
-        #define GLE_WGL_NV_swap_group GLEGetCurrentVariable(gl_WGL_NV_swap_group)
+        #define GLE_WGL_NV_swap_group GLEGetCurrentVariable(gle_WGL_NV_swap_group)
     #endif
 
 
@@ -4238,7 +4332,7 @@ extern "C" {
         #define wglQueryVideoCaptureDeviceNV       GLEGetCurrentFunction(wglQueryVideoCaptureDeviceNV)
         #define wglReleaseVideoCaptureDeviceNV     GLEGetCurrentFunction(wglReleaseVideoCaptureDeviceNV)
 
-        #define GLE_WGL_NV_video_capture GLEGetCurrentVariable(gl_WGL_NV_video_capture)
+        #define GLE_WGL_NV_video_capture GLEGetCurrentVariable(gle_WGL_NV_video_capture)
     #endif
 
 
@@ -4249,13 +4343,14 @@ extern "C" {
 
         #define wglCopyImageSubDataNV GLEGetCurrentFunction(wglCopyImageSubDataNV)
 
-        #define GLE_WGL_NV_copy_image GLEGetCurrentVariable(gl_WGL_NV_copy_image)
+        #define GLE_WGL_NV_copy_image GLEGetCurrentVariable(gle_WGL_NV_copy_image)
     #endif
 
 
     #ifndef WGL_NV_DX_interop
         #define WGL_NV_DX_interop 1
 
+        // Note that modern AMD drivers support this NVidia extension.
         #define WGL_ACCESS_READ_ONLY_NV     0x0000
         #define WGL_ACCESS_READ_WRITE_NV    0x0001
         #define WGL_ACCESS_WRITE_DISCARD_NV 0x0002
@@ -4278,10 +4373,20 @@ extern "C" {
         #define wglDXUnlockObjectsNV          GLEGetCurrentFunction(wglDXUnlockObjectsNV)
         #define wglDXUnregisterObjectNV       GLEGetCurrentFunction(wglDXUnregisterObjectNV)
 
-        #define GLE_WGL_NV_DX_interop GLEGetCurrentVariable(gl_WGL_NV_DX_interop)
+        #define GLE_WGL_NV_DX_interop GLEGetCurrentVariable(gle_WGL_NV_DX_interop)
     #endif
     
-#endif // GLE_WINDOWS_ENABLED
+
+    #ifndef WGL_NV_DX_interop2
+        #define WGL_NV_DX_interop2 1
+
+        // This is an update to WGL_NV_DX_interop to support DX10/DX11.
+        // https://www.opengl.org/registry/specs/NV/DX_interop2.txt
+        #define GLE_WGL_NV_DX_interop2 GLEGetCurrentVariable(gle_WGL_NV_DX_interop2)
+
+        #endif
+
+#endif // GLE_WGL_ENABLED
 
 
 
@@ -4289,7 +4394,7 @@ extern "C" {
    Apple-specific (CGL) functionality
 ************************************************************************************/
 
-#if defined(GLE_APPLE_ENABLED)
+#if defined(GLE_CGL_ENABLED)
     // We don't currently disable Apple's OpenGL/OpenGL.h and replicate its declarations here.
     // We might want to do that if we intended to support hooking its functions here like we do for wgl functions.
     #include <OpenGL/OpenGL.h>
@@ -4301,7 +4406,7 @@ extern "C" {
    Unix-specific (GLX) functionality
 ************************************************************************************/
 
-#if defined(GLE_UNIX_ENABLED)
+#if defined(GLE_GLX_ENABLED)
     #ifdef __glxext_h_
         #error glxext.h was included before this header. This header needs to be inlcuded instead of or at least before glxext.h
     #endif
@@ -4539,6 +4644,50 @@ extern "C" {
         // This was glXGetProcAddressARB in GLX versions prior to v1.4.
         // This function pointer is assumed to always be present.
         extern void (* glXGetProcAddress(const GLubyte *procName)) ();
+
+        // For backward compatibility
+        extern void (* glXGetProcAddressARB(const GLubyte *procName)) ();
+    #endif
+
+
+
+	#ifndef GLX_ARB_create_context
+        #define GLX_ARB_create_context 1
+
+        #define GLX_CONTEXT_DEBUG_BIT_ARB              0x0001
+        #define GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x0002
+        #define GLX_CONTEXT_MAJOR_VERSION_ARB          0x2091
+        #define GLX_CONTEXT_MINOR_VERSION_ARB          0x2092
+        #define GLX_CONTEXT_FLAGS_ARB                  0x2094
+
+        typedef GLXContext (* PFNGLXCREATECONTEXTATTRIBSARBPROC) (Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
+
+        #define glXCreateContextAttribsARB GLEGetCurrentFunction(glXCreateContextAttribsARB)
+
+        #define GLE_GLX_ARB_create_context GLEGetCurrentVariable(gle_GLX_ARB_create_context)
+    #endif
+
+
+    #ifndef GLX_ARB_create_context_profile
+        #define GLX_ARB_create_context_profile 1
+
+        #define GLX_CONTEXT_CORE_PROFILE_BIT_ARB 		  0x00000001
+        #define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
+        #define GLX_CONTEXT_PROFILE_MASK_ARB 		0x9126
+
+        #define GLE_GLX_ARB_create_context_profile GLEGetCurrentVariable(gle_GLX_ARB_create_context_profile)
+    #endif
+
+
+    #ifndef GLX_ARB_create_context_robustness
+        #define GLX_ARB_create_context_robustness 1
+
+        #define GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB 		0x00000004
+        #define GLX_LOSE_CONTEXT_ON_RESET_ARB               0x8252
+        #define GLX_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
+        #define GLX_NO_RESET_NOTIFICATION_ARB       		0x8261
+
+        #define GLE_GLX_ARB_create_context_robustness GLEGetCurrentVariable(gle_GLX_ARB_create_context_robustness)
     #endif
 
 
@@ -4553,7 +4702,7 @@ extern "C" {
 
         #define glXSwapIntervalEXT GLEGetCurrentFunction(glXSwapIntervalEXT)
 
-        #define GLE_GLX_EXT_swap_control GLEGetCurrentVariable(gl_GLX_EXT_swap_control)
+        #define GLE_GLX_EXT_swap_control GLEGetCurrentVariable(gle_GLX_EXT_swap_control)
     #endif
     
 
@@ -4572,10 +4721,24 @@ extern "C" {
         #define glXWaitForMscOML     GLEGetCurrentFunction(glXWaitForMscOML)
         #define glXWaitForSbcOML     GLEGetCurrentFunction(glXWaitForSbcOML)
 
-        #define GLE_GLX_OML_sync_control GLEGetCurrentVariable(gl_GLX_OML_sync_control)
+        #define GLE_GLX_OML_sync_control GLEGetCurrentVariable(gle_GLX_OML_sync_control)
+    #endif
+    
+    
+    #ifndef GLX_MESA_swap_control
+        #define GLX_MESA_swap_control 1
+
+        // GLX_MESA_swap_control has the same functionality as GLX_EXT_swap_control but with a different interface, so we have an independent entry for it here.
+        typedef int (* PFNGLXGETSWAPINTERVALMESAPROC) (void);
+        typedef int (* PFNGLXSWAPINTERVALMESAPROC) (unsigned int interval);
+
+        #define glXGetSwapIntervalMESA GLEGetCurrentFunction(glXGetSwapIntervalMESA)
+        #define glXSwapIntervalMESA    GLEGetCurrentFunction(glXSwapIntervalMESA)
+
+        #define GLE_MESA_swap_control GLEGetCurrentVariable(gle_MESA_swap_control)
     #endif
 
-#endif // GLE_UNIX_ENABLED
+#endif // GLE_GLX_ENABLED
 
 
 // Undo some defines, because the user may include <Windows.h> after including this header.

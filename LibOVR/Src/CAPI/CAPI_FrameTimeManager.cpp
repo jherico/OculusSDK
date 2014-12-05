@@ -605,7 +605,8 @@ void FrameTimeManager::GetTimewarpPredictions(ovrEyeType eye, double timewarpSta
 
 
 void FrameTimeManager::GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eyeId,
-                                           ovrPosef renderPose, ovrMatrix4f twmOut[2])
+                                           ovrPosef renderPose, ovrMatrix4f twmOut[2],
+										   double debugTimingOffsetInSeconds)
 {
     if (!hmd)
     {
@@ -615,6 +616,13 @@ void FrameTimeManager::GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eyeId,
     double timewarpStartEnd[2] = { 0.0, 0.0 };    
     GetTimewarpPredictions(eyeId, timewarpStartEnd);
 
+	//TPH, to vary timing, to allow developers to debug, to shunt the predicted time forward 
+	//and back, and see if the SDK is truly delivering the correct time.  Also to allow
+	//illustration of the detrimental effects when this is not done right. 
+	timewarpStartEnd[0] += debugTimingOffsetInSeconds;
+	timewarpStartEnd[1] += debugTimingOffsetInSeconds;
+
+      
     //HMDState* p = (HMDState*)hmd;
     ovrTrackingState startState = ovrHmd_GetTrackingState(hmd, timewarpStartEnd[0]);
     ovrTrackingState endState   = ovrHmd_GetTrackingState(hmd, timewarpStartEnd[1]);

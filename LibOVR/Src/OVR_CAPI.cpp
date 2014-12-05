@@ -252,9 +252,10 @@ static ovrBool CAPI_ovrInitializeCalled = 0;
 
 static OVR::Service::NetClient* CAPI_pNetClient = 0;
 
-OVR_EXPORT void ovr_InitializeRenderingShim()
+OVR_EXPORT ovrBool ovr_InitializeRenderingShim()
 {
     OVR::System::DirectDisplayInitialize();
+    return OVR::System::DirectDisplayEnabled();
 }
 
 OVR_EXPORT ovrBool ovr_Initialize()
@@ -267,6 +268,12 @@ OVR_EXPORT ovrBool ovr_Initialize()
     {
         OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));
         CAPI_SystemInitCalled = 1;
+    }
+
+    if (!OVR::System::DirectDisplayEnabled() && !OVR::Display::InCompatibilityMode(false))
+    {
+        OVR_ASSERT(false);
+        return 0;
     }
 
     CAPI_pNetClient = NetClient::GetInstance();
@@ -847,8 +854,8 @@ OVR_EXPORT void ovrHmd_AddDistortionTimeMeasurement(ovrHmd hmddesc, double disto
 
 
 
-OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye,
-                                              ovrPosef renderPose, ovrMatrix4f twmOut[2])
+OVR_EXPORT void ovrHmd_GetEyeTimewarpMatricesDebug(ovrHmd hmddesc, ovrEyeType eye,
+                                              ovrPosef renderPose, ovrMatrix4f twmOut[2],double debugTimingOffsetInSeconds)
 {
     if (!hmddesc)
         return;
@@ -857,7 +864,7 @@ OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye,
     // Debug checks: BeginFrame was called, on the same thread.
     hmds->checkBeginFrameTimingScope("ovrHmd_GetTimewarpEyeMatrices");   
 
-    hmds->TimeManager.GetTimewarpMatrices(hmddesc, eye, renderPose, twmOut);
+    hmds->TimeManager.GetTimewarpMatrices(hmddesc, eye, renderPose, twmOut, debugTimingOffsetInSeconds);
 
     /*
     // MA: Took this out because new latency test approach just sames
@@ -868,6 +875,13 @@ OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye,
         hmds->ProcessLatencyTest2(hmds->LatencyTest2DrawColor, -1.0f);
     }
     */
+}
+
+
+OVR_EXPORT void ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye,
+                                              ovrPosef renderPose, ovrMatrix4f twmOut[2])
+{
+    return(ovrHmd_GetEyeTimewarpMatricesDebug(hmddesc, eye, renderPose, twmOut, 0.0));
 }
 
 
@@ -893,10 +907,12 @@ OVR_EXPORT ovrEyeRenderDesc ovrHmd_GetRenderDesc(ovrHmd hmddesc,
 
 
 
-OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmddesc,
+
+OVR_EXPORT ovrBool ovrHmd_CreateDistortionMeshDebug( ovrHmd hmddesc,
                                                 ovrEyeType eyeType, ovrFovPort fov,
                                                 unsigned int distortionCaps,
-                                                ovrDistortionMesh *meshData)
+                                                ovrDistortionMesh *meshData,
+												float debugEyeReliefOverrideInMetres)
 {
     // The 'internal' function below can be found in CAPI_HMDState.
     // Not ideal, but navigating the convolutions of what compiles
@@ -906,8 +922,15 @@ OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmddesc,
                                                 eyeType, fov,
                                                 distortionCaps,
                                                 meshData,
-                                                0));
+                                                debugEyeReliefOverrideInMetres));
 
+}
+OVR_EXPORT ovrBool ovrHmd_CreateDistortionMesh( ovrHmd hmddesc,
+                                                ovrEyeType eyeType, ovrFovPort fov,
+                                                unsigned int distortionCaps,
+                                                ovrDistortionMesh *meshData)
+{
+    return(ovrHmd_CreateDistortionMeshDebug( hmddesc, eyeType, fov, distortionCaps,meshData, 0));
 }
 
 

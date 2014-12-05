@@ -175,8 +175,13 @@ public:
 //-----------------------------------------------------------------------------------
 // ***** Thread class
 
-// ThreadId uniquely identifies a thread; returned by GetCurrentThreadId() and
-// Thread::GetThreadId.
+// ThreadHandle is a handle to a thread, which on some platforms (e.g. Windows) is 
+// different from ThreadId. On Unix platforms, a ThreadHandle is the same as a 
+// ThreadId and is pthread_t.
+typedef void* ThreadHandle;
+
+// ThreadId uniquely identifies a thread; returned by Windows GetCurrentThreadId(), 
+// Unix pthread_self() and Thread::GetThreadId.
 typedef void* ThreadId;
 
 
@@ -363,7 +368,12 @@ public:
 
 
     // *** Debugging functionality
-    virtual void    SetThreadName( const char* name );
+    virtual void    SetThreadName(const char* name);
+    static void     SetThreadName(const char* name, ThreadId threadId);
+    static void     SetCurrentThreadName(const char* name);
+
+    static void     GetThreadName(char* name, size_t nameCapacity, ThreadId threadId);
+    static void     GetCurrentThreadName(char* name, size_t nameCapacity);
 
 private:
 #if defined(OVR_OS_WIN32)

@@ -6,7 +6,7 @@ Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
 				Peter Hoff, Dan Goodman, Bryan Croteau                
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ limitations under the License.
 #include "Util/Util_Render_Stereo.h"
 using namespace OVR::Util::Render;
 
+#include "Kernel/OVR_DebugHelp.h"
 
 #include "Player.h"
 #include "Sensors/OVR_DeviceConstants.h"
@@ -94,7 +95,7 @@ using namespace OVR::Render;
 //
 //  - Additional input processing is done in OnMouse, OnKey.
 
-class OculusWorldDemoApp : public Application
+class OculusWorldDemoApp : public Application, public OVR::ExceptionHandler::ExceptionListener
 {
 public:
     OculusWorldDemoApp();
@@ -147,6 +148,8 @@ public:
     // Processes DeviceNotificationStatus queue to handles plug/unplug.
     void         ProcessDeviceNotificationQueue();
 
+    // ExceptionHandler callback
+    int HandleException(uintptr_t userValue, OVR::ExceptionHandler* pExceptionHandler, OVR::ExceptionInfo* pExceptionInfo, const char* reportFilePath);
 
     // ***** Callbacks for Menu option changes
 
@@ -178,6 +181,7 @@ protected:
     int                 ScreenNumber;
     int                 FirstScreenInCycle;
     bool                SupportsSrgb;
+    bool                SupportsMultisampling;
 
     // Last vision processing statistics
     double              LastVisionProcessingTime;
@@ -277,7 +281,8 @@ protected:
     bool                ScaleAffectsEyeHeight;
     float               DesiredPixelDensity;    
     float               FovSideTanMax;
-    float               FovSideTanLimit; // Limit value for Fov.   
+    float               FovSideTanLimit; // Limit value for Fov.
+    bool                FadedBorder;
 
     // Time-warp.
     bool                TimewarpEnabled;
@@ -285,6 +290,7 @@ protected:
     float               TimewarpRenderIntervalInSeconds;    
     bool                FreezeEyeUpdate;
     bool                FreezeEyeOneFrameRendered;
+    bool                ComputeShaderEnabled;
 
     // Other global settings.
     float               CenterPupilDepthMeters;
@@ -365,6 +371,8 @@ protected:
 
     // Profiler for rendering - displays timing stats.
     RenderProfiler      Profiler;
+
+    OVR::ExceptionHandler ExceptionHandler;
 };
 
 

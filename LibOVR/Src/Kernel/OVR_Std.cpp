@@ -34,6 +34,54 @@ namespace OVR {
 
 // Source for functions not available on all platforms is included here.
 
+size_t OVR_CDECL OVR_strlcpy(char* dest, const char* src, size_t destsize)
+{
+    const char* s = src;
+    size_t      n = destsize;
+
+    if(n && --n)
+    {
+        do{
+            if((*dest++ = *s++) == 0)
+                break;
+        } while(--n);
+    }
+
+    if(!n)
+    {
+        if(destsize)
+            *dest = 0;
+        while(*s++)
+            { }
+    }
+
+    return (size_t)((s - src) - 1);
+}
+
+
+size_t OVR_CDECL OVR_strlcat(char* dest, const char* src, size_t destsize)
+{
+    const size_t d = destsize ? OVR_strlen(dest) : 0;
+    const size_t s = OVR_strlen(src);
+    const size_t t = s + d;
+
+    OVR_ASSERT((destsize == 0) || (d < destsize));
+
+    if(t < destsize)
+        memcpy(dest + d, src, (s + 1) * sizeof(*src));
+    else
+    {
+        if(destsize)
+        {
+            memcpy(dest + d, src, ((destsize - d) - 1) * sizeof(*src));
+            dest[destsize - 1] = 0;
+        }
+    }
+
+    return t;
+}
+
+
 // Case insensitive compare implemented in platform-specific way.
 int OVR_CDECL OVR_stricmp(const char* a, const char* b)
 {

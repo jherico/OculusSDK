@@ -202,7 +202,7 @@ public:
     Posef            GetEyePredictionPose(ovrHmd hmd, ovrEyeType eye);
 
     void    GetTimewarpPredictions(ovrEyeType eye, double timewarpStartEnd[2]); 
-    void    GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2]);
+    void    GetTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2],double debugTimingOffsetInSeconds = 0.0);
 
     // Used by renderer to determine if it should time distortion rendering.
     bool    NeedDistortionTimeMeasurement() const;

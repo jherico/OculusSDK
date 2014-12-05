@@ -6,7 +6,7 @@ Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
 				Peter Hoff, Dan Goodman, Bryan Croteau                
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,38 +24,76 @@ limitations under the License.
 
 #include "OculusWorldDemo.h"
 #include "Kernel/OVR_Threads.h"
+#include "Util/Util_SystemGUI.h"
 
+
+OVR_DISABLE_MSVC_WARNING(4996) // "scanf may be unsafe"
 
 //-------------------------------------------------------------------------------------
 // ***** OculusWorldDemoApp
 
 OculusWorldDemoApp::OculusWorldDemoApp() :
     pRender(0),
+    RenderParams(),
     WindowSize(1280,800),
     ScreenNumber(0),
     FirstScreenInCycle(0),
+    SupportsSrgb(true),             // May be proven false below.
+    SupportsMultisampling(true),    // May be proven false below.
+
     LastVisionProcessingTime(0.),
     VisionTimesCount(0),
     VisionProcessingSum(0.),
     VisionProcessingAverage(0.),
 
+  //RenderTargets()
+  //MsaaRenderTargets()
+    DrawEyeTargets(NULL),
     Hmd(0),
+  //EyeRenderDesc[2];
+  //Projection[2];          // Projection matrix for eye.
+  //OrthoProjection[2];     // Projection for 2D.
+  //EyeRenderPose[2];       // Poses we used for rendering.
+  //EyeTexture[2];
+  //EyeRenderSize[2];       // Saved render eye sizes; base for dynamic sizing.
     StartTrackingCaps(0),
     UsingDebugHmd(false),
+
+    FrameCounter(0),
+	TotalFrameCounter(0),
+    SecondsPerFrame(0.f),
+    FPS(0.f),
+    LastFpsUpdate(0.0),
+    LastUpdate(0.0),
+
+    MainFilePath(),
+    CollisionModels(),
+    GroundCollisionModels(),
+
     LoadingState(LoadingState_Frame0),
     HaveVisionTracking(false),
     HavePositionTracker(false),
     HaveHMDConnected(false),
+
+    LastGamepadState(),
+
+    ThePlayer(),
+    View(),
+    MainScene(),
+    LoadingScene(),
+    SmallGreenCube(),
+
+	OculusCubesScene(),
+	RedCubesScene(),
+	BlueCubesScene(),
+
+    HmdFrameTiming(),
     HmdStatus(0),
+
     NotificationTimeout(0.0),
 
-    // Initial location
-    DistortionClearBlue(0),      
-    ShiftDown(false),
-    CtrlDown(false),
     HmdSettingsChanged(false),
 
-    // Modifiable options.
     RendertargetIsSharedByBothEyes(false),
     DynamicRezScalingEnabled(false),
 	EnableSensor(true),
@@ -65,11 +103,15 @@ OculusWorldDemoApp::OculusWorldDemoApp() :
     DesiredPixelDensity(1.0f),
     FovSideTanMax(1.0f), // Updated based on Hmd.
     FovSideTanLimit(1.0f), // Updated based on Hmd.
+    FadedBorder(true),
+
     TimewarpEnabled(true),
     TimewarpNoJitEnabled(false),
     TimewarpRenderIntervalInSeconds(0.0f),
     FreezeEyeUpdate(false),
     FreezeEyeOneFrameRendered(false),
+    ComputeShaderEnabled(false),
+
     CenterPupilDepthMeters(0.05f),
     ForceZeroHeadMovement(false),
     VsyncEnabled(true),
@@ -84,27 +126,23 @@ OculusWorldDemoApp::OculusWorldDemoApp() :
 	PixelLuminanceOverdrive(true),
     HqAaDistortion(true),
     MirrorToWindow(true),
-    SupportsSrgb(true),
+
+    DistortionClearBlue(0),
+    ShiftDown(false),
+    CtrlDown(false),
     IsLogging(false),
 
-    // Scene state
     SceneMode(Scene_World),
     GridDisplayMode(GridDisplay_None),
     GridMode(Grid_Lens),
     TextScreen(Text_None),
     BlocksShowType(0),
-    BlocksCenter(0.0f, 0.0f, 0.0f)     
+    BlocksCenter(0.0f, 0.0f, 0.0f),
+    Menu(),
+    Profiler(),
+    ExceptionHandler()
 {
-    FPS					= 0.0f;
-    SecondsPerFrame		= 0.0f;
-    FrameCounter		= 0;
-	TotalFrameCounter	= 0;
-    LastFpsUpdate		= 0;
-    LastUpdate          = 0.0;
-
     EyeRenderSize[0] = EyeRenderSize[1] = Sizei(0);
-
-    DistortionClearBlue = false;
 
     // EyeRenderDesc[], EyeTexture[] : Initialized in CalculateHmdValues()
 }
@@ -125,8 +163,20 @@ OculusWorldDemoApp::~OculusWorldDemoApp()
     ovr_Shutdown();
 }
 
+
+
 int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 {
+    OVR::Thread::SetCurrentThreadName("OWDMain");
+
+    // *** Setup exception handler
+
+    ExceptionHandler.SetExceptionListener(this, 0);
+    ExceptionHandler.SetExceptionPaths("default", "default");
+    ExceptionHandler.EnableReportPrivacy(false); // If we were collecting these reports then we need to get user permission in order to enable disable privacy.
+    ExceptionHandler.Enable(true);
+    
+
     // *** Oculus HMD & Sensor Initialization
 
     // Create DeviceManager and first available HMDDevice from it.
@@ -225,7 +275,6 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 
     LastUpdate = ovr_GetTimeInSeconds();
 
-    // Select renderer based on command line arguments.
     for (int i = 1; i < argc; i++)
     {
         if (!strcmp(argv[i], "-StartPerfLog") && i < argc - 1)
@@ -238,25 +287,6 @@ int OculusWorldDemoApp::OnStartup(int argc, const char** argv)
 }
 
 
-// Temporary helper function. Will go away with the next release.
-// Requires a valid current OpenGL context in order to work.
-static bool MultisamplingIsSupported()
-{
-    #if defined(OVR_OS_MAC)
-        const char* pVersion = (const char*)glGetString(GL_VERSION);
-        int majorVersion = 0;
-        if(pVersion)
-        {
-            sscanf(pVersion, "%d", &majorVersion); // On Mac the gl version string begins with major.minor
-            return (majorVersion >= 3);
-        }
-        return false;
-    #else
-        return true;
-    #endif
-}
-
-    
 bool OculusWorldDemoApp::SetupWindowAndRendering(int argc, const char** argv)
 {
     // *** Window creation
@@ -273,54 +303,93 @@ bool OculusWorldDemoApp::SetupWindowAndRendering(int argc, const char** argv)
 
     // *** Initialize Rendering
 
-#if defined(OVR_OS_WIN32)
-    const char* graphics = "d3d11";
-#else
-    const char* graphics = "GL";
-#endif
+    #if defined(OVR_OS_MS)
+        const char* graphics = "d3d11";  //Default to DX11. Can be overridden below.
+    #else
+        const char* graphics = "GL";
+    #endif
 
     // Select renderer based on command line arguments.
+    // Example usage: App.exe -r d3d9 -fs
+    // Example usage: App.exe -r GL
+    // Example usage: App.exe -r GL -GLVersion 4.1 -GLCoreProfile -DebugEnabled 
     for(int i = 1; i < argc; i++)
     {
-        if(!strcmp(argv[i], "-r") && i < argc - 1)
+        const bool lastArg = (i == (argc - 1)); // False if there are any more arguments after this.
+        
+        if(!OVR_stricmp(argv[i], "-r") && !lastArg)  // Example: -r GL
         {
-            graphics = argv[i + 1];
+            graphics = argv[++i];
         }
-        else if(!strcmp(argv[i], "-fs"))
+        else if(!OVR_stricmp(argv[i], "-fs"))        // Example: -fs
         {
-            RenderParams.Fullscreen = true;
+            RenderParams.Fullscreen = 1;
+        }
+        else if(!OVR_stricmp(argv[i], "-MultisampleDisabled")) // Example: -MultisampleDisabled
+        {
+            MultisampleEnabled = false;
+        }
+        else if(!OVR_stricmp(argv[i], "-DebugEnabled")) // Example: -DebugEnabled
+        {
+            RenderParams.DebugEnabled = true;
+        }
+        else if(!OVR_stricmp(argv[i], "-GLVersion") && !lastArg) // Example: -GLVersion 3.2
+        {
+            const char* version = argv[++i];
+            sscanf(version, "%d.%d", &RenderParams.GLMajorVersion, &RenderParams.GLMinorVersion);
+        }
+        else if(!OVR_stricmp(argv[i], "-GLCoreProfile")) // Example: -GLCoreProfile
+        {
+            RenderParams.GLCoreProfile = true;
+        }
+        else if(!OVR_stricmp(argv[i], "-GLCoreCompatibilityProfile")) // Example: -GLCompatibilityProfile
+        {
+            RenderParams.GLCompatibilityProfile = true;
+        }
+        else if(!OVR_stricmp(argv[i], "-GLForwardCompatibleProfile")) // Example: -GLForwardCompatibleProfile
+        {
+            RenderParams.GLForwardCompatibleProfile = true;
         }
     }
 
-    String title = "Oculus World Demo ";
-    title += graphics;
+    // Setup RenderParams.RenderAPIType
+    if (OVR_stricmp(graphics, "GL") == 0)
+        RenderParams.RenderAPIType = ovrRenderAPI_OpenGL;
+    #if defined(OVR_OS_MS)
+        else if (OVR_stricmp(graphics, "d3d9") == 0)
+            RenderParams.RenderAPIType = ovrRenderAPI_D3D9;
+        else if (OVR_stricmp(graphics, "d3d10") == 0)
+            RenderParams.RenderAPIType = ovrRenderAPI_D3D10;
+        else if (OVR_stricmp(graphics, "d3d11") == 0)
+            RenderParams.RenderAPIType = ovrRenderAPI_D3D11;
+    #endif
 
-    if (Hmd->ProductName[0])
-    {
-        title += " : ";
-        title += Hmd->ProductName;
-    }
+    StringBuffer title;
+    title.AppendFormat("Oculus World Demo %s : %s", graphics, Hmd->ProductName[0] ? Hmd->ProductName : "<unknown device>");
     pPlatform->SetWindowTitle(title);
 
-    if (OVR_strcmp(graphics, "GL") == 0 && !(Hmd->HmdCaps & ovrHmdCap_ExtendDesktop))
+    if ((RenderParams.RenderAPIType == ovrRenderAPI_OpenGL) && !(Hmd->HmdCaps & ovrHmdCap_ExtendDesktop))
         SupportsSrgb = false;
 
-    // Enable multi-sampling by default if possible.
-    MultisampleEnabled = MultisamplingIsSupported();
+    // Ideally we would use the created OpenGL context to determine multisamping support,
+    // but that creates something of a chicken-and-egg problem which is easier to solve in
+    // practice by the code below, as it's the only case where multisamping isn't supported
+    // in modern computers of interest to us.
+    #if defined(OVR_OS_MAC)
+        if (RenderParams.GLMajorVersion < 3)
+            SupportsMultisampling = false;
+    #endif
     
-    RenderParams.Display     = DisplayId(Hmd->DisplayDeviceName, Hmd->DisplayId);
+    // Enable multi-sampling by default.
+    RenderParams.Display        = DisplayId(Hmd->DisplayDeviceName, Hmd->DisplayId);
     RenderParams.SrgbBackBuffer = SupportsSrgb && false;   // don't create sRGB back-buffer for OWD
-    RenderParams.Multisample = MultisampleEnabled ? 1 : 0;
-    RenderParams.Resolution  = Hmd->Resolution;
+    RenderParams.Multisample    = (SupportsMultisampling && MultisampleEnabled) ? 1 : 0;
+    RenderParams.Resolution     = Hmd->Resolution;
+  //RenderParams.Fullscreen     = true;
 
-    //RenderParams.Fullscreen = true;
     pRender = pPlatform->SetupGraphics(OVR_DEFAULT_RENDER_DEVICE_SET,
-                                       graphics, RenderParams);
-
-    if (!pRender)
-        return false;
-
-    return true;
+                                       graphics, RenderParams); // To do: Remove the graphics argument to SetupGraphics, as RenderParams already has this info.
+    return (pRender != nullptr);
 }
 
 // Custom formatter for Timewarp interval message.
@@ -396,16 +465,16 @@ void OculusWorldDemoApp::PopulateOptionMenu()
                                                         AddShortcutUpKey(Key_I).AddShortcutDownKey(Key_K);
     Menu.AddFloat("Render Target.Pixel Density",       &DesiredPixelDensity, 0.5f, 2.5, 0.025f, "%3.2f", 1.0f).
                                                         SetNotify(this, &OWD::HmdSettingChange);
-    
-    if(MultisamplingIsSupported())
-        Menu.AddBool("Render Target.MultiSample 'F4'",    &MultisampleEnabled)    .AddShortcutKey(Key_F4).SetNotify(this, &OWD::MultisampleChange);
-    
+    if (SupportsMultisampling)
+    Menu.AddBool("Render Target.MultiSample 'F4'",    &MultisampleEnabled)    .AddShortcutKey(Key_F4).SetNotify(this, &OWD::MultisampleChange);
     Menu.AddBool("Render Target.High Quality Distortion 'F5'", &HqAaDistortion).AddShortcutKey(Key_F5).SetNotify(this, &OWD::HmdSettingChange);
     //Menu.AddBool("Render Target.sRGB Distortion 'F6'", &SupportsSrgb).AddShortcutKey(Key_F6).SetNotify(this, &OWD::MultisampleChange);
     Menu.AddEnum( "Render Target.Distortion Clear Color",  &DistortionClearBlue).
                                                         SetNotify(this, &OWD::DistortionClearColorChange).
                                                         AddEnumValue("Black",  0).
-                                                        AddEnumValue("Blue", 1);    
+                                                        AddEnumValue("Blue", 1);
+    Menu.AddBool( "Render Target.Faded Border",         &FadedBorder).
+                                                        SetNotify(this, &OWD::HmdSettingChange);
 
     // Timewarp
     Menu.AddBool( "Timewarp.TimewarpEnabled 'O'",   &TimewarpEnabled).AddShortcutKey(Key_O).
@@ -415,6 +484,12 @@ void OculusWorldDemoApp::PopulateOptionMenu()
     Menu.AddFloat("Timewarp.RenderIntervalSeconds", &TimewarpRenderIntervalInSeconds,   
                                                     0.0001f, 1.00f, 0.0001f, "%.1f", 1.0f, &FormatTimewarp).
                                                     AddShortcutUpKey(Key_J).AddShortcutDownKey(Key_U);
+
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
+    Menu.AddBool( "Timewarp.ComputeShaderEnabled",  &ComputeShaderEnabled).
+    																SetNotify(this, &OWD::HmdSettingChange);
+#endif
+    
     
     // First page properties
     Menu.AddFloat("Player.Position Tracking Scale", &PositionTrackingScale, 0.00f, 50.0f, 0.05f).
@@ -540,7 +615,7 @@ void OculusWorldDemoApp::CalculateHmdValues()
         }
     }
 
-    DrawEyeTargets = MultisampleEnabled ? MsaaRenderTargets : RenderTargets;
+    DrawEyeTargets = (MultisampleEnabled && SupportsMultisampling) ? MsaaRenderTargets : RenderTargets;
 
     // Hmd caps.
     unsigned hmdCaps = (VsyncEnabled ? 0 : ovrHmdCap_NoVSync);
@@ -557,7 +632,7 @@ void OculusWorldDemoApp::CalculateHmdValues()
 
     if (!MirrorToWindow)
         hmdCaps |= ovrHmdCap_NoMirrorToWindow;
- 
+
     // If using our driver, display status overlay messages.
     if (!(Hmd->HmdCaps & ovrHmdCap_ExtendDesktop) && (NotificationTimeout != 0.0f))
     {                
@@ -572,8 +647,10 @@ void OculusWorldDemoApp::CalculateHmdValues()
 
 
 	ovrRenderAPIConfig config         = pRender->Get_ovrRenderAPIConfig();
-    unsigned           distortionCaps = ovrDistortionCap_Chromatic |
-										ovrDistortionCap_Vignette;
+    unsigned           distortionCaps = ovrDistortionCap_Chromatic;
+
+    if (FadedBorder)
+        distortionCaps |= ovrDistortionCap_Vignette;
     if (SupportsSrgb)
         distortionCaps |= ovrDistortionCap_SRGB;
 	if(PixelLuminanceOverdrive)
@@ -587,6 +664,11 @@ void OculusWorldDemoApp::CalculateHmdValues()
 #if defined(OVR_OS_LINUX)
     if (LinuxFullscreenOnDevice)
         distortionCaps |= ovrDistortionCap_LinuxDevFullscreen;
+#endif
+
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
+    if(ComputeShaderEnabled)
+        distortionCaps |= ovrDistortionCap_ComputeShader;
 #endif
 
     if (!ovrHmd_ConfigureRendering( Hmd, &config, distortionCaps, eyeFov, EyeRenderDesc ))
@@ -646,7 +728,7 @@ Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requ
         // Hmmm... someone nuked my texture. Rez change or similar. Make sure we reallocate.
         rt.OvrTex.Header.TextureSize = Sizei(0);
         
-        if(MultisampleEnabled)
+        if(MultisampleEnabled && SupportsMultisampling)
             msrt.OvrTex.Header.TextureSize = Sizei(0);
 
         newRTSize = requestedSize;
@@ -684,7 +766,7 @@ Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requ
         // Configure texture for SDK Rendering.
         rt.OvrTex = rt.pTex->Get_ovrTexture();
         
-        if(MultisampleEnabled)
+        if(MultisampleEnabled && SupportsMultisampling)
         {
             int msaaformat = format | 4;    // 4 is MSAA rate
 
@@ -804,6 +886,16 @@ void OculusWorldDemoApp::OnKey(OVR::KeyCode key, int chr, bool down, int modifie
                                          ThePlayer.UserEyeHeight, Positions[nextPosition].z);
             ThePlayer.BodyYaw = DegreeToRad( Positions[nextPosition].YawDegrees );
         }
+        break;
+
+    case Key_BracketLeft: // Control-Shift-[  --> Test OVR_ASSERT
+        if(down && (modifiers & Mod_Control) && (modifiers & Mod_Shift))
+            OVR_ASSERT(key != Key_BracketLeft);
+        break;
+
+    case Key_BracketRight: // Control-Shift-]  --> Test exception handling
+        if(down && (modifiers & Mod_Control) && (modifiers & Mod_Shift))
+            OVR::CreateException(OVR::kCETAccessViolation);
         break;
 
     case Key_Num1:
@@ -998,7 +1090,7 @@ void OculusWorldDemoApp::OnIdle()
         pRender->SetDefaultRenderTarget();
         pRender->FinishScene();
 
-        if(MultisampleEnabled)
+        if(MultisampleEnabled && SupportsMultisampling)
         {
             if (MonoscopicRender)
             {
@@ -1015,7 +1107,7 @@ void OculusWorldDemoApp::OnIdle()
             }
         }
     }
-        
+       
     /*
     double t= ovr_GetTimeInSeconds();
     while (ovr_GetTimeInSeconds() < (t + 0.017))
@@ -1041,38 +1133,35 @@ bool OculusWorldDemoApp::FrameNeedsRendering(double curtime)
     double          timeSinceLast       = curtime - lastUpdate;
     bool            updateRenderedView  = true;
 
-    if (TimewarpEnabled)
+    if (FreezeEyeUpdate)
     {
-        if (FreezeEyeUpdate)
+        // Draw one frame after (FreezeEyeUpdate = true) to update message text.            
+        if (FreezeEyeOneFrameRendered)
+            updateRenderedView = false;
+        else
+            FreezeEyeOneFrameRendered = true;
+    }
+    else
+    {
+        FreezeEyeOneFrameRendered = false;
+
+        if ( (timeSinceLast < 0.0) || ((float)timeSinceLast > renderInterval) )
         {
-            // Draw one frame after (FreezeEyeUpdate = true) to update message text.            
-            if (FreezeEyeOneFrameRendered)
-                updateRenderedView = false;
-            else
-                FreezeEyeOneFrameRendered = true;
+            // This allows us to do "fractional" speeds, e.g. 45fps rendering on a 60fps display.
+            lastUpdate += renderInterval;
+            if ( timeSinceLast > 5.0 )
+            {
+                // renderInterval is probably tiny (i.e. "as fast as possible")
+                lastUpdate = curtime;
+            }
+
+            updateRenderedView = true;
         }
         else
         {
-            FreezeEyeOneFrameRendered = false;
-
-            if ( (timeSinceLast < 0.0) || ((float)timeSinceLast > renderInterval) )
-            {
-                // This allows us to do "fractional" speeds, e.g. 45fps rendering on a 60fps display.
-                lastUpdate += renderInterval;
-                if ( timeSinceLast > 5.0 )
-                {
-                    // renderInterval is probably tiny (i.e. "as fast as possible")
-                    lastUpdate = curtime;
-                }
-
-                updateRenderedView = true;
-            }
-            else
-            {
-                updateRenderedView = false;
-            }
-        }        
-    }
+            updateRenderedView = false;
+        }
+    }        
         
     return updateRenderedView;
 }
@@ -1582,6 +1671,23 @@ void OculusWorldDemoApp::GamepadStateChanged(const GamepadState& pad)
 
     LastGamepadState = pad;
 }
+
+
+int OculusWorldDemoApp::HandleException(uintptr_t /*userValue*/, OVR::ExceptionHandler* /*pExceptionHandler*/, ExceptionInfo* /*pExceptionInfo*/, const char* reportFilePath)
+{
+    const char* uiText = ExceptionHandler::GetExceptionUIText(reportFilePath);
+
+    if(uiText)
+    {
+        OVR::Util::DisplayMessageBox("Exception encountered in OculusWorldDemo", uiText);
+        ExceptionHandler::FreeExceptionUIText(uiText);
+    }
+
+    return 0;
+}
+
+
+
 
 
 //-------------------------------------------------------------------------------------

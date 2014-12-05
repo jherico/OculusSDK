@@ -177,6 +177,15 @@
     <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp">
       <Filter>CAPI\D3D9</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Src\Kernel\OVR_DebugHelp.cpp">
+      <Filter>Kernel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Util\Util_SystemGUI.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GLE.cpp">
+      <Filter>CAPI\GL</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h">
@@ -402,6 +411,18 @@
     <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h">
       <Filter>CAPI\GL</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Src\Kernel\OVR_DebugHelp.h">
+      <Filter>Kernel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_SystemGUI.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GLE.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GLE_GL.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Util">
@@ -470,6 +491,9 @@
       <Filter>CAPI\D3D1X\Shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_ps.psh">
+      <Filter>CAPI\D3D1X\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionCS2x2.csh">
       <Filter>CAPI\D3D1X\Shaders</Filter>
     </CustomBuild>
   </ItemGroup>

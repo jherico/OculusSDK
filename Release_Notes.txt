@@ -1,4 +1,4 @@
-Oculus SDK 0.4.3 Release Notes - Runtime Rev 1
+Oculus SDK 0.4.4 Release Notes - Runtime Rev 1
 ----------------------------------------------
 
 After installing the SDK, update the Oculus DK2 firmware
@@ -11,62 +11,73 @@ and Known Issues sections below.
 New SDK Features
 ----------------
 
-* Display Driver latency reduction in Direct Mode by 1 frame, resulting in 0ms Post-present.
+* A matching runtime and SDK are now required for development. This does not break 
+  backwards compatibility as a newer runtime will work with an older SDK/Integration.
 
-* Updated display driver to support multi-threaded calls efficiently, this may improve performance in some scenarios.
+* Introduced a versioning system for the display driver.
 
-* New thread-safe function ovrHmd_GetEyePoses() in OVR_CAPI makes it easier for the 
-  application to query the two eye (camera) poses by internalizing the HMD-to-eye-offset 
-  calculations among other benefits. The ovrHmd_GetEyePose() function is being deprecated.
+* Added Better HqDistortion for D3D11.
 
-* Added Pixel Luminance Overdrive support to the OVR_CAPI OpenGL rendering back-end to 
-  remove various 2-frame-rise (ghosting) artifacts. This feature is tied to the 
-  ovrDistortionCap_Overdrive flag in OVR_CAPI. This effect can be toggled 
-  OculusWorldDemo’s option menu.
-  
-* Added option to re-center starting head position across all applications.
-  This is tied to a specific device and serial number and will be shared
-  across profiles on the same system.
-  
-* Added option in the Oculus Configuration Utility to Suppress the Health and Safety Warning
-  during active development.  Please see section 7.2 of the Oculus Developer Guide for more 
-  information.
+* Added support for specifying OpenGL version and core profile support. OculusWorldDemo 
+  can now be run with core profile support.
 
-* Added option in the Oculus Configuration Utility to set the OVRServer logging level.
-  
-* Added pop-up error messages when the Rift can't be activated in Direct Display mode.
+* Enabling of GLE module. This moves the GL extension loading and management to the GLE 
+  module, which is somewhat like GLEW. This also allows for automated hooking of all 
+  GL functions on platforms (enabled by default on Mac because it doesn't support KHR_Debug). 
+  It also centralizes the OpenGL version and extension management to a single place and 
+  consistent interface.
 
-* Updated the Health and Safety Warning screen to reflect an age restriction of 13. 
-  More information can be found in the Oculus VR Best Practices Guide and in the Oculus VR 
-  Health And Safety Warnings documentation.
-  
-Unity
-* Overhauled C# API. Reduced performance overhead. See the migration guide for more details.
+* Added debug functionality to LibOVR and our Sample apps to make bug reporting easier 
+  for external users. Much of this functionality is in Kernel/OVR_DebugHelp.h/cpp.
 
-* Improved support for multi-layered rendering. Just instantiate multiple OVRCameraRigs, set Camera.depth and Camera.clearFlags for each eye, and use.
+* Added debug functions to CAPI, to allow realtime debug changing of eye-relief 
+  (in the creation of distortion meshes), and realtime debug offsetting of timing 
+  information (in generation of timewarp matrices). 
 
-* Added support for Unity Free in Unity 4.5.5 and up.
-
-* Added support for Unity 5 internal beta.
-
-* Improved performance on all platforms.
+* Added an new, simplified version of Oculus TinyRoom.
 
 
-
-Bug Fixes since 0.4.2
+Bug Fixes since 0.4.3
 ---------------------
 
-*  OculusWorldDemo now showcases MSAA the proper way for both D3D10/11 and OpenGL by resolving the multi-sampled buffer before feeding it into the ovrHmd_EndFrame() function.
-*  Improved OpenGL state management through contexts
-*  Fixes in Vsync direct mode tearing
-*  Fixed a bug in the D3D10/11 rendering path that was causing the overall brightness of the visuals to change on some systems.
-*  Fix LibOVR build on OSX Yosemite
+* Retuned vignette for both DK1 and DK2. Default to no-vignette to maximize FOV on DK2.
+
+* Fixed an OVR_Assert with the ovrHmd_GetLastError() function. It was not de-serializing the 
+  result which would trigger the OVR_Assert.
+
+* Fixed a bug where we weren't setting our own framebuffer as the default framebuffer in context 
+  creation.
+
+* Fixed a potential memory leak after a firmware update via the OculusConfigUtil.
+
+* Fixed shared context creation on Linux.
+
+* Fixed Linux DK1 device type.
+
+* Fix for DK1 window unable to target device.
+
+UE4
+* Fixed a crash in Direct Mode ResizeBuffers when the UMD decides to take advantage of multithreaded 
+  resource creation 
 
 Unity
-*  Fixed a source of jitter in TimeWarp timing that resulted in shaky images.
-*  Removed problematic "out of camera range" message. Will be replaced by an optional camera bounds visualization in a future release.
-*  In the editor, Game view rendering no longer targets the wrong view.
-*  In the editor, Game view rendering no longer breaks when you resize the window or view.
+* Fixed a crash when switching from full-screen to windowed.
+
+* Fixed gravity modifier in OVRPlayerController prefab. Was 0, which prevented movement.
+
+* Fixing a bleaching bug with Halo effect.
+
+* Fixed black screen bug in Unity DX11 build + Extended mode.
+
+* Added a lock to prevent race conditions between the main & render threads during shutdown.
+
+* Fix race conditions with OVRManager life cycle management and black screens/crashes associated 
+  with scene loading.
+
+Code changes
+* RTSize is now BackBufferSize.
+
+* ovr_InitializeRenderingShim() now returns a bool instead of void.
 
 
 Troubleshooting
@@ -88,7 +99,7 @@ Here we describe these issues and provide advice on addressing them.
   disabling one monitor to see if the problem goes away.
 
 
-0.4.3 Rev 1 Known Issues - LibOVR and Display Driver
+0.4.4 Rev 1 Known Issues - LibOVR and Display Driver
 ----------------------------------------------------
 
 * Monitors in multiple display configurations will blink when activating the Rift.
@@ -116,6 +127,8 @@ Here we describe these issues and provide advice on addressing them.
   of the installer.  If you need to go back to a previous version, first
   uninstall the current version and then install the previous one.
 
+* You must have Aero enabled on Windows 7 for full display driver support. 
+
 
 Known Issues - Unity
 --------------------
@@ -124,7 +137,6 @@ Known Issues - Unity
 
 * Editor Game view does not yet directly render to the Rift.
 
-* D3D11 in extended mode is unsupported for this release. This configuration will typically appear to judder due to being capped at the 60hz refresh of your primary monitor.
-
-* Forcing Unity to use OpenGL on Windows is unsupported for this release. This configuration is currently unstable and may encounter crashes.
+* Forcing Unity to use OpenGL on Windows is unsupported for this release. This configuration 
+  is currently unstable and may encounter crashes.
 

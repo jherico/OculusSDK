@@ -605,11 +605,15 @@ public:
     inline static C     ExchangeAdd_NoSync(volatile C* p, C val)        { C2T_union u; u.c = val; u.t = Ops::ExchangeAdd_NoSync((PT)p, u.t); return u.c; }
     inline static bool  CompareAndSet_Sync(volatile C* p, C c, C val)   { C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Sync((PT)p, cu.t, u.t); }
     inline static bool  CompareAndSet_Release(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Release((PT)p, cu.t, u.t); }
-    inline static bool  CompareAndSet_Relse(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Acquire((PT)p, cu.t, u.t); }
+    inline static bool  CompareAndSet_Acquire(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Acquire((PT)p, cu.t, u.t); }
     inline static bool  CompareAndSet_NoSync(volatile C* p, C c, C val) { C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_NoSync((PT)p, cu.t, u.t); }
+
     // Loads and stores with memory fence. These have only the relevant versions.    
     inline static void  Store_Release(volatile C* p, C val)             { C2T_union u; u.c = val; Ops::Store_Release((PT)p, u.t); }    
     inline static C     Load_Acquire(const volatile C* p)               { C2T_union u; u.t = Ops::Load_Acquire((PT)p); return u.c; }
+
+    // Deprecated typo error:
+    inline static bool  CompareAndSet_Relse(volatile C* p, C c, C val){ C2T_union u,cu; u.c = val; cu.c = c; return Ops::CompareAndSet_Acquire((PT)p, cu.t, u.t); }
 };
 
 
@@ -638,7 +642,7 @@ public:
     inline T     Exchange_NoSync(T val)             { return Ops::Exchange_NoSync(&Value, val); }
     inline bool  CompareAndSet_Sync(T c, T val)     { return Ops::CompareAndSet_Sync(&Value, c, val); }
     inline bool  CompareAndSet_Release(T c, T val)  { return Ops::CompareAndSet_Release(&Value, c, val); }
-    inline bool  CompareAndSet_Acquire(T c, T val)  { return Ops::CompareAndSet_Relse(&Value, c, val); }
+    inline bool  CompareAndSet_Acquire(T c, T val)  { return Ops::CompareAndSet_Acquire(&Value, c, val); }
     inline bool  CompareAndSet_NoSync(T c, T val)   { return Ops::CompareAndSet_NoSync(&Value, c, val); }
     // Load & Store.
     inline void  Store_Release(T val)               { Ops::Store_Release(&Value, val); }
@@ -841,7 +845,7 @@ public:
 
     CRITICAL_SECTION cs;
 public:   
-    Lock(unsigned spinCount = 0);      
+    Lock(unsigned spinCount = 10000);   // Mutexes with non-zero spin counts usually result in better performance.
     ~Lock();
     // Locking functions.
     inline void DoLock()    { ::EnterCriticalSection(&cs); }
@@ -854,9 +858,9 @@ public:
     static pthread_mutexattr_t RecursiveAttr;
     static bool                RecursiveAttrInit;
 
-    Lock (unsigned dummy = 0)
+    Lock (unsigned spinCount = 0) // To do: Support spin count, probably via a custom lock implementation.
     {
-        OVR_UNUSED(dummy);
+        OVR_UNUSED(spinCount);
         if (!RecursiveAttrInit)
         {
             pthread_mutexattr_init(&RecursiveAttr);

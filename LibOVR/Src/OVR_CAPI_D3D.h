@@ -46,18 +46,20 @@ limitations under the License.
 #endif
 
 /// Used to configure slave D3D rendering (i.e. for devices created externally).
-struct ovrD3D11ConfigData
+struct OVR_ALIGNAS(8) ovrD3D11ConfigData
 {
     /// General device settings.
-    ovrRenderAPIConfigHeader Header;
+    ovrRenderAPIConfigHeader    Header;
     /// The D3D device to use for rendering.
-	ID3D11Device*            pDevice;
+	ID3D11Device*               pDevice;
     /// The D3D device context to use for rendering.
-    ID3D11DeviceContext*     pDeviceContext;
+    ID3D11DeviceContext*        pDeviceContext;
     /// A render target view for the backbuffer.
-    ID3D11RenderTargetView*  pBackBufferRT;
+    ID3D11RenderTargetView*     pBackBufferRT;
+    /// A UAV for the backbuffer (if using compute shaders)
+    ID3D11UnorderedAccessView*  pBackBufferUAV;
     /// The swapchain that will present rendered frames.
-    IDXGISwapChain*          pSwapChain;
+    IDXGISwapChain*             pSwapChain;
 };
 
 /// Contains D3D11-specific rendering information.
@@ -70,7 +72,7 @@ union ovrD3D11Config
 };
 
 /// Used to pass D3D11 eye texture data to ovrHmd_EndFrame.
-struct ovrD3D11TextureData
+struct OVR_ALIGNAS(8) ovrD3D11TextureData
 {
     /// General device settings.
     ovrTextureHeader          Header;
@@ -100,13 +102,14 @@ union ovrD3D11Texture
 // ***** D3D10 Specific
 
 /// Used to configure slave D3D rendering (i.e. for devices created externally).
-struct ovrD3D10ConfigData
+struct OVR_ALIGNAS(8) ovrD3D10ConfigData
 {
     /// General device settings.
     ovrRenderAPIConfigHeader Header;
     ID3D10Device*            pDevice;
-    void*                    Unused;
+    void*                    Unused1;           // pDeviceContext in DX11
     ID3D10RenderTargetView*  pBackBufferRT;
+    void*                    Unused2;           // pBackBufferUAV in DX11
     IDXGISwapChain*          pSwapChain;
 };
 
@@ -117,7 +120,7 @@ union ovrD3D10Config
 };
 
 /// Used to pass D3D10 eye texture data to ovrHmd_EndFrame.
-struct ovrD3D10TextureData
+struct OVR_ALIGNAS(8) ovrD3D10TextureData
 {
     /// General device settings.
     ovrTextureHeader          Header;
@@ -139,7 +142,7 @@ union ovrD3D10Texture
 // ***** D3D9 Specific
 
 // Used to configure D3D9 rendering 
-struct ovrD3D9ConfigData
+struct OVR_ALIGNAS(8) ovrD3D9ConfigData
 {
     // General device settings.
     ovrRenderAPIConfigHeader Header;
@@ -155,7 +158,7 @@ union ovrD3D9Config
 };
 
 // Used to pass D3D9 eye texture data to ovrHmd_EndFrame.
-struct ovrD3D9TextureData
+struct OVR_ALIGNAS(8) ovrD3D9TextureData
 {
     // General device settings.
     ovrTextureHeader            Header;

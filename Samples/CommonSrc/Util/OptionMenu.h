@@ -5,7 +5,7 @@ Content     :   Option selection and editing for OculusWorldDemo
 Created     :   March 7, 2014
 Authors     :   Michael Antonov, Caleb Leak
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ using namespace OVR::Render;
 //-------------------------------------------------------------------------------------
 struct FunctionNotifyBase : public NewOverrideBase
 {
+	virtual ~FunctionNotifyBase(){}
     virtual void CallNotify(void*) { }
     virtual void CallNotify() { }
 };
@@ -58,8 +59,8 @@ struct FunctionNotifyContext : public FunctionNotifyBase
 {
     typedef void (C::*FnPtr)(X*);
 
-    FunctionNotifyContext(C* p, FnPtr fn) : pClass(p), pFn(fn), pContext(NULL) { }
-    FunctionNotifyContext(C* p, FnPtr fn, X* pContext) : pClass(p), pFn(fn), pContext(pContext) { }
+    FunctionNotifyContext(C* p, FnPtr fn) : pContext(NULL), pClass(p), pFn(fn) { }
+    FunctionNotifyContext(C* p, FnPtr fn, X* pContext) : pContext(pContext), pClass(p), pFn(fn) { }
     virtual void CallNotify(void* var)  { (void)(pClass->*pFn)(static_cast<X*>(var)); }
     virtual void CallNotify()  { (void)(pClass->*pFn)(pContext); }
 private:
@@ -108,12 +109,12 @@ struct ShortcutKey
 struct OptionShortcut
 {
     Array<ShortcutKey>  Keys;
-    Array<uint32_t>       GamepadButtons;
+    Array<uint32_t>     GamepadButtons;
     FunctionNotifyBase* pNotify;
 
     OptionShortcut() : pNotify(NULL) {}
     OptionShortcut(FunctionNotifyBase* pNotify) : pNotify(pNotify) {}
-    ~OptionShortcut()  { if (pNotify) delete pNotify; }
+    ~OptionShortcut()  { delete pNotify; }
 
     void AddShortcut(ShortcutKey key) { Keys.PushBack(key); }
     void AddShortcut(uint32_t gamepadButton) { GamepadButtons.PushBack(gamepadButton); }

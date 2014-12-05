@@ -162,6 +162,42 @@ inline char* OVR_CDECL OVR_strcpy(char* dest, size_t destsize, const char* src)
 #endif
 }
 
+
+// Acts the same as the strlcpy function. 
+// Copies src to dest, 0-terminating even if it involves truncating the write.
+// Returns the required strlen of dest (which is one less than the required size of dest).
+// strlcpy is a safer alternative to strcpy and strncpy and provides size information.
+// However, it still may result in an incomplete copy. 
+//
+// Example usage:
+//     char buffer[256];
+//     if(OVR_strlcpy(buffer, "hello world", sizeof(buffer)) < sizeof(buffer))
+//         { there was enough space }
+//     else
+//         { need a larger buffer }
+//
+size_t OVR_CDECL OVR_strlcpy(char* dest, const char* src, size_t destsize);
+
+// Acts the same as the strlcat function.
+// Appends src to dest, 0-terminating even if it involves an incomplete write.
+// Doesn't 0-terminate in the case that destsize is 0.
+// Returns the required strlen of dest (which is one less than the required size of dest).
+// The terminating 0 char of dest is overwritten by the first 
+// character of src, and a new 0 char is appended to dest. The required capacity 
+// of the destination is (strlen(src) + strlen(dest) + 1).
+// strlcat is a safer alternative to strcat and provides size information.
+// However, it still may result in an incomplete copy. 
+//
+// Example usage:
+//     char buffer[256] = "hello ";
+//     if(OVR_strlcat(buffer, "world", sizeof(buffer)) < sizeof(buffer))
+//         { there was enough space }
+//     else
+//         { need a larger buffer }
+//
+size_t OVR_CDECL OVR_strlcat(char* dest, const char* src, size_t destsize);
+
+
 inline char* OVR_CDECL OVR_strncpy(char* dest, size_t destsize, const char* src, size_t count)
 {
 #if defined(OVR_MSVC_SAFESTRING)

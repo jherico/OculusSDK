@@ -50,7 +50,7 @@ class Session;
 //-----------------------------------------------------------------------------
 
 static const uint16_t RPCVersion_Major = 1; // MAJOR version when you make incompatible API changes,
-static const uint16_t RPCVersion_Minor = 1; // MINOR version when you add functionality in a backwards-compatible manner, and
+static const uint16_t RPCVersion_Minor = 2; // MINOR version when you add functionality in a backwards-compatible manner, and
 static const uint16_t RPCVersion_Patch = 0; // PATCH version when you make backwards-compatible bug fixes.
 
 // Client starts communication by sending its version number.
