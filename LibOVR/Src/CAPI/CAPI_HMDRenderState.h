@@ -65,7 +65,7 @@ struct HMDRenderState
 
     // Capabilities passed to Configure.
     unsigned                EnabledHmdCaps;
-    unsigned                DistortionCaps;
+    unsigned                DistortionCaps;     // enum ovrDistortionCaps
 };
 
 

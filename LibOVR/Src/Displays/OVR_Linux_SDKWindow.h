@@ -97,15 +97,24 @@ public:
     /// Rotation necessary to correctly orient this SDK window.
     DistortionRotation GetDistortionRotation() {return mDeviceScreen.rotation;}
 
-    _XDisplay* GetDisplay()         {return mXDisplay;}
+    struct _XDisplay* GetDisplay()  {return mXDisplay;}
     XVisualInfo* GetVisual()        {return mXVisual;}
-    GLXFBConfig GetFBConfig()       {return mFBConfig;}
     Window GetDrawable()            {return mXWindow;}
     bool HasValidWindow()           {return (mXWindow != 0);}
 
-    // If cfg is non-null it is populated with the chosen configuration.
-    static XVisualInfo* chooseVisual(_XDisplay* display, int xscreen,
-                                     GLXFBConfig* cfg = NULL);
+    // Choose frame buffer configuration and return fbConfigID. Returns -1 if
+    // a failure occurs.
+    static int chooseFBConfigID(struct _XDisplay* display, int xscreen);
+
+    // Obtain visual from frame buffer configuration ID. You must call XFree
+    // on the XVisualInfo* pointer.
+    static XVisualInfo* getVisual(struct _XDisplay* display,
+                                  int fbConfigID, int xscreen);
+
+    // GLXFBConfig pointer from frame buffer configuration ID. You must call
+    // XFree on the GLXFBConfig pointer.
+    static GLXFBConfig* getGLXFBConfig(struct _XDisplay* display,
+                                       int fbConfigID, int xscreen);
 
     static LinuxDeviceScreen findDevScreenForHMD(const ovrHmd& hmd);
     static LinuxDeviceScreen findDevScreenForDevID(const char* deviceID);
@@ -116,22 +125,18 @@ public:
     // visual was successfully obtained. False otherwise.
     static bool getVisualFromDrawable(GLXDrawable drawable, XVisualInfo* vinfoOut);
 
-    // TODO: Function which uses glXGetConfig to generate an FB config from
-    //       a visual. Chooses first FBConfig if multiple matches found.
-    //static GLXFBConfig* getFBConfigFromVisual(XVisualInfo* vis);
-
 private:
 
     /// Constructs SDK window on the given device screen.
     void buildVisualAndWindow(const LinuxDeviceScreen& devScreen);
 
     // Added m in front of variables so as to not conflict with X names.
-    _XDisplay*       mXDisplay;
-    int              mXScreen;
-    XVisualInfo*     mXVisual;
-    XContext         mXUniqueContext;
-    Window           mXWindow;
-    GLXFBConfig      mFBConfig;
+    struct _XDisplay* mXDisplay;
+    int               mXScreen;
+    XVisualInfo*      mXVisual;
+    XContext          mXUniqueContext;
+    Window            mXWindow;
+    int               mFBConfigID;
 
     LinuxDeviceScreen mDeviceScreen;
 };

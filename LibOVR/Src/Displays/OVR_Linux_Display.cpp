@@ -185,7 +185,7 @@ static int parseEdid(uint8_t* edid, Linux::DisplayEDID& edidResult)
 //  data    OUT This pointer is modified to point to the output from
 //              XRRGetOutputProperty. You *must* call XFree on this pointer.
 //  dataLen OUT The length of the data returned in 'data'.
-static int getXRRProperty(_XDisplay* display, RROutput output, Atom atom,
+static int getXRRProperty(struct _XDisplay* display, RROutput output, Atom atom,
                           uint8_t** data, int* dataLen)
 {
   unsigned long nitems;
@@ -226,7 +226,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
 {
     int result = 0;
 
-    _XDisplay* display = XOpenDisplay(NULL);
+    struct _XDisplay* display = XOpenDisplay(NULL);
 
     if (display == NULL)
     {
@@ -352,7 +352,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                     {
                         case 3: desc.DeviceTypeGuess = HmdType_DK2;       break;
                         case 2: desc.DeviceTypeGuess = HmdType_DKHDProto; break;
-                        case 1: desc.DeviceTypeGuess = HmdType_DK2;       break;
+                        case 1: desc.DeviceTypeGuess = HmdType_DK1;       break;
 
                         default:
                         case 0: desc.DeviceTypeGuess = HmdType_Unknown;   break;

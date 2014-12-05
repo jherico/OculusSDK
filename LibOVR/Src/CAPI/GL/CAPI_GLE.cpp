@@ -125,6 +125,15 @@ limitations under the License.
 
     
     OVR::GLEContext::GLEContext()
+      : MajorVersion(0)
+      , MinorVersion(0)
+      , WholeVersion(0)
+      , IsGLES(false)
+      , IsCoreProfile(false)
+      , EnableHookGetError(true)
+      , PlatformMajorVersion(0)
+      , PlatformMinorVersion(0)
+      , PlatformWholeVersion(0)
     {
         // The following sequence is not thread-safe. Two threads could set the context to this at the same time.
         if(GetCurrentContext() == NULL)
@@ -140,17 +149,45 @@ limitations under the License.
     
     void OVR::GLEContext::Init()
     {
-        InitVersion();
-        InitExtensionLoad();
-        InitExtensionSupport();
+        PlatformInit();
+
+        if(!IsInitialized())
+        {
+            InitVersion();
+            InitExtensionLoad();
+            InitExtensionSupport();
+        }
     }
     
-    
+
+    bool OVR::GLEContext::IsInitialized() const
+    {
+        return (MajorVersion != 0);
+    }
+
+
     void OVR::GLEContext::Shutdown()
     {
         // This memset is valid only if this class has no virtual functions (similar to concept of POD).
         // We cannot assert this because restrictions prevent us from using C++11 type traits here.
         memset(this, 0, sizeof(GLEContext));
+    }
+
+
+    void OVR::GLEContext::PlatformInit()
+    {
+        if(!IsPlatformInitialized())
+        {
+            InitPlatformExtensionLoad();
+            InitPlatformExtensionSupport();
+            InitPlatformVersion();
+        }
+    }
+
+
+    bool OVR::GLEContext::IsPlatformInitialized() const
+    {
+        return (PlatformMajorVersion != 0);
     }
 
 
@@ -188,6 +225,11 @@ limitations under the License.
             glGetIntegerv(GL_MINOR_VERSION, &minor);
         }
 
+        // Write version data
+        MajorVersion  = major;
+        MinorVersion  = minor;
+        WholeVersion  = (major * 100) + minor;
+
         GLint profileMask = 0;
         if(WholeVersion >= 302)
         {
@@ -198,13 +240,8 @@ limitations under the License.
             // NSOpenGLView::pixelFormat to get the core profile attribute.
             glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profileMask);
         }
-        
-        // Write version data
-        MajorVersion  = major;
-        MinorVersion  = minor;
-        WholeVersion  = (major * 100) + minor;
-        IsGLES        = isGLES;
         IsCoreProfile = (profileMask == GL_CONTEXT_CORE_PROFILE_BIT); // There's also GL_CONTEXT_COMPATIBILITY_PROFILE_BIT
+        IsGLES        = isGLES;
     }
     
     
@@ -527,7 +564,7 @@ limitations under the License.
         GLELoadProc(glDebugMessageInsertAMD_Impl, glDebugMessageInsertAMD);
         GLELoadProc(glGetDebugMessageLogAMD_Impl, glGetDebugMessageLogAMD);
 
-      #if defined(GLE_APPLE_ENABLED)
+      #if defined(GLE_CGL_ENABLED)
         // GL_APPLE_element_array
         GLELoadProc(glDrawElementArrayAPPLE_Impl, glDrawElementArrayAPPLE);
         GLELoadProc(glDrawRangeElementArrayAPPLE_Impl, glDrawRangeElementArrayAPPLE);
@@ -578,7 +615,7 @@ limitations under the License.
         GLELoadProc(glMapVertexAttrib2dAPPLE_Impl, glMapVertexAttrib2dAPPLE);
         GLELoadProc(glMapVertexAttrib2fAPPLE_Impl, glMapVertexAttrib2fAPPLE);
         
-      #endif // GLE_APPLE_ENABLED
+      #endif // GLE_CGL_ENABLED
       
         // GL_ARB_debug_output
         GLELoadProc(glDebugMessageCallbackARB_Impl, glDebugMessageCallbackARB);
@@ -614,13 +651,38 @@ limitations under the License.
         GLELoadProc(glIsRenderbuffer_Impl, glIsRenderbuffer);
         GLELoadProc(glRenderbufferStorage_Impl, glRenderbufferStorage);
         GLELoadProc(glRenderbufferStorageMultisample_Impl, glRenderbufferStorageMultisample);
+
+        if(!glBindFramebuffer_Impl) // This will rarely if ever be the case in practice with modern computers and drivers.
+        {
+            // See if we can map GL_EXT_framebuffer_object to GL_ARB_framebuffer_object. The former is basically a subset of the latter, but we use only that subset.
+            GLELoadProc(glBindFramebuffer_Impl, glBindFramebufferEXT);
+            GLELoadProc(glBindRenderbuffer_Impl, glBindRenderbufferEXT);
+          //GLELoadProc(glBlitFramebuffer_Impl, glBlitFramebufferEXT (nonexistent));
+            GLELoadProc(glCheckFramebufferStatus_Impl, glCheckFramebufferStatusEXT);
+            GLELoadProc(glDeleteFramebuffers_Impl, glDeleteFramebuffersEXT);
+            GLELoadProc(glDeleteRenderbuffers_Impl, glDeleteRenderbuffersEXT);
+            GLELoadProc(glFramebufferRenderbuffer_Impl, glFramebufferRenderbufferEXT);
+            GLELoadProc(glFramebufferTexture1D_Impl, glFramebufferTexture1DEXT);
+            GLELoadProc(glFramebufferTexture2D_Impl, glFramebufferTexture2DEXT);
+            GLELoadProc(glFramebufferTexture3D_Impl, glFramebufferTexture3DEXT);
+          //GLELoadProc(glFramebufferTextureLayer_Impl, glFramebufferTextureLayerEXT (nonexistent));
+            GLELoadProc(glGenFramebuffers_Impl, glGenFramebuffersEXT);
+            GLELoadProc(glGenRenderbuffers_Impl, glGenRenderbuffersEXT);
+            GLELoadProc(glGenerateMipmap_Impl, glGenerateMipmapEXT);
+            GLELoadProc(glGetFramebufferAttachmentParameteriv_Impl, glGetFramebufferAttachmentParameterivEXT);
+            GLELoadProc(glGetRenderbufferParameteriv_Impl, glGetRenderbufferParameterivEXT);
+            GLELoadProc(glIsFramebuffer_Impl, glIsFramebufferEXT);
+            GLELoadProc(glIsRenderbuffer_Impl, glIsRenderbufferEXT);
+            GLELoadProc(glRenderbufferStorage_Impl, glRenderbufferStorageEXT);
+          //GLELoadProc(glRenderbufferStorageMultisample_Impl, glRenderbufferStorageMultisampleEXT (nonexistent));
+        }
         
         // GL_ARB_texture_multisample
         GLELoadProc(glGetMultisamplefv_Impl, glGetMultisamplefv);
         GLELoadProc(glSampleMaski_Impl, glSampleMaski);
         GLELoadProc(glTexImage2DMultisample_Impl, glTexImage2DMultisample);
         GLELoadProc(glTexImage3DMultisample_Impl, glTexImage3DMultisample);
-
+        
         // GL_ARB_timer_query
         GLELoadProc(glGetQueryObjecti64v_Impl, glGetQueryObjecti64v);
         GLELoadProc(glGetQueryObjectui64v_Impl, glGetQueryObjectui64v);
@@ -632,7 +694,7 @@ limitations under the License.
         GLELoadProc(glGenVertexArrays_Impl, glGenVertexArrays);
         GLELoadProc(glIsVertexArray_Impl, glIsVertexArray);
 
-        #if defined(GLE_APPLE_ENABLED)
+        #if defined(GLE_CGL_ENABLED) // Apple OpenGL...
             if(WholeVersion < 302) // It turns out that Apple OpenGL versions prior to 3.2 have glBindVertexArray, etc. but they silently fail by default. So always use the APPLE version.
             {
                 glBindVertexArray_Impl    = glBindVertexArrayAPPLE_Impl;
@@ -641,7 +703,7 @@ limitations under the License.
                 glIsVertexArray_Impl      = glIsVertexArrayAPPLE_Impl;
                 
                 if(glBindVertexArray_Impl)
-                    gl_ARB_vertex_array_object = true; // We are routing the APPLE version through our version, with the assumption that we use the ARB version the same as we would use the APPLE version.
+                    gle_ARB_vertex_array_object = true; // We are routing the APPLE version through our version, with the assumption that we use the ARB version the same as we would use the APPLE version.
             }
         #endif
         
@@ -667,139 +729,6 @@ limitations under the License.
 
         // GL_WIN_swap_hint
         GLELoadProc(glAddSwapHintRectWIN_Impl, glAddSwapHintRectWIN);
-
-      #if defined(GLE_WINDOWS_ENABLED)
-        // WGL
-        // We don't load these as function pointers but rather statically link to them.
-
-        GLELoadProc(wglCreateBufferRegionARB_Impl, wglCreateBufferRegionARB);
-        GLELoadProc(wglDeleteBufferRegionARB_Impl, wglDeleteBufferRegionARB);
-        GLELoadProc(wglSaveBufferRegionARB_Impl, wglSaveBufferRegionARB);
-        GLELoadProc(wglRestoreBufferRegionARB_Impl, wglRestoreBufferRegionARB);
-
-        // WGL_ARB_extensions_string
-        GLELoadProc(wglGetExtensionsStringARB_Impl, wglGetExtensionsStringARB);
-
-        // WGL_ARB_pixel_format
-        GLELoadProc(wglGetPixelFormatAttribivARB_Impl, wglGetPixelFormatAttribivARB);
-        GLELoadProc(wglGetPixelFormatAttribfvARB_Impl, wglGetPixelFormatAttribfvARB);
-        GLELoadProc(wglChoosePixelFormatARB_Impl, wglChoosePixelFormatARB);
-
-        // WGL_ARB_make_current_read
-        GLELoadProc(wglMakeContextCurrentARB_Impl, wglMakeContextCurrentARB);
-        GLELoadProc(wglGetCurrentReadDCARB_Impl, wglGetCurrentReadDCARB);
-
-        // WGL_ARB_pbuffer
-        GLELoadProc(wglCreatePbufferARB_Impl, wglCreatePbufferARB);
-        GLELoadProc(wglGetPbufferDCARB_Impl, wglGetPbufferDCARB);
-        GLELoadProc(wglReleasePbufferDCARB_Impl, wglReleasePbufferDCARB);
-        GLELoadProc(wglDestroyPbufferARB_Impl, wglDestroyPbufferARB);
-        GLELoadProc(wglQueryPbufferARB_Impl, wglQueryPbufferARB);
-
-        // WGL_ARB_render_texture
-        GLELoadProc(wglBindTexImageARB_Impl, wglBindTexImageARB);
-        GLELoadProc(wglReleaseTexImageARB_Impl, wglReleaseTexImageARB);
-        GLELoadProc(wglSetPbufferAttribARB_Impl, wglSetPbufferAttribARB);
-
-        // WGL_NV_present_video
-        GLELoadProc(wglEnumerateVideoDevicesNV_Impl, wglEnumerateVideoDevicesNV);
-        GLELoadProc(wglBindVideoDeviceNV_Impl, wglBindVideoDeviceNV);
-        GLELoadProc(wglQueryCurrentContextNV_Impl, wglQueryCurrentContextNV);
-
-        // WGL_ARB_create_context
-        GLELoadProc(wglCreateContextAttribsARB_Impl, wglCreateContextAttribsARB);
-
-        // WGL_EXT_extensions_string
-        GLELoadProc(wglGetExtensionsStringEXT_Impl, wglGetExtensionsStringEXT);
-
-        // WGL_EXT_swap_control
-        GLELoadProc(wglGetSwapIntervalEXT_Impl, wglGetSwapIntervalEXT);
-        GLELoadProc(wglSwapIntervalEXT_Impl, wglSwapIntervalEXT);
-        
-        // WGL_OML_sync_control
-        GLELoadProc(wglGetSyncValuesOML_Impl, wglGetSyncValuesOML);
-        GLELoadProc(wglGetMscRateOML_Impl, wglGetMscRateOML);
-        GLELoadProc(wglSwapBuffersMscOML_Impl, wglSwapBuffersMscOML);
-        GLELoadProc(wglSwapLayerBuffersMscOML_Impl, wglSwapLayerBuffersMscOML);
-        GLELoadProc(wglWaitForMscOML_Impl, wglWaitForMscOML);
-        GLELoadProc(wglWaitForSbcOML_Impl, wglWaitForSbcOML);
-
-        // WGL_NV_video_output
-        GLELoadProc(wglGetVideoDeviceNV_Impl, wglGetVideoDeviceNV);
-        GLELoadProc(wglReleaseVideoDeviceNV_Impl, wglReleaseVideoDeviceNV);
-        GLELoadProc(wglBindVideoImageNV_Impl, wglBindVideoImageNV);
-        GLELoadProc(wglReleaseVideoImageNV_Impl, wglReleaseVideoImageNV);
-        GLELoadProc(wglSendPbufferToVideoNV_Impl, wglSendPbufferToVideoNV);
-        GLELoadProc(wglGetVideoInfoNV_Impl, wglGetVideoInfoNV);
-
-        // WGL_NV_swap_group
-        GLELoadProc(wglJoinSwapGroupNV_Impl, wglJoinSwapGroupNV);
-        GLELoadProc(wglBindSwapBarrierNV_Impl, wglBindSwapBarrierNV);
-        GLELoadProc(wglQuerySwapGroupNV_Impl, wglQuerySwapGroupNV);
-        GLELoadProc(wglQueryMaxSwapGroupsNV_Impl, wglQueryMaxSwapGroupsNV);
-        GLELoadProc(wglQueryFrameCountNV_Impl, wglQueryFrameCountNV);
-        GLELoadProc(wglResetFrameCountNV_Impl, wglResetFrameCountNV);
-
-        // WGL_NV_video_capture
-        GLELoadProc(wglBindVideoCaptureDeviceNV_Impl, wglBindVideoCaptureDeviceNV);
-        GLELoadProc(wglEnumerateVideoCaptureDevicesNV_Impl, wglEnumerateVideoCaptureDevicesNV);
-        GLELoadProc(wglLockVideoCaptureDeviceNV_Impl, wglLockVideoCaptureDeviceNV);
-        GLELoadProc(wglQueryVideoCaptureDeviceNV_Impl, wglQueryVideoCaptureDeviceNV);
-        GLELoadProc(wglReleaseVideoCaptureDeviceNV_Impl, wglReleaseVideoCaptureDeviceNV);
-
-        // WGL_NV_copy_image
-        GLELoadProc(wglCopyImageSubDataNV_Impl, wglCopyImageSubDataNV);
-
-        // WGL_NV_DX_interop
-        GLELoadProc(wglDXCloseDeviceNV_Impl, wglDXCloseDeviceNV);
-        GLELoadProc(wglDXLockObjectsNV_Impl, wglDXLockObjectsNV);
-        GLELoadProc(wglDXObjectAccessNV_Impl, wglDXObjectAccessNV);
-        GLELoadProc(wglDXOpenDeviceNV_Impl, wglDXOpenDeviceNV);
-        GLELoadProc(wglDXRegisterObjectNV_Impl, wglDXRegisterObjectNV);
-        GLELoadProc(wglDXSetResourceShareHandleNV_Impl, wglDXSetResourceShareHandleNV);
-        GLELoadProc(wglDXUnlockObjectsNV_Impl, wglDXUnlockObjectsNV);
-        GLELoadProc(wglDXUnregisterObjectNV_Impl, wglDXUnregisterObjectNV);
-      #endif
-      
-      #if defined(GLE_UNIX_ENABLED)
-        // GLX_VERSION_1_1
-        // We don't create any pointers_Impl, because we assume these functions are always present.
-        
-        // GLX_VERSION_1_2
-        GLELoadProc(glXGetCurrentDisplay_Impl, glXGetCurrentDisplay);
-
-        // GLX_VERSION_1_3
-        GLELoadProc(glXChooseFBConfig_Impl, glXChooseFBConfig);
-        GLELoadProc(glXCreateNewContext_Impl, glXCreateNewContext);
-        GLELoadProc(glXCreatePbuffer_Impl, glXCreatePbuffer);
-        GLELoadProc(glXCreatePixmap_Impl, glXCreatePixmap);
-        GLELoadProc(glXCreateWindow_Impl, glXCreateWindow);
-        GLELoadProc(glXDestroyPbuffer_Impl, glXDestroyPbuffer);
-        GLELoadProc(glXDestroyPixmap_Impl, glXDestroyPixmap);
-        GLELoadProc(glXDestroyWindow_Impl, glXDestroyWindow);
-        GLELoadProc(glXGetCurrentReadDrawable_Impl, glXGetCurrentReadDrawable);
-        GLELoadProc(glXGetFBConfigAttrib_Impl, glXGetFBConfigAttrib);
-        GLELoadProc(glXGetFBConfigs_Impl, glXGetFBConfigs);
-        GLELoadProc(glXGetSelectedEvent_Impl, glXGetSelectedEvent);
-        GLELoadProc(glXGetVisualFromFBConfig_Impl, glXGetVisualFromFBConfig);
-        GLELoadProc(glXMakeContextCurrent_Impl, glXMakeContextCurrent);
-        GLELoadProc(glXQueryContext_Impl, glXQueryContext);
-        GLELoadProc(glXQueryDrawable_Impl, glXQueryDrawable);
-        GLELoadProc(glXSelectEvent_Impl, glXSelectEvent);
-
-        // GLX_VERSION_1_4
-        // Nothing to declare
-        
-        // GLX_EXT_swap_control
-        GLELoadProc(glXSwapIntervalEXT_Impl, glXSwapIntervalEXT);
- 
-        // GLX_OML_sync_control
-        GLELoadProc(glXGetMscRateOML_Impl, glXGetMscRateOML);
-        GLELoadProc(glXGetSyncValuesOML_Impl, glXGetSyncValuesOML);
-        GLELoadProc(glXGetSyncValuesOML_Impl, glXSwapBuffersMscOML);
-        GLELoadProc(glXSwapBuffersMscOML_Impl, glXSwapBuffersMscOML);
-        GLELoadProc(glXWaitForSbcOML_Impl, glXWaitForSbcOML);
-     #endif
     }
     
 
@@ -859,38 +788,44 @@ limitations under the License.
 
         ValueStringPair vspArray[] =
         {
-            { gl_AMD_debug_output, "GL_AMD_debug_output" },
-          #if defined(GLE_APPLE_ENABLED)
-            { gl_APPLE_aux_depth_stencil, "GL_APPLE_aux_depth_stencil" },
-            { gl_APPLE_client_storage, "GL_APPLE_client_storage" },
-            { gl_APPLE_element_array, "GL_APPLE_element_array" },
-            { gl_APPLE_fence, "GL_APPLE_fence" },
-            { gl_APPLE_float_pixels, "GL_APPLE_float_pixels" },
-            { gl_APPLE_flush_buffer_range, "GL_APPLE_flush_buffer_range" },
-            { gl_APPLE_object_purgeable, "GL_APPLE_object_purgeable" },
-            { gl_APPLE_pixel_buffer, "GL_APPLE_pixel_buffer" },
-            { gl_APPLE_rgb_422, "GL_APPLE_rgb_422" },
-            { gl_APPLE_row_bytes, "GL_APPLE_row_bytes" },
-            { gl_APPLE_specular_vector, "GL_APPLE_specular_vector" },
-            { gl_APPLE_texture_range, "GL_APPLE_texture_range" },
-            { gl_APPLE_transform_hint, "GL_APPLE_transform_hint" },
-            { gl_APPLE_vertex_array_object, "GL_APPLE_vertex_array_object" },
-            { gl_APPLE_vertex_array_range, "GL_APPLE_vertex_array_range" },
-            { gl_APPLE_vertex_program_evaluators, "GL_APPLE_vertex_program_evaluators" },
-            { gl_APPLE_ycbcr_422, "GL_APPLE_ycbcr_422" },
+            { gle_AMD_debug_output, "GL_AMD_debug_output" },
+          #if defined(GLE_CGL_ENABLED)
+            { gle_APPLE_aux_depth_stencil, "GL_APPLE_aux_depth_stencil" },
+            { gle_APPLE_client_storage, "GL_APPLE_client_storage" },
+            { gle_APPLE_element_array, "GL_APPLE_element_array" },
+            { gle_APPLE_fence, "GL_APPLE_fence" },
+            { gle_APPLE_float_pixels, "GL_APPLE_float_pixels" },
+            { gle_APPLE_flush_buffer_range, "GL_APPLE_flush_buffer_range" },
+            { gle_APPLE_object_purgeable, "GL_APPLE_object_purgeable" },
+            { gle_APPLE_pixel_buffer, "GL_APPLE_pixel_buffer" },
+            { gle_APPLE_rgb_422, "GL_APPLE_rgb_422" },
+            { gle_APPLE_row_bytes, "GL_APPLE_row_bytes" },
+            { gle_APPLE_specular_vector, "GL_APPLE_specular_vector" },
+            { gle_APPLE_texture_range, "GL_APPLE_texture_range" },
+            { gle_APPLE_transform_hint, "GL_APPLE_transform_hint" },
+            { gle_APPLE_vertex_array_object, "GL_APPLE_vertex_array_object" },
+            { gle_APPLE_vertex_array_range, "GL_APPLE_vertex_array_range" },
+            { gle_APPLE_vertex_program_evaluators, "GL_APPLE_vertex_program_evaluators" },
+            { gle_APPLE_ycbcr_422, "GL_APPLE_ycbcr_422" },
           #endif
-            { gl_ARB_debug_output, "GL_ARB_debug_output" },
-            { gl_ARB_ES2_compatibility, "GL_ARB_ES2_compatibility" },
-            { gl_ARB_framebuffer_object, "GL_ARB_framebuffer_object" },
-            { gl_ARB_framebuffer_sRGB, "GL_ARB_framebuffer_sRGB" },
-            { gl_ARB_texture_multisample, "GL_ARB_texture_multisample" },
-            { gl_ARB_texture_non_power_of_two, "GL_ARB_texture_non_power_of_two" },
-            { gl_ARB_timer_query, "GL_ARB_timer_query" },
-            { gl_ARB_vertex_array_object, "GL_ARB_vertex_array_object" },
-            { gl_EXT_draw_buffers2, "GL_EXT_draw_buffers2" },
-            { gl_EXT_texture_filter_anisotropic, "GL_EXT_texture_filter_anisotropic" },
-            { gl_KHR_debug, "GL_KHR_debug" },
-            { gl_WIN_swap_hint, "GL_WIN_swap_hint" }
+            { gle_ARB_debug_output, "GL_ARB_debug_output" },
+            { gle_ARB_depth_buffer_float, "GL_ARB_depth_buffer_float" },
+            { gle_ARB_ES2_compatibility, "GL_ARB_ES2_compatibility" },
+            { gle_ARB_framebuffer_object, "GL_ARB_framebuffer_object" },
+            { gle_ARB_framebuffer_object, "GL_EXT_framebuffer_object" },    // We map glBindFramebuffer, etc. to glBindFramebufferEXT, etc. if necessary
+            { gle_ARB_framebuffer_sRGB, "GL_ARB_framebuffer_sRGB" },
+            { gle_ARB_texture_multisample, "GL_ARB_texture_multisample" },
+            { gle_ARB_texture_non_power_of_two, "GL_ARB_texture_non_power_of_two" },
+            { gle_ARB_texture_rectangle, "GL_ARB_texture_rectangle" },
+            { gle_ARB_texture_rectangle, "GL_EXT_texture_rectangle" },  // We also check for GL_EXT_texture_rectangle and GL_NV_texture_rectangle.
+            { gle_ARB_texture_rectangle, "GL_NV_texture_rectangle" },
+            { gle_ARB_timer_query, "GL_ARB_timer_query" },
+            { gle_ARB_vertex_array_object, "GL_ARB_vertex_array_object" },
+            { gle_EXT_draw_buffers2, "GL_EXT_draw_buffers2" },
+            { gle_EXT_texture_compression_s3tc, "GL_EXT_texture_compression_s3tc" },
+            { gle_EXT_texture_filter_anisotropic, "GL_EXT_texture_filter_anisotropic" },
+            { gle_KHR_debug, "GL_KHR_debug" },
+            { gle_WIN_swap_hint, "GL_WIN_swap_hint" }
             // Windows WGL, Unix GLX, and Apple CGL extensions are handled below, as they require different calls from glGetString(GL_EXTENSIONS).
         };
 
@@ -950,74 +885,315 @@ limitations under the License.
             // Else we have a problem: no means to read the extensions was successful.
         }
 
-      #if defined(GLE_WINDOWS_ENABLED)
-        // We need to use wglGetExtensionsStringARB or wglGetExtensionsStringEXT as opposed to above with glGetString(GL_EXTENSIONS).
-        ValueStringPair vspWGLArray[] =
-        {
-            { gl_WGL_ARB_buffer_region, "WGL_ARB_buffer_region" }
-           ,{ gl_WGL_ARB_extensions_string, "WGL_ARB_extensions_string" }
-           ,{ gl_WGL_ARB_pixel_format, "WGL_ARB_pixel_format" }
-           ,{ gl_WGL_ARB_make_current_read, "WGL_ARB_make_current_read" }
-           ,{ gl_WGL_ARB_pbuffer, "WGL_ARB_pbuffer" }
-           ,{ gl_WGL_ARB_render_texture, "WGL_ARB_render_texture" }
-           ,{ gl_WGL_TYPE_RGBA_FLOAT_ARB, "WGL_TYPE_RGBA_FLOAT_ARB" }
-           ,{ gl_WGL_ARB_framebuffer_sRGB, "WGL_ARB_framebuffer_sRGB" }
-           ,{ gl_WGL_NV_present_video, "WGL_NV_present_video" }
-           ,{ gl_WGL_ARB_create_context, "WGL_ARB_create_context" }
-           ,{ gl_WGL_ARB_create_context_profile, "WGL_ARB_create_context_profile" }
-           ,{ gl_WGL_ARB_create_context_robustness, "WGL_ARB_create_context_robustness" }
-           ,{ gl_WGL_EXT_extensions_string, "WGL_EXT_extensions_string" }
-           ,{ gl_WGL_EXT_swap_control, "WGL_EXT_swap_control" }
-           ,{ gl_WGL_OML_sync_control, "WGL_OML_sync_control" }
-           ,{ gl_WGL_EXT_framebuffer_sRGB, "WGL_EXT_framebuffer_sRGB" }
-           ,{ gl_WGL_NV_video_output, "WGL_NV_video_output" }
-           ,{ gl_WGL_NV_swap_group, "WGL_NV_swap_group" }
-           ,{ gl_WGL_NV_video_capture, "WGL_NV_video_capture" }
-           ,{ gl_WGL_NV_copy_image, "WGL_NV_copy_image" }
-           ,{ gl_WGL_NV_DX_interop, "WGL_NV_DX_interop" }
-        };
-
-        if(wglGetExtensionsStringARB_Impl)
-            extensions = wglGetExtensionsStringARB_Impl(wglGetCurrentDC());
-        else if(wglGetExtensionsStringEXT_Impl)
-            extensions = wglGetExtensionsStringEXT_Impl();
-
-        if (extensions && *extensions)
-        {
-            OVR_DEBUG_LOG(("WGL_EXTENSIONS: %s", (const char*)extensions));
-            CheckExtensions(vspWGLArray, OVR_ARRAY_COUNT(vspWGLArray), extensions);
-        }
-      #elif defined(GLE_UNIX_ENABLED)
-        ValueStringPair vspGLXArray[] =
-        {
-            { gl_GLX_EXT_swap_control, "GLX_EXT_swap_control" }
-           ,{ gl_GLX_OML_sync_control, "GLX_OML_sync_control" }
-        };
-
-        extensions = glXGetClientString(glXGetCurrentDisplay(), GLX_EXTENSIONS); // We could alternatively use glXQueryExtensionsString(glXGetCurrentDisplay(), 0)
-
-        if (extensions && *extensions)
-        {
-            OVR_DEBUG_LOG(("GLX_EXTENSIONS: %s", (const char*)extensions));
-            CheckExtensions(vspGLXArray, OVR_ARRAY_COUNT(vspGLXArray), extensions);
-        }
-      #elif defined(GLE_APPLE_ENABLED)
-        // We don't currently use this.
-      #endif
+        #if defined(GLE_CGL_ENABLED)
+            // The following are built into Apple OpenGL 3.2+ (declared in <OpenGL/gl3.h>) and not identified as extensions.
+            // On other platforms (e.g. Windows) these are identified as extensions and are detected above.
+            if(WholeVersion >= 302)
+            {
+                gle_ARB_depth_buffer_float       = true;
+                gle_ARB_framebuffer_object       = true;
+                gle_ARB_framebuffer_sRGB         = true;
+                gle_ARB_texture_multisample      = true;
+                gle_ARB_texture_non_power_of_two = true;
+                gle_ARB_texture_rectangle        = true;
+                gle_ARB_vertex_array_object      = true;
+            }
+        #endif
 
     } // GLEContext::InitExtensionSupport()
         
+
+    void OVR::GLEContext::InitPlatformVersion()
+    {
+        #if defined(GLE_GLX_ENABLED)
+            const char* pGLXVersion = glXGetClientString(glXGetCurrentDisplay(), GLX_VERSION); // To do: Use a better mechanism to get the desired display.
+            sscanf(pGLXVersion, "%d.%d", &PlatformMajorVersion, &PlatformMinorVersion);
+
+        #elif defined(GLE_EGL_ENABLED)
+            const char* pEGLVersion = eglQueryString(eglGetDisplay(EGL_DEFAULT_DISPLAY), EGL_VERSION);
+            sscanf(pEGLVersion, "%d.%d", &PlatformMajorVersion, &PlatformMinorVersion);
+
+        #else
+            PlatformMajorVersion = 1;
+            PlatformMinorVersion = 0;
+            PlatformWholeVersion = 100;
+        #endif
+    }
+
+
+    void OVR::GLEContext::InitPlatformExtensionLoad()
+    {
+        #if defined(GLE_WGL_ENABLED)
+            // WGL
+            // We don't load these as function pointers but rather statically link to them.
+            // These need to be loaded via LoadLibrary instead of wglLoadLibrary.
+
+            #if 0
+        	HINSTANCE hOpenGL = LoadLibraryW(L"Opengl32.dll");
+            if(hOpenGL)
+            {
+                wglCopyContext_Impl            = (OVRTypeof(wglCopyContext_Impl)) GetProcAddress(hOpenGL, "wglCopyContext");
+                wglCreateContext_Impl          = (OVRTypeof(wglCreateContext_Impl)) GetProcAddress(hOpenGL, "wglCreateContext");
+                wglCreateLayerContext_Impl     = (OVRTypeof(wglCreateLayerContext_Impl)) GetProcAddress(hOpenGL, "wglCreateLayerContext");
+                wglDeleteContext_Impl          = (OVRTypeof(wglDeleteContext_Impl)) GetProcAddress(hOpenGL, "wglDeleteContext");
+                wglGetCurrentContext_Impl      = (OVRTypeof(wglGetCurrentContext_Impl)) GetProcAddress(hOpenGL, "wglGetCurrentContext");
+                wglGetCurrentDC_Impl           = (OVRTypeof(wglGetCurrentDC_Impl)) GetProcAddress(hOpenGL, "wglGetCurrentDC");
+                wglGetProcAddress_Impl         = (OVRTypeof(wglGetProcAddress_Impl)) GetProcAddress(hOpenGL, "wglGetProcAddress");
+                wglMakeCurrent_Impl            = (OVRTypeof(wglMakeCurrent_Impl)) GetProcAddress(hOpenGL, "wglMakeCurrent");
+                wglShareLists_Impl             = (OVRTypeof(wglShareLists_Impl)) GetProcAddress(hOpenGL, "wglShareLists");
+                wglUseFontBitmapsA_Impl        = (OVRTypeof(wglUseFontBitmapsA_Impl)) GetProcAddress(hOpenGL, "wglUseFontBitmapsA");
+                wglUseFontBitmapsW_Impl        = (OVRTypeof(wglUseFontBitmapsW_Impl)) GetProcAddress(hOpenGL, "wglUseFontBitmapsW");
+                wglUseFontOutlinesA_Impl       = (OVRTypeof(wglUseFontOutlinesA_Impl)) GetProcAddress(hOpenGL, "wglUseFontOutlinesA");
+                wglUseFontOutlinesW_Impl       = (OVRTypeof(wglUseFontOutlinesW_Impl)) GetProcAddress(hOpenGL, "wglUseFontOutlinesW");
+                wglDescribeLayerPlane_Impl     = (OVRTypeof(wglDescribeLayerPlane_Impl)) GetProcAddress(hOpenGL, "wglDescribeLayerPlane");
+                wglSetLayerPaletteEntries_Impl = (OVRTypeof(wglSetLayerPaletteEntries_Impl)) GetProcAddress(hOpenGL, "wglSetLayerPaletteEntries");
+                wglGetLayerPaletteEntries_Impl = (OVRTypeof(wglGetLayerPaletteEntries_Impl)) GetProcAddress(hOpenGL, "wglGetLayerPaletteEntries");
+                wglRealizeLayerPalette_Impl    = (OVRTypeof(wglRealizeLayerPalette_Impl)) GetProcAddress(hOpenGL, "wglRealizeLayerPalette");
+                wglSwapLayerBuffers_Impl       = (OVRTypeof(wglSwapLayerBuffers_Impl)) GetProcAddress(hOpenGL, "wglSwapLayerBuffers");
+                wglSwapMultipleBuffers_Impl    = (OVRTypeof(wglSwapMultipleBuffers_Impl)) GetProcAddress(hOpenGL, "wglSwapMultipleBuffers");
+                FreeLibrary(hOpenGL);
+            }
+            #endif
+
+            // WGL_ARB_buffer_region
+            GLELoadProc(wglCreateBufferRegionARB_Impl, wglCreateBufferRegionARB);
+            GLELoadProc(wglDeleteBufferRegionARB_Impl, wglDeleteBufferRegionARB);
+            GLELoadProc(wglSaveBufferRegionARB_Impl, wglSaveBufferRegionARB);
+            GLELoadProc(wglRestoreBufferRegionARB_Impl, wglRestoreBufferRegionARB);
+
+            // WGL_ARB_extensions_string
+            GLELoadProc(wglGetExtensionsStringARB_Impl, wglGetExtensionsStringARB);
+
+            // WGL_ARB_pixel_format
+            GLELoadProc(wglGetPixelFormatAttribivARB_Impl, wglGetPixelFormatAttribivARB);
+            GLELoadProc(wglGetPixelFormatAttribfvARB_Impl, wglGetPixelFormatAttribfvARB);
+            GLELoadProc(wglChoosePixelFormatARB_Impl, wglChoosePixelFormatARB);
+
+            // WGL_ARB_make_current_read
+            GLELoadProc(wglMakeContextCurrentARB_Impl, wglMakeContextCurrentARB);
+            GLELoadProc(wglGetCurrentReadDCARB_Impl, wglGetCurrentReadDCARB);
+
+            // WGL_ARB_pbuffer
+            GLELoadProc(wglCreatePbufferARB_Impl, wglCreatePbufferARB);
+            GLELoadProc(wglGetPbufferDCARB_Impl, wglGetPbufferDCARB);
+            GLELoadProc(wglReleasePbufferDCARB_Impl, wglReleasePbufferDCARB);
+            GLELoadProc(wglDestroyPbufferARB_Impl, wglDestroyPbufferARB);
+            GLELoadProc(wglQueryPbufferARB_Impl, wglQueryPbufferARB);
+
+            // WGL_ARB_render_texture
+            GLELoadProc(wglBindTexImageARB_Impl, wglBindTexImageARB);
+            GLELoadProc(wglReleaseTexImageARB_Impl, wglReleaseTexImageARB);
+            GLELoadProc(wglSetPbufferAttribARB_Impl, wglSetPbufferAttribARB);
+
+            // WGL_NV_present_video
+            GLELoadProc(wglEnumerateVideoDevicesNV_Impl, wglEnumerateVideoDevicesNV);
+            GLELoadProc(wglBindVideoDeviceNV_Impl, wglBindVideoDeviceNV);
+            GLELoadProc(wglQueryCurrentContextNV_Impl, wglQueryCurrentContextNV);
+
+            // WGL_ARB_create_context
+            GLELoadProc(wglCreateContextAttribsARB_Impl, wglCreateContextAttribsARB);
+
+            // WGL_EXT_extensions_string
+            GLELoadProc(wglGetExtensionsStringEXT_Impl, wglGetExtensionsStringEXT);
+
+            // WGL_EXT_swap_control
+            GLELoadProc(wglGetSwapIntervalEXT_Impl, wglGetSwapIntervalEXT);
+            GLELoadProc(wglSwapIntervalEXT_Impl, wglSwapIntervalEXT);
+        
+            // WGL_OML_sync_control
+            GLELoadProc(wglGetSyncValuesOML_Impl, wglGetSyncValuesOML);
+            GLELoadProc(wglGetMscRateOML_Impl, wglGetMscRateOML);
+            GLELoadProc(wglSwapBuffersMscOML_Impl, wglSwapBuffersMscOML);
+            GLELoadProc(wglSwapLayerBuffersMscOML_Impl, wglSwapLayerBuffersMscOML);
+            GLELoadProc(wglWaitForMscOML_Impl, wglWaitForMscOML);
+            GLELoadProc(wglWaitForSbcOML_Impl, wglWaitForSbcOML);
+
+            // WGL_NV_video_output
+            GLELoadProc(wglGetVideoDeviceNV_Impl, wglGetVideoDeviceNV);
+            GLELoadProc(wglReleaseVideoDeviceNV_Impl, wglReleaseVideoDeviceNV);
+            GLELoadProc(wglBindVideoImageNV_Impl, wglBindVideoImageNV);
+            GLELoadProc(wglReleaseVideoImageNV_Impl, wglReleaseVideoImageNV);
+            GLELoadProc(wglSendPbufferToVideoNV_Impl, wglSendPbufferToVideoNV);
+            GLELoadProc(wglGetVideoInfoNV_Impl, wglGetVideoInfoNV);
+
+            // WGL_NV_swap_group
+            GLELoadProc(wglJoinSwapGroupNV_Impl, wglJoinSwapGroupNV);
+            GLELoadProc(wglBindSwapBarrierNV_Impl, wglBindSwapBarrierNV);
+            GLELoadProc(wglQuerySwapGroupNV_Impl, wglQuerySwapGroupNV);
+            GLELoadProc(wglQueryMaxSwapGroupsNV_Impl, wglQueryMaxSwapGroupsNV);
+            GLELoadProc(wglQueryFrameCountNV_Impl, wglQueryFrameCountNV);
+            GLELoadProc(wglResetFrameCountNV_Impl, wglResetFrameCountNV);
+
+            // WGL_NV_video_capture
+            GLELoadProc(wglBindVideoCaptureDeviceNV_Impl, wglBindVideoCaptureDeviceNV);
+            GLELoadProc(wglEnumerateVideoCaptureDevicesNV_Impl, wglEnumerateVideoCaptureDevicesNV);
+            GLELoadProc(wglLockVideoCaptureDeviceNV_Impl, wglLockVideoCaptureDeviceNV);
+            GLELoadProc(wglQueryVideoCaptureDeviceNV_Impl, wglQueryVideoCaptureDeviceNV);
+            GLELoadProc(wglReleaseVideoCaptureDeviceNV_Impl, wglReleaseVideoCaptureDeviceNV);
+
+            // WGL_NV_copy_image
+            GLELoadProc(wglCopyImageSubDataNV_Impl, wglCopyImageSubDataNV);
+
+            // WGL_NV_DX_interop
+            GLELoadProc(wglDXCloseDeviceNV_Impl, wglDXCloseDeviceNV);
+            GLELoadProc(wglDXLockObjectsNV_Impl, wglDXLockObjectsNV);
+            GLELoadProc(wglDXObjectAccessNV_Impl, wglDXObjectAccessNV);
+            GLELoadProc(wglDXOpenDeviceNV_Impl, wglDXOpenDeviceNV);
+            GLELoadProc(wglDXRegisterObjectNV_Impl, wglDXRegisterObjectNV);
+            GLELoadProc(wglDXSetResourceShareHandleNV_Impl, wglDXSetResourceShareHandleNV);
+            GLELoadProc(wglDXUnlockObjectsNV_Impl, wglDXUnlockObjectsNV);
+            GLELoadProc(wglDXUnregisterObjectNV_Impl, wglDXUnregisterObjectNV);
+
+        #elif defined(GLE_GLX_ENABLED)
+            // GLX_VERSION_1_1
+            // We don't create any pointers_Impl, because we assume these functions are always present.
+        
+            // GLX_VERSION_1_2
+            GLELoadProc(glXGetCurrentDisplay_Impl, glXGetCurrentDisplay);
+
+            // GLX_VERSION_1_3
+            GLELoadProc(glXChooseFBConfig_Impl, glXChooseFBConfig);
+            GLELoadProc(glXCreateNewContext_Impl, glXCreateNewContext);
+            GLELoadProc(glXCreatePbuffer_Impl, glXCreatePbuffer);
+            GLELoadProc(glXCreatePixmap_Impl, glXCreatePixmap);
+            GLELoadProc(glXCreateWindow_Impl, glXCreateWindow);
+            GLELoadProc(glXDestroyPbuffer_Impl, glXDestroyPbuffer);
+            GLELoadProc(glXDestroyPixmap_Impl, glXDestroyPixmap);
+            GLELoadProc(glXDestroyWindow_Impl, glXDestroyWindow);
+            GLELoadProc(glXGetCurrentReadDrawable_Impl, glXGetCurrentReadDrawable);
+            GLELoadProc(glXGetFBConfigAttrib_Impl, glXGetFBConfigAttrib);
+            GLELoadProc(glXGetFBConfigs_Impl, glXGetFBConfigs);
+            GLELoadProc(glXGetSelectedEvent_Impl, glXGetSelectedEvent);
+            GLELoadProc(glXGetVisualFromFBConfig_Impl, glXGetVisualFromFBConfig);
+            GLELoadProc(glXMakeContextCurrent_Impl, glXMakeContextCurrent);
+            GLELoadProc(glXQueryContext_Impl, glXQueryContext);
+            GLELoadProc(glXQueryDrawable_Impl, glXQueryDrawable);
+            GLELoadProc(glXSelectEvent_Impl, glXSelectEvent);
+
+            // GLX_VERSION_1_4
+            // Nothing to declare
+        
+            // GLX_ARB_create_context
+            GLELoadProc(glXCreateContextAttribsARB_Impl, glXCreateContextAttribsARB);
+
+            // GLX_EXT_swap_control
+            GLELoadProc(glXSwapIntervalEXT_Impl, glXSwapIntervalEXT);
+ 
+            // GLX_OML_sync_control
+            GLELoadProc(glXGetMscRateOML_Impl, glXGetMscRateOML);
+            GLELoadProc(glXGetSyncValuesOML_Impl, glXGetSyncValuesOML);
+            GLELoadProc(glXGetSyncValuesOML_Impl, glXSwapBuffersMscOML);
+            GLELoadProc(glXSwapBuffersMscOML_Impl, glXSwapBuffersMscOML);
+            GLELoadProc(glXWaitForSbcOML_Impl, glXWaitForSbcOML);
+
+            // GLX_MESA_swap_control
+            GLELoadProc(glXGetSwapIntervalMESA_Impl, glXGetSwapIntervalMESA);
+            GLELoadProc(glXSwapIntervalMESA_Impl, glXSwapIntervalMESA);
+        #endif
+    }
+
+
+    void OVR::GLEContext::InitPlatformExtensionSupport()
+    {
+        #if defined(GLE_WGL_ENABLED)
+            // We need to use wglGetExtensionsStringARB or wglGetExtensionsStringEXT as opposed to above with glGetString(GL_EXTENSIONS).
+            ValueStringPair vspWGLArray[] =
+            {
+                 { gle_WGL_ARB_buffer_region, "WGL_ARB_buffer_region" }
+                ,{ gle_WGL_ARB_create_context, "WGL_ARB_create_context" }
+                ,{ gle_WGL_ARB_create_context_profile, "WGL_ARB_create_context_profile" }
+                ,{ gle_WGL_ARB_create_context_robustness, "WGL_ARB_create_context_robustness" }
+                ,{ gle_WGL_ARB_extensions_string, "WGL_ARB_extensions_string" }
+                ,{ gle_WGL_ARB_framebuffer_sRGB, "WGL_ARB_framebuffer_sRGB" }
+                ,{ gle_WGL_ARB_framebuffer_sRGB, "WGL_EXT_framebuffer_sRGB" }    // We map the EXT to the ARB.
+                ,{ gle_WGL_ARB_make_current_read, "WGL_ARB_make_current_read" }
+                ,{ gle_WGL_ARB_pbuffer, "WGL_ARB_pbuffer" }
+                ,{ gle_WGL_ARB_pixel_format, "WGL_ARB_pixel_format" }
+                ,{ gle_WGL_ARB_pixel_format_float, "WGL_ARB_pixel_format_float" }
+                ,{ gle_WGL_ARB_render_texture, "WGL_ARB_render_texture" }
+                ,{ gle_WGL_ATI_render_texture_rectangle, "WGL_ATI_render_texture_rectangle" }
+                ,{ gle_WGL_EXT_extensions_string, "WGL_EXT_extensions_string" }
+                ,{ gle_WGL_EXT_swap_control, "WGL_EXT_swap_control" }
+                ,{ gle_WGL_NV_copy_image, "WGL_NV_copy_image" }
+                ,{ gle_WGL_NV_DX_interop, "WGL_NV_DX_interop" }
+                ,{ gle_WGL_NV_DX_interop2, "WGL_NV_DX_interop2" }
+                ,{ gle_WGL_NV_present_video, "WGL_NV_present_video" }
+                ,{ gle_WGL_NV_render_texture_rectangle, "WGL_NV_render_texture_rectangle" }
+                ,{ gle_WGL_NV_swap_group, "WGL_NV_swap_group" }
+                ,{ gle_WGL_NV_video_capture, "WGL_NV_video_capture" }
+                ,{ gle_WGL_NV_video_output, "WGL_NV_video_output" }
+                ,{ gle_WGL_OML_sync_control, "WGL_OML_sync_control" }
+            };
+
+            const char* extensions = NULL;
+
+            if(wglGetExtensionsStringARB_Impl)
+                extensions = wglGetExtensionsStringARB_Impl(wglGetCurrentDC()); // To do: Use a better mechanism to get the desired HDC.
+            else if(wglGetExtensionsStringEXT_Impl)
+                extensions = wglGetExtensionsStringEXT_Impl();
+
+            if (extensions && *extensions)
+            {
+                OVR_DEBUG_LOG(("WGL_EXTENSIONS: %s", (const char*)extensions));
+                CheckExtensions(vspWGLArray, OVR_ARRAY_COUNT(vspWGLArray), extensions);
+            }
+
+        #elif defined(GLE_GLX_ENABLED)
+            ValueStringPair vspGLXArray[] =
+            {
+                 { gle_GLX_ARB_create_context,            "GLX_ARB_create_context" }
+                ,{ gle_GLX_ARB_create_context_profile,    "GLX_ARB_create_context_profile" }
+                ,{ gle_GLX_ARB_create_context_robustness, "GLX_ARB_create_context_robustness" }
+                ,{ gle_GLX_EXT_swap_control,              "GLX_EXT_swap_control" }
+                ,{ gle_GLX_OML_sync_control,              "GLX_OML_sync_control" }
+                ,{ gle_MESA_swap_control,                 "GLX_MESA_swap_control" }
+            };
+
+            const char* extensions = glXGetClientString(glXGetCurrentDisplay(), GLX_EXTENSIONS); // To do: Use a better mechanism to get the desired display.
+
+            if (extensions && *extensions)
+            {
+                OVR_DEBUG_LOG(("GLX_EXTENSIONS: %s", (const char*)extensions));
+                CheckExtensions(vspGLXArray, OVR_ARRAY_COUNT(vspGLXArray), extensions);
+            }
+        #endif
+    }
+
 
     #if defined(GLE_HOOKING_ENABLED)
 
         #undef glGetError
         extern "C" { GLAPI GLenum GLAPIENTRY glGetError(); }
-        void OVR::GLEContext::PostHook()
+
+        // Disabled until such time as it might be useful to enable for debug purposes.
+        //void OVR::GLEContext::PreHook(const char* functionName)
+        //{
+        //    if(EnableHookGetError)
+        //    {
+        //        int err = glGetError();
+        //
+        //        for(int i = 0; (i < 6) && (err != GL_NO_ERROR); i++) // 6 is an arbitrary cap to prevent infinite looping which would occur if the current GL context is invalid.
+        //        {
+        //            OVR_DEBUG_LOG(("GL Error prior to hook: %d (%#x) from %s", err, err, functionName ? functionName : "OpenGL")); OVR_UNUSED(functionName);
+        //            err = glGetError();
+        //        }
+        //    }
+        //}
+
+        void OVR::GLEContext::PostHook(const char* functionName)
         {
-            int err = glGetError();
-            if(err != 0)
+            if(EnableHookGetError)
             {
-                OVR_DEBUG_LOG(("GL Error: %d", err));
+                // OpenGL Standard regarding error state: To allow for distributed implementations, there may be several error flags. If any single error flag has recorded an error, the value of that flag 
+                // is returned and that flag is reset to GL_NO_ERROR when glGetError is called. If more than one flag has recorded an error, glGetError returns and 
+                // clears an arbitrary error flag value. Thus, glGetError should always be called in a loop, until it returns GL_NO_ERROR, if all error flags are to be reset.
+                int err = glGetError();
+
+                for(int i = 0; (i < 6) && (err != GL_NO_ERROR); i++) // 6 is an arbitrary cap to prevent infinite looping which would occur if the current GL context is invalid.
+                {
+                    OVR_DEBUG_LOG(("GL Error: %d (%#x) from %s", err, err, functionName ? functionName : "OpenGL")); OVR_UNUSED(functionName);
+                    err = glGetError();
+                }
             }
         }
 
@@ -1028,7 +1204,7 @@ limitations under the License.
         void OVR::GLEContext::glAccum_Hook(GLenum op, GLfloat value)
         {
             glAccum(op, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glAlphaFunc
@@ -1036,7 +1212,7 @@ limitations under the License.
         void OVR::GLEContext::glAlphaFunc_Hook(GLenum func, GLclampf ref)
         {
             glAlphaFunc(func, ref);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glAreTexturesResident
@@ -1044,7 +1220,7 @@ limitations under the License.
         GLboolean OVR::GLEContext::glAreTexturesResident_Hook(GLsizei n, const GLuint *textures, GLboolean *residences)
         {
             GLboolean b = glAreTexturesResident(n, textures, residences);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -1053,7 +1229,7 @@ limitations under the License.
         void OVR::GLEContext::glArrayElement_Hook(GLint i)
         {
             glArrayElement(i);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glBegin
@@ -1061,7 +1237,7 @@ limitations under the License.
         void OVR::GLEContext::glBegin_Hook(GLenum mode)
         {
             glBegin(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glBindTexture
@@ -1069,7 +1245,7 @@ limitations under the License.
         void OVR::GLEContext::glBindTexture_Hook(GLenum target, GLuint texture)
         {
             glBindTexture(target, texture);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glBitmap
@@ -1077,7 +1253,7 @@ limitations under the License.
         void OVR::GLEContext::glBitmap_Hook(GLsizei width, GLsizei height, GLfloat xorig, GLfloat yorig, GLfloat xmove, GLfloat ymove, const GLubyte *bitmap)
         {
             glBitmap(width, height, xorig, yorig, xmove, ymove, bitmap);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glBlendFunc
@@ -1085,7 +1261,7 @@ limitations under the License.
         void OVR::GLEContext::glBlendFunc_Hook(GLenum sfactor, GLenum dfactor)
         {
             glBlendFunc(sfactor, dfactor);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCallList
@@ -1093,7 +1269,7 @@ limitations under the License.
         void OVR::GLEContext::glCallList_Hook(GLuint list)
         {
             glCallList(list);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCallLists
@@ -1101,7 +1277,7 @@ limitations under the License.
         void OVR::GLEContext::glCallLists_Hook(GLsizei n, GLenum type, const void *lists)
         {
             glCallLists(n, type, lists);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClear
@@ -1109,7 +1285,7 @@ limitations under the License.
         void OVR::GLEContext::glClear_Hook(GLbitfield mask)
         {
             glClear(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClearAccum
@@ -1117,7 +1293,7 @@ limitations under the License.
         void OVR::GLEContext::glClearAccum_Hook(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
         {
             glClearAccum(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClearColor
@@ -1125,7 +1301,7 @@ limitations under the License.
         void OVR::GLEContext::glClearColor_Hook(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
         {
             glClearColor(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClearDepth
@@ -1133,7 +1309,7 @@ limitations under the License.
         void OVR::GLEContext::glClearDepth_Hook(GLclampd depth)
         {
             glClearDepth(depth);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClearIndex
@@ -1141,7 +1317,7 @@ limitations under the License.
         void OVR::GLEContext::glClearIndex_Hook(GLfloat c)
         {
             glClearIndex(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClearStencil
@@ -1149,7 +1325,7 @@ limitations under the License.
         void OVR::GLEContext::glClearStencil_Hook(GLint s)
         {
             glClearStencil(s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glClipPlane
@@ -1157,7 +1333,7 @@ limitations under the License.
         void OVR::GLEContext::glClipPlane_Hook(GLenum plane, const GLdouble *equation)
         {
             glClipPlane(plane, equation);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3b
@@ -1165,7 +1341,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3b_Hook(GLbyte red, GLbyte green, GLbyte blue)
         {
             glColor3b(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3bv
@@ -1173,7 +1349,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3bv_Hook(const GLbyte *v)
         {
             glColor3bv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3d
@@ -1181,7 +1357,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3d_Hook(GLdouble red, GLdouble green, GLdouble blue)
         {
             glColor3d(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3dv
@@ -1189,7 +1365,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3dv_Hook(const GLdouble *v)
         {
             glColor3dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3f
@@ -1197,7 +1373,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3f_Hook(GLfloat red, GLfloat green, GLfloat blue)
         {
             glColor3f(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3fv
@@ -1205,7 +1381,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3fv_Hook(const GLfloat *v)
         {
             glColor3fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3i
@@ -1213,7 +1389,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3i_Hook(GLint red, GLint green, GLint blue)
         {
             glColor3i(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3iv
@@ -1221,7 +1397,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3iv_Hook(const GLint *v)
         {
             glColor3iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3s
@@ -1229,7 +1405,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3s_Hook(GLshort red, GLshort green, GLshort blue)
         {
             glColor3s(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3sv
@@ -1237,7 +1413,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3sv_Hook(const GLshort *v)
         {
             glColor3sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3ub
@@ -1245,7 +1421,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3ub_Hook(GLubyte red, GLubyte green, GLubyte blue)
         {
             glColor3ub(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3ubv
@@ -1253,7 +1429,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3ubv_Hook(const GLubyte *v)
         {
             glColor3ubv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3ui
@@ -1261,7 +1437,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3ui_Hook(GLuint red, GLuint green, GLuint blue)
         {
             glColor3ui(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3uiv
@@ -1269,7 +1445,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3uiv_Hook(const GLuint *v)
         {
             glColor3uiv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3us
@@ -1277,7 +1453,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3us_Hook(GLushort red, GLushort green, GLushort blue)
         {
             glColor3us(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor3usv
@@ -1285,7 +1461,7 @@ limitations under the License.
         void OVR::GLEContext::glColor3usv_Hook(const GLushort *v)
         {
             glColor3usv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4b
@@ -1293,7 +1469,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4b_Hook(GLbyte red, GLbyte green, GLbyte blue, GLbyte alpha)
         {
             glColor4b(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4bv
@@ -1301,7 +1477,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4bv_Hook(const GLbyte *v)
         {
             glColor4bv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4d
@@ -1309,7 +1485,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4d_Hook(GLdouble red, GLdouble green, GLdouble blue, GLdouble alpha)
         {
             glColor4d(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4dv
@@ -1317,7 +1493,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4dv_Hook(const GLdouble *v)
         {
             glColor4dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4f
@@ -1325,7 +1501,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4f_Hook(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
         {
             glColor4f(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4fv
@@ -1333,7 +1509,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4fv_Hook(const GLfloat *v)
         {
             glColor4fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4i
@@ -1341,7 +1517,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4i_Hook(GLint red, GLint green, GLint blue, GLint alpha)
         {
             glColor4i(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4iv
@@ -1349,7 +1525,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4iv_Hook(const GLint *v)
         {
             glColor4iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4s
@@ -1357,7 +1533,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4s_Hook(GLshort red, GLshort green, GLshort blue, GLshort alpha)
         {
             glColor4s(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4sv
@@ -1365,7 +1541,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4sv_Hook(const GLshort *v)
         {
             glColor4sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4ub
@@ -1373,7 +1549,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4ub_Hook(GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha)
         {
             glColor4ub(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4ubv
@@ -1381,7 +1557,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4ubv_Hook(const GLubyte *v)
         {
             glColor4ubv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4ui
@@ -1389,7 +1565,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4ui_Hook(GLuint red, GLuint green, GLuint blue, GLuint alpha)
         {
             glColor4ui(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4uiv
@@ -1397,7 +1573,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4uiv_Hook(const GLuint *v)
         {
             glColor4uiv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4us
@@ -1405,7 +1581,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4us_Hook(GLushort red, GLushort green, GLushort blue, GLushort alpha)
         {
             glColor4us(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColor4usv
@@ -1413,7 +1589,7 @@ limitations under the License.
         void OVR::GLEContext::glColor4usv_Hook(const GLushort *v)
         {
             glColor4usv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColorMask
@@ -1421,7 +1597,7 @@ limitations under the License.
         void OVR::GLEContext::glColorMask_Hook(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
         {
             glColorMask(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColorMaterial
@@ -1429,7 +1605,7 @@ limitations under the License.
         void OVR::GLEContext::glColorMaterial_Hook(GLenum face, GLenum mode)
         {
             glColorMaterial(face, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glColorPointer
@@ -1437,7 +1613,7 @@ limitations under the License.
         void OVR::GLEContext::glColorPointer_Hook(GLint size, GLenum type, GLsizei stride, const void *pointer)
         {
             glColorPointer(size, type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCopyPixels
@@ -1445,7 +1621,7 @@ limitations under the License.
         void OVR::GLEContext::glCopyPixels_Hook(GLint x, GLint y, GLsizei width, GLsizei height, GLenum type)
         {
             glCopyPixels(x, y, width, height, type);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCopyTexImage1D
@@ -1453,7 +1629,7 @@ limitations under the License.
         void OVR::GLEContext::glCopyTexImage1D_Hook(GLenum target, GLint level, GLenum internalFormat, GLint x, GLint y, GLsizei width, GLint border)
         {
             glCopyTexImage1D(target, level, internalFormat, x, y, width, border);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCopyTexImage2D
@@ -1461,7 +1637,7 @@ limitations under the License.
         void OVR::GLEContext::glCopyTexImage2D_Hook(GLenum target, GLint level, GLenum internalFormat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border)
         {
             glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCopyTexSubImage1D
@@ -1469,7 +1645,7 @@ limitations under the License.
         void OVR::GLEContext::glCopyTexSubImage1D_Hook(GLenum target, GLint level, GLint xoffset, GLint x, GLint y, GLsizei width)
         {
             glCopyTexSubImage1D(target, level, xoffset, x, y, width);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCopyTexSubImage2D
@@ -1477,7 +1653,7 @@ limitations under the License.
         void OVR::GLEContext::glCopyTexSubImage2D_Hook(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height)
         {
             glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glCullFace
@@ -1485,7 +1661,7 @@ limitations under the License.
         void OVR::GLEContext::glCullFace_Hook(GLenum mode)
         {
             glCullFace(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDeleteLists
@@ -1493,7 +1669,7 @@ limitations under the License.
         void OVR::GLEContext::glDeleteLists_Hook(GLuint list, GLsizei range)
         {
             glDeleteLists(list, range);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDeleteTextures
@@ -1501,7 +1677,7 @@ limitations under the License.
         void OVR::GLEContext::glDeleteTextures_Hook(GLsizei n, const GLuint *textures)
         {
             glDeleteTextures(n, textures);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDepthFunc
@@ -1509,7 +1685,7 @@ limitations under the License.
         void OVR::GLEContext::glDepthFunc_Hook(GLenum func)
         {
             glDepthFunc(func);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDepthMask
@@ -1517,7 +1693,7 @@ limitations under the License.
         void OVR::GLEContext::glDepthMask_Hook(GLboolean flag)
         {
             glDepthMask(flag);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDepthRange
@@ -1525,7 +1701,7 @@ limitations under the License.
         void OVR::GLEContext::glDepthRange_Hook(GLclampd zNear, GLclampd zFar)
         {
             glDepthRange(zNear, zFar);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDisable
@@ -1533,7 +1709,7 @@ limitations under the License.
         void OVR::GLEContext::glDisable_Hook(GLenum cap)
         {
             glDisable(cap);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDisableClientState
@@ -1541,7 +1717,7 @@ limitations under the License.
         void OVR::GLEContext::glDisableClientState_Hook(GLenum array)
         {
             glDisableClientState(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDrawArrays
@@ -1549,7 +1725,7 @@ limitations under the License.
         void OVR::GLEContext::glDrawArrays_Hook(GLenum mode, GLint first, GLsizei count)
         {
             glDrawArrays(mode, first, count);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDrawBuffer
@@ -1557,7 +1733,7 @@ limitations under the License.
         void OVR::GLEContext::glDrawBuffer_Hook(GLenum mode)
         {
             glDrawBuffer(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDrawElements
@@ -1565,7 +1741,7 @@ limitations under the License.
         void OVR::GLEContext::glDrawElements_Hook(GLenum mode, GLsizei count, GLenum type, const void *indices)
         {
             glDrawElements(mode, count, type, indices);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glDrawPixels
@@ -1573,7 +1749,7 @@ limitations under the License.
         void OVR::GLEContext::glDrawPixels_Hook(GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels)
         {
             glDrawPixels(width, height, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEdgeFlag
@@ -1581,7 +1757,7 @@ limitations under the License.
         void OVR::GLEContext::glEdgeFlag_Hook(GLboolean flag)
         {
             glEdgeFlag(flag);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEdgeFlagPointer
@@ -1589,7 +1765,7 @@ limitations under the License.
         void OVR::GLEContext::glEdgeFlagPointer_Hook(GLsizei stride, const void *pointer)
         {
             glEdgeFlagPointer(stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEdgeFlagv
@@ -1597,7 +1773,7 @@ limitations under the License.
         void OVR::GLEContext::glEdgeFlagv_Hook(const GLboolean *flag)
         {
             glEdgeFlagv(flag);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEnable
@@ -1606,7 +1782,7 @@ limitations under the License.
         void GLEContext::glEnable_Hook(GLenum cap)
         {
             glEnable(cap);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
         }
 
@@ -1615,7 +1791,7 @@ limitations under the License.
         void OVR::GLEContext::glEnableClientState_Hook(GLenum array)
         {
             glEnableClientState(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEnd
@@ -1623,7 +1799,7 @@ limitations under the License.
         void OVR::GLEContext::glEnd_Hook()
         {
             glEnd();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEndList
@@ -1631,7 +1807,7 @@ limitations under the License.
         void OVR::GLEContext::glEndList_Hook()
         {
             glEndList();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord1d
@@ -1639,7 +1815,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord1d_Hook(GLdouble u)
         {
             glEvalCoord1d(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord1dv
@@ -1647,7 +1823,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord1dv_Hook(const GLdouble *u)
         {
             glEvalCoord1dv(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord1f
@@ -1655,7 +1831,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord1f_Hook(GLfloat u)
         {
             glEvalCoord1f(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord1fv
@@ -1663,7 +1839,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord1fv_Hook(const GLfloat *u)
         {
             glEvalCoord1fv(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord2d
@@ -1671,7 +1847,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord2d_Hook(GLdouble u, GLdouble v)
         {
             glEvalCoord2d(u, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord2dv
@@ -1679,7 +1855,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord2dv_Hook(const GLdouble *u)
         {
             glEvalCoord2dv(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord2f
@@ -1687,7 +1863,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord2f_Hook(GLfloat u, GLfloat v)
         {
             glEvalCoord2f(u, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalCoord2fv
@@ -1695,7 +1871,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalCoord2fv_Hook(const GLfloat *u)
         {
             glEvalCoord2fv(u);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalMesh1
@@ -1703,7 +1879,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalMesh1_Hook(GLenum mode, GLint i1, GLint i2)
         {
             glEvalMesh1(mode, i1, i2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalMesh2
@@ -1711,7 +1887,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalMesh2_Hook(GLenum mode, GLint i1, GLint i2, GLint j1, GLint j2)
         {
             glEvalMesh2(mode, i1, i2, j1, j2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalPoint1
@@ -1719,7 +1895,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalPoint1_Hook(GLint i)
         {
             glEvalPoint1(i);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glEvalPoint2
@@ -1727,7 +1903,7 @@ limitations under the License.
         void OVR::GLEContext::glEvalPoint2_Hook(GLint i, GLint j)
         {
             glEvalPoint2(i, j);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFeedbackBuffer
@@ -1735,7 +1911,7 @@ limitations under the License.
         void OVR::GLEContext::glFeedbackBuffer_Hook(GLsizei size, GLenum type, GLfloat *buffer)
         {
             glFeedbackBuffer(size, type, buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFinish
@@ -1743,7 +1919,7 @@ limitations under the License.
         void OVR::GLEContext::glFinish_Hook()
         {
             glFinish();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFlush
@@ -1751,7 +1927,7 @@ limitations under the License.
         void OVR::GLEContext::glFlush_Hook()
         {
             glFlush();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFogf
@@ -1759,7 +1935,7 @@ limitations under the License.
         void OVR::GLEContext::glFogf_Hook(GLenum pname, GLfloat param)
         {
             glFogf(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFogfv
@@ -1767,7 +1943,7 @@ limitations under the License.
         void OVR::GLEContext::glFogfv_Hook(GLenum pname, const GLfloat *params)
         {
             glFogfv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFogi
@@ -1775,7 +1951,7 @@ limitations under the License.
         void OVR::GLEContext::glFogi_Hook(GLenum pname, GLint param)
         {
             glFogi(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFogiv
@@ -1783,7 +1959,7 @@ limitations under the License.
         void OVR::GLEContext::glFogiv_Hook(GLenum pname, const GLint *params)
         {
             glFogiv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFrontFace
@@ -1791,7 +1967,7 @@ limitations under the License.
         void OVR::GLEContext::glFrontFace_Hook(GLenum mode)
         {
             glFrontFace(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glFrustum
@@ -1799,7 +1975,7 @@ limitations under the License.
         void OVR::GLEContext::glFrustum_Hook(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble zNear, GLdouble zFar)
         {
             glFrustum(left, right, bottom, top, zNear, zFar);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGenLists
@@ -1807,7 +1983,7 @@ limitations under the License.
         GLuint OVR::GLEContext::glGenLists_Hook(GLsizei range)
         {
             GLuint u = glGenLists(range);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
@@ -1816,7 +1992,7 @@ limitations under the License.
         void OVR::GLEContext::glGenTextures_Hook(GLsizei n, GLuint *textures)
         {
             glGenTextures(n, textures);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetBooleanv
@@ -1824,7 +2000,7 @@ limitations under the License.
         void OVR::GLEContext::glGetBooleanv_Hook(GLenum pname, GLboolean *params)
         {
             glGetBooleanv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetClipPlane
@@ -1832,7 +2008,7 @@ limitations under the License.
         void OVR::GLEContext::glGetClipPlane_Hook(GLenum plane, GLdouble *equation)
         {
             glGetClipPlane(plane, equation);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetDoublev
@@ -1840,7 +2016,7 @@ limitations under the License.
         void OVR::GLEContext::glGetDoublev_Hook(GLenum pname, GLdouble *params)
         {
             glGetDoublev(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         //#undef glGetError Not needed because we happen to do this above already.
@@ -1848,7 +2024,7 @@ limitations under the License.
         GLenum OVR::GLEContext::glGetError_Hook()
         {
             GLenum e = glGetError();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return e;
         }
 
@@ -1857,7 +2033,7 @@ limitations under the License.
         void OVR::GLEContext::glGetFloatv_Hook(GLenum pname, GLfloat *params)
         {
             glGetFloatv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetIntegerv
@@ -1865,7 +2041,7 @@ limitations under the License.
         void OVR::GLEContext::glGetIntegerv_Hook(GLenum pname, GLint *params)
         {
             glGetIntegerv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetLightfv
@@ -1873,7 +2049,7 @@ limitations under the License.
         void OVR::GLEContext::glGetLightfv_Hook(GLenum light, GLenum pname, GLfloat *params)
         {
             glGetLightfv(light, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetLightiv
@@ -1881,7 +2057,7 @@ limitations under the License.
         void OVR::GLEContext::glGetLightiv_Hook(GLenum light, GLenum pname, GLint *params)
         {
             glGetLightiv(light, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetMapdv
@@ -1889,7 +2065,7 @@ limitations under the License.
         void OVR::GLEContext::glGetMapdv_Hook(GLenum target, GLenum query, GLdouble *v)
         {
             glGetMapdv(target, query, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetMapfv
@@ -1897,7 +2073,7 @@ limitations under the License.
         void OVR::GLEContext::glGetMapfv_Hook(GLenum target, GLenum query, GLfloat *v)
         {
             glGetMapfv(target, query, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetMapiv
@@ -1905,7 +2081,7 @@ limitations under the License.
         void OVR::GLEContext::glGetMapiv_Hook(GLenum target, GLenum query, GLint *v)
         {
             glGetMapiv(target, query, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetMaterialfv
@@ -1913,7 +2089,7 @@ limitations under the License.
         void OVR::GLEContext::glGetMaterialfv_Hook(GLenum face, GLenum pname, GLfloat *params)
         {
             glGetMaterialfv(face, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetMaterialiv
@@ -1921,7 +2097,7 @@ limitations under the License.
         void OVR::GLEContext::glGetMaterialiv_Hook(GLenum face, GLenum pname, GLint *params)
         {
             glGetMaterialiv(face, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetPixelMapfv
@@ -1929,7 +2105,7 @@ limitations under the License.
         void OVR::GLEContext::glGetPixelMapfv_Hook(GLenum map, GLfloat *values)
         {
             glGetPixelMapfv(map, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetPixelMapuiv
@@ -1937,7 +2113,7 @@ limitations under the License.
         void OVR::GLEContext::glGetPixelMapuiv_Hook(GLenum map, GLuint *values)
         {
             glGetPixelMapuiv(map, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetPixelMapusv
@@ -1945,7 +2121,7 @@ limitations under the License.
         void OVR::GLEContext::glGetPixelMapusv_Hook(GLenum map, GLushort *values)
         {
             glGetPixelMapusv(map, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetPointerv
@@ -1953,7 +2129,7 @@ limitations under the License.
         void OVR::GLEContext::glGetPointerv_Hook(GLenum pname, void* *params)
         {
             glGetPointerv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetPolygonStipple
@@ -1961,7 +2137,7 @@ limitations under the License.
         void OVR::GLEContext::glGetPolygonStipple_Hook(GLubyte *mask)
         {
             glGetPolygonStipple(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         // #undef glGetString // This was already disabled above.
@@ -1969,7 +2145,7 @@ limitations under the License.
         const GLubyte * OVR::GLEContext::glGetString_Hook(GLenum name)
         {
             const GLubyte * p = glGetString(name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return p;
         }
 
@@ -1978,7 +2154,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexEnvfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             glGetTexEnvfv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexEnviv
@@ -1986,7 +2162,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexEnviv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             glGetTexEnviv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexGendv
@@ -1994,7 +2170,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexGendv_Hook(GLenum coord, GLenum pname, GLdouble *params)
         {
             glGetTexGendv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexGenfv
@@ -2002,7 +2178,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexGenfv_Hook(GLenum coord, GLenum pname, GLfloat *params)
         {
             glGetTexGenfv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexGeniv
@@ -2010,7 +2186,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexGeniv_Hook(GLenum coord, GLenum pname, GLint *params)
         {
             glGetTexGeniv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexImage
@@ -2018,7 +2194,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexImage_Hook(GLenum target, GLint level, GLenum format, GLenum type, void *pixels)
         {
             glGetTexImage(target, level, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexLevelParameterfv
@@ -2026,7 +2202,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexLevelParameterfv_Hook(GLenum target, GLint level, GLenum pname, GLfloat *params)
         {
             glGetTexLevelParameterfv(target, level, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexLevelParameteriv
@@ -2034,7 +2210,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexLevelParameteriv_Hook(GLenum target, GLint level, GLenum pname, GLint *params)
         {
             glGetTexLevelParameteriv(target, level, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexParameterfv
@@ -2042,7 +2218,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexParameterfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             glGetTexParameterfv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glGetTexParameteriv
@@ -2050,7 +2226,7 @@ limitations under the License.
         void OVR::GLEContext::glGetTexParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             glGetTexParameteriv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glHint
@@ -2058,7 +2234,7 @@ limitations under the License.
         void OVR::GLEContext::glHint_Hook(GLenum target, GLenum mode)
         {
             glHint(target, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexMask
@@ -2066,7 +2242,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexMask_Hook(GLuint mask)
         {
             glIndexMask(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexPointer
@@ -2074,7 +2250,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexPointer_Hook(GLenum type, GLsizei stride, const void *pointer)
         {
             glIndexPointer(type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexd
@@ -2082,7 +2258,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexd_Hook(GLdouble c)
         {
             glIndexd(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexdv
@@ -2090,7 +2266,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexdv_Hook(const GLdouble *c)
         {
             glIndexdv(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexf
@@ -2098,7 +2274,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexf_Hook(GLfloat c)
         {
             glIndexf(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexfv
@@ -2106,7 +2282,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexfv_Hook(const GLfloat *c)
         {
             glIndexfv(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexi
@@ -2114,7 +2290,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexi_Hook(GLint c)
         {
             glIndexi(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexiv
@@ -2122,7 +2298,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexiv_Hook(const GLint *c)
         {
             glIndexiv(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexs
@@ -2130,7 +2306,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexs_Hook(GLshort c)
         {
             glIndexs(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexsv
@@ -2138,7 +2314,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexsv_Hook(const GLshort *c)
         {
             glIndexsv(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexub
@@ -2146,7 +2322,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexub_Hook(GLubyte c)
         {
             glIndexub(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIndexubv
@@ -2154,7 +2330,7 @@ limitations under the License.
         void OVR::GLEContext::glIndexubv_Hook(const GLubyte *c)
         {
             glIndexubv(c);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glInitNames
@@ -2162,7 +2338,7 @@ limitations under the License.
         void OVR::GLEContext::glInitNames_Hook()
         {
             glInitNames();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glInterleavedArrays
@@ -2170,7 +2346,7 @@ limitations under the License.
         void OVR::GLEContext::glInterleavedArrays_Hook(GLenum format, GLsizei stride, const void *pointer)
         {
             glInterleavedArrays(format, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glIsEnabled
@@ -2178,7 +2354,7 @@ limitations under the License.
         GLboolean OVR::GLEContext::glIsEnabled_Hook(GLenum cap)
         {
             GLboolean b = glIsEnabled(cap);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -2187,7 +2363,7 @@ limitations under the License.
         GLboolean OVR::GLEContext::glIsList_Hook(GLuint list)
         {
             GLboolean b = glIsList(list);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -2196,7 +2372,7 @@ limitations under the License.
         GLboolean OVR::GLEContext::glIsTexture_Hook(GLuint texture)
         {
             GLboolean b = glIsTexture(texture);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -2205,7 +2381,7 @@ limitations under the License.
         void OVR::GLEContext::glLightModelf_Hook(GLenum pname, GLfloat param)
         {
             glLightModelf(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightModelfv
@@ -2213,7 +2389,7 @@ limitations under the License.
         void OVR::GLEContext::glLightModelfv_Hook(GLenum pname, const GLfloat *params)
         {
             glLightModelfv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightModeli
@@ -2221,7 +2397,7 @@ limitations under the License.
         void OVR::GLEContext::glLightModeli_Hook(GLenum pname, GLint param)
         {
             glLightModeli(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightModeliv
@@ -2229,7 +2405,7 @@ limitations under the License.
         void OVR::GLEContext::glLightModeliv_Hook(GLenum pname, const GLint *params)
         {
             glLightModeliv(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightf
@@ -2237,7 +2413,7 @@ limitations under the License.
         void OVR::GLEContext::glLightf_Hook(GLenum light, GLenum pname, GLfloat param)
         {
             glLightf(light, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightfv
@@ -2245,7 +2421,7 @@ limitations under the License.
         void OVR::GLEContext::glLightfv_Hook(GLenum light, GLenum pname, const GLfloat *params)
         {
             glLightfv(light, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLighti
@@ -2253,7 +2429,7 @@ limitations under the License.
         void OVR::GLEContext::glLighti_Hook(GLenum light, GLenum pname, GLint param)
         {
             glLighti(light, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLightiv
@@ -2261,7 +2437,7 @@ limitations under the License.
         void OVR::GLEContext::glLightiv_Hook(GLenum light, GLenum pname, const GLint *params)
         {
             glLightiv(light, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLineStipple
@@ -2269,7 +2445,7 @@ limitations under the License.
         void OVR::GLEContext::glLineStipple_Hook(GLint factor, GLushort pattern)
         {
             glLineStipple(factor, pattern);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLineWidth
@@ -2277,7 +2453,7 @@ limitations under the License.
         void OVR::GLEContext::glLineWidth_Hook(GLfloat width)
         {
             glLineWidth(width);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glListBase
@@ -2285,7 +2461,7 @@ limitations under the License.
         void OVR::GLEContext::glListBase_Hook(GLuint base)
         {
             glListBase(base);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLoadIdentity
@@ -2293,7 +2469,7 @@ limitations under the License.
         void OVR::GLEContext::glLoadIdentity_Hook()
         {
             glLoadIdentity();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLoadMatrixd
@@ -2301,7 +2477,7 @@ limitations under the License.
         void OVR::GLEContext::glLoadMatrixd_Hook(const GLdouble *m)
         {
             glLoadMatrixd(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLoadMatrixf
@@ -2309,7 +2485,7 @@ limitations under the License.
         void OVR::GLEContext::glLoadMatrixf_Hook(const GLfloat *m)
         {
             glLoadMatrixf(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLoadName
@@ -2317,7 +2493,7 @@ limitations under the License.
         void OVR::GLEContext::glLoadName_Hook(GLuint name)
         {
             glLoadName(name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glLogicOp
@@ -2325,7 +2501,7 @@ limitations under the License.
         void OVR::GLEContext::glLogicOp_Hook(GLenum opcode)
         {
             glLogicOp(opcode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMap1d
@@ -2333,7 +2509,7 @@ limitations under the License.
         void OVR::GLEContext::glMap1d_Hook(GLenum target, GLdouble u1, GLdouble u2, GLint stride, GLint order, const GLdouble *points)
         {
             glMap1d(target, u1, u2, stride, order, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMap1f
@@ -2341,7 +2517,7 @@ limitations under the License.
         void OVR::GLEContext::glMap1f_Hook(GLenum target, GLfloat u1, GLfloat u2, GLint stride, GLint order, const GLfloat *points)
         {
             glMap1f(target, u1, u2, stride, order, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMap2d
@@ -2349,7 +2525,7 @@ limitations under the License.
         void OVR::GLEContext::glMap2d_Hook(GLenum target, GLdouble u1, GLdouble u2, GLint ustride, GLint uorder, GLdouble v1, GLdouble v2, GLint vstride, GLint vorder, const GLdouble *points)
         {
             glMap2d(target, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMap2f
@@ -2357,7 +2533,7 @@ limitations under the License.
         void OVR::GLEContext::glMap2f_Hook(GLenum target, GLfloat u1, GLfloat u2, GLint ustride, GLint uorder, GLfloat v1, GLfloat v2, GLint vstride, GLint vorder, const GLfloat *points)
         {
             glMap2f(target, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMapGrid1d
@@ -2365,7 +2541,7 @@ limitations under the License.
         void OVR::GLEContext::glMapGrid1d_Hook(GLint un, GLdouble u1, GLdouble u2)
         {
             glMapGrid1d(un, u1, u2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMapGrid1f
@@ -2373,7 +2549,7 @@ limitations under the License.
         void OVR::GLEContext::glMapGrid1f_Hook(GLint un, GLfloat u1, GLfloat u2)
         {
             glMapGrid1f(un, u1, u2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMapGrid2d
@@ -2381,7 +2557,7 @@ limitations under the License.
         void OVR::GLEContext::glMapGrid2d_Hook(GLint un, GLdouble u1, GLdouble u2, GLint vn, GLdouble v1, GLdouble v2)
         {
             glMapGrid2d(un, u1, u2, vn, v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMapGrid2f
@@ -2389,7 +2565,7 @@ limitations under the License.
         void OVR::GLEContext::glMapGrid2f_Hook(GLint un, GLfloat u1, GLfloat u2, GLint vn, GLfloat v1, GLfloat v2)
         {
             glMapGrid2f(un, u1, u2, vn, v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMaterialf
@@ -2397,7 +2573,7 @@ limitations under the License.
         void OVR::GLEContext::glMaterialf_Hook(GLenum face, GLenum pname, GLfloat param)
         {
             glMaterialf(face, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMaterialfv
@@ -2405,7 +2581,7 @@ limitations under the License.
         void OVR::GLEContext::glMaterialfv_Hook(GLenum face, GLenum pname, const GLfloat *params)
         {
             glMaterialfv(face, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMateriali
@@ -2413,7 +2589,7 @@ limitations under the License.
         void OVR::GLEContext::glMateriali_Hook(GLenum face, GLenum pname, GLint param)
         {
             glMateriali(face, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMaterialiv
@@ -2421,7 +2597,7 @@ limitations under the License.
         void OVR::GLEContext::glMaterialiv_Hook(GLenum face, GLenum pname, const GLint *params)
         {
             glMaterialiv(face, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMatrixMode
@@ -2429,7 +2605,7 @@ limitations under the License.
         void OVR::GLEContext::glMatrixMode_Hook(GLenum mode)
         {
             glMatrixMode(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMultMatrixd
@@ -2437,7 +2613,7 @@ limitations under the License.
         void OVR::GLEContext::glMultMatrixd_Hook(const GLdouble *m)
         {
             glMultMatrixd(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glMultMatrixf
@@ -2445,7 +2621,7 @@ limitations under the License.
         void OVR::GLEContext::glMultMatrixf_Hook(const GLfloat *m)
         {
             glMultMatrixf(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNewList
@@ -2453,7 +2629,7 @@ limitations under the License.
         void OVR::GLEContext::glNewList_Hook(GLuint list, GLenum mode)
         {
             glNewList(list, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3b
@@ -2461,7 +2637,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3b_Hook(GLbyte nx, GLbyte ny, GLbyte nz)
         {
             glNormal3b(nx, ny, nz);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3bv
@@ -2469,7 +2645,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3bv_Hook(const GLbyte *v)
         {
             glNormal3bv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3d
@@ -2477,7 +2653,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3d_Hook(GLdouble nx, GLdouble ny, GLdouble nz)
         {
             glNormal3d(nx, ny, nz);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3dv
@@ -2485,7 +2661,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3dv_Hook(const GLdouble *v)
         {
             glNormal3dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3f
@@ -2493,7 +2669,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3f_Hook(GLfloat nx, GLfloat ny, GLfloat nz)
         {
             glNormal3f(nx, ny, nz);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3fv
@@ -2501,7 +2677,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3fv_Hook(const GLfloat *v)
         {
             glNormal3fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3i
@@ -2509,7 +2685,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3i_Hook(GLint nx, GLint ny, GLint nz)
         {
             glNormal3i(nx, ny, nz);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3iv
@@ -2517,7 +2693,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3iv_Hook(const GLint *v)
         {
             glNormal3iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3s
@@ -2525,7 +2701,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3s_Hook(GLshort nx, GLshort ny, GLshort nz)
         {
             glNormal3s(nx, ny, nz);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormal3sv
@@ -2533,7 +2709,7 @@ limitations under the License.
         void OVR::GLEContext::glNormal3sv_Hook(const GLshort *v)
         {
             glNormal3sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glNormalPointer
@@ -2541,7 +2717,7 @@ limitations under the License.
         void OVR::GLEContext::glNormalPointer_Hook(GLenum type, GLsizei stride, const void *pointer)
         {
             glNormalPointer(type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glOrtho
@@ -2549,7 +2725,7 @@ limitations under the License.
         void OVR::GLEContext::glOrtho_Hook(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble zNear, GLdouble zFar)
         {
             glOrtho(left, right, bottom, top, zNear, zFar);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPassThrough
@@ -2557,7 +2733,7 @@ limitations under the License.
         void OVR::GLEContext::glPassThrough_Hook(GLfloat token)
         {
             glPassThrough(token);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelMapfv
@@ -2565,7 +2741,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelMapfv_Hook(GLenum map, GLsizei mapsize, const GLfloat *values)
         {
             glPixelMapfv(map, mapsize, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelMapuiv
@@ -2573,7 +2749,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelMapuiv_Hook(GLenum map, GLsizei mapsize, const GLuint *values)
         {
             glPixelMapuiv(map, mapsize, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelMapusv
@@ -2581,7 +2757,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelMapusv_Hook(GLenum map, GLsizei mapsize, const GLushort *values)
         {
             glPixelMapusv(map, mapsize, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelStoref
@@ -2589,7 +2765,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelStoref_Hook(GLenum pname, GLfloat param)
         {
             glPixelStoref(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelStorei
@@ -2597,7 +2773,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelStorei_Hook(GLenum pname, GLint param)
         {
             glPixelStorei(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelTransferf
@@ -2605,7 +2781,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelTransferf_Hook(GLenum pname, GLfloat param)
         {
             glPixelTransferf(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelTransferi
@@ -2613,7 +2789,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelTransferi_Hook(GLenum pname, GLint param)
         {
             glPixelTransferi(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPixelZoom
@@ -2621,7 +2797,7 @@ limitations under the License.
         void OVR::GLEContext::glPixelZoom_Hook(GLfloat xfactor, GLfloat yfactor)
         {
             glPixelZoom(xfactor, yfactor);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPointSize
@@ -2629,7 +2805,7 @@ limitations under the License.
         void OVR::GLEContext::glPointSize_Hook(GLfloat size)
         {
             glPointSize(size);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPolygonMode
@@ -2637,7 +2813,7 @@ limitations under the License.
         void OVR::GLEContext::glPolygonMode_Hook(GLenum face, GLenum mode)
         {
             glPolygonMode(face, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPolygonOffset
@@ -2645,7 +2821,7 @@ limitations under the License.
         void OVR::GLEContext::glPolygonOffset_Hook(GLfloat factor, GLfloat units)
         {
             glPolygonOffset(factor, units);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPolygonStipple
@@ -2653,7 +2829,7 @@ limitations under the License.
         void OVR::GLEContext::glPolygonStipple_Hook(const GLubyte *mask)
         {
             glPolygonStipple(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPopAttrib
@@ -2661,7 +2837,7 @@ limitations under the License.
         void OVR::GLEContext::glPopAttrib_Hook()
         {
             glPopAttrib();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPopClientAttrib
@@ -2669,7 +2845,7 @@ limitations under the License.
         void OVR::GLEContext::glPopClientAttrib_Hook()
         {
             glPopClientAttrib();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPopMatrix
@@ -2677,7 +2853,7 @@ limitations under the License.
         void OVR::GLEContext::glPopMatrix_Hook()
         {
             glPopMatrix();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPopName
@@ -2685,7 +2861,7 @@ limitations under the License.
         void OVR::GLEContext::glPopName_Hook()
         {
             glPopName();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPrioritizeTextures
@@ -2693,7 +2869,7 @@ limitations under the License.
         void OVR::GLEContext::glPrioritizeTextures_Hook(GLsizei n, const GLuint *textures, const GLclampf *priorities)
         {
             glPrioritizeTextures(n, textures, priorities);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPushAttrib
@@ -2701,7 +2877,7 @@ limitations under the License.
         void OVR::GLEContext::glPushAttrib_Hook(GLbitfield mask)
         {
             glPushAttrib(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPushClientAttrib
@@ -2709,7 +2885,7 @@ limitations under the License.
         void OVR::GLEContext::glPushClientAttrib_Hook(GLbitfield mask)
         {
             glPushClientAttrib(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPushMatrix
@@ -2717,7 +2893,7 @@ limitations under the License.
         void OVR::GLEContext::glPushMatrix_Hook()
         {
             glPushMatrix();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glPushName
@@ -2725,7 +2901,7 @@ limitations under the License.
         void OVR::GLEContext::glPushName_Hook(GLuint name)
         {
             glPushName(name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2d
@@ -2733,7 +2909,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2d_Hook(GLdouble x, GLdouble y)
         {
             glRasterPos2d(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2dv
@@ -2741,7 +2917,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2dv_Hook(const GLdouble *v)
         {
             glRasterPos2dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2f
@@ -2749,7 +2925,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2f_Hook(GLfloat x, GLfloat y)
         {
             glRasterPos2f(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2fv
@@ -2757,7 +2933,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2fv_Hook(const GLfloat *v)
         {
             glRasterPos2fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2i
@@ -2765,7 +2941,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2i_Hook(GLint x, GLint y)
         {
             glRasterPos2i(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2iv
@@ -2773,7 +2949,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2iv_Hook(const GLint *v)
         {
             glRasterPos2iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2s
@@ -2781,7 +2957,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2s_Hook(GLshort x, GLshort y)
         {
             glRasterPos2s(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos2sv
@@ -2789,7 +2965,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos2sv_Hook(const GLshort *v)
         {
             glRasterPos2sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3d
@@ -2797,7 +2973,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3d_Hook(GLdouble x, GLdouble y, GLdouble z)
         {
             glRasterPos3d(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3dv
@@ -2805,7 +2981,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3dv_Hook(const GLdouble *v)
         {
             glRasterPos3dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3f
@@ -2813,7 +2989,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3f_Hook(GLfloat x, GLfloat y, GLfloat z)
         {
             glRasterPos3f(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3fv
@@ -2821,7 +2997,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3fv_Hook(const GLfloat *v)
         {
             glRasterPos3fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3i
@@ -2829,7 +3005,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3i_Hook(GLint x, GLint y, GLint z)
         {
             glRasterPos3i(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3iv
@@ -2837,7 +3013,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3iv_Hook(const GLint *v)
         {
             glRasterPos3iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3s
@@ -2845,7 +3021,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3s_Hook(GLshort x, GLshort y, GLshort z)
         {
             glRasterPos3s(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos3sv
@@ -2853,7 +3029,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos3sv_Hook(const GLshort *v)
         {
             glRasterPos3sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4d
@@ -2861,7 +3037,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4d_Hook(GLdouble x, GLdouble y, GLdouble z, GLdouble w)
         {
             glRasterPos4d(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4dv
@@ -2869,7 +3045,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4dv_Hook(const GLdouble *v)
         {
             glRasterPos4dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4f
@@ -2877,7 +3053,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4f_Hook(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
         {
             glRasterPos4f(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4fv
@@ -2885,7 +3061,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4fv_Hook(const GLfloat *v)
         {
             glRasterPos4fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4i
@@ -2893,7 +3069,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4i_Hook(GLint x, GLint y, GLint z, GLint w)
         {
             glRasterPos4i(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4iv
@@ -2901,7 +3077,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4iv_Hook(const GLint *v)
         {
             glRasterPos4iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4s
@@ -2909,7 +3085,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4s_Hook(GLshort x, GLshort y, GLshort z, GLshort w)
         {
             glRasterPos4s(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRasterPos4sv
@@ -2917,7 +3093,7 @@ limitations under the License.
         void OVR::GLEContext::glRasterPos4sv_Hook(const GLshort *v)
         {
             glRasterPos4sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glReadBuffer
@@ -2925,7 +3101,7 @@ limitations under the License.
         void OVR::GLEContext::glReadBuffer_Hook(GLenum mode)
         {
             glReadBuffer(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glReadPixels
@@ -2933,7 +3109,7 @@ limitations under the License.
         void OVR::GLEContext::glReadPixels_Hook(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels)
         {
             glReadPixels(x, y, width, height, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectd
@@ -2941,7 +3117,7 @@ limitations under the License.
         void OVR::GLEContext::glRectd_Hook(GLdouble x1, GLdouble y1, GLdouble x2, GLdouble y2)
         {
             glRectd(x1, y1, x2, y2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectdv
@@ -2949,7 +3125,7 @@ limitations under the License.
         void OVR::GLEContext::glRectdv_Hook(const GLdouble *v1, const GLdouble *v2)
         {
             glRectdv(v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectf
@@ -2957,7 +3133,7 @@ limitations under the License.
         void OVR::GLEContext::glRectf_Hook(GLfloat x1, GLfloat y1, GLfloat x2, GLfloat y2)
         {
             glRectf(x1, y1, x2, y2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectfv
@@ -2965,7 +3141,7 @@ limitations under the License.
         void OVR::GLEContext::glRectfv_Hook(const GLfloat *v1, const GLfloat *v2)
         {
             glRectfv(v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRecti
@@ -2973,7 +3149,7 @@ limitations under the License.
         void OVR::GLEContext::glRecti_Hook(GLint x1, GLint y1, GLint x2, GLint y2)
         {
             glRecti(x1, y1, x2, y2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectiv
@@ -2981,7 +3157,7 @@ limitations under the License.
         void OVR::GLEContext::glRectiv_Hook(const GLint *v1, const GLint *v2)
         {
             glRectiv(v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRects
@@ -2989,7 +3165,7 @@ limitations under the License.
         void OVR::GLEContext::glRects_Hook(GLshort x1, GLshort y1, GLshort x2, GLshort y2)
         {
             glRects(x1, y1, x2, y2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRectsv
@@ -2997,7 +3173,7 @@ limitations under the License.
         void OVR::GLEContext::glRectsv_Hook(const GLshort *v1, const GLshort *v2)
         {
             glRectsv(v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRenderMode
@@ -3005,7 +3181,7 @@ limitations under the License.
         GLint OVR::GLEContext::glRenderMode_Hook(GLenum mode)
         {
             GLint  i = glRenderMode(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return i;
         }
 
@@ -3014,7 +3190,7 @@ limitations under the License.
         void OVR::GLEContext::glRotated_Hook(GLdouble angle, GLdouble x, GLdouble y, GLdouble z)
         {
             glRotated(angle, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glRotatef
@@ -3022,7 +3198,7 @@ limitations under the License.
         void OVR::GLEContext::glRotatef_Hook(GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
         {
             glRotatef(angle, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glScaled
@@ -3030,7 +3206,7 @@ limitations under the License.
         void OVR::GLEContext::glScaled_Hook(GLdouble x, GLdouble y, GLdouble z)
         {
             glScaled(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glScalef
@@ -3038,7 +3214,7 @@ limitations under the License.
         void OVR::GLEContext::glScalef_Hook(GLfloat x, GLfloat y, GLfloat z)
         {
             glScalef(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glScissor
@@ -3046,7 +3222,7 @@ limitations under the License.
         void OVR::GLEContext::glScissor_Hook(GLint x, GLint y, GLsizei width, GLsizei height)
         {
             glScissor(x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glSelectBuffer
@@ -3054,7 +3230,7 @@ limitations under the License.
         void OVR::GLEContext::glSelectBuffer_Hook(GLsizei size, GLuint *buffer)
         {
             glSelectBuffer(size, buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glShadeModel
@@ -3062,7 +3238,7 @@ limitations under the License.
         void OVR::GLEContext::glShadeModel_Hook(GLenum mode)
         {
             glShadeModel(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glStencilFunc
@@ -3070,7 +3246,7 @@ limitations under the License.
         void OVR::GLEContext::glStencilFunc_Hook(GLenum func, GLint ref, GLuint mask)
         {
             glStencilFunc(func, ref, mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glStencilMask
@@ -3078,7 +3254,7 @@ limitations under the License.
         void OVR::GLEContext::glStencilMask_Hook(GLuint mask)
         {
             glStencilMask(mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glStencilOp
@@ -3086,7 +3262,7 @@ limitations under the License.
         void OVR::GLEContext::glStencilOp_Hook(GLenum fail, GLenum zfail, GLenum zpass)
         {
             glStencilOp(fail, zfail, zpass);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1d
@@ -3094,7 +3270,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1d_Hook(GLdouble s)
         {
             glTexCoord1d(s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1dv
@@ -3102,7 +3278,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1dv_Hook(const GLdouble *v)
         {
             glTexCoord1dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1f
@@ -3110,7 +3286,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1f_Hook(GLfloat s)
         {
             glTexCoord1f(s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1fv
@@ -3118,7 +3294,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1fv_Hook(const GLfloat *v)
         {
             glTexCoord1fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1i
@@ -3126,7 +3302,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1i_Hook(GLint s)
         {
             glTexCoord1i(s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1iv
@@ -3134,7 +3310,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1iv_Hook(const GLint *v)
         {
             glTexCoord1iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1s
@@ -3142,7 +3318,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1s_Hook(GLshort s)
         {
             glTexCoord1s(s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord1sv
@@ -3150,7 +3326,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord1sv_Hook(const GLshort *v)
         {
             glTexCoord1sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2d
@@ -3158,7 +3334,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2d_Hook(GLdouble s, GLdouble t)
         {
             glTexCoord2d(s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2dv
@@ -3166,7 +3342,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2dv_Hook(const GLdouble *v)
         {
             glTexCoord2dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2f
@@ -3174,7 +3350,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2f_Hook(GLfloat s, GLfloat t)
         {
             glTexCoord2f(s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2fv
@@ -3182,7 +3358,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2fv_Hook(const GLfloat *v)
         {
             glTexCoord2fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2i
@@ -3190,7 +3366,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2i_Hook(GLint s, GLint t)
         {
             glTexCoord2i(s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2iv
@@ -3198,7 +3374,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2iv_Hook(const GLint *v)
         {
             glTexCoord2iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2s
@@ -3206,7 +3382,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2s_Hook(GLshort s, GLshort t)
         {
             glTexCoord2s(s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord2sv
@@ -3214,7 +3390,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord2sv_Hook(const GLshort *v)
         {
             glTexCoord2sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3d
@@ -3222,7 +3398,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3d_Hook(GLdouble s, GLdouble t, GLdouble r)
         {
             glTexCoord3d(s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3dv
@@ -3230,7 +3406,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3dv_Hook(const GLdouble *v)
         {
             glTexCoord3dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3f
@@ -3238,7 +3414,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3f_Hook(GLfloat s, GLfloat t, GLfloat r)
         {
             glTexCoord3f(s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3fv
@@ -3246,7 +3422,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3fv_Hook(const GLfloat *v)
         {
             glTexCoord3fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3i
@@ -3254,7 +3430,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3i_Hook(GLint s, GLint t, GLint r)
         {
             glTexCoord3i(s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3iv
@@ -3262,7 +3438,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3iv_Hook(const GLint *v)
         {
             glTexCoord3iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3s
@@ -3270,7 +3446,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3s_Hook(GLshort s, GLshort t, GLshort r)
         {
             glTexCoord3s(s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord3sv
@@ -3278,7 +3454,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord3sv_Hook(const GLshort *v)
         {
             glTexCoord3sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4d
@@ -3286,7 +3462,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4d_Hook(GLdouble s, GLdouble t, GLdouble r, GLdouble q)
         {
             glTexCoord4d(s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4dv
@@ -3294,7 +3470,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4dv_Hook(const GLdouble *v)
         {
             glTexCoord4dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4f
@@ -3302,7 +3478,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4f_Hook(GLfloat s, GLfloat t, GLfloat r, GLfloat q)
         {
             glTexCoord4f(s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4fv
@@ -3310,7 +3486,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4fv_Hook(const GLfloat *v)
         {
             glTexCoord4fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4i
@@ -3318,7 +3494,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4i_Hook(GLint s, GLint t, GLint r, GLint q)
         {
             glTexCoord4i(s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4iv
@@ -3326,7 +3502,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4iv_Hook(const GLint *v)
         {
             glTexCoord4iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4s
@@ -3334,7 +3510,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4s_Hook(GLshort s, GLshort t, GLshort r, GLshort q)
         {
             glTexCoord4s(s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoord4sv
@@ -3342,7 +3518,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoord4sv_Hook(const GLshort *v)
         {
             glTexCoord4sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexCoordPointer
@@ -3350,7 +3526,7 @@ limitations under the License.
         void OVR::GLEContext::glTexCoordPointer_Hook(GLint size, GLenum type, GLsizei stride, const void *pointer)
         {
             glTexCoordPointer(size, type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexEnvf
@@ -3358,7 +3534,7 @@ limitations under the License.
         void OVR::GLEContext::glTexEnvf_Hook(GLenum target, GLenum pname, GLfloat param)
         {
             glTexEnvf(target, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexEnvfv
@@ -3366,7 +3542,7 @@ limitations under the License.
         void OVR::GLEContext::glTexEnvfv_Hook(GLenum target, GLenum pname, const GLfloat *params)
         {
             glTexEnvfv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexEnvi
@@ -3374,7 +3550,7 @@ limitations under the License.
         void OVR::GLEContext::glTexEnvi_Hook(GLenum target, GLenum pname, GLint param)
         {
             glTexEnvi(target, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexEnviv
@@ -3382,7 +3558,7 @@ limitations under the License.
         void OVR::GLEContext::glTexEnviv_Hook(GLenum target, GLenum pname, const GLint *params)
         {
             glTexEnviv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGend
@@ -3390,7 +3566,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGend_Hook(GLenum coord, GLenum pname, GLdouble param)
         {
             glTexGend(coord, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGendv
@@ -3398,7 +3574,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGendv_Hook(GLenum coord, GLenum pname, const GLdouble *params)
         {
             glTexGendv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGenf
@@ -3406,7 +3582,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGenf_Hook(GLenum coord, GLenum pname, GLfloat param)
         {
             glTexGenf(coord, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGenfv
@@ -3414,7 +3590,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGenfv_Hook(GLenum coord, GLenum pname, const GLfloat *params)
         {
             glTexGenfv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGeni
@@ -3422,7 +3598,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGeni_Hook(GLenum coord, GLenum pname, GLint param)
         {
             glTexGeni(coord, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexGeniv
@@ -3430,7 +3606,7 @@ limitations under the License.
         void OVR::GLEContext::glTexGeniv_Hook(GLenum coord, GLenum pname, const GLint *params)
         {
             glTexGeniv(coord, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexImage1D
@@ -3438,7 +3614,7 @@ limitations under the License.
         void OVR::GLEContext::glTexImage1D_Hook(GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, const void *pixels)
         {
             glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexImage2D
@@ -3446,7 +3622,7 @@ limitations under the License.
         void OVR::GLEContext::glTexImage2D_Hook(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels)
         {
             glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexParameterf
@@ -3454,7 +3630,7 @@ limitations under the License.
         void OVR::GLEContext::glTexParameterf_Hook(GLenum target, GLenum pname, GLfloat param)
         {
             glTexParameterf(target, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexParameterfv
@@ -3462,7 +3638,7 @@ limitations under the License.
         void OVR::GLEContext::glTexParameterfv_Hook(GLenum target, GLenum pname, const GLfloat *params)
         {
             glTexParameterfv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexParameteri
@@ -3470,7 +3646,7 @@ limitations under the License.
         void OVR::GLEContext::glTexParameteri_Hook(GLenum target, GLenum pname, GLint param)
         {
             glTexParameteri(target, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexParameteriv
@@ -3478,7 +3654,7 @@ limitations under the License.
         void OVR::GLEContext::glTexParameteriv_Hook(GLenum target, GLenum pname, const GLint *params)
         {
             glTexParameteriv(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexSubImage1D
@@ -3486,7 +3662,7 @@ limitations under the License.
         void OVR::GLEContext::glTexSubImage1D_Hook(GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void *pixels)
         {
             glTexSubImage1D(target, level, xoffset, width, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTexSubImage2D
@@ -3494,7 +3670,7 @@ limitations under the License.
         void OVR::GLEContext::glTexSubImage2D_Hook(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels)
         {
             glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTranslated
@@ -3502,7 +3678,7 @@ limitations under the License.
         void OVR::GLEContext::glTranslated_Hook(GLdouble x, GLdouble y, GLdouble z)
         {
             glTranslated(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glTranslatef
@@ -3510,7 +3686,7 @@ limitations under the License.
         void OVR::GLEContext::glTranslatef_Hook(GLfloat x, GLfloat y, GLfloat z)
         {
             glTranslatef(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2d
@@ -3518,7 +3694,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2d_Hook(GLdouble x, GLdouble y)
         {
             glVertex2d(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2dv
@@ -3526,7 +3702,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2dv_Hook(const GLdouble *v)
         {
             glVertex2dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2f
@@ -3534,7 +3710,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2f_Hook(GLfloat x, GLfloat y)
         {
             glVertex2f(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2fv
@@ -3542,7 +3718,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2fv_Hook(const GLfloat *v)
         {
             glVertex2fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2i
@@ -3550,7 +3726,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2i_Hook(GLint x, GLint y)
         {
             glVertex2i(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2iv
@@ -3558,7 +3734,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2iv_Hook(const GLint *v)
         {
             glVertex2iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2s
@@ -3566,7 +3742,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2s_Hook(GLshort x, GLshort y)
         {
             glVertex2s(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex2sv
@@ -3574,7 +3750,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex2sv_Hook(const GLshort *v)
         {
             glVertex2sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3d
@@ -3582,7 +3758,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3d_Hook(GLdouble x, GLdouble y, GLdouble z)
         {
             glVertex3d(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3dv
@@ -3590,7 +3766,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3dv_Hook(const GLdouble *v)
         {
             glVertex3dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3f
@@ -3598,7 +3774,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3f_Hook(GLfloat x, GLfloat y, GLfloat z)
         {
             glVertex3f(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3fv
@@ -3606,7 +3782,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3fv_Hook(const GLfloat *v)
         {
             glVertex3fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3i
@@ -3614,7 +3790,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3i_Hook(GLint x, GLint y, GLint z)
         {
             glVertex3i(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3iv
@@ -3622,7 +3798,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3iv_Hook(const GLint *v)
         {
             glVertex3iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3s
@@ -3630,7 +3806,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3s_Hook(GLshort x, GLshort y, GLshort z)
         {
             glVertex3s(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex3sv
@@ -3638,7 +3814,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex3sv_Hook(const GLshort *v)
         {
             glVertex3sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4d
@@ -3646,7 +3822,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4d_Hook(GLdouble x, GLdouble y, GLdouble z, GLdouble w)
         {
             glVertex4d(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4dv
@@ -3654,7 +3830,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4dv_Hook(const GLdouble *v)
         {
             glVertex4dv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4f
@@ -3662,7 +3838,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4f_Hook(GLfloat x, GLfloat y, GLfloat z, GLfloat w)
         {
             glVertex4f(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4fv
@@ -3670,7 +3846,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4fv_Hook(const GLfloat *v)
         {
             glVertex4fv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4i
@@ -3678,7 +3854,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4i_Hook(GLint x, GLint y, GLint z, GLint w)
         {
             glVertex4i(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4iv
@@ -3686,7 +3862,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4iv_Hook(const GLint *v)
         {
             glVertex4iv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4s
@@ -3694,7 +3870,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4s_Hook(GLshort x, GLshort y, GLshort z, GLshort w)
         {
             glVertex4s(x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertex4sv
@@ -3702,7 +3878,7 @@ limitations under the License.
         void OVR::GLEContext::glVertex4sv_Hook(const GLshort *v)
         {
             glVertex4sv(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glVertexPointer
@@ -3710,7 +3886,7 @@ limitations under the License.
         void OVR::GLEContext::glVertexPointer_Hook(GLint size, GLenum type, GLsizei stride, const void *pointer)
         {
             glVertexPointer(size, type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         #undef glViewport
@@ -3718,7 +3894,7 @@ limitations under the License.
         void OVR::GLEContext::glViewport_Hook(GLint x, GLint y, GLsizei width, GLsizei height)
         {
             glViewport(x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -3728,35 +3904,35 @@ limitations under the License.
         {
             if(glBlendColor_Impl)
                 glBlendColor_Impl(red, green, blue, alpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlendEquation_Hook(GLenum mode)
         {
             if(glBlendEquation_Impl)
                 glBlendEquation_Impl(mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDrawRangeElements_Hook(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices)
         {
             if(glDrawRangeElements_Impl)
                 glDrawRangeElements_Impl(mode, start, end, count, type, indices);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexImage3D_Hook(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels)
         {
             if(glTexImage3D_Impl)
                 glTexImage3D_Impl(target, level, internalformat, width, height, depth, border, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexSubImage3D_Hook(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels)
         {
             if(glTexSubImage3D_Impl)
                 glTexSubImage3D_Impl(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -3764,7 +3940,7 @@ limitations under the License.
         {
             if(glCopyTexSubImage3D_Impl)
                 glCopyTexSubImage3D_Impl(target, level, xoffset, yoffset, zoffset, x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         // GL_VERSION_1_2 deprecated functions
@@ -3773,224 +3949,224 @@ limitations under the License.
         {
             if(glColorTable_Impl)
                 glColorTable_Impl(target, internalformat, width, format, type, table);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glColorTableParameterfv_Hook(GLenum target, GLenum pname, const GLfloat *params)
         {
             if(glColorTableParameterfv_Impl)
                 glColorTableParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glColorTableParameteriv_Hook(GLenum target, GLenum pname, const GLint *params)
         {
             if(glColorTableParameteriv_Impl)
                 glColorTableParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCopyColorTable_Hook(GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width)
         {
             if(glCopyColorTable_Impl)
                 glCopyColorTable_Impl(target, internalformat, x, y, width);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetColorTable_Hook(GLenum target, GLenum format, GLenum type, GLvoid *table)
         {
             if(glGetColorTable_Impl)
                 glGetColorTable_Impl(target, format, type, table);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetColorTableParameterfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             if(glGetColorTableParameterfv_Impl)
                 glGetColorTableParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetColorTableParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetColorTableParameteriv_Impl)
                 glGetColorTableParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glColorSubTable_Hook(GLenum target, GLsizei start, GLsizei count, GLenum format, GLenum type, const GLvoid *data)
         {
             if(glColorSubTable_Impl)
                 glColorSubTable_Impl(target, start, count, format, type, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCopyColorSubTable_Hook(GLenum target, GLsizei start, GLint x, GLint y, GLsizei width)
         {
             if(glCopyColorSubTable_Impl)
                 glCopyColorSubTable_Impl(target, start, x, y, width);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionFilter1D_Hook(GLenum target, GLenum internalformat, GLsizei width, GLenum format, GLenum type, const GLvoid *image)
         {
             if(glConvolutionFilter1D_Impl)
                 glConvolutionFilter1D_Impl(target, internalformat, width, format, type, image);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionFilter2D_Hook(GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *image)
         {
             if(glConvolutionFilter2D_Impl)
                 glConvolutionFilter2D_Impl(target, internalformat, width, height, format, type, image);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionParameterf_Hook(GLenum target, GLenum pname, GLfloat params)
         {
             if(glConvolutionParameterf_Impl)
                 glConvolutionParameterf_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionParameterfv_Hook(GLenum target, GLenum pname, const GLfloat *params)
         {
             if(glConvolutionParameterfv_Impl)
                 glConvolutionParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionParameteri_Hook(GLenum target, GLenum pname, GLint params)
         {
             if(glConvolutionParameteri_Impl)
                 glConvolutionParameteri_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glConvolutionParameteriv_Hook(GLenum target, GLenum pname, const GLint *params)
         {
             if(glConvolutionParameteriv_Impl)
                 glConvolutionParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCopyConvolutionFilter1D_Hook(GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width)
         {
             if(glCopyConvolutionFilter1D_Impl)
                 glCopyConvolutionFilter1D_Impl(target, internalformat, x, y, width);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCopyConvolutionFilter2D_Hook(GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height)
         {
             if(glCopyConvolutionFilter2D_Impl)
                 glCopyConvolutionFilter2D_Impl(target, internalformat, x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetConvolutionFilter_Hook(GLenum target, GLenum format, GLenum type, GLvoid *image)
         {
             if(glGetConvolutionFilter_Impl)
                 glGetConvolutionFilter_Impl(target, format, type, image);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetConvolutionParameterfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             if(glGetConvolutionParameterfv_Impl)
                 glGetConvolutionParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetConvolutionParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetConvolutionParameteriv_Impl)
                 glGetConvolutionParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetSeparableFilter_Hook(GLenum target, GLenum format, GLenum type, GLvoid *row, GLvoid *column, GLvoid *span)
         {
             if(glGetSeparableFilter_Impl)
                 glGetSeparableFilter_Impl(target, format, type, row, column, span);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSeparableFilter2D_Hook(GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *row, const GLvoid *column)
         {
             if(glSeparableFilter2D_Impl)
                 glSeparableFilter2D_Impl(target, internalformat, width, height, format, type, row, column);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetHistogram_Hook(GLenum target, GLboolean reset, GLenum format, GLenum type, GLvoid *values)
         {
             if(glGetHistogram_Impl)
                 glGetHistogram_Impl(target, reset, format, type, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetHistogramParameterfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             if(glGetHistogramParameterfv_Impl)
                 glGetHistogramParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetHistogramParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetHistogramParameteriv_Impl)
                 glGetHistogramParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetMinmax_Hook(GLenum target, GLboolean reset, GLenum format, GLenum type, GLvoid *values)
         {
             if(glGetMinmax_Impl)
                 glGetMinmax_Impl(target, reset, format, type, values);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetMinmaxParameterfv_Hook(GLenum target, GLenum pname, GLfloat *params)
         {
             if(glGetMinmaxParameterfv_Impl)
                 glGetMinmaxParameterfv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetMinmaxParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetMinmaxParameteriv_Impl)
                 glGetMinmaxParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glHistogram_Hook(GLenum target, GLsizei width, GLenum internalformat, GLboolean sink)
         {
             if(glHistogram_Impl)
                 glHistogram_Impl(target, width, internalformat, sink);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMinmax_Hook(GLenum target, GLenum internalformat, GLboolean sink)
         {
             if(glMinmax_Impl)
                 glMinmax_Impl(target, internalformat, sink);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glResetHistogram_Hook(GLenum target)
         {
             if(glResetHistogram_Impl)
                 glResetHistogram_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glResetMinmax_Hook(GLenum target)
         {
             if(glResetMinmax_Impl)
                 glResetMinmax_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
         */
 
@@ -3999,63 +4175,63 @@ limitations under the License.
         {
             if(glActiveTexture_Impl)
                 glActiveTexture_Impl(texture);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSampleCoverage_Hook(GLclampf value, GLboolean invert)
         {
             if(glSampleCoverage_Impl)
                 glSampleCoverage_Impl(value, invert);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexImage3D_Hook(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexImage3D_Impl)
                 glCompressedTexImage3D_Impl(target, level, internalformat, width, height, depth, border, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexImage2D_Hook(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexImage2D_Impl)
                 glCompressedTexImage2D_Impl(target, level, internalformat, width, height, border, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexImage1D_Hook(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLint border, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexImage1D_Impl)
                 glCompressedTexImage1D_Impl(target, level, internalformat, width, border, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexSubImage3D_Hook(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexSubImage3D_Impl)
                 glCompressedTexSubImage3D_Impl(target, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexSubImage2D_Hook(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexSubImage2D_Impl)
                 glCompressedTexSubImage2D_Impl(target, level, xoffset, yoffset, width, height, format, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompressedTexSubImage1D_Hook(GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const GLvoid *data)
         {
             if(glCompressedTexSubImage1D_Impl)
                 glCompressedTexSubImage1D_Impl(target, level, xoffset, width, format, imageSize, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetCompressedTexImage_Hook(GLenum target, GLint level, GLvoid *img)
         {
             if(glGetCompressedTexImage_Impl)
                 glGetCompressedTexImage_Impl(target, level, img);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -4064,259 +4240,259 @@ limitations under the License.
         {
             if(glClientActiveTexture_Impl)
                 glClientActiveTexture_Impl(texture);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1d_Hook(GLenum target, GLdouble s)
         {
             if(glMultiTexCoord1d_Impl)
                 glMultiTexCoord1d_Impl(target, s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1dv_Hook(GLenum target, const GLdouble *v)
         {
             if(glMultiTexCoord1dv_Impl)
                 glMultiTexCoord1dv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1f_Hook(GLenum target, GLfloat s)
         {
             if(glMultiTexCoord1f_Impl)
                 glMultiTexCoord1f_Impl(target, s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1fv_Hook(GLenum target, const GLfloat *v)
         {
             if(glMultiTexCoord1fv_Impl)
                 glMultiTexCoord1fv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1i_Hook(GLenum target, GLint s)
         {
             if(glMultiTexCoord1i_Impl)
                 glMultiTexCoord1i_Impl(target, s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1iv_Hook(GLenum target, const GLint *v)
         {
             if(glMultiTexCoord1iv_Impl)
                 glMultiTexCoord1iv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1s_Hook(GLenum target, GLshort s)
         {
             if(glMultiTexCoord1s_Impl)
                 glMultiTexCoord1s_Impl(target, s);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord1sv_Hook(GLenum target, const GLshort *v)
         {
             if(glMultiTexCoord1sv_Impl)
                 glMultiTexCoord1sv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2d_Hook(GLenum target, GLdouble s, GLdouble t)
         {
             if(glMultiTexCoord2d_Impl)
                 glMultiTexCoord2d_Impl(target, s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2dv_Hook(GLenum target, const GLdouble *v)
         {
             if(glMultiTexCoord2dv_Impl)
                 glMultiTexCoord2dv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2f_Hook(GLenum target, GLfloat s, GLfloat t)
         {
             if(glMultiTexCoord2f_Impl)
                 glMultiTexCoord2f_Impl(target, s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2fv_Hook(GLenum target, const GLfloat *v)
         {
             if(glMultiTexCoord2fv_Impl)
                 glMultiTexCoord2fv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2i_Hook(GLenum target, GLint s, GLint t)
         {
             if(glMultiTexCoord2i_Impl)
                 glMultiTexCoord2i_Impl(target, s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2iv_Hook(GLenum target, const GLint *v)
         {
             if(glMultiTexCoord2iv_Impl)
                 glMultiTexCoord2iv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2s_Hook(GLenum target, GLshort s, GLshort t)
         {
             if(glMultiTexCoord2s_Impl)
                 glMultiTexCoord2s_Impl(target, s, t);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord2sv_Hook(GLenum target, const GLshort *v)
         {
             if(glMultiTexCoord2sv_Impl)
                 glMultiTexCoord2sv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3d_Hook(GLenum target, GLdouble s, GLdouble t, GLdouble r)
         {
             if(glMultiTexCoord3d_Impl)
                 glMultiTexCoord3d_Impl(target, s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3dv_Hook(GLenum target, const GLdouble *v)
         {
             if(glMultiTexCoord3dv_Impl)
                 glMultiTexCoord3dv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3f_Hook(GLenum target, GLfloat s, GLfloat t, GLfloat r)
         {
             if(glMultiTexCoord3f_Impl)
                 glMultiTexCoord3f_Impl(target, s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3fv_Hook(GLenum target, const GLfloat *v)
         {
             if(glMultiTexCoord3fv_Impl)
                 glMultiTexCoord3fv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3i_Hook(GLenum target, GLint s, GLint t, GLint r)
         {
             if(glMultiTexCoord3i_Impl)
                 glMultiTexCoord3i_Impl(target, s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3iv_Hook(GLenum target, const GLint *v)
         {
             if(glMultiTexCoord3iv_Impl)
                 glMultiTexCoord3iv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3s_Hook(GLenum target, GLshort s, GLshort t, GLshort r)
         {
             if(glMultiTexCoord3s_Impl)
                 glMultiTexCoord3s_Impl(target, s, t, r);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord3sv_Hook(GLenum target, const GLshort *v)
         {
             if(glMultiTexCoord3sv_Impl)
                 glMultiTexCoord3sv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4d_Hook(GLenum target, GLdouble s, GLdouble t, GLdouble r, GLdouble q)
         {
             if(glMultiTexCoord4d_Impl)
                 glMultiTexCoord4d_Impl(target, s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4dv_Hook(GLenum target, const GLdouble *v)
         {
             if(glMultiTexCoord4dv_Impl)
                 glMultiTexCoord4dv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4f_Hook(GLenum target, GLfloat s, GLfloat t, GLfloat r, GLfloat q)
         {
             if(glMultiTexCoord4f_Impl)
                 glMultiTexCoord4f_Impl(target, s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4fv_Hook(GLenum target, const GLfloat *v)
         {
             if(glMultiTexCoord4fv_Impl)
                 glMultiTexCoord4fv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4i_Hook(GLenum target, GLint s, GLint t, GLint r, GLint q)
         {
             if(glMultiTexCoord4i_Impl)
                 glMultiTexCoord4i_Impl(target, s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4iv_Hook(GLenum target, const GLint *v)
         {
             if(glMultiTexCoord4iv_Impl)
                 glMultiTexCoord4iv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4s_Hook(GLenum target, GLshort s, GLshort t, GLshort r, GLshort q)
         {
             if(glMultiTexCoord4s_Impl)
                 glMultiTexCoord4s_Impl(target, s, t, r, q);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiTexCoord4sv_Hook(GLenum target, const GLshort *v)
         {
             if(glMultiTexCoord4sv_Impl)
                 glMultiTexCoord4sv_Impl(target, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glLoadTransposeMatrixf_Hook(const GLfloat *m)
         {
             if(glLoadTransposeMatrixf_Impl)
                 glLoadTransposeMatrixf_Impl(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glLoadTransposeMatrixd_Hook(const GLdouble *m)
         {
             if(glLoadTransposeMatrixd_Impl)
                 glLoadTransposeMatrixd_Impl(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultTransposeMatrixf_Hook(const GLfloat *m)
         {
             if(glMultTransposeMatrixf_Impl)
                 glMultTransposeMatrixf_Impl(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultTransposeMatrixd_Hook(const GLdouble *m)
         {
             if(glMultTransposeMatrixd_Impl)
                 glMultTransposeMatrixd_Impl(m);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -4325,49 +4501,49 @@ limitations under the License.
         {
             if(glBlendFuncSeparate_Impl)
                 glBlendFuncSeparate_Impl(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiDrawArrays_Hook(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
         {
             if(glMultiDrawArrays_Impl)
                 glMultiDrawArrays_Impl(mode, first, count, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiDrawElements_Hook(GLenum mode, const GLsizei *count, GLenum type, const GLvoid* *indices, GLsizei primcount)
         {
             if(glMultiDrawElements_Impl)
                 glMultiDrawElements_Impl(mode, count, type, indices, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPointParameterf_Hook(GLenum pname, GLfloat param)
         {
             if(glPointParameterf_Impl)
                 glPointParameterf_Impl(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPointParameterfv_Hook(GLenum pname, const GLfloat *params)
         {
             if(glPointParameterfv_Impl)
                 glPointParameterfv_Impl(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPointParameteri_Hook(GLenum pname, GLint param)
         {
             if(glPointParameteri_Impl)
                 glPointParameteri_Impl(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPointParameteriv_Hook(GLenum pname, const GLint *params)
         {
             if(glPointParameteriv_Impl)
                 glPointParameteriv_Impl(pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -4376,266 +4552,266 @@ limitations under the License.
         {
             if(glFogCoordf_Impl)
                 glFogCoordf_Impl(coord);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFogCoordfv_Hook(const GLfloat *coord)
         {
             if(glFogCoordfv_Impl)
                 glFogCoordfv_Impl(coord);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFogCoordd_Hook(GLdouble coord)
         {
             if(glFogCoordd_Impl)
                 glFogCoordd_Impl(coord);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFogCoorddv_Hook(const GLdouble *coord)
         {
             if(glFogCoorddv_Impl)
                 glFogCoorddv_Impl(coord);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFogCoordPointer_Hook(GLenum type, GLsizei stride, const GLvoid *pointer)
         {
             if(glFogCoordPointer_Impl)
                 glFogCoordPointer_Impl(type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3b_Hook(GLbyte red, GLbyte green, GLbyte blue)
         {
             if(glSecondaryColor3b_Impl)
                 glSecondaryColor3b_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3bv_Hook(const GLbyte *v)
         {
             if(glSecondaryColor3bv_Impl)
                 glSecondaryColor3bv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3d_Hook(GLdouble red, GLdouble green, GLdouble blue)
         {
             if(glSecondaryColor3d_Impl)
                 glSecondaryColor3d_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3dv_Hook(const GLdouble *v)
         {
             if(glSecondaryColor3dv_Impl)
                 glSecondaryColor3dv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3f_Hook(GLfloat red, GLfloat green, GLfloat blue)
         {
             if(glSecondaryColor3f_Impl)
                 glSecondaryColor3f_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3fv_Hook(const GLfloat *v)
         {
             if(glSecondaryColor3fv_Impl)
                 glSecondaryColor3fv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3i_Hook(GLint red, GLint green, GLint blue)
         {
             if(glSecondaryColor3i_Impl)
                 glSecondaryColor3i_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3iv_Hook(const GLint *v)
         {
             if(glSecondaryColor3iv_Impl)
                 glSecondaryColor3iv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3s_Hook(GLshort red, GLshort green, GLshort blue)
         {
             if(glSecondaryColor3s_Impl)
                 glSecondaryColor3s_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3sv_Hook(const GLshort *v)
         {
             if(glSecondaryColor3sv_Impl)
                 glSecondaryColor3sv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3ub_Hook(GLubyte red, GLubyte green, GLubyte blue)
         {
             if(glSecondaryColor3ub_Impl)
                 glSecondaryColor3ub_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3ubv_Hook(const GLubyte *v)
         {
             if(glSecondaryColor3ubv_Impl)
                 glSecondaryColor3ubv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3ui_Hook(GLuint red, GLuint green, GLuint blue)
         {
             if(glSecondaryColor3ui_Impl)
                 glSecondaryColor3ui_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3uiv_Hook(const GLuint *v)
         {
             if(glSecondaryColor3uiv_Impl)
                 glSecondaryColor3uiv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3us_Hook(GLushort red, GLushort green, GLushort blue)
         {
             if(glSecondaryColor3us_Impl)
                 glSecondaryColor3us_Impl(red, green, blue);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColor3usv_Hook(const GLushort *v)
         {
             if(glSecondaryColor3usv_Impl)
                 glSecondaryColor3usv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSecondaryColorPointer_Hook(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
         {
             if(glSecondaryColorPointer_Impl)
                 glSecondaryColorPointer_Impl(size, type, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2d_Hook(GLdouble x, GLdouble y)
         {
             if(glWindowPos2d_Impl)
                 glWindowPos2d_Impl(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2dv_Hook(const GLdouble *v)
         {
             if(glWindowPos2dv_Impl)
                 glWindowPos2dv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2f_Hook(GLfloat x, GLfloat y)
         {
             if(glWindowPos2f_Impl)
                 glWindowPos2f_Impl(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2fv_Hook(const GLfloat *v)
         {
             if(glWindowPos2fv_Impl)
                 glWindowPos2fv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2i_Hook(GLint x, GLint y)
         {
             if(glWindowPos2i_Impl)
                 glWindowPos2i_Impl(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2iv_Hook(const GLint *v)
         {
             if(glWindowPos2iv_Impl)
                 glWindowPos2iv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2s_Hook(GLshort x, GLshort y)
         {
             if(glWindowPos2s_Impl)
                 glWindowPos2s_Impl(x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos2sv_Hook(const GLshort *v)
         {
             if(glWindowPos2sv_Impl)
                 glWindowPos2sv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3d_Hook(GLdouble x, GLdouble y, GLdouble z)
         {
             if(glWindowPos3d_Impl)
                 glWindowPos3d_Impl(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3dv_Hook(const GLdouble *v)
         {
             if(glWindowPos3dv_Impl)
                 glWindowPos3dv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3f_Hook(GLfloat x, GLfloat y, GLfloat z)
         {
             if(glWindowPos3f_Impl)
                 glWindowPos3f_Impl(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3fv_Hook(const GLfloat *v)
         {
             if(glWindowPos3fv_Impl)
                 glWindowPos3fv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3i_Hook(GLint x, GLint y, GLint z)
         {
             if(glWindowPos3i_Impl)
                 glWindowPos3i_Impl(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3iv_Hook(const GLint *v)
         {
             if(glWindowPos3iv_Impl)
                 glWindowPos3iv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3s_Hook(GLshort x, GLshort y, GLshort z)
         {
             if(glWindowPos3s_Impl)
                 glWindowPos3s_Impl(x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glWindowPos3sv_Hook(const GLshort *v)
         {
             if(glWindowPos3sv_Impl)
                 glWindowPos3sv_Impl(v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -4644,14 +4820,14 @@ limitations under the License.
         {
             if(glGenQueries_Impl)
                 glGenQueries_Impl(n, ids);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteQueries_Hook(GLsizei n, const GLuint *ids)
         {
             if(glDeleteQueries_Impl)
                 glDeleteQueries_Impl(n, ids);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsQuery_Hook(GLuint id)
@@ -4659,7 +4835,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsQuery_Impl)
                 b = glIsQuery_Impl(id);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -4667,56 +4843,56 @@ limitations under the License.
         {
             if(glBeginQuery_Impl)
                 glBeginQuery_Impl(target, id);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEndQuery_Hook(GLenum target)
         {
             if(glEndQuery_Impl)
                 glEndQuery_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetQueryiv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetQueryiv_Impl)
                 glGetQueryiv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetQueryObjectiv_Hook(GLuint id, GLenum pname, GLint *params)
         {
             if(glGetQueryObjectiv_Impl)
                 glGetQueryObjectiv_Impl(id, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetQueryObjectuiv_Hook(GLuint id, GLenum pname, GLuint *params)
         {
             if(glGetQueryObjectuiv_Impl)
                 glGetQueryObjectuiv_Impl(id, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBindBuffer_Hook(GLenum target, GLuint buffer)
         {
             if(glBindBuffer_Impl)
                 glBindBuffer_Impl(target, buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteBuffers_Hook(GLsizei n, const GLuint *buffers)
         {
             if(glDeleteBuffers_Impl)
                 glDeleteBuffers_Impl(n, buffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenBuffers_Hook(GLsizei n, GLuint *buffers)
         {
             if(glGenBuffers_Impl)
                 glGenBuffers_Impl(n, buffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsBuffer_Hook(GLuint buffer)
@@ -4724,7 +4900,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsBuffer_Impl)
                 b = glIsBuffer_Impl(buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -4732,21 +4908,21 @@ limitations under the License.
         {
             if(glBufferData_Impl)
                 glBufferData_Impl(target, size, data, usage);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBufferSubData_Hook(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data)
         {
             if(glBufferSubData_Impl)
                 glBufferSubData_Impl(target, offset, size, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetBufferSubData_Hook(GLenum target, GLintptr offset, GLsizeiptr size, GLvoid *data)
         {
             if(glGetBufferSubData_Impl)
                 glGetBufferSubData_Impl(target, offset, size, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLvoid* OVR::GLEContext::glMapBuffer_Hook(GLenum target, GLenum access)
@@ -4754,7 +4930,7 @@ limitations under the License.
             GLvoid* p = NULL;
             if(glMapBuffer_Impl)
                 p = glMapBuffer_Impl(target, access);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return p;
         }
 
@@ -4763,7 +4939,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glUnmapBuffer_Impl)
                 b = glUnmapBuffer_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -4771,14 +4947,14 @@ limitations under the License.
         {
             if(glGetBufferParameteriv_Impl)
                 glGetBufferParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetBufferPointerv_Hook(GLenum target, GLenum pname, GLvoid* *params)
         {
             if(glGetBufferPointerv_Impl)
                 glGetBufferPointerv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -4787,56 +4963,56 @@ limitations under the License.
         {
             if(glBlendEquationSeparate_Impl)
                 glBlendEquationSeparate_Impl(modeRGB, modeAlpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDrawBuffers_Hook(GLsizei n, const GLenum *bufs)
         {
             if(glDrawBuffers_Impl)
                 glDrawBuffers_Impl(n, bufs);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glStencilOpSeparate_Hook(GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass)
         {
             if(glStencilOpSeparate_Impl)
                 glStencilOpSeparate_Impl(face, sfail, dpfail, dppass);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glStencilFuncSeparate_Hook(GLenum face, GLenum func, GLint ref, GLuint mask)
         {
             if(glStencilFuncSeparate_Impl)
                 glStencilFuncSeparate_Impl(face, func, ref, mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glStencilMaskSeparate_Hook(GLenum face, GLuint mask)
         {
             if(glStencilMaskSeparate_Impl)
                 glStencilMaskSeparate_Impl(face, mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glAttachShader_Hook(GLuint program, GLuint shader)
         {
             if(glAttachShader_Impl)
                 glAttachShader_Impl(program, shader);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBindAttribLocation_Hook(GLuint program, GLuint index, const GLchar *name)
         {
             if(glBindAttribLocation_Impl)
                 glBindAttribLocation_Impl(program, index, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glCompileShader_Hook(GLuint shader)
         {
             if(glCompileShader_Impl)
                 glCompileShader_Impl(shader);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLuint OVR::GLEContext::glCreateProgram_Hook()
@@ -4844,7 +5020,7 @@ limitations under the License.
             GLuint u = 0;
             if(glCreateProgram_Impl)
                 u = glCreateProgram_Impl();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
@@ -4853,7 +5029,7 @@ limitations under the License.
             GLuint u = 0;
             if(glCreateShader_Impl)
                 u = glCreateShader_Impl(type);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
@@ -4861,56 +5037,56 @@ limitations under the License.
         {
             if(glDeleteProgram_Impl)
                 glDeleteProgram_Impl(program);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteShader_Hook(GLuint shader)
         {
             if(glDeleteShader_Impl)
                 glDeleteShader_Impl(shader);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDetachShader_Hook(GLuint program, GLuint shader)
         {
             if(glDetachShader_Impl)
                 glDetachShader_Impl(program, shader);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDisableVertexAttribArray_Hook(GLuint index)
         {
             if(glDisableVertexAttribArray_Impl)
                 glDisableVertexAttribArray_Impl(index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEnableVertexAttribArray_Hook(GLuint index)
         {
             if(glEnableVertexAttribArray_Impl)
                 glEnableVertexAttribArray_Impl(index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetActiveAttrib_Hook(GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)
         {
             if(glGetActiveAttrib_Impl)
                 glGetActiveAttrib_Impl(program, index, bufSize, length, size, type, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetActiveUniform_Hook(GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name)
         {
             if(glGetActiveUniform_Impl)
                 glGetActiveUniform_Impl(program, index, bufSize, length, size, type, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetAttachedShaders_Hook(GLuint program, GLsizei maxCount, GLsizei *count, GLuint *obj)
         {
             if(glGetAttachedShaders_Impl)
                 glGetAttachedShaders_Impl(program, maxCount, count, obj);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLint OVR::GLEContext::glGetAttribLocation_Hook(GLuint program, const GLchar *name)
@@ -4918,7 +5094,7 @@ limitations under the License.
             GLint i = 0;
             if(glGetAttribLocation_Impl)
                 i = glGetAttribLocation_Impl(program, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return i;
         }
 
@@ -4926,35 +5102,35 @@ limitations under the License.
         {
             if(glGetProgramiv_Impl)
                 glGetProgramiv_Impl(program, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetProgramInfoLog_Hook(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog)
         {
             if(glGetProgramInfoLog_Impl)
                 glGetProgramInfoLog_Impl(program, bufSize, length, infoLog);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetShaderiv_Hook(GLuint shader, GLenum pname, GLint *params)
         {
             if(glGetShaderiv_Impl)
                 glGetShaderiv_Impl(shader, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetShaderInfoLog_Hook(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog)
         {
             if(glGetShaderInfoLog_Impl)
                 glGetShaderInfoLog_Impl(shader, bufSize, length, infoLog);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetShaderSource_Hook(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *source)
         {
             if(glGetShaderSource_Impl)
                 glGetShaderSource_Impl(shader, bufSize, length, source);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLint OVR::GLEContext::glGetUniformLocation_Hook(GLuint program, const GLchar *name)
@@ -4962,7 +5138,7 @@ limitations under the License.
             GLint i = 0;
             if(glGetUniformLocation_Impl)
                 i = glGetUniformLocation_Impl(program, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return i;
         }
 
@@ -4970,42 +5146,42 @@ limitations under the License.
         {
             if(glGetUniformfv_Impl)
                 glGetUniformfv_Impl(program, location, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetUniformiv_Hook(GLuint program, GLint location, GLint *params)
         {
             if(glGetUniformiv_Impl)
                 glGetUniformiv_Impl(program, location, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribdv_Hook(GLuint index, GLenum pname, GLdouble *params)
         {
             if(glGetVertexAttribdv_Impl)
                 glGetVertexAttribdv_Impl(index, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribfv_Hook(GLuint index, GLenum pname, GLfloat *params)
         {
             if(glGetVertexAttribfv_Impl)
                 glGetVertexAttribfv_Impl(index, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribiv_Hook(GLuint index, GLenum pname, GLint *params)
         {
             if(glGetVertexAttribiv_Impl)
                 glGetVertexAttribiv_Impl(index, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribPointerv_Hook(GLuint index, GLenum pname, GLvoid* *pointer)
         {
             if(glGetVertexAttribPointerv_Impl)
                 glGetVertexAttribPointerv_Impl(index, pname, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsProgram_Hook(GLuint program)
@@ -5013,7 +5189,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsProgram_Impl)
                 b = glIsProgram_Impl(program);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -5022,7 +5198,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsShader_Impl)
                 b = glIsShader_Impl(shader);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -5030,420 +5206,420 @@ limitations under the License.
         {
             if(glLinkProgram_Impl)
                 glLinkProgram_Impl(program);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glShaderSource_Hook(GLuint shader, GLsizei count, const GLchar* *string, const GLint *length)
         {
             if(glShaderSource_Impl)
                 glShaderSource_Impl(shader, count, string, length);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUseProgram_Hook(GLuint program)
         {
             if(glUseProgram_Impl)
                 glUseProgram_Impl(program);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform1f_Hook(GLint location, GLfloat v0)
         {
             if(glUniform1f_Impl)
                 glUniform1f_Impl(location, v0);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2f_Hook(GLint location, GLfloat v0, GLfloat v1)
         {
             if(glUniform2f_Impl)
                 glUniform2f_Impl(location, v0, v1);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3f_Hook(GLint location, GLfloat v0, GLfloat v1, GLfloat v2)
         {
             if(glUniform3f_Impl)
                 glUniform3f_Impl(location, v0, v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4f_Hook(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3)
         {
             if(glUniform4f_Impl)
                 glUniform4f_Impl(location, v0, v1, v2, v3);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform1i_Hook(GLint location, GLint v0)
         {
             if(glUniform1i_Impl)
                 glUniform1i_Impl(location, v0);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2i_Hook(GLint location, GLint v0, GLint v1)
         {
             if(glUniform2i_Impl)
                 glUniform2i_Impl(location, v0, v1);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3i_Hook(GLint location, GLint v0, GLint v1, GLint v2)
         {
             if(glUniform3i_Impl)
                 glUniform3i_Impl(location, v0, v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4i_Hook(GLint location, GLint v0, GLint v1, GLint v2, GLint v3)
         {
             if(glUniform4i_Impl)
                 glUniform4i_Impl(location, v0, v1, v2, v3);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform1fv_Hook(GLint location, GLsizei count, const GLfloat *value)
         {
             if(glUniform1fv_Impl)
                 glUniform1fv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2fv_Hook(GLint location, GLsizei count, const GLfloat *value)
         {
             if(glUniform2fv_Impl)
                 glUniform2fv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3fv_Hook(GLint location, GLsizei count, const GLfloat *value)
         {
             if(glUniform3fv_Impl)
                 glUniform3fv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4fv_Hook(GLint location, GLsizei count, const GLfloat *value)
         {
             if(glUniform4fv_Impl)
                 glUniform4fv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform1iv_Hook(GLint location, GLsizei count, const GLint *value)
         {
             if(glUniform1iv_Impl)
                 glUniform1iv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2iv_Hook(GLint location, GLsizei count, const GLint *value)
         {
             if(glUniform2iv_Impl)
                 glUniform2iv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3iv_Hook(GLint location, GLsizei count, const GLint *value)
         {
             if(glUniform3iv_Impl)
                 glUniform3iv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4iv_Hook(GLint location, GLsizei count, const GLint *value)
         {
             if(glUniform4iv_Impl)
                 glUniform4iv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix2fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix2fv_Impl)
                 glUniformMatrix2fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix3fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix3fv_Impl)
                 glUniformMatrix3fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix4fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix4fv_Impl)
                 glUniformMatrix4fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glValidateProgram_Hook(GLuint program)
         {
             if(glValidateProgram_Impl)
                 glValidateProgram_Impl(program);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1d_Hook(GLuint index, GLdouble x)
         {
             if(glVertexAttrib1d_Impl)
                 glVertexAttrib1d_Impl(index, x);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1dv_Hook(GLuint index, const GLdouble *v)
         {
             if(glVertexAttrib1dv_Impl)
                 glVertexAttrib1dv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1f_Hook(GLuint index, GLfloat x)
         {
             if(glVertexAttrib1f_Impl)
                 glVertexAttrib1f_Impl(index, x);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1fv_Hook(GLuint index, const GLfloat *v)
         {
             if(glVertexAttrib1fv_Impl)
                 glVertexAttrib1fv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1s_Hook(GLuint index, GLshort x)
         {
             if(glVertexAttrib1s_Impl)
                 glVertexAttrib1s_Impl(index, x);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib1sv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttrib1sv_Impl)
                 glVertexAttrib1sv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2d_Hook(GLuint index, GLdouble x, GLdouble y)
         {
             if(glVertexAttrib2d_Impl)
                 glVertexAttrib2d_Impl(index, x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2dv_Hook(GLuint index, const GLdouble *v)
         {
             if(glVertexAttrib2dv_Impl)
                 glVertexAttrib2dv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2f_Hook(GLuint index, GLfloat x, GLfloat y)
         {
             if(glVertexAttrib2f_Impl)
                 glVertexAttrib2f_Impl(index, x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2fv_Hook(GLuint index, const GLfloat *v)
         {
             if(glVertexAttrib2fv_Impl)
                 glVertexAttrib2fv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2s_Hook(GLuint index, GLshort x, GLshort y)
         {
             if(glVertexAttrib2s_Impl)
                 glVertexAttrib2s_Impl(index, x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib2sv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttrib2sv_Impl)
                 glVertexAttrib2sv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3d_Hook(GLuint index, GLdouble x, GLdouble y, GLdouble z)
         {
             if(glVertexAttrib3d_Impl)
                 glVertexAttrib3d_Impl(index, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3dv_Hook(GLuint index, const GLdouble *v)
         {
             if(glVertexAttrib3dv_Impl)
                 glVertexAttrib3dv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3f_Hook(GLuint index, GLfloat x, GLfloat y, GLfloat z)
         {
             if(glVertexAttrib3f_Impl)
                 glVertexAttrib3f_Impl(index, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3fv_Hook(GLuint index, const GLfloat *v)
         {
             if(glVertexAttrib3fv_Impl)
                 glVertexAttrib3fv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3s_Hook(GLuint index, GLshort x, GLshort y, GLshort z)
         {
             if(glVertexAttrib3s_Impl)
                 glVertexAttrib3s_Impl(index, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib3sv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttrib3sv_Impl)
                 glVertexAttrib3sv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nbv_Hook(GLuint index, const GLbyte *v)
         {
             if(glVertexAttrib4Nbv_Impl)
                 glVertexAttrib4Nbv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Niv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttrib4Niv_Impl)
                 glVertexAttrib4Niv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nsv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttrib4Nsv_Impl)
                 glVertexAttrib4Nsv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nub_Hook(GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
         {
             if(glVertexAttrib4Nub_Impl)
                 glVertexAttrib4Nub_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nubv_Hook(GLuint index, const GLubyte *v)
         {
             if(glVertexAttrib4Nubv_Impl)
                 glVertexAttrib4Nubv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nuiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttrib4Nuiv_Impl)
                 glVertexAttrib4Nuiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4Nusv_Hook(GLuint index, const GLushort *v)
         {
             if(glVertexAttrib4Nusv_Impl)
                 glVertexAttrib4Nusv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4bv_Hook(GLuint index, const GLbyte *v)
         {
             if(glVertexAttrib4bv_Impl)
                 glVertexAttrib4bv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4d_Hook(GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
         {
             if(glVertexAttrib4d_Impl)
                 glVertexAttrib4d_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4dv_Hook(GLuint index, const GLdouble *v)
         {
             if(glVertexAttrib4dv_Impl)
                 glVertexAttrib4dv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4f_Hook(GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
         {
             if(glVertexAttrib4f_Impl)
                 glVertexAttrib4f_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4fv_Hook(GLuint index, const GLfloat *v)
         {
             if(glVertexAttrib4fv_Impl)
                 glVertexAttrib4fv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4iv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttrib4iv_Impl)
                 glVertexAttrib4iv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4s_Hook(GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
         {
             if(glVertexAttrib4s_Impl)
                 glVertexAttrib4s_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4sv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttrib4sv_Impl)
                 glVertexAttrib4sv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4ubv_Hook(GLuint index, const GLubyte *v)
         {
             if(glVertexAttrib4ubv_Impl)
                 glVertexAttrib4ubv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4uiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttrib4uiv_Impl)
                 glVertexAttrib4uiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttrib4usv_Hook(GLuint index, const GLushort *v)
         {
             if(glVertexAttrib4usv_Impl)
                 glVertexAttrib4usv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribPointer_Hook(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer)
         {
             if(glVertexAttribPointer_Impl)
                 glVertexAttribPointer_Impl(index, size, type, normalized, stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -5452,42 +5628,42 @@ limitations under the License.
         {
             if(glUniformMatrix2x3fv_Impl)
                 glUniformMatrix2x3fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix3x2fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix3x2fv_Impl)
                 glUniformMatrix3x2fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix2x4fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix2x4fv_Impl)
                 glUniformMatrix2x4fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix4x2fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix4x2fv_Impl)
                 glUniformMatrix4x2fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix3x4fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix3x4fv_Impl)
                 glUniformMatrix3x4fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniformMatrix4x3fv_Hook(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)
         {
             if(glUniformMatrix4x3fv_Impl)
                 glUniformMatrix4x3fv_Impl(location, count, transpose, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -5496,35 +5672,35 @@ limitations under the License.
         {
             if(glColorMaski_Impl)
                 glColorMaski_Impl(index, r, g, b, a);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetBooleani_v_Hook(GLenum target, GLuint index, GLboolean *data)
         {
             if(glGetBooleani_v_Impl)
                 glGetBooleani_v_Impl(target, index, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetIntegeri_v_Hook(GLenum target, GLuint index, GLint *data)
         {
             if(glGetIntegeri_v_Impl)
                 glGetIntegeri_v_Impl(target, index, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEnablei_Hook(GLenum target, GLuint index)
         {
             if(glEnablei_Impl)
                 glEnablei_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDisablei_Hook(GLenum target, GLuint index)
         {
             if(glDisablei_Impl)
                 glDisablei_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsEnabledi_Hook(GLenum target, GLuint index)
@@ -5532,7 +5708,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsEnabledi_Impl)
                 b = glIsEnabledi_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -5540,238 +5716,238 @@ limitations under the License.
         {
             if(glBeginTransformFeedback_Impl)
                 glBeginTransformFeedback_Impl(primitiveMode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEndTransformFeedback_Hook()
         {
             if(glEndTransformFeedback_Impl)
                 glEndTransformFeedback_Impl();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBindBufferRange_Hook(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size)
         {
             if(glBindBufferRange_Impl)
                 glBindBufferRange_Impl(target, index, buffer, offset, size);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBindBufferBase_Hook(GLenum target, GLuint index, GLuint buffer)
         {
             if(glBindBufferBase_Impl)
                 glBindBufferBase_Impl(target, index, buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTransformFeedbackVaryings_Hook(GLuint program, GLsizei count, const GLchar* *varyings, GLenum bufferMode)
         {
             if(glTransformFeedbackVaryings_Impl)
                 glTransformFeedbackVaryings_Impl(program, count, varyings, bufferMode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetTransformFeedbackVarying_Hook(GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLsizei *size, GLenum *type, GLchar *name)
         {
             if(glGetTransformFeedbackVarying_Impl)
                 glGetTransformFeedbackVarying_Impl(program, index, bufSize, length, size, type, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClampColor_Hook(GLenum target, GLenum clamp)
         {
             if(glClampColor_Impl)
                 glClampColor_Impl(target, clamp);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBeginConditionalRender_Hook(GLuint id, GLenum mode)
         {
             if(glBeginConditionalRender_Impl)
                 glBeginConditionalRender_Impl(id, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEndConditionalRender_Hook()
         {
             if(glEndConditionalRender_Impl)
                 glEndConditionalRender_Impl();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribIPointer_Hook(GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
         {
             if(glVertexAttribIPointer_Impl)
                 glVertexAttribIPointer_Impl(index, size, type,  stride, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribIiv_Hook(GLuint index, GLenum pname, GLint *params)
         {
             if(glGetVertexAttribIiv_Impl)
                 glGetVertexAttribIiv_Impl(index, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetVertexAttribIuiv_Hook(GLuint index, GLenum pname, GLuint *params)
         {
             if(glGetVertexAttribIuiv_Impl)
                 glGetVertexAttribIuiv_Impl(index, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI1i_Hook(GLuint index, GLint x)
         {
             if(glVertexAttribI1i_Impl)
                 glVertexAttribI1i_Impl(index, x);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI2i_Hook(GLuint index, GLint x, GLint y)
         {
             if(glVertexAttribI2i_Impl)
                 glVertexAttribI2i_Impl(index, x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI3i_Hook(GLuint index, GLint x, GLint y, GLint z)
         {
             if(glVertexAttribI3i_Impl)
                 glVertexAttribI3i_Impl(index, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4i_Hook(GLuint index, GLint x, GLint y, GLint z, GLint w)
         {
             if(glVertexAttribI4i_Impl)
                 glVertexAttribI4i_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI1ui_Hook(GLuint index, GLuint x)
         {
             if(glVertexAttribI1ui_Impl)
                 glVertexAttribI1ui_Impl(index, x);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI2ui_Hook(GLuint index, GLuint x, GLuint y)
         {
             if(glVertexAttribI2ui_Impl)
                 glVertexAttribI2ui_Impl(index, x, y);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI3ui_Hook(GLuint index, GLuint x, GLuint y, GLuint z)
         {
             if(glVertexAttribI3ui_Impl)
                 glVertexAttribI3ui_Impl(index, x, y, z);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4ui_Hook(GLuint index, GLuint x, GLuint y, GLuint z, GLuint w)
         {
             if(glVertexAttribI4ui_Impl)
                 glVertexAttribI4ui_Impl(index, x, y, z, w);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI1iv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttribI1iv_Impl)
                 glVertexAttribI1iv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI2iv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttribI2iv_Impl)
                 glVertexAttribI2iv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI3iv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttribI3iv_Impl)
                 glVertexAttribI3iv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4iv_Hook(GLuint index, const GLint *v)
         {
             if(glVertexAttribI4iv_Impl)
                 glVertexAttribI4iv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI1uiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttribI1uiv_Impl)
                 glVertexAttribI1uiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI2uiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttribI2uiv_Impl)
                 glVertexAttribI2uiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI3uiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttribI3uiv_Impl)
                 glVertexAttribI3uiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4uiv_Hook(GLuint index, const GLuint *v)
         {
             if(glVertexAttribI4uiv_Impl)
                 glVertexAttribI4uiv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4bv_Hook(GLuint index, const GLbyte *v)
         {
             if(glVertexAttribI4bv_Impl)
                 glVertexAttribI4bv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4sv_Hook(GLuint index, const GLshort *v)
         {
             if(glVertexAttribI4sv_Impl)
                 glVertexAttribI4sv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4ubv_Hook(GLuint index, const GLubyte *v)
         {
             if(glVertexAttribI4ubv_Impl)
                 glVertexAttribI4ubv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexAttribI4usv_Hook(GLuint index, const GLushort *v)
         {
             if(glVertexAttribI4usv_Impl)
                 glVertexAttribI4usv_Impl(index, v);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetUniformuiv_Hook(GLuint program, GLint location, GLuint *params)
         {
             if(glGetUniformuiv_Impl)
                 glGetUniformuiv_Impl(program, location, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBindFragDataLocation_Hook(GLuint program, GLuint color, const GLchar *name)
         {
             if(glBindFragDataLocation_Impl)
                 glBindFragDataLocation_Impl(program, color, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLint OVR::GLEContext::glGetFragDataLocation_Hook(GLuint program, const GLchar *name)
@@ -5779,7 +5955,7 @@ limitations under the License.
             GLint i = 0;
             if(glGetFragDataLocation_Impl)
                 i = glGetFragDataLocation_Impl(program, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return i;
         }
 
@@ -5787,112 +5963,112 @@ limitations under the License.
         {
             if(glUniform1ui_Impl)
                 glUniform1ui_Impl(location, v0);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2ui_Hook(GLint location, GLuint v0, GLuint v1)
         {
             if(glUniform2ui_Impl)
                 glUniform2ui_Impl(location, v0, v1);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3ui_Hook(GLint location, GLuint v0, GLuint v1, GLuint v2)
         {
             if(glUniform3ui_Impl)
                 glUniform3ui_Impl(location, v0, v1, v2);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4ui_Hook(GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3)
         {
             if(glUniform4ui_Impl)
                 glUniform4ui_Impl(location, v0, v1, v2, v3);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform1uiv_Hook(GLint location, GLsizei count, const GLuint *value)
         {
             if(glUniform1uiv_Impl)
                 glUniform1uiv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform2uiv_Hook(GLint location, GLsizei count, const GLuint *value)
         {
             if(glUniform2uiv_Impl)
                 glUniform2uiv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform3uiv_Hook(GLint location, GLsizei count, const GLuint *value)
         {
             if(glUniform3uiv_Impl)
                 glUniform3uiv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glUniform4uiv_Hook(GLint location, GLsizei count, const GLuint *value)
         {
             if(glUniform4uiv_Impl)
                 glUniform4uiv_Impl(location, count, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexParameterIiv_Hook(GLenum target, GLenum pname, const GLint *params)
         {
             if(glTexParameterIiv_Impl)
                 glTexParameterIiv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexParameterIuiv_Hook(GLenum target, GLenum pname, const GLuint *params)
         {
             if(glTexParameterIuiv_Impl)
                 glTexParameterIuiv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetTexParameterIiv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetTexParameterIiv_Impl)
                 glGetTexParameterIiv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetTexParameterIuiv_Hook(GLenum target, GLenum pname, GLuint *params)
         {
             if(glGetTexParameterIuiv_Impl)
                 glGetTexParameterIuiv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClearBufferiv_Hook(GLenum buffer, GLint drawbuffer, const GLint *value)
         {
             if(glClearBufferiv_Impl)
                 glClearBufferiv_Impl(buffer, drawbuffer, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClearBufferuiv_Hook(GLenum buffer, GLint drawbuffer, const GLuint *value)
         {
             if(glClearBufferuiv_Impl)
                 glClearBufferuiv_Impl(buffer, drawbuffer, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClearBufferfv_Hook(GLenum buffer, GLint drawbuffer, const GLfloat *value)
         {
             if(glClearBufferfv_Impl)
                 glClearBufferfv_Impl(buffer, drawbuffer, value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClearBufferfi_Hook(GLenum buffer, GLint drawbuffer, GLfloat depth, GLint stencil)
         {
             if(glClearBufferfi_Impl)
                 glClearBufferfi_Impl(buffer, drawbuffer, depth, stencil);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         const GLubyte* OVR::GLEContext::glGetStringi_Hook(GLenum name, GLuint index)
@@ -5900,7 +6076,7 @@ limitations under the License.
             const GLubyte* p = NULL;
             if(glGetStringi_Impl)
                 p = glGetStringi_Impl(name, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return p;
         }
 
@@ -5910,28 +6086,28 @@ limitations under the License.
         {
             if(glDrawArraysInstanced_Impl)
                 glDrawArraysInstanced_Impl(mode, first, count, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDrawElementsInstanced_Hook(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices, GLsizei primcount)
         {
             if(glDrawElementsInstanced_Impl)
                 glDrawElementsInstanced_Impl(mode, count, type, indices, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexBuffer_Hook(GLenum target, GLenum internalformat, GLuint buffer)
         {
             if(glTexBuffer_Impl)
                 glTexBuffer_Impl(target, internalformat, buffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPrimitiveRestartIndex_Hook(GLuint index)
         {
             if(glPrimitiveRestartIndex_Impl)
                 glPrimitiveRestartIndex_Impl(index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -5940,21 +6116,21 @@ limitations under the License.
         {
             if(glGetInteger64i_v_Impl)
                 glGetInteger64i_v_Impl(target, index, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetBufferParameteri64v_Hook(GLenum target, GLenum pname, GLint64 *params)
         {
             if(glGetBufferParameteri64v_Impl)
                 glGetBufferParameteri64v_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFramebufferTexture_Hook(GLenum target, GLenum attachment, GLuint texture, GLint level)
         {
             if(glFramebufferTexture_Impl)
                 glFramebufferTexture_Impl(target, attachment, texture, level);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -5963,7 +6139,7 @@ limitations under the License.
         {
             if(glVertexAttribDivisor_Impl)
                 glVertexAttribDivisor_Impl(index, divisor);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -5972,35 +6148,35 @@ limitations under the License.
         {
             if(glMinSampleShading_Impl)
                 glMinSampleShading_Impl(value);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlendEquationi_Hook(GLuint buf, GLenum mode)
         {
             if(glBlendEquationi_Impl)
                 glBlendEquationi_Impl(buf, mode);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlendEquationSeparatei_Hook(GLuint buf, GLenum modeRGB, GLenum modeAlpha)
         {
             if(glBlendEquationSeparatei_Impl)
                 glBlendEquationSeparatei_Impl(buf, modeRGB, modeAlpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlendFunci_Hook(GLuint buf, GLenum src, GLenum dst)
         {
             if(glBlendFunci_Impl)
                 glBlendFunci_Impl(buf, src, dst);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlendFuncSeparatei_Hook(GLuint buf, GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha)
         {
             if(glBlendFuncSeparatei_Impl)
                 glBlendFuncSeparatei_Impl(buf, srcRGB, dstRGB, srcAlpha, dstAlpha);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6009,21 +6185,21 @@ limitations under the License.
         {
             if(glDebugMessageEnableAMD_Impl)
                 glDebugMessageEnableAMD_Impl(category, severity, count, ids, enabled);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageInsertAMD_Hook(GLenum category, GLenum severity, GLuint id, GLsizei length, const GLchar *buf)
         {
             if(glDebugMessageInsertAMD_Impl)
                 glDebugMessageInsertAMD_Impl(category, severity, id, length, buf);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageCallbackAMD_Hook(GLDEBUGPROCAMD callback, GLvoid *userParam)
         {
             if(glDebugMessageCallbackAMD_Impl)
                 glDebugMessageCallbackAMD_Impl(callback, userParam);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLuint OVR::GLEContext::glGetDebugMessageLogAMD_Hook(GLuint count, GLsizei bufsize, GLenum *categories, GLuint *severities, GLuint *ids, GLsizei *lengths, GLchar *message)
@@ -6031,46 +6207,46 @@ limitations under the License.
             GLuint u = 0;
             if(glGetDebugMessageLogAMD_Impl)
                 u = glGetDebugMessageLogAMD_Impl(count, bufsize, categories, severities, ids, lengths, message);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
 
-    #if defined(GLE_APPLE_ENABLED)
+    #if defined(GLE_CGL_ENABLED)
         // GL_APPLE_element_array
         void OVR::GLEContext::glElementPointerAPPLE_Hook(GLenum type, const GLvoid *pointer)
         {
             if(glElementPointerAPPLE_Impl)
                 glElementPointerAPPLE_Impl(type, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDrawElementArrayAPPLE_Hook(GLenum mode, GLint first, GLsizei count)
         {
             if(glDrawElementArrayAPPLE_Impl)
                 glDrawElementArrayAPPLE_Impl(mode, first, count);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDrawRangeElementArrayAPPLE_Hook(GLenum mode, GLuint start, GLuint end, GLint first, GLsizei count)
         {
             if(glDrawRangeElementArrayAPPLE_Impl)
                 glDrawRangeElementArrayAPPLE_Impl(mode, start, end, first, count);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiDrawElementArrayAPPLE_Hook(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
         {
             if(glMultiDrawElementArrayAPPLE_Impl)
                 glMultiDrawElementArrayAPPLE_Impl(mode, first, count, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMultiDrawRangeElementArrayAPPLE_Hook(GLenum mode, GLuint start, GLuint end, const GLint *first, const GLsizei *count, GLsizei primcount)
         {
             if(glMultiDrawRangeElementArrayAPPLE_Impl)
                 glMultiDrawRangeElementArrayAPPLE_Impl(mode, start, end, first, count, primcount);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6079,21 +6255,21 @@ limitations under the License.
         {
             if(glGenFencesAPPLE_Impl)
                 glGenFencesAPPLE_Impl(n, fences);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteFencesAPPLE_Hook(GLsizei n, const GLuint *fences)
         {
             if(glDeleteFencesAPPLE_Impl)
                 glDeleteFencesAPPLE_Impl(n, fences);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSetFenceAPPLE_Hook(GLuint fence)
         {
             if(glSetFenceAPPLE_Impl)
                 glSetFenceAPPLE_Impl(fence);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsFenceAPPLE_Hook(GLuint fence)
@@ -6101,7 +6277,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsFenceAPPLE_Impl)
                 b = glIsFenceAPPLE_Impl(fence);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6110,7 +6286,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glTestFenceAPPLE_Impl)
                 b = glTestFenceAPPLE_Impl(fence);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6118,7 +6294,7 @@ limitations under the License.
         {
             if(glFinishFenceAPPLE_Impl)
                 glFinishFenceAPPLE_Impl(fence);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glTestObjectAPPLE_Hook(GLenum object, GLuint name)
@@ -6126,7 +6302,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glTestObjectAPPLE_Impl)
                 b = glTestObjectAPPLE_Impl(object, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6134,7 +6310,7 @@ limitations under the License.
         {
             if(glFinishObjectAPPLE_Impl)
                 glFinishObjectAPPLE_Impl(object, name);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6143,14 +6319,14 @@ limitations under the License.
         {
             if(glBufferParameteriAPPLE_Impl)
                 glBufferParameteriAPPLE_Impl(target, pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFlushMappedBufferRangeAPPLE_Hook(GLenum target, GLintptr offset, GLsizeiptr size)
         {
             if(glFlushMappedBufferRangeAPPLE_Impl)
                 glFlushMappedBufferRangeAPPLE_Impl(target, offset, size);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6160,7 +6336,7 @@ limitations under the License.
             GLenum e = 0;
             if(glObjectPurgeableAPPLE_Impl)
                 e = glObjectPurgeableAPPLE_Impl(objectType, name, option);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return e;
         }
 
@@ -6169,7 +6345,7 @@ limitations under the License.
             GLenum e = 0;
             if(glObjectUnpurgeableAPPLE_Impl)
                 e =glObjectUnpurgeableAPPLE_Impl(objectType, name, option);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return e;
         }
 
@@ -6177,7 +6353,7 @@ limitations under the License.
         {
             if(glGetObjectParameterivAPPLE_Impl)
                 glGetObjectParameterivAPPLE_Impl(objectType, name, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6186,14 +6362,14 @@ limitations under the License.
         {
             if(glTextureRangeAPPLE_Impl)
                 glTextureRangeAPPLE_Impl(target, length, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetTexParameterPointervAPPLE_Hook(GLenum target, GLenum pname, GLvoid **params)
         {
             if(glGetTexParameterPointervAPPLE_Impl)
                 glGetTexParameterPointervAPPLE_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6202,21 +6378,21 @@ limitations under the License.
         {
             if(glBindVertexArrayAPPLE_Impl)
                 glBindVertexArrayAPPLE_Impl(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteVertexArraysAPPLE_Hook(GLsizei n, const GLuint *arrays)
         {
             if(glDeleteVertexArraysAPPLE_Impl)
                 glDeleteVertexArraysAPPLE_Impl(n, arrays);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenVertexArraysAPPLE_Hook(GLsizei n, GLuint *arrays)
         {
             if(glGenVertexArraysAPPLE_Impl)
                 glGenVertexArraysAPPLE_Impl(n, arrays);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsVertexArrayAPPLE_Hook(GLuint array)
@@ -6224,7 +6400,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsVertexArrayAPPLE_Impl)
                 b = glIsVertexArrayAPPLE_Impl(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6234,21 +6410,21 @@ limitations under the License.
         {
             if(glVertexArrayRangeAPPLE_Impl)
                 glVertexArrayRangeAPPLE_Impl(length, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFlushVertexArrayRangeAPPLE_Hook(GLsizei length, GLvoid *pointer)
         {
             if(glFlushVertexArrayRangeAPPLE_Impl)
                 glFlushVertexArrayRangeAPPLE_Impl(length, pointer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glVertexArrayParameteriAPPLE_Hook(GLenum pname, GLint param)
         {
             if(glVertexArrayParameteriAPPLE_Impl)
                 glVertexArrayParameteriAPPLE_Impl(pname, param);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6257,14 +6433,14 @@ limitations under the License.
         {
             if(glEnableVertexAttribAPPLE_Impl)
                 glEnableVertexAttribAPPLE_Impl(index, pname);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDisableVertexAttribAPPLE_Hook(GLuint index, GLenum pname)
         {
             if(glDisableVertexAttribAPPLE_Impl)
                 glDisableVertexAttribAPPLE_Impl(index, pname);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsVertexAttribEnabledAPPLE_Hook(GLuint index, GLenum pname)
@@ -6272,7 +6448,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsVertexAttribEnabledAPPLE_Impl)
                 b = glIsVertexAttribEnabledAPPLE_Impl(index, pname);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6280,30 +6456,30 @@ limitations under the License.
         {
             if(glMapVertexAttrib1dAPPLE_Impl)
                 glMapVertexAttrib1dAPPLE_Impl(index, size, u1, u2, stride, order, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMapVertexAttrib1fAPPLE_Hook(GLuint index, GLuint size, GLfloat u1, GLfloat u2, GLint stride, GLint order, const GLfloat *points)
         {
             if(glMapVertexAttrib1fAPPLE_Impl)
                 glMapVertexAttrib1fAPPLE_Impl(index, size, u1, u2, stride, order, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMapVertexAttrib2dAPPLE_Hook(GLuint index, GLuint size, GLdouble u1, GLdouble u2, GLint ustride, GLint uorder, GLdouble v1, GLdouble v2, GLint vstride, GLint vorder, const GLdouble *points)
         {
             if(glMapVertexAttrib2dAPPLE_Impl)
                 glMapVertexAttrib2dAPPLE_Impl(index, size, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glMapVertexAttrib2fAPPLE_Hook(GLuint index, GLuint size, GLfloat u1, GLfloat u2, GLint ustride, GLint uorder, GLfloat v1, GLfloat v2, GLint vstride, GLint vorder, const GLfloat *points)
         {
             if(glMapVertexAttrib2fAPPLE_Impl)
                 glMapVertexAttrib2fAPPLE_Impl(index, size, u1, u2, ustride, uorder, v1, v2, vstride, vorder, points);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
-    #endif // GLE_APPLE_ENABLED
+    #endif // GLE_CGL_ENABLED
 
 
         // GL_ARB_debug_output
@@ -6311,21 +6487,21 @@ limitations under the License.
         {
             if(glDebugMessageControlARB_Impl)
                 glDebugMessageControlARB_Impl(source, type, severity, count, ids, enabled);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageInsertARB_Hook(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *buf)
         {
             if(glDebugMessageInsertARB_Impl)
                 glDebugMessageInsertARB_Impl(source, type, id, severity, length, buf);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageCallbackARB_Hook(GLDEBUGPROCARB callback, const GLvoid *userParam)
         {
             if(glDebugMessageCallbackARB_Impl)
                 glDebugMessageCallbackARB_Impl(callback, userParam);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLuint OVR::GLEContext::glGetDebugMessageLogARB_Hook(GLuint count, GLsizei bufsize, GLenum *sources, GLenum *types, GLuint *ids, GLenum *severities, GLsizei *lengths, GLchar *messageLog)
@@ -6333,7 +6509,7 @@ limitations under the License.
             GLuint u = 0;
             if(glGetDebugMessageLogARB_Impl)
                 u = glGetDebugMessageLogARB_Impl(count, bufsize, sources, types, ids, severities, lengths, messageLog);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
@@ -6343,35 +6519,35 @@ limitations under the License.
         {
             if(glReleaseShaderCompiler_Impl)
                 glReleaseShaderCompiler_Impl();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glShaderBinary_Hook(GLsizei count, const GLuint *shaders, GLenum binaryformat, const GLvoid *binary, GLsizei length)
         {
             if(glShaderBinary_Impl)
                 glShaderBinary_Impl(count, shaders, binaryformat, binary, length);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetShaderPrecisionFormat_Hook(GLenum shadertype, GLenum precisiontype, GLint *range, GLint *precision)
         {
             if(glGetShaderPrecisionFormat_Impl)
                 glGetShaderPrecisionFormat_Impl(shadertype, precisiontype, range, precision);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDepthRangef_Hook(GLclampf n, GLclampf f)
         {
             if(glDepthRangef_Impl)
                 glDepthRangef_Impl(n, f);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glClearDepthf_Hook(GLclampf d)
         {
             if(glClearDepthf_Impl)
                 glClearDepthf_Impl(d);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6381,7 +6557,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsRenderbuffer_Impl)
                 b = glIsRenderbuffer_Impl(renderbuffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6389,35 +6565,35 @@ limitations under the License.
         {
             if(glBindRenderbuffer_Impl)
                 glBindRenderbuffer_Impl(target, renderbuffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteRenderbuffers_Hook(GLsizei n, const GLuint *renderbuffers)
         {
             if(glDeleteRenderbuffers_Impl)
                 glDeleteRenderbuffers_Impl(n, renderbuffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenRenderbuffers_Hook(GLsizei n, GLuint *renderbuffers)
         {
             if(glGenRenderbuffers_Impl)
                 glGenRenderbuffers_Impl(n, renderbuffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glRenderbufferStorage_Hook(GLenum target, GLenum internalformat, GLsizei width, GLsizei height)
         {
             if(glRenderbufferStorage_Impl)
                 glRenderbufferStorage_Impl(target, internalformat, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetRenderbufferParameteriv_Hook(GLenum target, GLenum pname, GLint *params)
         {
             if(glGetRenderbufferParameteriv_Impl)
                 glGetRenderbufferParameteriv_Impl(target, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsFramebuffer_Hook(GLuint framebuffer)
@@ -6425,7 +6601,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsFramebuffer_Impl)
                 b = glIsFramebuffer_Impl(framebuffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6433,21 +6609,21 @@ limitations under the License.
         {
             if(glBindFramebuffer_Impl)
                 glBindFramebuffer_Impl(target, framebuffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteFramebuffers_Hook(GLsizei n, const GLuint *framebuffers)
         {
             if(glDeleteFramebuffers_Impl)
                 glDeleteFramebuffers_Impl(n, framebuffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenFramebuffers_Hook(GLsizei n, GLuint *framebuffers)
         {
             if(glGenFramebuffers_Impl)
                 glGenFramebuffers_Impl(n, framebuffers);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLenum OVR::GLEContext::glCheckFramebufferStatus_Hook(GLenum target)
@@ -6455,7 +6631,7 @@ limitations under the License.
             GLenum e = 0;
             if(glCheckFramebufferStatus_Impl)
                 e = glCheckFramebufferStatus_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return e;
         }
 
@@ -6463,63 +6639,63 @@ limitations under the License.
         {
             if(glFramebufferTexture1D_Impl)
                 glFramebufferTexture1D_Impl(target, attachment, textarget, texture, level);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFramebufferTexture2D_Hook(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
         {
             if(glFramebufferTexture2D_Impl)
                 glFramebufferTexture2D_Impl(target, attachment, textarget, texture, level);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFramebufferTexture3D_Hook(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
         {
             if(glFramebufferTexture3D_Impl)
                 glFramebufferTexture3D_Impl(target, attachment, textarget, texture, level, zoffset);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFramebufferRenderbuffer_Hook(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer)
         {
             if(glFramebufferRenderbuffer_Impl)
                 glFramebufferRenderbuffer_Impl(target, attachment, renderbuffertarget, renderbuffer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetFramebufferAttachmentParameteriv_Hook(GLenum target, GLenum attachment, GLenum pname, GLint *params)
         {
             if(glGetFramebufferAttachmentParameteriv_Impl)
                 glGetFramebufferAttachmentParameteriv_Impl(target, attachment, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenerateMipmap_Hook(GLenum target)
         {
             if(glGenerateMipmap_Impl)
                 glGenerateMipmap_Impl(target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glBlitFramebuffer_Hook(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter)
         {
             if(glBlitFramebuffer_Impl)
                 glBlitFramebuffer_Impl(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glRenderbufferStorageMultisample_Hook(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
         {
             if(glRenderbufferStorageMultisample_Impl)
                 glRenderbufferStorageMultisample_Impl(target, samples, internalformat, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glFramebufferTextureLayer_Hook(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer)
         {
             if(glFramebufferTextureLayer_Impl)
                 glFramebufferTextureLayer_Impl(target, attachment, texture, level, layer);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6528,28 +6704,28 @@ limitations under the License.
         {
             if(glTexImage2DMultisample_Impl)
                 glTexImage2DMultisample_Impl(target, samples, internalformat, width, height, fixedsamplelocations);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glTexImage3DMultisample_Hook(GLenum target, GLsizei samples, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations)
         {
             if(glTexImage3DMultisample_Impl)
                 glTexImage3DMultisample_Impl(target, samples, internalformat, width, height, depth, fixedsamplelocations);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetMultisamplefv_Hook(GLenum pname, GLuint index, GLfloat *val)
         {
             if(glGetMultisamplefv_Impl)
                 glGetMultisamplefv_Impl(pname, index, val);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glSampleMaski_Hook(GLuint index, GLbitfield mask)
         {
             if(glSampleMaski_Impl)
                 glSampleMaski_Impl(index, mask);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6558,21 +6734,21 @@ limitations under the License.
         {
             if(glQueryCounter_Impl)
                 glQueryCounter_Impl(id, target);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetQueryObjecti64v_Hook(GLuint id, GLenum pname, GLint64 *params)
         {
             if(glGetQueryObjecti64v_Impl)
                 glGetQueryObjecti64v_Impl(id, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetQueryObjectui64v_Hook(GLuint id, GLenum pname, GLuint64 *params)
         {
             if(glGetQueryObjectui64v_Impl)
                 glGetQueryObjectui64v_Impl(id, pname, params);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6581,21 +6757,21 @@ limitations under the License.
         {
             if(glBindVertexArray_Impl)
                 glBindVertexArray_Impl(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDeleteVertexArrays_Hook(GLsizei n, const GLuint *arrays)
         {
             if(glDeleteVertexArrays_Impl)
                 glDeleteVertexArrays_Impl(n, arrays);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGenVertexArrays_Hook(GLsizei n, GLuint *arrays)
         {
             if(glGenVertexArrays_Impl)
                 glGenVertexArrays_Impl(n, arrays);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsVertexArray_Hook(GLuint array)
@@ -6603,7 +6779,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsVertexArray_Impl)
                 b = glIsVertexArray_Impl(array);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6613,35 +6789,35 @@ limitations under the License.
         {
             if(glColorMaskIndexedEXT_Impl)
                 glColorMaskIndexedEXT_Impl(index, r, g, b, a);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetBooleanIndexedvEXT_Hook(GLenum target, GLuint index, GLboolean *data)
         {
             if(glGetBooleanIndexedvEXT_Impl)
                 glGetBooleanIndexedvEXT_Impl(target, index, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetIntegerIndexedvEXT_Hook(GLenum target, GLuint index, GLint *data)
         {
             if(glGetIntegerIndexedvEXT_Impl)
                 glGetIntegerIndexedvEXT_Impl(target, index, data);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glEnableIndexedEXT_Hook(GLenum target, GLuint index)
         {
             if(glEnableIndexedEXT_Impl)
                 glEnableIndexedEXT_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDisableIndexedEXT_Hook(GLenum target, GLuint index)
         {
             if(glDisableIndexedEXT_Impl)
                 glDisableIndexedEXT_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLboolean OVR::GLEContext::glIsEnabledIndexedEXT_Hook(GLenum target, GLuint index)
@@ -6649,7 +6825,7 @@ limitations under the License.
             GLboolean b = GL_FALSE;
             if(glIsEnabledIndexedEXT_Impl)
                 b = glIsEnabledIndexedEXT_Impl(target, index);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return b;
         }
 
@@ -6659,21 +6835,21 @@ limitations under the License.
         {
             if(glDebugMessageControl_Impl)
                 glDebugMessageControl_Impl(source, type, severity, count, ids, enabled);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageInsert_Hook(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* buf)
         {
             if(glDebugMessageInsert_Impl)
                 glDebugMessageInsert_Impl(source, type, id, severity, length, buf);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glDebugMessageCallback_Hook(GLDEBUGPROC callback, const void* userParam)
         {
             if(glDebugMessageCallback_Impl)
                 glDebugMessageCallback_Impl(callback, userParam);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         GLuint OVR::GLEContext::glGetDebugMessageLog_Hook(GLuint count, GLsizei bufSize, GLenum* sources, GLenum* types, GLuint* ids, GLenum* severities, GLsizei* lengths,  char* messageLog)
@@ -6681,7 +6857,7 @@ limitations under the License.
             GLuint u = 0;
             if(glGetDebugMessageLog_Impl)
                 u = glGetDebugMessageLog_Impl(count, bufSize, sources, types, ids, severities, lengths, messageLog);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
             return u;
         }
 
@@ -6689,42 +6865,42 @@ limitations under the License.
         {
             if(glPushDebugGroup_Impl)
                 glPushDebugGroup_Impl(source, id, length,  message);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glPopDebugGroup_Hook()
         {
             if(glPopDebugGroup_Impl)
                 glPopDebugGroup_Impl();
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glObjectLabel_Hook(GLenum identifier, GLuint name, GLsizei length, const char *label)
         {
             if(glObjectLabel_Impl)
                 glObjectLabel_Impl(identifier, name, length, label);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetObjectLabel_Hook(GLenum identifier, GLuint name, GLsizei bufSize, GLsizei *length, char *label)
         {
             if(glGetObjectLabel_Impl)
                 glGetObjectLabel_Impl(identifier, name, bufSize, length, label);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glObjectPtrLabel_Hook(void* ptr, GLsizei length, const char *label)
         {
             if(glObjectPtrLabel_Impl)
                 glObjectPtrLabel_Impl(ptr, length, label);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
         void OVR::GLEContext::glGetObjectPtrLabel_Hook(void* ptr, GLsizei bufSize, GLsizei *length, char *label)
         {
             if(glGetObjectPtrLabel_Impl)
                 glGetObjectPtrLabel_Impl(ptr, bufSize, length, label);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
@@ -6733,23 +6909,24 @@ limitations under the License.
         {
             if(glAddSwapHintRectWIN_Impl)
                 glAddSwapHintRectWIN_Impl(x, y, width, height);
-            PostHook();
+            PostHook(GLE_CURRENT_FUNCTION);
         }
 
 
-        #if defined(GLE_WINDOWS_ENABLED)
+        #if defined(GLE_WGL_ENABLED)
 			// WGL
-			void OVR::GLEContext::PostWGLHook()
+			void OVR::GLEContext::PostWGLHook(const char* /*function*/)
 			{
-				// Empty for now.
+				// Empty for now. WGL functions don't have a function like glGetError().
 			}
 
+            /* We currently don't hook these
 			#undef wglCopyContext
 			extern "C" { GLAPI BOOL GLAPIENTRY wglCopyContext(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask); }
 			BOOL OVR::GLEContext::wglCopyContext_Hook(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask)
 			{
 				BOOL b = wglCopyContext(hglrcSrc, hglrcDst, mask);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6758,7 +6935,7 @@ limitations under the License.
 			HGLRC OVR::GLEContext::wglCreateContext_Hook(HDC hdc)
 			{
 				HGLRC h = wglCreateContext(hdc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -6767,7 +6944,7 @@ limitations under the License.
 			HGLRC OVR::GLEContext::wglCreateLayerContext_Hook(HDC hdc, int iLayerPlane)
 			{
 				HGLRC h = wglCreateLayerContext(hdc, iLayerPlane);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -6776,7 +6953,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglDeleteContext_Hook(HGLRC hglrc)
 			{
 				BOOL b = wglDeleteContext(hglrc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6785,7 +6962,7 @@ limitations under the License.
 			HGLRC OVR::GLEContext::wglGetCurrentContext_Hook()
 			{
 				HGLRC h = wglGetCurrentContext();
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -6794,7 +6971,7 @@ limitations under the License.
 			HDC OVR::GLEContext::wglGetCurrentDC_Hook()
 			{
 				HDC h = wglGetCurrentDC();
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -6803,7 +6980,7 @@ limitations under the License.
 			PROC OVR::GLEContext::wglGetProcAddress_Hook(LPCSTR lpszProc)
 			{
 				PROC p = wglGetProcAddress(lpszProc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return p;
 			}
 
@@ -6812,7 +6989,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglMakeCurrent_Hook(HDC hdc, HGLRC hglrc)
 			{
 				BOOL b = wglMakeCurrent(hdc, hglrc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6821,7 +6998,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglShareLists_Hook(HGLRC hglrc1, HGLRC hglrc2)
 			{
 				BOOL b = wglShareLists(hglrc1, hglrc2);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6830,7 +7007,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglUseFontBitmapsA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
 			{
 				BOOL b = wglUseFontBitmapsA(hdc, first, count, listBase);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6839,7 +7016,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglUseFontBitmapsW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
 			{
 				BOOL b = wglUseFontBitmapsW(hdc, first, count, listBase);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6848,7 +7025,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglUseFontOutlinesA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
 			{
 				BOOL b = wglUseFontOutlinesA(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6857,7 +7034,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglUseFontOutlinesW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
 			{
 				BOOL b = wglUseFontOutlinesW(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6866,7 +7043,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglDescribeLayerPlane_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nBytes, LPLAYERPLANEDESCRIPTOR plpd)
 			{
 				BOOL b = wglDescribeLayerPlane(hdc, iPixelFormat, iLayerPlane, nBytes, plpd);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6875,7 +7052,7 @@ limitations under the License.
 			int OVR::GLEContext::wglSetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, const COLORREF *pcr)
 			{
 				int i = wglSetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -6884,7 +7061,7 @@ limitations under the License.
 			int OVR::GLEContext::wglGetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, COLORREF *pcr)
 			{
 				int i = wglGetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -6893,7 +7070,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglRealizeLayerPalette_Hook(HDC hdc, int iLayerPlane, BOOL bRealize)
 			{
 				BOOL b = wglRealizeLayerPalette(hdc, iLayerPlane, bRealize);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6902,7 +7079,7 @@ limitations under the License.
 			BOOL OVR::GLEContext::wglSwapLayerBuffers_Hook(HDC hdc, UINT fuPlanes)
 			{
 				BOOL b = wglSwapLayerBuffers(hdc, fuPlanes);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6911,9 +7088,10 @@ limitations under the License.
 			DWORD OVR::GLEContext::wglSwapMultipleBuffers_Hook(UINT i, CONST WGLSWAP* p)
 			{
 				DWORD dw = wglSwapMultipleBuffers(i, p);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return dw;
 			}
+            */
 
 			// The rest of the functions are pointer-based.
 
@@ -6923,7 +7101,7 @@ limitations under the License.
 				HANDLE h = NULL;
 				if(wglCreateBufferRegionARB_Impl)
 					h = wglCreateBufferRegionARB_Impl(hDC, iLayerPlane, uType);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -6931,7 +7109,7 @@ limitations under the License.
 			{
 				if(wglDeleteBufferRegionARB_Impl)
 					wglDeleteBufferRegionARB_Impl(hRegion);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 			}
 
 			BOOL OVR::GLEContext::wglSaveBufferRegionARB_Hook(HANDLE hRegion, int x, int y, int width, int height)
@@ -6939,7 +7117,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglSaveBufferRegionARB_Impl)
 					b = wglSaveBufferRegionARB_Impl(hRegion, x, y, width, height);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6948,7 +7126,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglRestoreBufferRegionARB_Impl)
 					b = wglRestoreBufferRegionARB_Impl(hRegion, x, y, width, height, xSrc, ySrc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6958,7 +7136,7 @@ limitations under the License.
 				const char * p = NULL;
 				if(wglGetExtensionsStringARB_Impl)
 					p = wglGetExtensionsStringARB_Impl(hdc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return p;
 			}
 
@@ -6968,7 +7146,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetPixelFormatAttribivARB_Impl)
 					b = wglGetPixelFormatAttribivARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6977,7 +7155,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetPixelFormatAttribfvARB_Impl)
 					b = wglGetPixelFormatAttribfvARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, pfValues);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6986,7 +7164,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglChoosePixelFormatARB_Impl)
 					b = wglChoosePixelFormatARB_Impl(hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -6996,7 +7174,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglMakeContextCurrentARB_Impl)
 					b = wglMakeContextCurrentARB_Impl(hDrawDC, hReadDC, hglrc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7005,7 +7183,7 @@ limitations under the License.
 				HDC h = NULL;
 				if(wglGetCurrentReadDCARB_Impl)
 					h = wglGetCurrentReadDCARB_Impl();
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7015,7 +7193,7 @@ limitations under the License.
 				HPBUFFERARB h = NULL;
 				if(wglCreatePbufferARB_Impl)
 					h = wglCreatePbufferARB_Impl(hDC, iPixelFormat, iWidth, iHeight, piAttribList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7024,7 +7202,7 @@ limitations under the License.
 				HDC h = NULL;
 				if(wglGetPbufferDCARB_Impl)
 					h = wglGetPbufferDCARB_Impl(hPbuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7033,7 +7211,7 @@ limitations under the License.
 				int i = 0;
 				if(wglReleasePbufferDCARB_Impl)
 					i = wglReleasePbufferDCARB_Impl(hPbuffer, hDC);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -7042,7 +7220,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDestroyPbufferARB_Impl)
 					b = wglDestroyPbufferARB_Impl(hPbuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7051,7 +7229,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQueryPbufferARB_Impl)
 					b = wglQueryPbufferARB_Impl(hPbuffer, iAttribute, piValue);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7061,7 +7239,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglBindTexImageARB_Impl)
 					b = wglBindTexImageARB_Impl(hPbuffer, iBuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7070,7 +7248,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglReleaseTexImageARB_Impl)
 					b = wglReleaseTexImageARB_Impl(hPbuffer, iBuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7079,7 +7257,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglSetPbufferAttribARB_Impl)
 					b = wglSetPbufferAttribARB_Impl(hPbuffer, piAttribList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7089,7 +7267,7 @@ limitations under the License.
 				int i = 0;
 				if(wglEnumerateVideoDevicesNV_Impl)
 					i = wglEnumerateVideoDevicesNV_Impl(hDC, phDeviceList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -7098,7 +7276,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglBindVideoDeviceNV_Impl)
 					b = wglBindVideoDeviceNV_Impl(hDC, uVideoSlot, hVideoDevice, piAttribList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7107,7 +7285,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQueryCurrentContextNV_Impl)
 					b = wglQueryCurrentContextNV_Impl(iAttribute, piValue);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7117,7 +7295,7 @@ limitations under the License.
 				HGLRC h = NULL;
 				if(wglCreateContextAttribsARB_Impl)
 					h = wglCreateContextAttribsARB_Impl(hDC, hShareContext, attribList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7127,7 +7305,7 @@ limitations under the License.
 				const char * p = NULL;
 				if(wglGetExtensionsStringEXT_Impl)
 					p = wglGetExtensionsStringEXT_Impl();
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return p;
 			}
 
@@ -7137,7 +7315,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglSwapIntervalEXT_Impl)
 					b = wglSwapIntervalEXT_Impl(interval);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7146,7 +7324,7 @@ limitations under the License.
 				int i = 0;
 				if(wglGetSwapIntervalEXT_Impl)
 					i = wglGetSwapIntervalEXT_Impl();
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -7156,7 +7334,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetSyncValuesOML_Impl)
 					b = wglGetSyncValuesOML_Impl(hdc, ust, msc, sbc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7165,7 +7343,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetMscRateOML_Impl)
 					b = wglGetMscRateOML_Impl(hdc, numerator, denominator);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7174,7 +7352,7 @@ limitations under the License.
 				INT64 i = 0;
 				if(wglSwapBuffersMscOML_Impl)
 					i = wglSwapBuffersMscOML_Impl(hdc, target_msc, divisor, remainder);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -7183,7 +7361,7 @@ limitations under the License.
 				INT64 i = 0;
 				if(wglSwapLayerBuffersMscOML_Impl)
 					i = wglSwapLayerBuffersMscOML_Impl(hdc, fuPlanes, target_msc, divisor, remainder);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return i;
 			}
 
@@ -7192,7 +7370,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglWaitForMscOML_Impl)
 					b = wglWaitForMscOML_Impl(hdc, target_msc, divisor, remainder, ust, msc, sbc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7201,7 +7379,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglWaitForSbcOML_Impl)
 					b = wglWaitForSbcOML_Impl(hdc, target_sbc, ust, msc, sbc);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7211,7 +7389,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetVideoDeviceNV_Impl)
 					b = wglGetVideoDeviceNV_Impl(hDC, numDevices, hVideoDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7220,7 +7398,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglReleaseVideoDeviceNV_Impl)
 					b = wglReleaseVideoDeviceNV_Impl(hVideoDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7229,7 +7407,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglBindVideoImageNV_Impl)
 					b = wglBindVideoImageNV_Impl(hVideoDevice, hPbuffer, iVideoBuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7238,7 +7416,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglReleaseVideoImageNV_Impl)
 					b = wglReleaseVideoImageNV_Impl(hPbuffer, iVideoBuffer);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7247,7 +7425,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglSendPbufferToVideoNV_Impl)
 					b = wglSendPbufferToVideoNV_Impl(hPbuffer, iBufferType, pulCounterPbuffer, bBlock);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7256,7 +7434,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglGetVideoInfoNV_Impl)
 					b = wglGetVideoInfoNV_Impl(hpVideoDevice, pulCounterOutputPbuffer, pulCounterOutputVideo);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7266,7 +7444,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglJoinSwapGroupNV_Impl)
 					b = wglJoinSwapGroupNV_Impl(hDC, group);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7275,7 +7453,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglBindSwapBarrierNV_Impl)
 					b = wglBindSwapBarrierNV_Impl(group, barrier);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7284,7 +7462,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQuerySwapGroupNV_Impl)
 					b = wglQuerySwapGroupNV_Impl(hDC, group, barrier);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 		   }
 
@@ -7293,7 +7471,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQueryMaxSwapGroupsNV_Impl)
 					b = wglQueryMaxSwapGroupsNV_Impl(hDC, maxGroups, maxBarriers);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7302,7 +7480,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQueryFrameCountNV_Impl)
 					b = wglQueryFrameCountNV_Impl(hDC, count);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7311,7 +7489,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglResetFrameCountNV_Impl)
 					b = wglResetFrameCountNV_Impl(hDC);
-				PostHook();
+				PostHook(GLE_CURRENT_FUNCTION);
 				return b;
 		   }
 
@@ -7321,7 +7499,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglBindVideoCaptureDeviceNV_Impl)
 					b = wglBindVideoCaptureDeviceNV_Impl(uVideoSlot, hDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7330,7 +7508,7 @@ limitations under the License.
 				UINT u = 0;
 				if(wglEnumerateVideoCaptureDevicesNV_Impl)
 					u = wglEnumerateVideoCaptureDevicesNV_Impl(hDc, phDeviceList);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return u;
 			}
 
@@ -7339,7 +7517,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglLockVideoCaptureDeviceNV_Impl)
 					b = wglLockVideoCaptureDeviceNV_Impl(hDc, hDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7348,7 +7526,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglQueryVideoCaptureDeviceNV_Impl)
 					b = wglQueryVideoCaptureDeviceNV_Impl(hDc, hDevice, iAttribute, piValue);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7357,7 +7535,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglReleaseVideoCaptureDeviceNV_Impl)
 					b = wglReleaseVideoCaptureDeviceNV_Impl(hDc, hDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7368,7 +7546,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglCopyImageSubDataNV_Impl)
 					b = wglCopyImageSubDataNV_Impl(hSrcRC, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, hDstRC, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7378,7 +7556,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXSetResourceShareHandleNV_Impl)
 					b = wglDXSetResourceShareHandleNV_Impl(dxObject, shareHandle);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7387,7 +7565,7 @@ limitations under the License.
 				HANDLE h = NULL;
 				if(wglDXOpenDeviceNV_Impl)
 					h = wglDXOpenDeviceNV_Impl(dxDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7396,7 +7574,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXCloseDeviceNV_Impl)
 					b = wglDXCloseDeviceNV_Impl(hDevice);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7405,7 +7583,7 @@ limitations under the License.
 				HANDLE h = NULL;
 				if(wglDXRegisterObjectNV_Impl)
 					h = wglDXRegisterObjectNV_Impl(hDevice, dxObject, name, type, access);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return h;
 			}
 
@@ -7414,7 +7592,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXUnregisterObjectNV_Impl)
 					b = wglDXUnregisterObjectNV_Impl(hDevice, hObject);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7423,7 +7601,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXObjectAccessNV_Impl)
 					b = wglDXObjectAccessNV_Impl(hObject, access);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7432,7 +7610,7 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXLockObjectsNV_Impl)
 					b = wglDXLockObjectsNV_Impl(hDevice, count, hObjects);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
@@ -7441,16 +7619,16 @@ limitations under the License.
 				BOOL b = FALSE;
 				if(wglDXUnlockObjectsNV_Impl)
 					b = wglDXUnlockObjectsNV_Impl(hDevice, count, hObjects);
-				PostWGLHook();
+				PostWGLHook(GLE_CURRENT_FUNCTION);
 				return b;
 			}
 
-        #endif // defined(GLE_WINDOWS_ENABLED)
+        #endif // defined(GLE_WGL_ENABLED)
 
-        #if defined(GLE_UNIX_ENABLED)
-			void OVR::GLEContext::PostGLXHook()
+        #if defined(GLE_GLX_ENABLED)
+			void OVR::GLEContext::PostGLXHook(const char* /*function*/)
 			{
-				// Empty for now.
+				// Empty for now. GLX functions don't have a function like glGetError().
 			}
 
 			// GLX_VERSION_1_0
@@ -7463,7 +7641,7 @@ limitations under the License.
 				::Display* p = NULL;
 				if(glXGetCurrentDisplay_Impl)
 	                p = glXGetCurrentDisplay_Impl();
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return p;
 			}
 
@@ -7473,7 +7651,7 @@ limitations under the License.
 				GLXFBConfig* p = NULL;
 				if(glXChooseFBConfig_Impl)
 	                p = glXChooseFBConfig_Impl(dpy, screen, attrib_list, nelements);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return p;
 			}
 
@@ -7482,7 +7660,7 @@ limitations under the License.
 		    	GLXContext c = 0;
 				if(glXCreateNewContext_Impl)
 	                c = glXCreateNewContext_Impl(dpy, config, render_type, share_list, direct);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return c;
 			}
 
@@ -7491,7 +7669,7 @@ limitations under the License.
 		    	GLXPbuffer b = 0;
 	            if(glXCreatePbuffer_Impl)
 	            	b = glXCreatePbuffer_Impl(dpy, config, attrib_list);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
@@ -7500,7 +7678,7 @@ limitations under the License.
 		    	GLXPixmap m = 0;
 	            if(glXCreatePixmap_Impl)
 	            	m = glXCreatePixmap_Impl(dpy, config, pixmap, attrib_list);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return m;
 			}
 
@@ -7509,7 +7687,7 @@ limitations under the License.
 		    	GLXWindow w = 0;
 	            if(glXCreateWindow_Impl)
 	            	w = glXCreateWindow_Impl(dpy, config, win, attrib_list);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return w;
 			}
 
@@ -7517,21 +7695,21 @@ limitations under the License.
 		    {
 	            if(glXDestroyPbuffer_Impl)
 	                glXDestroyPbuffer_Impl(dpy, pbuf);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 		    }
 
 		    void OVR::GLEContext::glXDestroyPixmap_Hook(Display *dpy, GLXPixmap pixmap)
 			{
 	            if(glXDestroyPixmap_Impl)
 	            	glXDestroyPixmap_Impl(dpy, pixmap);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 			}
 
 		    void OVR::GLEContext::glXDestroyWindow_Hook(Display *dpy, GLXWindow win)
 			{
 	            if(glXDestroyWindow_Impl)
 	            	glXDestroyWindow_Impl(dpy, win);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 			}
 
 		    GLXDrawable OVR::GLEContext::glXGetCurrentReadDrawable_Hook(void)
@@ -7539,7 +7717,7 @@ limitations under the License.
 		    	GLXDrawable d;
 	            if(glXGetCurrentReadDrawable_Impl)
 	            	d = glXGetCurrentReadDrawable_Impl();
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return d;
 			}
 
@@ -7548,7 +7726,7 @@ limitations under the License.
 	            int i = -1;
 	            if(glXGetFBConfigAttrib_Impl)
 	            	i = glXGetFBConfigAttrib_Impl(dpy, config, attribute, value);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return i;
 			}
 
@@ -7557,7 +7735,7 @@ limitations under the License.
 		    	GLXFBConfig* p = NULL;
 	            if(glXGetFBConfigs_Impl)
 	            	p = glXGetFBConfigs_Impl(dpy, screen, nelements);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return p;
 		    }
 
@@ -7565,7 +7743,7 @@ limitations under the License.
 			{
 	            if(glXGetSelectedEvent_Impl)
 	            	glXGetSelectedEvent_Impl(dpy, draw, event_mask);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 			}
 
 		    XVisualInfo* OVR::GLEContext::glXGetVisualFromFBConfig_Hook(Display *dpy, GLXFBConfig config)
@@ -7573,7 +7751,7 @@ limitations under the License.
 		    	XVisualInfo* p = NULL;
 	            if(glXGetVisualFromFBConfig_Impl)
 	            	p = glXGetVisualFromFBConfig_Impl(dpy, config);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return p;
 			}
 
@@ -7582,7 +7760,7 @@ limitations under the License.
 	            Bool b = False;
 	            if(glXMakeContextCurrent_Impl)
 	            	b = glXMakeContextCurrent_Impl(dpy, draw, read, ctx);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
@@ -7591,7 +7769,7 @@ limitations under the License.
 	            int i = GLX_BAD_ATTRIBUTE;
 	            if(glXQueryContext_Impl)
 	            	i = glXQueryContext_Impl(dpy, ctx, attribute, value);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return i;
 		    }
 
@@ -7599,25 +7777,35 @@ limitations under the License.
 			{
 	            if(glXQueryDrawable_Impl)
 	            	glXQueryDrawable_Impl(dpy, draw, attribute, value);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 			}
 
 		    void OVR::GLEContext::glXSelectEvent_Hook(Display *dpy, GLXDrawable draw, unsigned long event_mask)
 			{
 	            if(glXSelectEvent_Impl)
 	            	glXSelectEvent_Impl(dpy, draw, event_mask);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 			}
 
 		    // GLX_VERSION_1_4
 		    // We don't do hooking of this.
+
+		    // GLX_ARB_create_context
+	        GLXContext OVR::GLEContext::glXCreateContextAttribsARB_Hook(Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list)
+			{
+	        	GLXContext c = 0;
+	            if(glXCreateContextAttribsARB_Impl)
+	            	c = glXCreateContextAttribsARB_Impl(dpy,  config, share_context, direct, attrib_list);
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
+	            return c;
+			}
 
 		    // GLX_EXT_swap_control
 		    void OVR::GLEContext::glXSwapIntervalEXT_Hook(Display* dpy, GLXDrawable drawable, int interval)
 		    {
 	            if(glXSwapIntervalEXT_Impl)
 	            	glXSwapIntervalEXT_Impl(dpy, drawable, interval);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 		    }
 
             // GLX_OML_sync_control
@@ -7626,7 +7814,7 @@ limitations under the License.
 	            Bool b = False;
 	            if(glXGetMscRateOML_Impl)
 	            	b = glXGetMscRateOML_Impl(dpy, drawable, numerator, denominator);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
@@ -7635,7 +7823,7 @@ limitations under the License.
 	            Bool b = False;
 	            if(glXGetSyncValuesOML_Impl)
 	            	b = glXGetSyncValuesOML_Impl(dpy, drawable, ust, msc, sbc);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
@@ -7644,7 +7832,7 @@ limitations under the License.
    				int64_t i = 0;
 	            if(glXSwapBuffersMscOML_Impl)
 	            	i = glXSwapBuffersMscOML_Impl(dpy, drawable, target_msc, divisor, remainder);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return i;
 			}
 
@@ -7653,7 +7841,7 @@ limitations under the License.
 	            Bool b = False;
 	            if(glXWaitForMscOML_Impl)
 	            	b = glXWaitForMscOML_Impl(dpy, drawable, target_msc, divisor, remainder, ust, msc, sbc);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
@@ -7662,11 +7850,31 @@ limitations under the License.
 	            Bool b = False;
 	            if(glXWaitForSbcOML_Impl)
 	            	b = glXWaitForSbcOML_Impl(dpy, drawable, target_sbc, ust, msc, sbc);
-	            PostGLXHook();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
 	            return b;
 			}
 
-        #endif // defined(GLE_UNIX_ENABLED)
+            // GLX_MESA_swap_control
+            int OVR::GLEContext::glXGetSwapIntervalMESA_Hook()
+		    {
+	            int i = 0;
+                if(glXGetSwapIntervalMESA_Impl)
+	            	i = glXGetSwapIntervalMESA_Impl();
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
+                return i;
+		    }
+
+
+            int OVR::GLEContext::glXSwapIntervalMESA_Hook(unsigned int interval)
+		    {
+	            int i = 0;
+                if(glXSwapIntervalMESA_Impl)
+	            	i = glXSwapIntervalMESA_Impl(interval);
+	            PostGLXHook(GLE_CURRENT_FUNCTION);
+                return i;
+		    }
+
+        #endif // defined(GLE_GLX_ENABLED)
 
     #endif // GLE_HOOKING_ENABLED
 

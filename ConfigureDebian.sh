@@ -41,11 +41,9 @@ echo "Installing mesa-common..."
 sudo apt-get install mesa-common-dev
 echo "Installing freeglut3..."
 sudo apt-get install freeglut3-dev
-echo "Installing Xinerama..."
-sudo apt-get install libxinerama-dev
 echo "Installing Xrandr..."
 sudo apt-get install libxrandr-dev
-echo "Installing XFree86"
-sudo apt-get install libxxf86vm-dev
+echo "Installing uuid"
+sudo apt-get install uuid-dev
 echo "Installation complete"
 

@@ -142,6 +142,7 @@ public:
 
     static HMDState* CreateHMDState(Service::NetClient* client, const HMDNetworkInfo& netInfo);
     static HMDState* CreateHMDState(ovrHmdType hmdType); // Used for debug mode
+    static const OVR::List<HMDState>& GetHMDStateList();
 
     // *** Sensor Setup
 

@@ -80,7 +80,7 @@ UInt32 GamepadManager::GetGamepadCount()
     return 1;
 }
 
-bool GamepadManager::GetGamepadState(UInt32 index, GamepadState *pState)
+bool GamepadManager::GetGamepadState(UInt32 /*index*/, GamepadState *pState)
 {
     if (pDevice)
     {

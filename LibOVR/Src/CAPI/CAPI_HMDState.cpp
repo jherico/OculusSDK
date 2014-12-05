@@ -35,6 +35,10 @@ limitations under the License.
 namespace OVR { namespace CAPI {
 
 
+// Accessed via HMDState::GetHMDStateList()
+static OVR::List<HMDState> hmdStateList; // List of all created HMDStates.
+
+
 //-------------------------------------------------------------------------------------
 // ***** HMDState
 
@@ -73,6 +77,7 @@ HMDState::HMDState(const OVR::Service::HMDNetworkInfo& netInfo,
     BeginFrameTimingCalled(false)
 {
     sharedInit(profile);
+    hmdStateList.PushBack(this);
 }
 
 
@@ -108,10 +113,13 @@ HMDState::HMDState(const OVR::HMDInfo& hmdInfo, Profile* profile) :
     BeginFrameTimingCalled(false)
 {
     sharedInit(profile);
+    hmdStateList.PushBack(this);
 }
 
 HMDState::~HMDState()
 {
+    hmdStateList.Remove(this);
+
     if (pClient)
     {
 		pClient->Hmd_Release(NetId);
@@ -296,6 +304,12 @@ HMDState* HMDState::CreateHMDState(ovrHmdType hmdType)
 }
     
 
+const OVR::List<HMDState>& HMDState::GetHMDStateList()
+{
+    return hmdStateList;
+}
+
+
 //-------------------------------------------------------------------------------------
 // *** Sensor 
 
@@ -334,8 +348,9 @@ void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
 {
     if (OurHMDInfo.HmdType < HmdType_DK2)
     {
-        // disable low persistence
+        // disable low persistence and pentile.
         hmdCaps &= ~ovrHmdCap_LowPersistence;
+        hmdCaps &= ~ovrHmdCap_DirectPentile;
 
         // disable dynamic prediction using the internal latency tester
         hmdCaps &= ~ovrHmdCap_DynamicPrediction;
@@ -352,6 +367,9 @@ void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
         }
     }
 
+    // Pentile unsupported on everything right now.
+    hmdCaps &= ~ovrHmdCap_DirectPentile;
+	
     if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_NoVSync)
     {
         TimeManager.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);

@@ -31,7 +31,7 @@ limitations under the License.
 #include "OVR_Win32_FocusReader.h"
 
 // Exported 
-extern void checkUMDriverOverrides(void* context);
+extern bool checkUMDriverOverrides(void* context);
 extern void clearUMDriverOverrides();
 
 #include <stdio.h>
@@ -197,10 +197,10 @@ DisplayShim::~DisplayShim()
 
 bool DisplayShim::Initialize( bool inCompatibility )
 {
-	if( !inCompatibility )
-		checkUMDriverOverrides( this );
+	if (inCompatibility)
+        return false;
 
-	return true;
+    return checkUMDriverOverrides( this );
 }
 
 bool DisplayShim::Shutdown()

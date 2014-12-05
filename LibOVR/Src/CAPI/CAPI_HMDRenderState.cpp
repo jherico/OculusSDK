@@ -65,6 +65,11 @@ ovrHmdDesc HMDRenderState::GetDesc() const
                           ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits |
                           ovrDistortionCap_HqDistortion | ovrDistortionCap_LinuxDevFullscreen;
 
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
+    // TODO: this gets enabled for everything, but is only applicable for DX11+
+    d.DistortionCaps   |= ovrDistortionCap_ComputeShader;
+#endif
+
     if( OurHMDInfo.InCompatibilityMode )
         d.HmdCaps |= ovrHmdCap_ExtendDesktop;
 

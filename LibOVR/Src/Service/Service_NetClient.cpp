@@ -192,6 +192,12 @@ const char* NetClient::GetStringValue(VirtualHmdId hmd, const char* key, const c
         return "";
     }
 
+	// If a null value is provided,
+	if (!default_val)
+	{
+		default_val = "";
+	}
+
     ProfileGetValue1_Str = default_val;
 
     OVR::Net::BitStream bsOut, returnData;
@@ -605,13 +611,13 @@ const char* NetClient::Hmd_GetLastError(VirtualHmdId hmd)
         return Hmd_GetLastError_Str.ToCStr();
     }
 
-	OVR::Net::BitStream bsOut;
+    OVR::Net::BitStream bsOut, returnData;
 	bsOut.Write(hmd);
-	if (!GetRPC1()->CallBlocking("Hmd_GetLastError_1", &bsOut, GetSession()->GetConnectionAtIndex(0)))
+    if (!GetRPC1()->CallBlocking("Hmd_GetLastError_1", &bsOut, GetSession()->GetConnectionAtIndex(0), &returnData))
 	{
 		return Hmd_GetLastError_Str.ToCStr();
 	}
-    if (!bsOut.Read(Hmd_GetLastError_Str))
+    if (!returnData.Read(Hmd_GetLastError_Str))
     {
         OVR_ASSERT(false);
     }

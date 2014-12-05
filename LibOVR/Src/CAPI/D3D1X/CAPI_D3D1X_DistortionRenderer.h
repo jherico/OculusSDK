@@ -85,14 +85,22 @@ protected:
 		BOOL memoryCleared;
 
 		ID3D1xRasterizerState* rasterizerState;
-		ID3D1xSamplerState* samplerStates[D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT];
 		ID3D1xInputLayout* inputLayoutState;
 
-		ID3D1xShaderResourceView* psShaderResourceState[D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
-		ID3D1xShaderResourceView* vsShaderResourceState[D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
+		ID3D1xShaderResourceView*   psShaderResourceState[D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
+		ID3D1xSamplerState*         psSamplerStates[D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT];
+		ID3D1xBuffer*               psConstantBuffersState[D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT];
 
-		ID3D1xBuffer* psConstantBuffersState[D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT];
-		ID3D1xBuffer* vsConstantBuffersState[D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT];
+        ID3D1xShaderResourceView*   vsShaderResourceState[D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
+		ID3D1xSamplerState*         vsSamplerStates[D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT];
+		ID3D1xBuffer*               vsConstantBuffersState[D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT];
+
+#if (OVR_D3D_VERSION == 11)
+        ID3D1xShaderResourceView*   csShaderResourceState[D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT];
+		ID3D1xSamplerState*         csSamplerStates[D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT];
+		ID3D1xBuffer*               csConstantBuffersState[D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT];
+		ID3D1xUnorderedAccessView*  csUnorderedAccessViewState[D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT];
+#endif
 
 		ID3D1xRenderTargetView* renderTargetViewState[D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT];
 		ID3D1xDepthStencilView* depthStencilViewState;
@@ -117,6 +125,7 @@ protected:
 #if (OVR_D3D_VERSION == 11)
 		ID3D11HullShader* currentHullShader;
 		ID3D11DomainShader* currentDomainShader;
+		ID3D11ComputeShader* currentComputeShader;
 #endif
 
 	};
@@ -168,6 +177,7 @@ private:
 
 	Ptr<Buffer>         DistortionMeshVBs[2];    // one per-eye
 	Ptr<Buffer>         DistortionMeshIBs[2];    // one per-eye
+	Ptr<Buffer>         DistortionPinBuffer[2];  // one per-eye
 
 	Ptr<ShaderSet>      DistortionShader;
 	Ptr<ID3D1xInputLayout> DistortionVertexIL;

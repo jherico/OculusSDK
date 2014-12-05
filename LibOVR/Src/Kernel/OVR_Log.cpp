@@ -30,6 +30,8 @@ limitations under the License.
 #include <stdio.h>
 #include <time.h>
 #include "../Kernel/OVR_System.h"
+#include "../Kernel/OVR_DebugHelp.h"
+#include "../Util/Util_SystemGUI.h"
 
 #if defined(OVR_OS_MS) && !defined(OVR_OS_MS_MOBILE)
 #define WIN32_LEAN_AND_MEAN
@@ -371,5 +373,60 @@ OVR_LOG_FUNCTION_IMPL(DebugText)
 OVR_LOG_FUNCTION_IMPL(Debug)
 OVR_LOG_FUNCTION_IMPL(Assert)
 #endif
+
+
+
+// Assertion handler support
+// To consider: Move this to an OVR_Types.cpp or OVR_Assert.cpp source file.
+
+static OVRAssertionHandler sOVRAssertionHandler = OVR::DefaultAssertionHandler;
+static intptr_t sOVRAssertionHandlerUserParameter = 0;
+
+OVRAssertionHandler GetAssertionHandler(intptr_t* userParameter)
+{
+    if(userParameter)
+        *userParameter = sOVRAssertionHandlerUserParameter;
+    return sOVRAssertionHandler;
+}
+
+void SetAssertionHandler(OVRAssertionHandler assertionHandler, intptr_t userParameter)
+{
+    sOVRAssertionHandler = assertionHandler;
+    sOVRAssertionHandlerUserParameter = userParameter;
+}
+
+intptr_t DefaultAssertionHandler(intptr_t /*userParameter*/, const char* title, const char* message)
+{
+    if(OVRIsDebuggerPresent())
+    {
+        OVR_DEBUG_BREAK;
+    }
+    else
+    {
+        #if defined(OVR_BUILD_DEBUG)
+            // Print a stack trace of all threads.
+            OVR::String s;
+            OVR::String threadListOutput;
+            static OVR::SymbolLookup symbolLookup;
+
+            s = "Failure: "; 
+            s += message;
+
+            if(symbolLookup.Initialize() && symbolLookup.ReportThreadCallstack(threadListOutput, 4)) // This '4' is there to skip our internal handling and retrieve starting at the assertion location (our caller) only.
+            {
+                s += "\r\n\r\n";
+                s += threadListOutput;
+            }
+
+            OVR::Util::DisplayMessageBox(title, s.ToCStr());
+        #else
+            OVR::Util::DisplayMessageBox(title, message);
+        #endif
+    }
+    
+    return 0;
+}
+
+
 
 } // OVR

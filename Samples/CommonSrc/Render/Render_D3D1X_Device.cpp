@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation  for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -761,6 +761,9 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
     PreFullscreenH(0),
     BackBuffer(),
     BackBufferRT(),
+#if (OVR_D3D_VERSION>=11)
+    BackBufferUAV(),
+#endif
     CurRenderTarget(),
     CurDepthBuffer(),
     Rasterizer(),
@@ -852,7 +855,10 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
         UpdateMonitorOutputs();
     }
 
-    int flags = D3D10_CREATE_DEVICE_BGRA_SUPPORT; //0;
+    int flags = D3D10_CREATE_DEVICE_BGRA_SUPPORT;
+
+    if(p.DebugEnabled)
+        flags |= D3D1x_(CREATE_DEVICE_DEBUG);
 
 #if (OVR_D3D_VERSION == 10)
     Device = NULL;
@@ -865,7 +871,7 @@ RenderDevice::RenderDevice(const RendererParams& p, HWND window) :
     Context = NULL;
     D3D_FEATURE_LEVEL featureLevel; // TODO: Limit certain features based on D3D feature level
     hr = D3D11CreateDevice(Adapter, Adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
-                           NULL, flags /*| D3D11_CREATE_DEVICE_DEBUG*/, NULL, 0, D3D1x_(SDK_VERSION),
+                           NULL, flags, NULL, 0, D3D1x_(SDK_VERSION),
                            &Device.GetRawRef(), &featureLevel, &Context.GetRawRef());
 #endif
 	if (FAILED(hr))
@@ -1176,6 +1182,9 @@ bool RenderDevice::RecreateSwapChain()
     scDesc.BufferDesc.RefreshRate.Numerator = 0;
     scDesc.BufferDesc.RefreshRate.Denominator = 1;
     scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+#if (OVR_D3D_VERSION>=11)
+    scDesc.BufferUsage |= DXGI_USAGE_UNORDERED_ACCESS;
+#endif
     scDesc.OutputWindow = Window;
     scDesc.SampleDesc.Count = Params.Multisample;
     scDesc.SampleDesc.Quality = 0;
@@ -1203,6 +1212,9 @@ bool RenderDevice::RecreateSwapChain()
 
     BackBuffer = NULL;
     BackBufferRT = NULL;
+#if (OVR_D3D_VERSION>=11)
+    BackBufferUAV = NULL;
+#endif
     hr = SwapChain->GetBuffer(0, __uuidof(ID3D1xTexture2D), (void**)&BackBuffer.GetRawRef());
     if (FAILED(hr))
     {
@@ -1216,6 +1228,15 @@ bool RenderDevice::RecreateSwapChain()
         OVR_LOG_COM_ERROR(hr);
         return false;
     }
+
+#if (OVR_D3D_VERSION>=11)
+    hr = Device->CreateUnorderedAccessView(BackBuffer, NULL, &BackBufferUAV.GetRawRef());
+    if (FAILED(hr))
+    {
+        OVR_LOG_COM_ERROR(hr);
+        return false;
+    }
+#endif
 
     Texture* depthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, Params.Multisample);
     CurDepthBuffer = depthBuffer;
@@ -1243,21 +1264,22 @@ ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
 #if (OVR_D3D_VERSION == 10)
 	static ovrD3D10Config cfg;
-	cfg.D3D10.Header.API         = ovrRenderAPI_D3D10;
-	cfg.D3D10.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-	cfg.D3D10.Header.Multisample = Params.Multisample;
-	cfg.D3D10.pDevice            = Device;
-	cfg.D3D10.pBackBufferRT      = BackBufferRT;
-	cfg.D3D10.pSwapChain         = SwapChain;
+	cfg.D3D10.Header.API            = ovrRenderAPI_D3D10;
+	cfg.D3D10.Header.BackBufferSize = Sizei(WindowWidth, WindowHeight);
+	cfg.D3D10.Header.Multisample    = Params.Multisample;
+	cfg.D3D10.pDevice               = Device;
+	cfg.D3D10.pBackBufferRT         = BackBufferRT;
+	cfg.D3D10.pSwapChain            = SwapChain;
 #else
 	static ovrD3D11Config cfg;
-	cfg.D3D11.Header.API         = ovrRenderAPI_D3D11;
-	cfg.D3D11.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-	cfg.D3D11.Header.Multisample = Params.Multisample;
-	cfg.D3D11.pDevice            = Device;
-	cfg.D3D11.pDeviceContext     = Context;
-	cfg.D3D11.pBackBufferRT      = BackBufferRT;
-	cfg.D3D11.pSwapChain         = SwapChain;
+	cfg.D3D11.Header.API            = ovrRenderAPI_D3D11;
+	cfg.D3D11.Header.BackBufferSize = Sizei(WindowWidth, WindowHeight);
+	cfg.D3D11.Header.Multisample    = Params.Multisample;
+	cfg.D3D11.pDevice               = Device;
+	cfg.D3D11.pDeviceContext        = Context;
+	cfg.D3D11.pBackBufferRT         = BackBufferRT;
+	cfg.D3D11.pBackBufferUAV        = BackBufferUAV;
+	cfg.D3D11.pSwapChain            = SwapChain;
 #endif
 	return cfg.Config;
 }
@@ -1491,8 +1513,11 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
         D3DBuffer = NULL;
         Size = 0;
         Use = 0;
-        Dynamic = 0;
+        Dynamic = false;
     }
+#if (OVR_D3D_VERSION>=11)
+    D3DUav = NULL;
+#endif
 
     D3D1x_(BUFFER_DESC) desc;
     memset(&desc, 0, sizeof(desc));
@@ -1505,7 +1530,7 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
     {
         desc.Usage = D3D1x_(USAGE_DYNAMIC);
         desc.CPUAccessFlags = D3D1x_(CPU_ACCESS_WRITE);
-        Dynamic = 1;
+        Dynamic = true;
     }
 
     switch(use & Buffer_TypeMask)
@@ -1514,13 +1539,40 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
     case Buffer_Index:   desc.BindFlags = D3D1x_(BIND_INDEX_BUFFER);  break;
     case Buffer_Uniform:
         desc.BindFlags = D3D1x_(BIND_CONSTANT_BUFFER);
-        size += ((size + 15) & ~15) - size;
+        size = ((size + 15) & ~15);
         break;
     case Buffer_Feedback:
         desc.BindFlags = D3D1x_(BIND_STREAM_OUTPUT);
         desc.Usage     = D3D1x_(USAGE_DEFAULT);
         desc.CPUAccessFlags = 0;
-        size += ((size + 15) & ~15) - size;
+        size = ((size + 15) & ~15);
+        break;
+    case Buffer_Compute:
+#if (OVR_D3D_VERSION >= 11)
+        // There's actually a bunch of options for buffers bound to a CS.
+        // Right now this is the most appropriate general-purpose one. Add more as needed.
+
+        // NOTE - if you want D3D1x_(CPU_ACCESS_WRITE), it MUST be either D3D1x_(USAGE_DYNAMIC) or D3D1x_(USAGE_STAGING).
+        // TODO: we want a resource that is rarely written to, in which case we'd need two surfaces - one a STAGING
+        // that the CPU writes to, and one a DEFAULT, and we CopyResource from one to the other. Hassle!
+        // Setting it as D3D1x_(USAGE_DYNAMIC) will get the job done for now.
+        // Also for fun - you can't have a D3D1x_(USAGE_DYNAMIC) buffer that is also a D3D1x_(BIND_UNORDERED_ACCESS).
+        OVR_ASSERT ( !(use & Buffer_ReadOnly) );
+        desc.BindFlags = D3D1x_(BIND_SHADER_RESOURCE);
+        desc.Usage     = D3D1x_(USAGE_DYNAMIC);
+        desc.MiscFlags = D3D1x_(RESOURCE_MISC_BUFFER_STRUCTURED);
+        desc.CPUAccessFlags = D3D1x_(CPU_ACCESS_WRITE);
+        // SUPERHACKYFIXME
+        desc.StructureByteStride = sizeof(DistortionComputePin);
+
+        Dynamic = true;
+        size = ((size + 15) & ~15);
+#else
+        OVR_ASSERT ( false );  // No compute shaders in DX10
+#endif
+        break;
+    default:
+        OVR_ASSERT ( !"unknown buffer type" );
         break;
     }
 
@@ -1537,13 +1589,41 @@ bool   Buffer::Data(int use, const void *buffer, size_t size)
     {
         Use = use;
         Size = desc.ByteWidth;
-        return 1;
     }
-    if (FAILED(hr))
+    else
     {
         OVR_LOG_COM_ERROR(hr);
+        OVR_ASSERT ( false );
+        return false;
     }
-    return 0;
+
+    if ( ( use & Buffer_TypeMask ) == Buffer_Compute )
+    {
+        HRESULT hres = Ren->Device->CreateShaderResourceView ( D3DBuffer, NULL, &D3DSrv.GetRawRef() );
+        if ( SUCCEEDED(hres) )
+        {
+#if (OVR_D3D_VERSION >= 11)
+#if 0           // Right now we do NOT ask for UAV access (see flags above).
+            hres = Ren->Device->CreateUnorderedAccessView ( D3DBuffer, NULL, &D3DUav.GetRawRef() );
+            if ( SUCCEEDED(hres) )
+            {
+                // All went well.
+            }
+#endif
+#endif
+        }
+
+        if ( !SUCCEEDED(hres) )
+        {
+            OVR_LOG_COM_ERROR(hr);
+            OVR_ASSERT ( false );
+            Use = 0;
+            Size = 0;
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void*  Buffer::Map(size_t start, size_t size, int flags)
@@ -1814,6 +1894,7 @@ Render::Shader *RenderDevice::LoadBuiltinShader(ShaderStage stage, int shader)
     case Shader_Pixel:
         return PixelShaders[shader];
     default:
+        OVR_ASSERT ( false );
         return NULL;
     }
 }
@@ -1983,7 +2064,7 @@ void RenderDevice::SetTexture(Render::ShaderStage stage, int slot, const Texture
     ID3D1xShaderResourceView* sv = t ? t->TexSv : NULL;
     switch(stage)
     {
-    case Shader_Fragment:
+    case Shader_Pixel:
         Context->PSSetShaderResources(slot, 1, &sv);
         if (t)
         {
@@ -1998,6 +2079,21 @@ void RenderDevice::SetTexture(Render::ShaderStage stage, int slot, const Texture
             Context->VSSetSamplers(slot, 1, &t->Sampler.GetRawRef());
         }
         break;
+
+#if (OVR_D3D_VERSION >= 11)
+    case Shader_Compute:
+        Context->CSSetShaderResources(slot, 1, &sv);
+        if (t)
+        {
+            Context->CSSetSamplers(slot, 1, &t->Sampler.GetRawRef());
+        }
+        break;
+#endif
+
+    default:
+        OVR_ASSERT ( false );
+        break;
+
     }
 }
 
@@ -2575,6 +2671,61 @@ void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Bu
         Context->Draw(count, 0);
     }
 }
+
+
+// This is far less generic than the name suggests - very hard-coded to the distortion CSes.
+void RenderDevice::RenderCompute(const Fill* fill, Render::Buffer* buffer, int invocationSizeInPixels )
+{
+#if (OVR_D3D_VERSION >= 11)
+    //Context->CSCSSetShaderResources
+    //Context->CSSetUnorderedAccessViews
+    //Context->CSSetShader
+    //Context->CSSetSamplers
+    //Context->CSSetConstantBuffers
+
+    ShaderSet* shaders = ((ShaderFill*)fill)->GetShaders();
+    ShaderBase* cshader = ((ShaderBase*)shaders->GetShader(Shader_Compute));
+
+    ID3D1xUnorderedAccessView *uavRendertarget = BackBufferUAV.GetRawRef();
+    int SizeX = WindowWidth/2;
+    int SizeY = WindowHeight;
+    if (CurRenderTarget != NULL)
+    {
+        OVR_ASSERT ( !"write me" );
+        uavRendertarget = NULL; //CurRenderTarget->TexUav.GetRawRef();
+        SizeX = CurRenderTarget->GetWidth() / 2;
+        SizeY = CurRenderTarget->GetHeight()   ;
+    }
+
+    int TileNumX = ( SizeX + (invocationSizeInPixels-1) ) / invocationSizeInPixels;
+    int TileNumY = ( SizeY + (invocationSizeInPixels-1) ) / invocationSizeInPixels;
+
+    Context->CSSetUnorderedAccessViews ( 0, 1, &uavRendertarget, NULL );
+    if ( buffer != NULL )
+    {
+        // Incoming eye-buffer textures start at t0 onwards, so set this in slot #4
+        // Subtlety - can't put this in slot 0 because fill->Set stops at the first NULL texture.
+        ID3D1xShaderResourceView *d3dSrv = ((Buffer*)buffer)->GetSrv();
+        Context->CSSetShaderResources ( 4, 1, &d3dSrv );
+    }
+
+    // TODO: uniform/constant buffers
+    cshader->UpdateBuffer(UniformBuffers[Shader_Compute]);
+    cshader->SetUniformBuffer(UniformBuffers[Shader_Compute]);
+
+    // Primitive type is ignored for CS.
+    // This call actually sets the textures and does Context->CSSetShader(). Primitive type is ignored.
+    fill->Set ( Prim_Unknown );
+
+    Context->Dispatch ( TileNumX, TileNumY, 1 );
+#else
+    OVR_ASSERT ( !"No compute shaders on DX10" );
+    OVR_UNUSED ( fill );
+    OVR_UNUSED ( buffer );
+    OVR_UNUSED ( invocationSizeInPixels );
+#endif
+}
+
 
 size_t RenderDevice::QueryGPUMemorySize()
 {

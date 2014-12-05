@@ -32,7 +32,10 @@ limitations under the License.
 #include "../../Kernel/OVR_Color.h"
 
 #if defined(OVR_OS_LINUX)
- #include "../../Displays/OVR_Linux_SDKWindow.h"
+    #include "../../Displays/OVR_Linux_SDKWindow.h"
+#elif defined(OVR_OS_MAC)
+    #include <CoreGraphics/CGDirectDisplay.h>
+    #include <OpenGL/OpenGL.h>
 #endif
 
 namespace OVR { namespace CAPI { namespace GL {
@@ -130,19 +133,14 @@ CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
                                                      FrameTimeManager& timeManager,
                                                      const HMDRenderState& renderState)
 {
-#if !defined(OVR_OS_MAC)
     InitGLExtensions();
-#endif
+
     return new DistortionRenderer(hmd, timeManager, renderState);
 }
 
 
 bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 {
-	GfxState = *new GraphicsState();
-
-	SaveGraphicsState();
-
     const ovrGLConfig* config = (const ovrGLConfig*)apiConfig;
 
     if (!config)
@@ -155,38 +153,29 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     }
 
 	RParams.Multisample = config->OGL.Header.Multisample;
-	RParams.RTSize      = config->OGL.Header.RTSize;
+	RParams.BackBufferSize      = config->OGL.Header.BackBufferSize;
 #if defined(OVR_OS_WIN32)
 	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
     RParams.DC          = config->OGL.DC;
 #elif defined(OVR_OS_LINUX)
-    if (config->OGL.Disp)
-        RParams.Disp = config->OGL.Disp;
-    if (!RParams.Disp)
-        RParams.Disp = XOpenDisplay(NULL);
-    if (!RParams.Disp)
-    {
-        OVR_DEBUG_LOG(("XOpenDisplay failed."));
-        return false;
-    }
-
-    if (config->OGL.Win)
-        RParams.Win         = config->OGL.Win;
-    if (!RParams.Win)
-    {
-        RParams.Win = glXGetCurrentDrawable();
-    }
-    if (!RParams.Win)
-    {
-        OVR_DEBUG_LOG(("XGetInputFocus failed."));
-        return false;
-    }
-
     RotateCCW90 = false;
     if (   RState.DistortionCaps & ovrDistortionCap_LinuxDevFullscreen
         && SDKWindow::getRotation(HMD) == DistRotateCCW90)
     {
         RotateCCW90 = true;
+    }
+    if (config->OGL.Disp)
+    {
+        RParams.Disp = config->OGL.Disp;
+    }
+    if (!RParams.Disp)
+    {
+        RParams.Disp = glXGetCurrentDisplay();
+    }
+    if (!RParams.Disp)
+    {
+        OVR_DEBUG_LOG(("glXGetCurrentDisplay failed."));
+        return false;
     }
 #endif
 	
@@ -195,22 +184,14 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
     LatencyVAO = 0;
 
-    Context currContext;
-    currContext.InitFromCurrent();
-    distortionContext.CreateShared( currContext );
-
-    //DistortionWarper.SetVsync((hmdCaps & ovrHmdCap_NoVSync) ? false : true);
+    GL::AutoContext autoGLContext(distortionContext); // Initializes distortionContext if not already, saves the current GL context, binds distortionContext, then at the end of scope re-binds the current GL context.
 
     pEyeTextures[0] = *new Texture(&RParams, 0, 0);
     pEyeTextures[1] = *new Texture(&RParams, 0, 0);
 
     initBuffersAndShaders();
 
-    distortionContext.Bind();
-    initOverdrive(); // because this creates an FBO
-    currContext.Bind();
-
-	RestoreGraphicsState();
+    initOverdrive();
 
     return true;
 }
@@ -228,10 +209,10 @@ void DistortionRenderer::initOverdrive()
         
 		for (int i = 0; i < NumOverdriveTextures ; i++)
 		{
-            pOverdriveTextures[i] = *new Texture(&RParams, RParams.RTSize.w, RParams.RTSize.h);
+            pOverdriveTextures[i] = *new Texture(&RParams, RParams.BackBufferSize.w, RParams.BackBufferSize.h);
             
             glBindTexture(GL_TEXTURE_2D, pOverdriveTextures[i]->TexId);
-            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, RParams.RTSize.w, RParams.RTSize.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, RParams.BackBufferSize.w, RParams.BackBufferSize.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
             OVR_ASSERT( glGetError() == GL_NO_ERROR );
 
             pOverdriveTextures[i]->SetSampleMode(Sample_ClampBorder | Sample_Linear);
@@ -251,10 +232,10 @@ void DistortionRenderer::initOverdrive()
         }
 
         {
-            OverdriveBackBufferTexture = *new Texture(&RParams, RParams.RTSize.w, RParams.RTSize.h);
+            OverdriveBackBufferTexture = *new Texture(&RParams, RParams.BackBufferSize.w, RParams.BackBufferSize.h);
 
             glBindTexture(GL_TEXTURE_2D, OverdriveBackBufferTexture->TexId);
-            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, RParams.RTSize.w, RParams.RTSize.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, RParams.BackBufferSize.w, RParams.BackBufferSize.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
             OVR_ASSERT(glGetError() == 0);
 
             OverdriveBackBufferTexture->SetSampleMode(Sample_ClampBorder | Sample_Linear);
@@ -336,7 +317,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
 #endif
 
     // Don't spin if we are explicitly asked not to
-    if (RState.DistortionCaps & ovrDistortionCap_TimeWarp &&
+    if ((RState.DistortionCaps & ovrDistortionCap_TimeWarp) &&
         !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
     {
         if (!TimeManager.NeedDistortionTimeMeasurement())
@@ -375,59 +356,88 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
     if (swapBuffers)
     {
 		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
-        int swapInterval = (useVsync) ? 1 : 0;
+        int ourSwapInterval = (useVsync) ? 1 : 0;
+        int originalSwapInterval;
+        
 #if defined(OVR_OS_WIN32)
-        if (wglGetSwapIntervalEXT() != swapInterval)
-            wglSwapIntervalEXT(swapInterval);
-		/*
-		bool cycle = false;
-		cycle = !cycle;
-		glClearColor(cycle ? 1 : 0, cycle ? 0 : 1, 0, 1);
-		glClear(GL_COLOR_BUFFER_BIT);
-		*/
+        originalSwapInterval = wglGetSwapIntervalEXT();
+        
+        if (ourSwapInterval != originalSwapInterval)
+            wglSwapIntervalEXT(ourSwapInterval);
+
         HDC dc = (RParams.DC != NULL) ? RParams.DC : GetDC(RParams.Window);
 		BOOL success = SwapBuffers(dc);
-        OVR_ASSERT(success);
-        OVR_UNUSED(success);
+        OVR_ASSERT_AND_UNUSED(success, success);
 
         if (RParams.DC == NULL)
             ReleaseDC(RParams.Window, dc);
+        
 #elif defined(OVR_OS_MAC)
+        originalSwapInterval = 0;
         CGLContextObj context = CGLGetCurrentContext();
-        GLint currentSwapInterval = 0;
-        CGLGetParameter(context, kCGLCPSwapInterval, &currentSwapInterval);
-        if (currentSwapInterval != swapInterval)
-            CGLSetParameter(context, kCGLCPSwapInterval, &swapInterval);
+        CGLError err = CGLGetParameter(context, kCGLCPSwapInterval, &originalSwapInterval);
+        OVR_ASSERT_AND_UNUSED(err == kCGLNoError, err);
+        
+        if (ourSwapInterval != originalSwapInterval)
+            CGLSetParameter(context, kCGLCPSwapInterval, &ourSwapInterval);
         
         CGLFlushDrawable(context);
+        
 #elif defined(OVR_OS_LINUX)
-        static const char* extensions = glXQueryExtensionsString(RParams.Disp, 0);
-        static bool supportsVSync = (extensions != NULL && strstr(extensions, "GLX_EXT_swap_control"));
-        if (supportsVSync)
+        originalSwapInterval = 0;
+        GLXDrawable drawable = glXGetCurrentDrawable();
+        struct _XDisplay* x11Display = RParams.Disp;
+
+        if(GLE_GLX_EXT_swap_control)
         {
-            GLuint currentSwapInterval = 0;
-            glXQueryDrawable(RParams.Disp, RParams.Win, GLX_SWAP_INTERVAL_EXT, &currentSwapInterval);
-            if (currentSwapInterval != (GLuint)swapInterval)
-                glXSwapIntervalEXT(RParams.Disp, RParams.Win, swapInterval);
+            static_assert(sizeof(GLuint) == sizeof(originalSwapInterval), "size mismatch");
+            glXQueryDrawable(x11Display, drawable, GLX_SWAP_INTERVAL_EXT, (GLuint*)&originalSwapInterval);
+
+            if (ourSwapInterval != originalSwapInterval)
+                glXSwapIntervalEXT(x11Display, drawable, ourSwapInterval);
+        }
+        else if (GLE_MESA_swap_control) // There is also GLX_SGI_swap_control
+        {
+            originalSwapInterval = glXGetSwapIntervalMESA();
+
+            if (ourSwapInterval != originalSwapInterval)
+                glXSwapIntervalMESA(ourSwapInterval);
         }
 
-        glXSwapBuffers(RParams.Disp, RParams.Win);
+        glXSwapBuffers(x11Display, drawable);
 #endif
+
         // Force GPU to flush the scene, resulting in the lowest possible latency.
-        // It's critical that this flush is *after* present.
-        // With the display driver this flush is obsolete and theoretically should
-        // be a no-op.
-        // Doesn't need to be done if running through the Oculus driver.
+        // It's critical that this flush is *after* present, because it results in the wait
+        // below completing after the vsync.
+        // With the display driver (direct mode) this flush is obsolete and theoretically
+        // should be a no-op and so doesn't need to be done if running in direct mode.
         if (RState.OurHMDInfo.InCompatibilityMode &&
             !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
             WaitUntilGpuIdle();
+        
+        // Restore the original swap interval if we changed it above.
+        if (originalSwapInterval != ourSwapInterval)
+        {
+#if defined(OVR_OS_WIN32)
+            wglSwapIntervalEXT(originalSwapInterval);
+#elif defined(OVR_OS_MAC)
+            CGLSetParameter(context, kCGLCPSwapInterval, &originalSwapInterval);
+#elif defined(OVR_OS_LINUX)
+            if(GLE_GLX_EXT_swap_control)
+                glXSwapIntervalEXT(x11Display, drawable, (GLuint)originalSwapInterval);
+            else if(GLE_MESA_swap_control)
+                glXSwapIntervalMESA(originalSwapInterval);
+#endif
+        }
     }
+
     currContext.Bind();
 }
 
 void DistortionRenderer::WaitUntilGpuIdle()
 {
-	glFinish();
+	glFinish(); // Block until current OpenGL commands (including swap) are complete.
 }
 
 double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
@@ -444,56 +454,12 @@ double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
     return WaitTillTime(absTime);
 }
 
-
-DistortionRenderer::GraphicsState::GraphicsState()
-{
-    GetGLVersionAndExtensions(GLVersionInfo);
-}
-
-
-void DistortionRenderer::GraphicsState::ApplyBool(GLenum Name, GLint Value, GLint index)
-{
-    if (GLVersionInfo.SupportsDrawBuffers && index != -1)
-	{
-		if (Value != 0)
-			glEnablei(Name, index);
-		else
-			glDisablei(Name, index);
-	}
-	else
-	{
-		if (Value != 0)
-			glEnable(Name);
-		else
-			glDisable(Name);
-	}
-}
-    
-    
-void DistortionRenderer::GraphicsState::Save()
-{
-}
-
-#ifdef OVR_OS_MAC
-bool DistortionRenderer::GraphicsState::isAtLeastOpenGL3()
-{
-    return (((GLVersionInfo.MajorVersion * 100) + GLVersionInfo.MinorVersion) >= 302); // OpenGL 3.2 or later
-}
-#endif
-
-void DistortionRenderer::GraphicsState::Restore()
-{
-}
-
-
 void DistortionRenderer::initBuffersAndShaders()
 {
     for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
     {
         // Allocate & generate distortion mesh vertices.
         ovrDistortionMesh meshData;
-
-//        double startT = ovr_GetTimeInSeconds();
 
         if (!ovrHmd_CreateDistortionMesh( HMD,
                                           RState.EyeRenderDesc[eyeNum].Eye,
@@ -560,8 +526,6 @@ void DistortionRenderer::initBuffersAndShaders()
 
 void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture)
 {
-    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
-        
     bool overdriveActive = IsOverdriveActive();
     int currOverdriveTextureIndex = -1;
 
@@ -585,7 +549,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    setViewport( Recti(0,0, RParams.RTSize.w, RParams.RTSize.h) );
+    setViewport( Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h) );
 
 	if (RState.DistortionCaps & ovrDistortionCap_SRGB)
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -595,7 +559,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_DEPTH_TEST);
     
-    if (glState->GLVersionInfo.SupportsDrawBuffers)
+    if (GLE_EXT_draw_buffers2)
     {
         glDisablei(GL_BLEND, 0);
         glColorMaski(0, GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
@@ -608,7 +572,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     
     glDisable(GL_DITHER);
     glDisable(GL_RASTERIZER_DISCARD);
-    if ((glState->GLVersionInfo.MajorVersion >= 3 && glState->GLVersionInfo.MinorVersion >= 2) || glState->GLVersionInfo.MajorVersion >= 4)
+    if (GLEContext::GetCurrentContext()->WholeVersion >= 302)
     {
         glDisable(GL_SAMPLE_MASK);
     }
@@ -738,7 +702,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
     ShaderFill quadFill(quadShader);
     //quadFill.SetInputLayout(SimpleQuadVertexIL);
 
-    setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
+    setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
 
     quadShader->SetUniform2f("Scale", 0.3f, 0.3f);
     quadShader->SetUniform4f("Color", (float)latencyTesterDrawColor[0] / 255.99f,
@@ -765,7 +729,7 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
     Ptr<ShaderSet> quadShader = (RState.DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
     ShaderFill quadFill(quadShader);
 
-    setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
+    setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
 
 #ifdef OVR_BUILD_DEBUG
     quadShader->SetUniform4f("Color", (float)latencyTesterPixelColor[0] / 255.99f,
@@ -773,14 +737,14 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
                                       (float)latencyTesterPixelColor[2] / 255.99f,
                                       1.0f);
 
-    Vector2f scale(20.0f / RParams.RTSize.w, 20.0f / RParams.RTSize.h); 
+    Vector2f scale(20.0f / RParams.BackBufferSize.w, 20.0f / RParams.BackBufferSize.h); 
 #else
     quadShader->SetUniform4f("Color", (float)latencyTesterPixelColor[0] / 255.99f,
                                       (float)latencyTesterPixelColor[0] / 255.99f,
                                       (float)latencyTesterPixelColor[0] / 255.99f,
                                       1.0f);
 
-    Vector2f scale(1.0f / RParams.RTSize.w, 1.0f / RParams.RTSize.h); 
+    Vector2f scale(1.0f / RParams.BackBufferSize.w, 1.0f / RParams.BackBufferSize.h); 
 #endif
     quadShader->SetUniform2f("Scale", scale.x, scale.y);
     if (!RotateCCW90)
@@ -796,8 +760,6 @@ void DistortionRenderer::renderPrimitives(
                           int offset, int count,
                           PrimitiveType rprim, GLuint* vao, bool isDistortionMesh)
 {
-    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
-
     GLenum prim;
     switch (rprim)
     {
@@ -823,57 +785,22 @@ void DistortionRenderer::renderPrimitives(
 	{
 		if (*vao != 0)
 		{
-#ifdef OVR_OS_MAC
-            if (glState->isAtLeastOpenGL3())
-            {
-                glBindVertexArray(*vao);
-            }
-            else
-            {
-                glBindVertexArrayAPPLE(*vao);
-            }
-#else
-			glBindVertexArray(*vao);
-#endif
+            glBindVertexArray(*vao);
 
 			if (isDistortionMesh)
 				glDrawElements(prim, count, GL_UNSIGNED_SHORT, NULL);
 			else
 				glDrawArrays(prim, 0, count);
 
-#ifdef OVR_OS_MAC
-            if (glState->isAtLeastOpenGL3())
-            {
-                glBindVertexArray(*vao);
-            }
-            else
-            {
-                glBindVertexArrayAPPLE(0);
-            }
-#else
             glBindVertexArray(0);
-#endif
 		}
 		else
 		{
-            if (glState->GLVersionInfo.SupportsVAO)
+            if (GL_ARB_vertex_array_object)
             {
-#ifdef OVR_OS_MAC
-                if (glState->isAtLeastOpenGL3())
-                {
-                    glGenVertexArrays(1, vao);
-                    glBindVertexArray(*vao);
-                }
-                else
-                {
-                    glGenVertexArraysAPPLE(1, vao);
-                    glBindVertexArrayAPPLE(*vao);
-                }
-#else
                 glGenVertexArrays(1, vao);
                 glBindVertexArray(*vao);
-#endif
-			}
+            }
 
 			int attributeCount = (isDistortionMesh) ? 5 : 1;
 			int* locs = new int[attributeCount];
@@ -912,7 +839,7 @@ void DistortionRenderer::renderPrimitives(
 				glDrawArrays(prim, 0, count);
 
 
-            if (!glState->GLVersionInfo.SupportsVAO)
+            if (!GL_ARB_vertex_array_object)
             {
 				for (int i = 0; i < attributeCount; ++i)
                     glDisableVertexAttribArray(locs[i]);
@@ -920,20 +847,9 @@ void DistortionRenderer::renderPrimitives(
 
 			delete[] locs;
 
-            if (glState->GLVersionInfo.SupportsVAO)
+            if (GL_ARB_vertex_array_object)
             {
-#ifdef OVR_OS_MAC
-                if (glState->isAtLeastOpenGL3())
-                {
-                    glBindVertexArray(0);
-                }
-                else
-                {
-                    glBindVertexArrayAPPLE(0);
-                }
-#else
                 glBindVertexArray(0);
-#endif
             }
 		}
 	}
@@ -947,12 +863,7 @@ void DistortionRenderer::setViewport(const Recti& vp)
 
 void DistortionRenderer::initShaders()
 {
-    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
-
-    const char* shaderPrefix =
-        (glState->GLVersionInfo.MajorVersion < 3 ||
-         (glState->GLVersionInfo.MajorVersion == 3 && glState->GLVersionInfo.MinorVersion < 2)) ?
-            glsl2Prefix : glsl3Prefix;
+    const char* shaderPrefix = (GLEContext::GetCurrentContext()->WholeVersion >= 302) ? glsl3Prefix : glsl2Prefix;
 
     {
 		ShaderInfo vsInfo = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & RState.DistortionCaps];
@@ -1053,10 +964,6 @@ void DistortionRenderer::initShaders()
 
 void DistortionRenderer::destroy()
 {
-	SaveGraphicsState();
-
-    GraphicsState* glState = (GraphicsState*)GfxState.GetPtr();
-    
     Context currContext;
     currContext.InitFromCurrent();
     
@@ -1064,7 +971,7 @@ void DistortionRenderer::destroy()
 
 	for(int eyeNum = 0; eyeNum < 2; eyeNum++)
 	{
-        if (glState->GLVersionInfo.SupportsVAO)
+        if (GL_ARB_vertex_array_object)
         {
             glDeleteVertexArrays(1, &DistortionMeshVAOs[eyeNum]);
         }
@@ -1098,8 +1005,6 @@ void DistortionRenderer::destroy()
     currContext.Bind();
     distortionContext.Destroy();
     // Who is responsible for destroying the app's context?
-
-	RestoreGraphicsState();
 }
 
 

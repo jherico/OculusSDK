@@ -1581,7 +1581,7 @@ bool BitStream::ReadBitsFromIntegerRange( templateType &value, const templateTyp
 template <class templateType>
 bool BitStream::ReadBitsFromIntegerRange( templateType &value, const templateType minimum, const templateType maximum, const int requiredBits, bool allowOutsideRange )
 {
-	OVR_ASSERT(maximum>=minimum);
+	OVR_ASSERT_AND_UNUSED(maximum>=minimum, maximum);
 	if (allowOutsideRange)
 	{
 		bool isOutsideRange;

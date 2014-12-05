@@ -5,7 +5,7 @@ Content     :   Platform renderer for simple scene graph
 Created     :   September 6, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,8 @@ enum ShaderStage
     Shader_Geometry = 1,
     Shader_Fragment = 2,
     Shader_Pixel    = 2,
-    Shader_Count    = 3,
+    Shader_Compute  = 3,
+    Shader_Count    = 4,
 };
 
 enum PrimitiveType
@@ -102,6 +103,9 @@ enum BuiltinShaders
     FShader_PostProcessMeshWithChromAbPositionalTimewarp ,
     FShader_PostProcessHeightmapTimewarp            ,
     FShader_Count                                   ,
+
+    CShader_PostProcess2x2                          = 0,
+    CShader_Count                                   ,
 };
 
 
@@ -119,6 +123,7 @@ enum BufferUsage
     Buffer_Index    = 2,
     Buffer_Uniform  = 4,
     Buffer_Feedback = 8,
+    Buffer_Compute  = 16,
     Buffer_TypeMask = 0xff,
     Buffer_ReadOnly = 0x100, // Buffer must be created with Data().
 };
@@ -292,6 +297,7 @@ class ShaderFill : public Fill
     Ptr<ShaderSet> Shaders;
     Ptr<Texture>   Textures[8];
     Ptr<Texture>   VtxTextures[8];
+    Ptr<Texture>   CsTextures[8];
 
 public:
     ShaderFill(ShaderSet* sh) : Shaders(sh) {  }
@@ -305,6 +311,7 @@ public:
         {
                  if(stage == Shader_Pixel)  Textures[i] = tex;
             else if(stage == Shader_Vertex) VtxTextures[i] = tex;
+            else if(stage == Shader_Compute) CsTextures[i] = tex;
             else OVR_ASSERT(false);
         }
     }
@@ -314,6 +321,7 @@ public:
         {
                  if(stage == Shader_Pixel)      return Textures[i];
             else if(stage == Shader_Vertex)     return VtxTextures[i];
+            else if(stage == Shader_Compute)    return CsTextures[i];
             else OVR_ASSERT(false);             return 0;
         }
         else
@@ -476,6 +484,15 @@ struct DistortionVertex
     Vector2f TexG;
     Vector2f TexB;
     Color Col;
+};
+
+struct DistortionComputePin     // Needs to match the one(s) declared in Render_D3D1X_Device.cpp inside the shaders.
+{
+    Vector2f TanEyeAnglesR;
+    Vector2f TanEyeAnglesG;
+    Vector2f TanEyeAnglesB;
+    Color Col;
+    int padding[1];
 };
 
 struct HeightmapVertex
@@ -709,6 +726,7 @@ enum PostProcessType
     PostProcess_MeshDistortionTimewarp,
     PostProcess_MeshDistortionPositionalTimewarp,
     PostProcess_MeshDistortionHeightmapTimewarp,
+    PostProcess_Compute2x2,
     PostProcess_NoDistortion,
 };
 
@@ -752,15 +770,24 @@ struct DisplayId
 
 struct RendererParams
 {
-    int         Multisample;
-    bool        SrgbBackBuffer;
-    int         Fullscreen;
-    DisplayId   Display;
-    // Resolution of the rendering buffer used during creation.
-    // Allows buffer of different size then the widow if not zero.
-    Sizei       Resolution;
+    ovrRenderAPIType RenderAPIType;              // ovrRenderAPI_D3D11, ovrRenderAPI_OpenGL, etc.
+    int              Multisample;                // If true then multisampling is requested.
+    bool             SrgbBackBuffer;             // If true then an SRGB back buffer is requested.
+    int              Fullscreen;                 // Requested full screen vs. windowed. 1 is full screen, else windowed. To do: Change this to bool and update code that is currently dependent on this being an int.
+    DisplayId        Display;                    // Requested display device.
+    Sizei            Resolution;                 // Resolution of the rendering buffer used during creation. Allows buffer of different size then the widow if not zero.
+    bool             DebugEnabled;               // If true then the renderer (e.g. DirectX, OpenGL) is created with debug support enabled.
 
-    RendererParams(int ms = 1) : Multisample(ms), SrgbBackBuffer(false), Fullscreen(0), Resolution(0) {}
+    // Relevant only when OpenGL is used.
+    int              GLMajorVersion;             // Requested OpenGL major version (WGL_CONTEXT_MAJOR_VERSION_ARB).
+    int              GLMinorVersion;             // Requested OpenGL minor version (WGL_CONTEXT_MINOR_VERSION_ARB).
+    bool             GLCoreProfile;              // True if a core profile context was requested (WGL_CONTEXT_CORE_PROFILE_BIT_ARB).
+    bool             GLCompatibilityProfile;     // True if a compatibility profile context was requested (WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB).
+    bool             GLForwardCompatibleProfile; // True if a forward compatible context was requested (WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB).
+
+    RendererParams(int ms = 1) :
+        RenderAPIType(ovrRenderAPI_None), Multisample(ms), SrgbBackBuffer(false), Fullscreen(0), Display(0), Resolution(0), DebugEnabled(false),
+        GLMajorVersion(2), GLMinorVersion(1), GLCoreProfile(false), GLCompatibilityProfile(false), GLForwardCompatibleProfile(false){}
     
     bool IsDisplaySet() const
     {
@@ -797,6 +824,8 @@ protected:
     int                 DistortionMeshNumTris[2];
     Ptr<Buffer>         pDistortionMeshVertexBuffer[2];
     Ptr<Buffer>         pDistortionMeshIndexBuffer[2];
+
+    Ptr<Buffer>         pDistortionComputePinBuffer[2];
 
     int                 HeightmapMeshNumTris[2];
     Ptr<Buffer>         pHeightmapMeshVertexBuffer[2];
@@ -947,6 +976,7 @@ public:
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene) = 0;
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) = 0;
+    virtual void RenderCompute(const Fill* fill, Render::Buffer* buffer, int invocationSizeInPixels ) = 0;
 
     // Returns width of text in same units as drawing. If strsize is not null, stores width and height.
     // Can optionally return char-range selection rectangle.
@@ -994,6 +1024,7 @@ public:
         PostProcessShader_MeshDistortionAndChromAbTimewarp,
         PostProcessShader_MeshDistortionAndChromAbPositionalTimewarp,
         PostProcessShader_MeshDistortionAndChromAbHeightmapTimewarp,
+        PostProcessShader_Compute2x2,
         PostProcessShader_Count
     };
 

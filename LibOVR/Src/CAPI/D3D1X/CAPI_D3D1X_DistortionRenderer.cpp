@@ -27,6 +27,7 @@ limitations under the License.
 #include "CAPI_D3D1X_DistortionRenderer.h"
 
 #include "../../OVR_CAPI_D3D.h"
+#include "../CAPI_HMDState.h"
 #include "../../Kernel/OVR_Color.h"
 
 namespace OVR { namespace CAPI { namespace D3D_NS {
@@ -43,11 +44,16 @@ namespace OVR { namespace CAPI { namespace D3D_NS {
 #include "Shaders/DistortionTimewarp_vs_refl.h"
 #include "Shaders/DistortionTimewarpChroma_vs.h"
 #include "Shaders/DistortionTimewarpChroma_vs_refl.h"
-    
+#include "Shaders/DistortionCS2x2.h"
+#include "Shaders/DistortionCS2x2_refl.h"
+
 #include "Shaders/SimpleQuad_vs.h"
 #include "Shaders/SimpleQuad_vs_refl.h"
 #include "Shaders/SimpleQuad_ps.h"
 #include "Shaders/SimpleQuad_ps_refl.h"
+
+#include <initguid.h>
+DEFINE_GUID(IID_OVRDXGISwapchain, 0x868f9b4f, 0xe427, 0x46ed, 0xb0, 0x94, 0x66, 0xd1, 0x3b, 0xb, 0x48, 0xf7);
 
 // Distortion pixel shader lookup.
 //  Bit 0: Chroma Correction
@@ -57,7 +63,7 @@ enum {
     DistortionVertexShaderBitMask = 3,
     DistortionVertexShaderCount   = DistortionVertexShaderBitMask + 1,
     DistortionPixelShaderBitMask  = 1,
-    DistortionPixelShaderCount    = DistortionPixelShaderBitMask + 1
+    DistortionPixelShaderCount    = DistortionPixelShaderBitMask + 1,
 };
 
 struct PrecompiledShader
@@ -87,6 +93,19 @@ static PrecompiledShader DistortionPixelShaderLookup[DistortionPixelShaderCount]
     PCS_REFL__(DistortionChroma_ps)
 };
 
+enum
+{
+    DistortionComputeShader2x2           = 0,
+    DistortionComputeShader2x2Pentile,
+    DistortionComputeShaderCount
+};
+static PrecompiledShader DistortionComputeShaderLookup[DistortionComputeShaderCount] =
+{
+    PCS_REFL__(DistortionCS2x2)
+};
+
+
+
 void DistortionShaderBitIndexCheck()
 {
     OVR_COMPILER_ASSERT(ovrDistortionCap_Chromatic == 1);
@@ -95,13 +114,22 @@ void DistortionShaderBitIndexCheck()
 
 
 
-struct DistortionVertex
+struct DistortionVertex         // Must match the VB description DistortionMeshVertexDesc
 {
     Vector2f ScreenPosNDC;
     Vector2f TanEyeAnglesR;
     Vector2f TanEyeAnglesG;
     Vector2f TanEyeAnglesB;
     Color    Col;
+};
+
+struct DistortionComputePin     // Must match the ones declared in DistortionCS*.csh
+{
+    Vector2f TanEyeAnglesR;
+    Vector2f TanEyeAnglesG;
+    Vector2f TanEyeAnglesB;
+    Color Col;
+    int padding[1];     // Aligns to power-of-two boundary, increases performance significantly.
 };
 
 
@@ -174,11 +202,25 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     if (!config->D3D_NS.pDevice || !config->D3D_NS.pBackBufferRT)
         return false;
 
+    if (System::DirectDisplayEnabled())
+    {
+        Ptr<IUnknown> ovrSwapChain;
+        if (config->D3D_NS.pSwapChain->QueryInterface(IID_OVRDXGISwapchain, (void**)&ovrSwapChain.GetRawRef()) == E_NOINTERFACE)
+        {
+            OVR_DEBUG_LOG_TEXT(("ovr_Initialize() or ovr_InitializeRenderingShim() wasn't called before DXGISwapChain was created."));
+        }
+    }
+
     RParams.pDevice		   = config->D3D_NS.pDevice;    
     RParams.pContext       = D3DSELECT_10_11(config->D3D_NS.pDevice, config->D3D_NS.pDeviceContext);
     RParams.pBackBufferRT  = config->D3D_NS.pBackBufferRT;
+#if (OVR_D3D_VERSION>=11)
+    RParams.pBackBufferUAV = config->D3D_NS.pBackBufferUAV;
+#else
+    RParams.pBackBufferUAV = NULL;
+#endif
     RParams.pSwapChain     = config->D3D_NS.pSwapChain;
-    RParams.RTSize         = config->D3D_NS.Header.RTSize;
+    RParams.BackBufferSize = config->D3D_NS.Header.BackBufferSize;
     RParams.Multisample    = config->D3D_NS.Header.Multisample;
 
 	GfxState = *new GraphicsState(RParams.pContext);
@@ -192,7 +234,7 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
 #if 0   // enable related section in DistortionChroma.psh shader
     // aniso requires proper sRGB sampling
-    SampleMode hqFilter = (distortionCaps & ovrDistortionCap_HqDistortion) ? Sample_Anisotropic : Sample_Linear;
+    SampleMode hqFilter = (RState.DistortionCaps & ovrDistortionCap_HqDistortion) ? Sample_Anisotropic : Sample_Linear;
 #else
     SampleMode hqFilter = Sample_Linear;
 #endif
@@ -237,12 +279,12 @@ void DistortionRenderer::initOverdrive()
         
 		for (int i = 0; i < NumOverdriveTextures; i++)
 		{
-			pOverdriveTextures[i] = *new Texture(&RParams, Texture_RGBA, RParams.RTSize,
+			pOverdriveTextures[i] = *new Texture(&RParams, Texture_RGBA, RParams.BackBufferSize,
                 getSamplerState(Sample_Linear|Sample_ClampBorder));
 
 			D3D1X_(TEXTURE2D_DESC) dsDesc;
-			dsDesc.Width     = RParams.RTSize.w;
-			dsDesc.Height    = RParams.RTSize.h;
+			dsDesc.Width     = RParams.BackBufferSize.w;
+			dsDesc.Height    = RParams.BackBufferSize.h;
 			dsDesc.MipLevels = 1;
 			dsDesc.ArraySize = 1;
 			dsDesc.Format    = backBufferDesc.Format;
@@ -403,60 +445,173 @@ double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
 
 void DistortionRenderer::initBuffersAndShaders()
 {
-    for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+    if ( RState.DistortionCaps & ovrDistortionCap_ComputeShader )
     {
-        // Allocate & generate distortion mesh vertices.
-        ovrDistortionMesh meshData;
+        // Compute shader distortion grid.
+        // TODO - only do this if the CS is actually enabled?
+	    for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+	    {
+            // Compute shader setup of regular grid.
+            DistortionMeshVBs[eyeNum] = NULL;
+            DistortionMeshIBs[eyeNum] = NULL;
 
-//        double startT = ovr_GetTimeInSeconds();
+            // These constants need to match those declared in the shader in DistortionCS*.csh
+            const int gridSizeInPixels = 16;
+            const int pinsPerEdge = 128;
 
-        if (!ovrHmd_CreateDistortionMesh( HMD,
-                                          RState.EyeRenderDesc[eyeNum].Eye,
-                                          RState.EyeRenderDesc[eyeNum].Fov,
-                                          RState.DistortionCaps,
-                                          &meshData) )
-        {
-            OVR_ASSERT(false);
-            continue;
+
+            // TODO: clean up this mess!
+            HMDState* hmds = (HMDState*)HMD->Handle;
+            ovrEyeType eyeType = RState.EyeRenderDesc[eyeNum].Eye;
+            ovrFovPort fov = RState.EyeRenderDesc[eyeNum].Fov;
+
+            const HmdRenderInfo&  hmdri          = hmds->RenderState.RenderInfo;    
+            DistortionRenderDesc& distortion = hmds->RenderState.Distortion[eyeType];
+
+
+            // Find the mapping from TanAngle space to target NDC space.
+            ScaleAndOffset2D      eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
+
+		    //const StereoEyeParams &stereoParams = ( eyeNum == 0 ) ? stereoParamsLeft : stereoParamsRight;
+            OVR_ASSERT ( gridSizeInPixels * (pinsPerEdge-1) > hmdri.ResolutionInPixels.w/2 );
+            OVR_ASSERT ( gridSizeInPixels * (pinsPerEdge-1) > hmdri.ResolutionInPixels.h );
+            DistortionComputePin Verts[pinsPerEdge*pinsPerEdge];
+            // Vertices are laid out in a vertical scanline pattern,
+            // scanning right to left, then within each scan going top to bottom, like DK2.
+            // If we move to a different panel orientation, we may need to flip this around.
+            int vertexNum = 0;
+            for ( int x = 0; x < pinsPerEdge; x++ )
+            {
+                for ( int y = 0; y < pinsPerEdge; y++ )
+                {
+                    int pixX = x * gridSizeInPixels;
+                    int pixY = y * gridSizeInPixels;
+    #if 0
+                    // Simple version, ignoring pentile offsets
+                    Vector2f screenPosNdc;
+                    screenPosNdc.x = 2.0f * (  0.5f - ( (float)pixX / (hmdri.ResolutionInPixels.w/2) ) );      // Note signs!
+                    screenPosNdc.y = 2.0f * ( -0.5f + ( (float)pixY / hmdri.ResolutionInPixels.h ) );      // Note signs!
+
+                    DistortionMeshVertexData vertex = DistortionMeshMakeVertex ( screenPosNdc,
+                                                                                    ( eyeNum == 1 ),
+                                                                                    hmdri,
+                                                                                    distortion,
+                                                                                    eyeToSourceNDC );
+                    DistortionComputePin *pCurVert = &(Verts[vertexNum]);
+                    pCurVert->TanEyeAnglesR = vertex.TanEyeAnglesR;
+                    pCurVert->TanEyeAnglesG = vertex.TanEyeAnglesG;
+                    pCurVert->TanEyeAnglesB = vertex.TanEyeAnglesB;
+    #else
+                    // Pentile offsets are messy.
+                    Vector2f screenPos[3];      // R=0, G=1, B=2
+                    DistortionMeshVertexData vertexRGB[3];
+                    screenPos[1] = Vector2f ( (float)pixX, (float)pixY );
+                    screenPos[0] = screenPos[1];
+                    screenPos[2] = screenPos[1];
+
+                    if ( ( hmds->RenderState.EnabledHmdCaps & ovrHmdCap_DirectPentile ) != 0 )
+                    {
+                        // Doing direct display, so enable the pentile offsets.
+                        screenPos[0] = screenPos[1] + hmdri.PelOffsetR;
+                        screenPos[2] = screenPos[1] + hmdri.PelOffsetB;
+                    }
+
+                    for ( int i = 0; i < 3; i++ )
+                    {
+                        Vector2f screenPosNdc;
+                        screenPosNdc.x = 2.0f * (  0.5f - ( screenPos[i].x / (hmdri.ResolutionInPixels.w/2) ) );      // Note signs!
+                        screenPosNdc.y = 2.0f * ( -0.5f + ( screenPos[i].y / hmdri.ResolutionInPixels.h ) );      // Note signs!
+                        vertexRGB[i] = DistortionMeshMakeVertex ( screenPosNdc,
+                                                                    ( eyeNum == 1 ),
+                                                                    hmdri,
+                                                                    distortion,
+                                                                    eyeToSourceNDC );
+                    }
+                    // Most data (fade, TW interpolate, etc) comes from the green channel.
+                    DistortionMeshVertexData vertex = vertexRGB[1];
+                    DistortionComputePin *pCurVert = &(Verts[vertexNum]);
+                    pCurVert->TanEyeAnglesR = vertexRGB[0].TanEyeAnglesR;
+                    pCurVert->TanEyeAnglesG = vertexRGB[1].TanEyeAnglesG;
+                    pCurVert->TanEyeAnglesB = vertexRGB[2].TanEyeAnglesB;
+    #endif
+
+				    // vertex.Shade will go negative beyond the edges to produce correct intercept with the 0.0 plane.
+				    // We want to preserve this, so bias and offset to fit [-1,+1] in a byte.
+				    // The reverse wll be done in the shader.
+				    float shade = Alg::Clamp ( vertex.Shade * 0.5f + 0.5f, 0.0f, 1.0f );
+				    pCurVert->Col.R = (OVR::UByte)( floorf ( shade * 255.999f ) );
+				    pCurVert->Col.G = pCurVert->Col.R;
+				    pCurVert->Col.B = pCurVert->Col.R;
+				    pCurVert->Col.A = (OVR::UByte)( floorf ( vertex.TimewarpLerp * 255.999f ) );
+
+                    vertexNum++;
+                }
+            }
+            DistortionPinBuffer[eyeNum] = *new Buffer(&RParams);
+            DistortionPinBuffer[eyeNum]->Data ( Buffer_Compute, Verts, vertexNum * sizeof(Verts[0]), sizeof(Verts[0]) );
         }
 
-//        double deltaT = ovr_GetTimeInSeconds() - startT;
-//        LogText("GenerateDistortion time = %f\n", deltaT);
-
-        // Now parse the vertex data and create a render ready vertex buffer from it
-        DistortionVertex *   pVBVerts    = (DistortionVertex*)OVR_ALLOC ( sizeof(DistortionVertex) * meshData.VertexCount );
-        DistortionVertex *   pCurVBVert  = pVBVerts;
-        ovrDistortionVertex* pCurOvrVert = meshData.pVertexData;
-
-        for ( unsigned vertNum = 0; vertNum < meshData.VertexCount; vertNum++ )
-        {
-            pCurVBVert->ScreenPosNDC.x = pCurOvrVert->ScreenPosNDC.x;
-            pCurVBVert->ScreenPosNDC.y = pCurOvrVert->ScreenPosNDC.y;
-            pCurVBVert->TanEyeAnglesR  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR);
-            pCurVBVert->TanEyeAnglesG  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesG);
-            pCurVBVert->TanEyeAnglesB  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesB);
-
-            // Convert [0.0f,1.0f] to [0,255]
-			if (RState.DistortionCaps & ovrDistortionCap_Vignette)
-				pCurVBVert->Col.R = (uint8_t)( Alg::Max ( pCurOvrVert->VignetteFactor, 0.0f ) * 255.99f );
-			else
-				pCurVBVert->Col.R = 255;
-
-            pCurVBVert->Col.G = pCurVBVert->Col.R;
-            pCurVBVert->Col.B = pCurVBVert->Col.R;
-            pCurVBVert->Col.A = (uint8_t)( pCurOvrVert->TimeWarpFactor * 255.99f );
-            pCurOvrVert++;
-            pCurVBVert++;
-        }
-
-        DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
-		DistortionMeshVBs[eyeNum]->Data(Buffer_Vertex | Buffer_ReadOnly, pVBVerts, sizeof(DistortionVertex)* meshData.VertexCount);
-        DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
-		DistortionMeshIBs[eyeNum]->Data(Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, (sizeof(INT16)* meshData.IndexCount));
-
-        OVR_FREE ( pVBVerts );
-        ovrHmd_DestroyDistortionMesh( &meshData );
     }
+    else
+    {
+        for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
+        {
+            // Allocate & generate distortion mesh vertices.
+            DistortionPinBuffer[eyeNum] = NULL;
+
+            ovrDistortionMesh meshData;
+
+    //        double startT = ovr_GetTimeInSeconds();
+
+            if (!ovrHmd_CreateDistortionMesh( HMD,
+                                              RState.EyeRenderDesc[eyeNum].Eye,
+                                              RState.EyeRenderDesc[eyeNum].Fov,
+                                              RState.DistortionCaps,
+                                              &meshData) )
+            {
+                OVR_ASSERT(false);
+                continue;
+            }
+
+    //        double deltaT = ovr_GetTimeInSeconds() - startT;
+    //        LogText("GenerateDistortion time = %f\n", deltaT);
+
+            // Now parse the vertex data and create a render ready vertex buffer from it
+            DistortionVertex *   pVBVerts    = (DistortionVertex*)OVR_ALLOC ( sizeof(DistortionVertex) * meshData.VertexCount );
+            DistortionVertex *   pCurVBVert  = pVBVerts;
+            ovrDistortionVertex* pCurOvrVert = meshData.pVertexData;
+
+            for ( unsigned vertNum = 0; vertNum < meshData.VertexCount; vertNum++ )
+            {
+                pCurVBVert->ScreenPosNDC.x = pCurOvrVert->ScreenPosNDC.x;
+                pCurVBVert->ScreenPosNDC.y = pCurOvrVert->ScreenPosNDC.y;
+                pCurVBVert->TanEyeAnglesR  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR);
+                pCurVBVert->TanEyeAnglesG  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesG);
+                pCurVBVert->TanEyeAnglesB  = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesB);
+
+                // Convert [0.0f,1.0f] to [0,255]
+			    if (RState.DistortionCaps & ovrDistortionCap_Vignette)
+				    pCurVBVert->Col.R = (uint8_t)( Alg::Max ( pCurOvrVert->VignetteFactor, 0.0f ) * 255.99f );
+			    else
+				    pCurVBVert->Col.R = 255;
+
+                pCurVBVert->Col.G = pCurVBVert->Col.R;
+                pCurVBVert->Col.B = pCurVBVert->Col.R;
+                pCurVBVert->Col.A = (uint8_t)( pCurOvrVert->TimeWarpFactor * 255.99f );
+                pCurOvrVert++;
+                pCurVBVert++;
+            }
+
+            DistortionMeshVBs[eyeNum] = *new Buffer(&RParams);
+		    DistortionMeshVBs[eyeNum]->Data(Buffer_Vertex | Buffer_ReadOnly, pVBVerts, sizeof(DistortionVertex)* meshData.VertexCount);
+            DistortionMeshIBs[eyeNum] = *new Buffer(&RParams);
+		    DistortionMeshIBs[eyeNum]->Data(Buffer_Index | Buffer_ReadOnly, meshData.pIndexData, (sizeof(INT16)* meshData.IndexCount));
+
+            OVR_FREE ( pVBVerts );
+            ovrHmd_DestroyDistortionMesh( &meshData );
+        }
+    }
+
 
     // Uniform buffers
     for(int i = 0; i < Shader_Count; i++)
@@ -501,17 +656,17 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     // Not affected by viewport.
     RParams.pContext->ClearRenderTargetView(RParams.pBackBufferRT, RState.ClearColor);
 
-    setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
+    setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
 
 
     for(int eyeNum = 0; eyeNum < 2; eyeNum++)
     {
 		ShaderFill distortionShaderFill(DistortionShader);
-        distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture);
+        distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture, Shader_Pixel);
 
         if(RState.DistortionCaps & ovrDistortionCap_HqDistortion)
         {
-            static float aaDerivMult = 0.5f;
+            static float aaDerivMult = 1.0f;
             DistortionShader->SetUniform1f("AaDerivativeMult", aaDerivMult);
         }
         else
@@ -522,7 +677,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
 
 		if(overdriveActive)
 		{
-            distortionShaderFill.SetTexture(1, pOverdriveTextures[LastUsedOverdriveTextureIndex]);
+            distortionShaderFill.SetTexture(1, pOverdriveTextures[LastUsedOverdriveTextureIndex], Shader_Pixel);
             
             float overdriveScaleRegularRise;
             float overdriveScaleRegularFall;
@@ -540,19 +695,82 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         DistortionShader->SetUniform2f("EyeToSourceUVScale",  UVScaleOffset[eyeNum][0].x, UVScaleOffset[eyeNum][0].y);
         DistortionShader->SetUniform2f("EyeToSourceUVOffset", UVScaleOffset[eyeNum][1].x, UVScaleOffset[eyeNum][1].y);
         
+
 		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
 		{                       
             ovrMatrix4f timeWarpMatrices[2];
             ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
                                           RState.EyeRenderPoses[eyeNum], timeWarpMatrices);
 
-            // Can feed identity like matrices incase of concern over timewarp calculations
-			DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
-			DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
-
-            renderPrimitives(&distortionShaderFill, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
-                            NULL, 0, (int)DistortionMeshIBs[eyeNum]->GetSize()/2, Prim_Triangles);
+    		if (RState.DistortionCaps & ovrDistortionCap_ComputeShader)
+            {
+			    DistortionShader->SetUniform3x3f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
+			    DistortionShader->SetUniform3x3f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
+            }
+            else
+            {
+                // Can feed identity like matrices incase of concern over timewarp calculations
+			    DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]));
+			    DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]));
+            }
 		}
+
+
+		if (RState.DistortionCaps & ovrDistortionCap_ComputeShader)
+        {
+#if (OVR_D3D_VERSION >= 11)
+            //RParams.pContext->CSCSSetShaderResources
+            //RParams.pContext->CSSetUnorderedAccessViews
+            //RParams.pContext->CSSetShader
+            //RParams.pContext->CSSetSamplers
+            //RParams.pContext->CSSetConstantBuffers
+
+
+			// These need to match the values used in the compiled shader
+            //const int gridSizeInPixels = 16;        // GRID_SIZE_IN_PIXELS
+            //const int pinsPerEdge = 128;            // PINS_PER_EDGE
+			const int nxnBlockSizeInPixels = 2;		// NXN_BLOCK_SIZE_PIXELS
+			const int simdSquareSize = 16;			// SIMD_SQUARE_SIZE
+
+			const int invocationSizeInPixels = nxnBlockSizeInPixels * simdSquareSize;
+
+            distortionShaderFill.SetTexture(0, eyeNum == 0 ? leftEyeTexture : rightEyeTexture, Shader_Compute);
+
+            DistortionShader->SetUniform1f("RightEye", (float)eyeNum);
+            DistortionShader->SetUniform1f("UseOverlay", 0.0f);             // No overlay supported here.
+            DistortionShader->SetUniform1f("FbSizePixelsX", (float)RParams.BackBufferSize.w);
+
+            ShaderSet* shaders = distortionShaderFill.GetShaders();
+            ShaderBase* cshader = ((ShaderBase*)shaders->GetShader(Shader_Compute));
+
+            ID3D1xUnorderedAccessView *uavRendertarget = RParams.pBackBufferUAV;
+            int SizeX = RParams.BackBufferSize.w/2;
+            int SizeY = RParams.BackBufferSize.h;
+
+            int TileNumX = ( SizeX + (invocationSizeInPixels-1) ) / invocationSizeInPixels;
+            int TileNumY = ( SizeY + (invocationSizeInPixels-1) ) / invocationSizeInPixels;
+
+            RParams.pContext->CSSetUnorderedAccessViews ( 0, 1, &uavRendertarget, NULL );
+
+
+            // Incoming eye-buffer textures start at t0 onwards, so set this in slot #4
+            // Subtlety - can't put this in slot 0 because fill->Set stops at the first NULL texture.
+            ID3D1xShaderResourceView *d3dSrv = DistortionPinBuffer[eyeNum]->GetSrv();
+            RParams.pContext->CSSetShaderResources ( 4, 1, &d3dSrv );
+
+            // TODO: uniform/constant buffers
+            cshader->UpdateBuffer(UniformBuffers[Shader_Compute]);
+            cshader->SetUniformBuffer(UniformBuffers[Shader_Compute]);
+
+            // Primitive type is ignored for CS.
+            // This call actually sets the textures and does pContext->CSSetShader(). Primitive type is ignored.
+            distortionShaderFill.Set ( Prim_Unknown );
+
+            RParams.pContext->Dispatch ( TileNumX, TileNumY, 1 );
+#else
+            OVR_ASSERT ( !"No compute shaders on DX10" );
+#endif
+        }
         else
         {
             renderPrimitives(&distortionShaderFill, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
@@ -611,7 +829,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
     ShaderFill quadFill(SimpleQuadShader);
     quadFill.SetInputLayout(SimpleQuadVertexIL);
 
-    setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
+    setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
 
     float testerLuminance = (float)latencyTesterDrawColor[0] / 255.99f;
     if(SrgbBackBuffer)
@@ -641,7 +859,7 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
     ShaderFill quadFill(SimpleQuadShader);
     quadFill.SetInputLayout(SimpleQuadVertexIL);
 
-    setViewport(Recti(0,0, RParams.RTSize.w, RParams.RTSize.h));
+    setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
 
     Vector3f testerColor = Vector3f((float)latencyTesterPixelColor[0] / 255.99f, 
                                     (float)latencyTesterPixelColor[1] / 255.99f,
@@ -657,12 +875,12 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
 #ifdef OVR_BUILD_DEBUG
     SimpleQuadShader->SetUniform4f("Color", testerColor.x, testerColor.y, testerColor.z, 1.0f);
 
-    Vector2f scale(20.0f / RParams.RTSize.w, 20.0f / RParams.RTSize.h); 
+    Vector2f scale(20.0f / RParams.BackBufferSize.w, 20.0f / RParams.BackBufferSize.h); 
 #else
     // sending in as gray scale
     SimpleQuadShader->SetUniform4f("Color", testerColor.x, testerColor.x, testerColor.x, 1.0f);
 
-    Vector2f scale(1.0f / RParams.RTSize.w, 1.0f / RParams.RTSize.h); 
+    Vector2f scale(1.0f / RParams.BackBufferSize.w, 1.0f / RParams.BackBufferSize.h); 
 #endif
     SimpleQuadShader->SetUniform2f("Scale", scale.x, scale.y);
     SimpleQuadShader->SetUniform2f("PositionOffset", 1.0f-scale.x, 1.0f-scale.y);
@@ -759,7 +977,7 @@ void DistortionRenderer::setViewport(const Recti& vp)
 
 
 
-
+// Must match struct DistortionVertex
 static D3D1X_(INPUT_ELEMENT_DESC) DistortionMeshVertexDesc[] =
 {
     {"Position", 0, DXGI_FORMAT_R32G32_FLOAT,   0, 0,   D3D1X_(INPUT_PER_VERTEX_DATA), 0},
@@ -774,10 +992,35 @@ static D3D1X_(INPUT_ELEMENT_DESC) SimpleQuadMeshVertexDesc[] =
     {"Position", 0, DXGI_FORMAT_R32G32_FLOAT,   0, 0,   D3D1X_(INPUT_PER_VERTEX_DATA), 0},
 };
 
+
+
 // TODO: this is D3D specific
 void DistortionRenderer::initShaders()
-{  
+{
+#if OVR_D3D_VERSION>=11
+    if ( ( RState.DistortionCaps & ovrDistortionCap_ComputeShader ) != 0 )
     {
+        // Compute shader
+        DistortionShader = *new ShaderSet;
+
+        int shaderNum = DistortionComputeShader2x2;
+        if ( ( RState.EnabledHmdCaps & ovrHmdCap_DirectPentile ) != 0 )
+        {
+            shaderNum = DistortionComputeShader2x2Pentile;
+        }
+
+        PrecompiledShader psShaderByteCode = DistortionComputeShaderLookup[shaderNum];
+        Ptr<D3D_NS::ComputeShader> cs  = *new D3D_NS::ComputeShader(
+            &RParams,
+            (void*)psShaderByteCode.ShaderData, psShaderByteCode.ShaderSize,
+            psShaderByteCode.ReflectionData, psShaderByteCode.ReflectionSize);
+
+        DistortionShader->SetShader(cs);
+    }
+    else
+#endif
+    {
+        // Vertex + pixel distortion shader.
         PrecompiledShader vsShaderByteCode = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & RState.DistortionCaps];
         Ptr<D3D_NS::VertexShader> vtxShader = *new D3D_NS::VertexShader(
             &RParams,
@@ -873,6 +1116,7 @@ void DistortionRenderer::destroy()
 	{
 		DistortionMeshVBs[eyeNum].Clear();
 		DistortionMeshIBs[eyeNum].Clear();
+        DistortionPinBuffer[eyeNum].Clear();
 	}
 
 	DistortionVertexIL.Clear();
@@ -881,6 +1125,7 @@ void DistortionRenderer::destroy()
     {
         DistortionShader->UnsetShader(Shader_Vertex);
 	    DistortionShader->UnsetShader(Shader_Pixel);
+	    DistortionShader->UnsetShader(Shader_Compute);
 	    DistortionShader.Clear();
     }
 
@@ -916,25 +1161,43 @@ DistortionRenderer::GraphicsState::GraphicsState(ID3D1xDeviceContext* c)
 #if (OVR_D3D_VERSION == 11)
 , currentHullShader(NULL)
 , currentDomainShader(NULL)
+, currentComputeShader(NULL)
 #endif
 {
 	for (int i = 0; i < D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT; ++i)
-		samplerStates[i] = NULL;
+    {
+		psSamplerStates[i] = NULL;
+		vsSamplerStates[i] = NULL;
+#if (OVR_D3D_VERSION == 11)
+		csSamplerStates[i] = NULL;
+#endif
+    }
 
 	for (int i = 0; i < D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT; i++)
 	{
 		psShaderResourceState[i] = NULL;
 		vsShaderResourceState[i] = NULL;
+#if (OVR_D3D_VERSION == 11)
+		csShaderResourceState[i] = NULL;
+#endif
 	}
 
 	for (int i = 0; i < D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT; i++)
 	{
 		psConstantBuffersState[i] = NULL;
 		vsConstantBuffersState[i] = NULL;
-	}
+#if (OVR_D3D_VERSION == 11)
+        csConstantBuffersState[i] = NULL;
+#endif
+    }
 
 	for (int i = 0; i < D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
+    {
 		renderTargetViewState[i] = NULL;
+#if (OVR_D3D_VERSION == 11)
+        csUnorderedAccessViewState[i] = NULL;
+#endif
+    }
 
 	for (int i = 0; i < 4; i++)
 		omBlendFactorState[i] = NULL;
@@ -947,127 +1210,72 @@ DistortionRenderer::GraphicsState::GraphicsState(ID3D1xDeviceContext* c)
     }
 }
 
+#define SAFE_RELEASE(x) if ( (x) != NULL ) { (x)->Release(); (x)=NULL; }
+
 void DistortionRenderer::GraphicsState::clearMemory()
 {
-	if (rasterizerState != NULL)
-	{
-		rasterizerState->Release();
-		rasterizerState = NULL;
-	}
+    SAFE_RELEASE ( rasterizerState );
 
 	for (int i = 0; i < D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT; ++i)
 	{
-		if (samplerStates[i] == NULL)
-			continue;
-		samplerStates[i]->Release();
-		samplerStates[i] = NULL;
+        SAFE_RELEASE ( psSamplerStates[i] );
+        SAFE_RELEASE ( vsSamplerStates[i] );
+#if (OVR_D3D_VERSION == 11)
+        SAFE_RELEASE ( csSamplerStates[i] );
+#endif
 	}
 
-	if (inputLayoutState != NULL)
-	{
-		inputLayoutState->Release();
-		inputLayoutState = NULL;
-	}
+    SAFE_RELEASE ( inputLayoutState );
 
 	for (int i = 0; i < D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT; i++)
 	{
-		if (psShaderResourceState[i] != NULL)
-		{
-			psShaderResourceState[i]->Release();
-			psShaderResourceState[i] = NULL;
-		}
-		if (vsShaderResourceState[i] != NULL)
-		{
-			vsShaderResourceState[i]->Release();
-			vsShaderResourceState[i] = NULL;
-		}
+        SAFE_RELEASE ( psShaderResourceState[i] );
+        SAFE_RELEASE ( vsShaderResourceState[i] );
+#if (OVR_D3D_VERSION == 11)
+        SAFE_RELEASE ( csShaderResourceState[i] );
+#endif
 	}
 
 	for (int i = 0; i < D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT; i++)
 	{
-		if (psConstantBuffersState[i] != NULL)
-		{
-			psConstantBuffersState[i]->Release();
-			psConstantBuffersState[i] = NULL;
-		}
-		if (vsConstantBuffersState[i] != NULL)
-		{
-			vsConstantBuffersState[i]->Release();
-			vsConstantBuffersState[i] = NULL;
-		}
+        SAFE_RELEASE ( psConstantBuffersState[i] );
+        SAFE_RELEASE ( vsConstantBuffersState[i] );
+#if (OVR_D3D_VERSION == 11)
+        SAFE_RELEASE ( csConstantBuffersState[i] );
+#endif
 	}
 
 	for (int i = 0; i < D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
 	{
-		if (renderTargetViewState[i] != NULL)
-		{
-			renderTargetViewState[i]->Release();
-			renderTargetViewState[i] = NULL;
-		}
+        SAFE_RELEASE ( renderTargetViewState[i] );
+#if (OVR_D3D_VERSION == 11)
+        SAFE_RELEASE ( csUnorderedAccessViewState[i] );
+#endif
 	}
 
-	if (depthStencilViewState != NULL)
-	{
-		depthStencilViewState->Release();
-		depthStencilViewState = NULL;
-	}
-
-	if (omBlendState != NULL)
-	{
-		omBlendState->Release();
-		omBlendState = NULL;
-	}
-
-	if (iaIndexBufferPointerState != NULL)
-	{
-		iaIndexBufferPointerState->Release();
-		iaIndexBufferPointerState = NULL;
-	}
+    SAFE_RELEASE ( depthStencilViewState );
+    SAFE_RELEASE ( omBlendState );
+    SAFE_RELEASE ( iaIndexBufferPointerState );
 
 	for (int i = 0; i < D3D1x_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT; i++)
 	{
-		if (iaVertexBufferPointersState[i] == NULL)
-			continue;
-		iaVertexBufferPointersState[i]->Release();
-		iaVertexBufferPointersState[i] = NULL;
+        SAFE_RELEASE ( iaVertexBufferPointersState[i] );
 	}
 
-	if (currentPixelShader != NULL)
-	{
-		currentPixelShader->Release();
-		currentPixelShader = NULL;
-	}
-
-	if (currentVertexShader != NULL)
-	{
-		currentVertexShader->Release();
-		currentVertexShader = NULL;
-	}
-
-	if (currentGeometryShader != NULL)
-	{
-		currentGeometryShader->Release();
-		currentGeometryShader = NULL;
-	}
+    SAFE_RELEASE ( currentPixelShader );
+    SAFE_RELEASE ( currentVertexShader );
+    SAFE_RELEASE ( currentGeometryShader );
 
 #if (OVR_D3D_VERSION == 11)
-
-	if (currentHullShader != NULL)
-	{
-		currentHullShader->Release();
-		currentHullShader = NULL;
-	}
-
-	if (currentDomainShader != NULL)
-	{
-		currentDomainShader->Release();
-		currentDomainShader = NULL;
-	}
-
+    SAFE_RELEASE ( currentHullShader );
+    SAFE_RELEASE ( currentDomainShader );
+    SAFE_RELEASE ( currentComputeShader );
 #endif
 
 	memoryCleared = TRUE;
 }
+
+#undef SAFE_RELEASE
 
 DistortionRenderer::GraphicsState::~GraphicsState()
 {
@@ -1083,14 +1291,22 @@ void DistortionRenderer::GraphicsState::Save()
 	memoryCleared = FALSE;
 
 	context->RSGetState(&rasterizerState);
-	context->PSGetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, samplerStates);
 	context->IAGetInputLayout(&inputLayoutState);
 
 	context->PSGetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, psShaderResourceState);
-	context->VSGetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, vsShaderResourceState);
-
+	context->PSGetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, psSamplerStates);
 	context->PSGetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, psConstantBuffersState);
+
+	context->VSGetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, vsShaderResourceState);
+	context->VSGetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, vsSamplerStates);
 	context->VSGetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, vsConstantBuffersState);
+
+#if (OVR_D3D_VERSION == 11)
+	context->CSGetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, csShaderResourceState);
+	context->CSGetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, csSamplerStates);
+	context->CSGetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, csConstantBuffersState);
+	context->CSGetUnorderedAccessViews(0, D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT, csUnorderedAccessViewState);
+#endif
 
 	context->OMGetRenderTargets(D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT, renderTargetViewState, &depthStencilViewState);
 
@@ -1112,6 +1328,7 @@ void DistortionRenderer::GraphicsState::Save()
 	context->GSGetShader(&currentGeometryShader, NULL, NULL);
 	context->HSGetShader(&currentHullShader, NULL, NULL);
 	context->DSGetShader(&currentDomainShader, NULL, NULL);
+	context->CSGetShader(&currentComputeShader, NULL, NULL);
 	/* maybe above doesn't work; then do something with this (must test on dx11)
 	ID3D11ClassInstance* blank_array[0];
 	UINT blank_uint = 0;
@@ -1120,6 +1337,7 @@ void DistortionRenderer::GraphicsState::Save()
 	context->GSGetShader(&currentGeometryShader, blank_array, blank_uint);
 	context->HSGetShader(&currentHullShader, blank_array, blank_uint);
 	context->DSGetShader(&currentDomainShader, blank_array, blank_uint);
+	context->CSGetShader(&currentComputeShader, blank_array, blank_uint);
 	*/
 #endif
 }
@@ -1130,22 +1348,30 @@ void DistortionRenderer::GraphicsState::Restore()
 	if (rasterizerState != NULL)
 		context->RSSetState(rasterizerState);
 
-	context->PSSetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, samplerStates);
-
 	if (inputLayoutState != NULL)
 		context->IASetInputLayout(inputLayoutState);
 
+	context->PSSetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, psSamplerStates);
 	if (psShaderResourceState != NULL)
 		context->PSSetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, psShaderResourceState);
-
-	if (vsShaderResourceState != NULL)
-		context->VSSetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, vsShaderResourceState);
-
 	if (psConstantBuffersState != NULL)
 		context->PSSetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, psConstantBuffersState);
 
+	context->VSSetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, vsSamplerStates);
+	if (vsShaderResourceState != NULL)
+		context->VSSetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, vsShaderResourceState);
 	if (vsConstantBuffersState != NULL)
 		context->VSSetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, vsConstantBuffersState);
+
+#if (OVR_D3D_VERSION == 11)
+	context->CSSetSamplers(0, D3D1x_COMMONSHADER_SAMPLER_SLOT_COUNT, csSamplerStates);
+	if (csShaderResourceState != NULL)
+		context->CSSetShaderResources(0, D3D1x_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, csShaderResourceState);
+	if (csConstantBuffersState != NULL)
+		context->CSSetConstantBuffers(0, D3D1x_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, csConstantBuffersState);
+	if (csUnorderedAccessViewState != NULL)
+    	context->CSSetUnorderedAccessViews(0, D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT, csUnorderedAccessViewState, NULL);
+#endif
 
 	if (depthStencilViewState != NULL || renderTargetViewState != NULL)
 		context->OMSetRenderTargets(D3D1x_SIMULTANEOUS_RENDER_TARGET_COUNT, renderTargetViewState, depthStencilViewState);
@@ -1179,6 +1405,8 @@ void DistortionRenderer::GraphicsState::Restore()
 		context->HSSetShader(currentHullShader, NULL, 0);
 	if (currentDomainShader != NULL)
 		context->DSSetShader(currentDomainShader, NULL, 0);
+	if (currentComputeShader != NULL)
+		context->CSSetShader(currentComputeShader, NULL, 0);
 #endif
 	clearMemory();
 }

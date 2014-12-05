@@ -3,7 +3,7 @@
 Filename    :   OVRVersion.h
 Content     :
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
 you may not use the Oculus VR Rift SDK except in compliance with the License,
@@ -27,8 +27,8 @@ limitations under the License.
 
 #define OVR_MAJOR_VERSION 0
 #define OVR_MINOR_VERSION 4
-#define OVR_BUILD_VERSION 3
-#define OVR_VERSION_STRING "0.4.3"
+#define OVR_BUILD_VERSION 4
+#define OVR_VERSION_STRING "0.4.4"
 
 #define OVR_DK2_LATEST_FIRMWARE_MAJOR_VERSION 2
 #define OVR_DK2_LATEST_FIRMWARE_MINOR_VERSION 12

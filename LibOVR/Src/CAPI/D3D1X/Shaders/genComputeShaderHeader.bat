@@ -4,7 +4,7 @@ echo Compiling shader and packing into header: %~2
 setlocal
 
 set PATH=%PATH%;"%DXSDK_DIR%Utilities\bin\x86\"
-fxc.exe  /nologo /E main /T vs_4_0 /Fo "%1" %2
+fxc.exe  /nologo /E main /T cs_5_0 /Fo "%1" %2
 bin2header.exe "%1"
 
 echo Generating shader reflection data for %1

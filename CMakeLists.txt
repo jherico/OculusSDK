@@ -26,6 +26,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 
 if(CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions(-std=gnu++0x)
     if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
@@ -36,11 +37,16 @@ if(WIN32)
     add_definitions(-DUNICODE -D_UNICODE)
 elseif(APPLE)
 else() 
+    add_subdirectory(3rdParty/EDID)
+    set_target_properties(edid PROPERTIES FOLDER "3rdParty")
 endif()
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
 set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
+
+add_subdirectory(Bindings/C)
+set_target_properties(OVR_C PROPERTIES FOLDER "Oculus")
 
 ###############################################################################
 #
@@ -49,16 +55,21 @@ set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
 
 option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
 if(OCULUS_BUILD_SAMPLES)
-    # Used by the sample code to read the tuscany resources
-    add_subdirectory(3rdParty/TinyXml)
-    set_target_properties(TinyXML2 PROPERTIES FOLDER "3rdParty")
-    include_directories(3rdParty/TinyXml)
-
     # Make sure to set up the OVR include paths
     include_directories(${OculusVR_SOURCE_DIR}/Include)
     include_directories(${OculusVR_SOURCE_DIR}/Src)
     include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
     include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
+    include_directories(Bindings/C/Include)
+
+    add_subdirectory (Samples/OculusRoomTiny )
+    set_target_properties(OculusRoomTiny PROPERTIES FOLDER "Samples")
+
+    # Used by the sample code to read the tuscany resources
+    add_subdirectory(3rdParty/TinyXml)
+    set_target_properties(TinyXML2 PROPERTIES FOLDER "3rdParty")
+    include_directories(3rdParty/TinyXml)
+
 
     add_subdirectory (Samples/CommonSrc )
     set_target_properties(CommonSrc PROPERTIES FOLDER "Samples")

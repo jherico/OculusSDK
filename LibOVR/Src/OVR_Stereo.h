@@ -320,6 +320,9 @@ public:
 	float       ScreenGapSizeInMeters;
 	float       CenterFromTopInMeters;
 	float       LensSeparationInMeters;
+    Vector2f    PelOffsetR;                     // Offsets from the green pel in pixels (i.e. usual values are 0.5 or 0.333)
+    Vector2f    PelOffsetB;
+
 
 	// Timing & shutter data. All values in seconds.
 	struct ShutterInfo
@@ -372,6 +375,8 @@ public:
 		ScreenGapSizeInMeters(0.0f),
 		CenterFromTopInMeters(0),
 		LensSeparationInMeters(0),
+        PelOffsetR(0.0f,0.0f),
+        PelOffsetB(0.0f,0.0f),
       //Shutter (initialized below)
 		DesktopX(0),
 		DesktopY(0),
@@ -409,6 +414,8 @@ public:
 		ScreenGapSizeInMeters = src.ScreenGapSizeInMeters;
 		CenterFromTopInMeters = src.CenterFromTopInMeters;
 		LensSeparationInMeters = src.LensSeparationInMeters;
+        PelOffsetR = src.PelOffsetR;
+        PelOffsetB = src.PelOffsetB;
 		DesktopX = src.DesktopX;
 		DesktopY = src.DesktopY;
 		Shutter = src.Shutter;
@@ -465,6 +472,8 @@ struct HmdRenderInfo
     Size<int>   ResolutionInPixels;
     Size<float> ScreenSizeInMeters;
     float       ScreenGapSizeInMeters;
+    Vector2f    PelOffsetR;                     // Offsets from the green pel in pixels (i.e. usual values are 0.5 or 0.333)
+    Vector2f    PelOffsetB;
 
     // Characteristics of the lenses.
     float       CenterFromTopInMeters;
@@ -509,6 +518,8 @@ struct HmdRenderInfo
         LensSeparationInMeters = 0.0f;
         LensDiameterInMeters = 0.0f;
         LensSurfaceToMidplateInMeters = 0.0f;
+        PelOffsetR = Vector2f ( 0.0f, 0.0f );
+        PelOffsetB = Vector2f ( 0.0f, 0.0f );
         Shutter.Type = HmdShutter_LAST;
         Shutter.VsyncToNextVsync = 0.0f;
         Shutter.VsyncToFirstScanline = 0.0f;

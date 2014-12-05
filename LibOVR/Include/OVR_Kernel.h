@@ -4,7 +4,7 @@ Filename    :   OVRKernel.h
 Content     :   This contains references to all OVR Kernel headers in Src folder.
                 Should be generated automatically based on PublicHeader tags.
 
-Copyright   :   Copyright 2014 Oculus VR, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 

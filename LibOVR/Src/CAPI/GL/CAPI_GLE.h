@@ -33,6 +33,10 @@ limitations under the License.
 ///////////////////////////////////////////////////////////////////////////////
 // How to use this functionality
 //
+// - You #include this header instead of gl.h, glext.h, wglext.h (Windows), gl3.h (Apple), gl3ext.h (Apple), glx.h (Unix), and glxext.h (Unix).
+//   Currently you still would #include <Windows.h> for the base wgl functions on Windows and OpenGL.h or NSOpenGL for the 
+//   base Apple cgl functions.
+// 
 // - You call OpenGL functions just like you would if you were directly using OpenGL 
 //   headers and declarations. The difference is that this module automatically loads
 //   extensions on init and so you should never need to use GetProcAddress, wglGetProcAddress, etc.
@@ -116,10 +120,43 @@ namespace OVR
     void* GLEGetProcAddress(const char* name);
 
 
-
+    // GLEContext
+    //
     // Manages a collection of OpenGL extension interfaces.
     // If the application has multiple OpenGL unrelated contexts then you will want to create a
-    // different instance of this class for each one you intend to use it with.
+    // different instance of this class for each one you intend to use it with. 
+    //
+    // Example usage:
+    //     GLEContext gGLEContext;
+    //
+    //     GLEContext::SetCurrentContext(&gGLEContext);
+    //     gGLEContext.PlatformInit(); // Initializes WGL/GLX/etc. platform-specific OpenGL functionality
+    //
+    //     if(GLE_WGL_ARB_create_context) // If wglCreateContextAttribsARB is available...
+    //     {
+    //         int attribList[] = { WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 2, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB, None };
+    //         HGLRC h = wglCreateContextAttribsARB(hDC, 0, attribList);
+    //         [...]
+    //     }
+    //
+    //     gGLEContext.Init(); // Must be called after an OpenGL context has been created.
+    //
+    //     if(GLE_WHOLE_VERSION() >= 302) // If OpenGL 3.2 or later
+    //     {
+    //         glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, someTexture, 0); // This is an OpenGL 3.2 function.
+    //         [...]
+    //     }
+    //
+    //     if(GLE_GL_ARB_texture_multisample) // If the GL_ARB_texture_multisample extension is available...
+    //     {
+    //         glEnable(GL_SAMPLE_MASK);
+    //         glSampleMaski(0, 0x1);
+    //         [...]
+    //     }
+    //
+    //     [...]
+    //
+    //     gGLEContext.Shutdown();
     //
     GLE_CLASS_EXPORT class GLEContext
     {
@@ -127,16 +164,27 @@ namespace OVR
         GLEContext();
        ~GLEContext();
       
-        // Loads all the extensions from the current OpenGL context.
+        // Initializes platform-specific functionality (e.g. Windows WGL, Unix GLX, Android EGL, Apple CGL).
+        // You would typically call this before creating an OpenGL context and using platform-specific functions.
+        void PlatformInit();
+        bool IsPlatformInitialized() const;
+
+        // Loads all the extensions from the current OpenGL context. This must be called after an OpenGL context 
+        // has been created and made current.
         void Init();
+        bool IsInitialized() const;
         
-        // Clears all the extensions
+        // Clears all the extensions initialized by PlatformInit and Init. 
         void Shutdown();
+
+        void SetEnableHookGetError(bool enabled)
+            { EnableHookGetError = enabled; }
 
         // Returns the default instance of this class.
         static GLEContext* GetCurrentContext();
         
         // Sets the default instance of this class. This should be called after enabling a new OpenGL context.
+        // This sets the current GLEContext; it does not set the underlying OpenGL context itself.
         static void SetCurrentContext(GLEContext*);
         
     public:
@@ -146,17 +194,27 @@ namespace OVR
         int   WholeVersion;             // Equals ((MajorVersion * 100) + MinorVersion). Example usage: if(glv.WholeVersion >= 302) // If OpenGL v3.02+ ...
         bool  IsGLES;                   // Open GL ES?
         bool  IsCoreProfile;            // Is the current OpenGL context a core profile context? Its trueness may be a false positive but will never be a false negative.
+        bool  EnableHookGetError;       // If enabled then hook functions call glGetError after making the call.
+
+        int   PlatformMajorVersion;     // GLX/WGL/EGL/CGL version. Not the same as OpenGL version.
+        int   PlatformMinorVersion;
+        int   PlatformWholeVersion;
 
         void InitVersion();             // Initializes the version information (e.g. MajorVersion). Called by the public Init function.
         void InitExtensionLoad();       // Loads the function addresses into the function pointers.
         void InitExtensionSupport();    // Loads the boolean extension support booleans.
         
+        void InitPlatformVersion();
+        void InitPlatformExtensionLoad();
+        void InitPlatformExtensionSupport();
+
     public:
         // GL_VERSION_1_1
         // Not normally included because all OpenGL 1.1 functionality is always present. But if we have 
         // hooking enabled then we implement our own version of each function.
         #if defined(GLE_HOOKING_ENABLED)
-            void PostHook();            // Called at the end of a hook function.
+          //void PreHook(const char* functionName);             // Called at the beginning of a hook function.
+            void PostHook(const char* functionName);            // Called at the end of a hook function.
 
             void            glAccum_Hook(GLenum op, GLfloat value);
             void            glAlphaFunc_Hook(GLenum func, GLclampf ref);
@@ -849,7 +907,7 @@ namespace OVR
             void   glDebugMessageCallbackAMD_Hook(GLDEBUGPROCAMD callback, GLvoid *userParam);
             GLuint glGetDebugMessageLogAMD_Hook(GLuint count, GLsizei bufsize, GLenum *categories, GLuint *severities, GLuint *ids, GLsizei *lengths, GLchar *message);
 
-        #if defined(GLE_APPLE_ENABLED)
+        #if defined(GLE_CGL_ENABLED)
             // GL_APPLE_element_array
             void glElementPointerAPPLE_Hook(GLenum type, const GLvoid *pointer);
             void glDrawElementArrayAPPLE_Hook(GLenum mode, GLint first, GLsizei count);
@@ -899,7 +957,7 @@ namespace OVR
             void glMapVertexAttrib1fAPPLE_Hook(GLuint index, GLuint size, GLfloat u1, GLfloat u2, GLint stride, GLint order, const GLfloat *points);
             void glMapVertexAttrib2dAPPLE_Hook(GLuint index, GLuint size, GLdouble u1, GLdouble u2, GLint ustride, GLint uorder, GLdouble v1, GLdouble v2, GLint vstride, GLint vorder, const GLdouble *points);
             void glMapVertexAttrib2fAPPLE_Hook(GLuint index, GLuint size, GLfloat u1, GLfloat u2, GLint ustride, GLint uorder, GLfloat v1, GLfloat v2, GLint vstride, GLint vorder, const GLfloat *points);
-        #endif // GLE_APPLE_ENABLED
+        #endif // GLE_CGL_ENABLED
 
             // GL_ARB_debug_output
             void   glDebugMessageControlARB_Hook(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
@@ -976,10 +1034,11 @@ namespace OVR
             // GL_WIN_swap_hint
             void glAddSwapHintRectWIN_Hook(GLint x, GLint y, GLsizei width, GLsizei height);
 
-          #if defined(GLE_WINDOWS_ENABLED)
-            void PostWGLHook();
+          #if defined(GLE_WGL_ENABLED)
+            void PostWGLHook(const char* functionName);
 
             // WGL
+            /* Hooking of these is currently disabled.
             BOOL  wglCopyContext_Hook(HGLRC, HGLRC, UINT);
             HGLRC wglCreateContext_Hook(HDC);
             HGLRC wglCreateLayerContext_Hook(HDC, int);
@@ -999,6 +1058,7 @@ namespace OVR
             BOOL  wglRealizeLayerPalette_Hook(HDC, int, BOOL);
             BOOL  wglSwapLayerBuffers_Hook(HDC, UINT);
             DWORD wglSwapMultipleBuffers_Hook(UINT, CONST WGLSWAP *);
+            */
 
             // WGL_ARB_buffer_region
             HANDLE wglCreateBufferRegionARB_Hook (HDC hDC, int iLayerPlane, UINT uType);
@@ -1088,10 +1148,10 @@ namespace OVR
             BOOL   wglDXObjectAccessNV_Hook(HANDLE hObject, GLenum access);
             BOOL   wglDXLockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects);
             BOOL   wglDXUnlockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects);
-          #endif // GLE_WINDOWS_ENABLED
+          #endif // GLE_WGL_ENABLED
 
-          #if defined(GLE_UNIX_ENABLED)
-            void PostGLXHook();
+          #if defined(GLE_GLX_ENABLED)
+            void PostGLXHook(const char* functionName);
 
             // GLX_VERSION_1_0
             // GLX_VERSION_1_1
@@ -1122,6 +1182,9 @@ namespace OVR
             // GLX_VERSION_1_4
             // We don't do hooking of this.
 
+            // GLX_ARB_create_context
+            GLXContext glXCreateContextAttribsARB_Hook(Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
+
             // GLX_EXT_swap_control
             void glXSwapIntervalEXT_Hook(::Display* dpy, GLXDrawable drawable, int interval);
 
@@ -1132,7 +1195,11 @@ namespace OVR
 			Bool    glXWaitForMscOML_Hook(::Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor, int64_t remainder, int64_t* ust, int64_t* msc, int64_t* sbc);
 			Bool    glXWaitForSbcOML_Hook(::Display* dpy, GLXDrawable drawable, int64_t target_sbc, int64_t* ust, int64_t* msc, int64_t* sbc);
 
-          #endif // GLE_UNIX_ENABLED
+            // GLX_MESA_swap_control
+            int glXGetSwapIntervalMESA_Hook();
+            int glXSwapIntervalMESA_Hook(unsigned int interval);
+
+          #endif // GLE_GLX_ENABLED
 
         #endif // #if defined(GLE_HOOKING_ENABLED)
 
@@ -1489,7 +1556,7 @@ namespace OVR
         PFNGLDEBUGMESSAGEINSERTAMDPROC glDebugMessageInsertAMD_Impl;
         PFNGLGETDEBUGMESSAGELOGAMDPROC glGetDebugMessageLogAMD_Impl;
 
-      #if defined(GLE_APPLE_ENABLED)
+      #if defined(GLE_CGL_ENABLED)
         // GL_APPLE_aux_depth_stencil
         // (no functions)
 
@@ -1563,7 +1630,7 @@ namespace OVR
         PFNGLMAPVERTEXATTRIB1FAPPLEPROC glMapVertexAttrib1fAPPLE_Impl;
         PFNGLMAPVERTEXATTRIB2DAPPLEPROC glMapVertexAttrib2dAPPLE_Impl;
         PFNGLMAPVERTEXATTRIB2FAPPLEPROC glMapVertexAttrib2fAPPLE_Impl;
-      #endif // GLE_APPLE_ENABLED
+      #endif // GLE_CGL_ENABLED
       
         // GL_ARB_debug_output
         PFNGLDEBUGMESSAGECALLBACKARBPROC glDebugMessageCallbackARB_Impl;
@@ -1612,6 +1679,9 @@ namespace OVR
         // GL_ARB_texture_non_power_of_two
         // (no functions)
 
+        // GL_ARB_texture_rectangle
+        // (no functions)
+
         // GL_ARB_timer_query
         PFNGLGETQUERYOBJECTI64VPROC glGetQueryObjecti64v_Impl;
         PFNGLGETQUERYOBJECTUI64VPROC glGetQueryObjectui64v_Impl;
@@ -1651,7 +1721,7 @@ namespace OVR
         // GL_WIN_swap_hint
         PFNGLADDSWAPHINTRECTWINPROC glAddSwapHintRectWIN_Impl;
 
-      #if defined(GLE_WINDOWS_ENABLED)
+      #if defined(GLE_WGL_ENABLED)
         // WGL
         // We don't declare pointers for these because we statically link to the implementations, same as with the OpenGL 1.1 functions.
         // BOOL  wglCopyContext_Hook(HGLRC, HGLRC, UINT);
@@ -1673,6 +1743,28 @@ namespace OVR
         // BOOL  wglRealizeLayerPalette_Hook(HDC, int, BOOL);
         // BOOL  wglSwapLayerBuffers_Hook(HDC, UINT);
         // DWORD wglSwapMultipleBuffers_Hook(UINT, CONST WGLSWAP *);
+
+        #if 0
+        PFNWGLCOPYCONTEXTPROC            wglCopyContext_Impl;
+        PFNWGLCREATECONTEXTPROC          wglCreateContext_Impl;
+        PFNWGLCREATELAYERCONTEXTPROC     wglCreateLayerContext_Impl;
+        PFNWGLDELETECONTEXTPROC          wglDeleteContext_Impl;
+        PFNWGLGETCURRENTCONTEXTPROC      wglGetCurrentContext_Impl;
+        PFNWGLGETCURRENTDCPROC           wglGetCurrentDC_Impl;
+        PFNWGLGETPROCADDRESSPROC         wglGetProcAddress_Impl;
+        PFNWGLMAKECURRENTPROC            wglMakeCurrent_Impl;
+        PFNWGLSHARELISTSPROC             wglShareLists_Impl;
+        PFNWGLUSEFONTBITMAPSAPROC        wglUseFontBitmapsA_Impl;
+        PFNWGLUSEFONTBITMAPSWPROC        wglUseFontBitmapsW_Impl;
+        PFNWGLUSEFONTOUTLINESAPROC       wglUseFontOutlinesA_Impl;
+        PFNWGLUSEFONTOUTLINESWPROC       wglUseFontOutlinesW_Impl;
+        PFNWGLDESCRIBELAYERPLANEPROC     wglDescribeLayerPlane_Impl;
+        PFNWGLSETLAYERPALETTEENTRIESPROC wglSetLayerPaletteEntries_Impl;
+        PFNWGLGETLAYERPALETTEENTRIESPROC wglGetLayerPaletteEntries_Impl;
+        PFNWGLREALIZELAYERPALETTEPROC    wglRealizeLayerPalette_Impl;
+        PFNWGLSWAPLAYERBUFFERSPROC       wglSwapLayerBuffers_Impl;
+        PFNWGLSWAPMULTIPLEBUFFERSPROC    wglSwapMultipleBuffers_Impl;
+        #endif
 
         // WGL_ARB_buffer_region
         PFNWGLCREATEBUFFERREGIONARBPROC  wglCreateBufferRegionARB_Impl;
@@ -1739,9 +1831,6 @@ namespace OVR
         PFNWGLWAITFORMSCOMLPROC          wglWaitForMscOML_Impl;
         PFNWGLWAITFORSBCOMLPROC          wglWaitForSbcOML_Impl;
 
-        // WGL_EXT_framebuffer_sRGB
-        // (no functions)
-
         // WGL_NV_video_output
         PFNWGLGETVIDEODEVICENVPROC     wglGetVideoDeviceNV_Impl;
         PFNWGLRELEASEVIDEODEVICENVPROC wglReleaseVideoDeviceNV_Impl;
@@ -1778,9 +1867,9 @@ namespace OVR
         PFNWGLDXUNLOCKOBJECTSNVPROC          wglDXUnlockObjectsNV_Impl;
         PFNWGLDXUNREGISTEROBJECTNVPROC       wglDXUnregisterObjectNV_Impl;
 
-      #endif // GLE_WINDOWS_ENABLED
+      #endif // GLE_WGL_ENABLED
       
-      #if defined(GLE_UNIX_ENABLED)
+      #if defined(GLE_GLX_ENABLED)
         // GLX_VERSION_1_1
         // We don't create any pointers, because we assume these functions are always present.
         
@@ -1809,6 +1898,9 @@ namespace OVR
         // GLX_VERSION_1_4
         // Nothing to declare
         
+        // GLX_ARB_create_context
+        PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB_Impl;
+
         // GLX_EXT_swap_control
         PFNGLXSWAPINTERVALEXTPROC glXSwapIntervalEXT_Impl;
 
@@ -1819,74 +1911,87 @@ namespace OVR
         PFNGLXWAITFORMSCOMLPROC     glXWaitForMscOML_Impl;
         PFNGLXWAITFORSBCOMLPROC     glXWaitForSbcOML_Impl;
 
-      #endif // GLE_UNIX_ENABLED
+        // GLX_MESA_swap_control
+        PFNGLXGETSWAPINTERVALMESAPROC glXGetSwapIntervalMESA_Impl;
+        PFNGLXSWAPINTERVALMESAPROC    glXSwapIntervalMESA_Impl;
+
+      #endif // GLE_GLX_ENABLED
 
         
         // Boolean extension support indicators. Each of these identifies the
         // presence or absence of the given extension. A better solution here
         // might be to use an STL map<const char*, bool>.
-        bool gl_AMD_debug_output;
-      //bool gl_AMD_performance_monitor;
-        bool gl_APPLE_aux_depth_stencil;
-        bool gl_APPLE_client_storage;
-        bool gl_APPLE_element_array;
-        bool gl_APPLE_fence;
-        bool gl_APPLE_float_pixels;
-        bool gl_APPLE_flush_buffer_range;
-        bool gl_APPLE_object_purgeable;
-        bool gl_APPLE_pixel_buffer;
-        bool gl_APPLE_rgb_422;
-        bool gl_APPLE_row_bytes;
-        bool gl_APPLE_specular_vector;
-        bool gl_APPLE_texture_range;
-        bool gl_APPLE_transform_hint;
-        bool gl_APPLE_vertex_array_object;
-        bool gl_APPLE_vertex_array_range;
-        bool gl_APPLE_vertex_program_evaluators;
-        bool gl_APPLE_ycbcr_422;
-        bool gl_ARB_debug_output;
-      //bool gl_ARB_direct_state_access;
-        bool gl_ARB_ES2_compatibility;
-        bool gl_ARB_framebuffer_object;
-        bool gl_ARB_framebuffer_sRGB;
-        bool gl_ARB_texture_multisample;
-        bool gl_ARB_texture_non_power_of_two;
-        bool gl_ARB_timer_query;
-        bool gl_ARB_vertex_array_object;
-      //bool gl_ARB_vertex_attrib_binding;
-        bool gl_EXT_draw_buffers2;
-        bool gl_EXT_texture_filter_anisotropic;
-      //bool gl_KHR_context_flush_control;
-        bool gl_KHR_debug;
-      //bool gl_KHR_robust_buffer_access_behavior;
-      //bool gl_KHR_robustness;
-        bool gl_WIN_swap_hint;
+        bool gle_AMD_debug_output;
+      //bool gle_AMD_performance_monitor;
+        bool gle_APPLE_aux_depth_stencil;
+        bool gle_APPLE_client_storage;
+        bool gle_APPLE_element_array;
+        bool gle_APPLE_fence;
+        bool gle_APPLE_float_pixels;
+        bool gle_APPLE_flush_buffer_range;
+        bool gle_APPLE_object_purgeable;
+        bool gle_APPLE_pixel_buffer;
+        bool gle_APPLE_rgb_422;
+        bool gle_APPLE_row_bytes;
+        bool gle_APPLE_specular_vector;
+        bool gle_APPLE_texture_range;
+        bool gle_APPLE_transform_hint;
+        bool gle_APPLE_vertex_array_object;
+        bool gle_APPLE_vertex_array_range;
+        bool gle_APPLE_vertex_program_evaluators;
+        bool gle_APPLE_ycbcr_422;
+        bool gle_ARB_debug_output;
+        bool gle_ARB_depth_buffer_float;
+      //bool gle_ARB_direct_state_access;
+        bool gle_ARB_ES2_compatibility;
+        bool gle_ARB_framebuffer_object;
+        bool gle_ARB_framebuffer_sRGB;
+        bool gle_ARB_texture_multisample;
+        bool gle_ARB_texture_non_power_of_two;
+        bool gle_ARB_texture_rectangle;
+        bool gle_ARB_timer_query;
+        bool gle_ARB_vertex_array_object;
+      //bool gle_ARB_vertex_attrib_binding;
+        bool gle_EXT_draw_buffers2;
+        bool gle_EXT_texture_compression_s3tc;
+        bool gle_EXT_texture_filter_anisotropic;
+      //bool gle_KHR_context_flush_control;
+        bool gle_KHR_debug;
+      //bool gle_KHR_robust_buffer_access_behavior;
+      //bool gle_KHR_robustness;
+        bool gle_WIN_swap_hint;
         
-      #if defined(GLE_WINDOWS_ENABLED)
-        bool gl_WGL_ARB_buffer_region;
-        bool gl_WGL_ARB_extensions_string;
-        bool gl_WGL_ARB_pixel_format;
-        bool gl_WGL_ARB_make_current_read;
-        bool gl_WGL_ARB_pbuffer;
-        bool gl_WGL_ARB_render_texture;
-        bool gl_WGL_TYPE_RGBA_FLOAT_ARB;
-        bool gl_WGL_ARB_framebuffer_sRGB;
-        bool gl_WGL_NV_present_video;
-        bool gl_WGL_ARB_create_context;
-        bool gl_WGL_ARB_create_context_profile;
-        bool gl_WGL_ARB_create_context_robustness;
-        bool gl_WGL_EXT_extensions_string;
-        bool gl_WGL_EXT_swap_control;
-        bool gl_WGL_OML_sync_control;
-        bool gl_WGL_EXT_framebuffer_sRGB;
-        bool gl_WGL_NV_video_output;
-        bool gl_WGL_NV_swap_group;
-        bool gl_WGL_NV_video_capture;
-        bool gl_WGL_NV_copy_image;
-        bool gl_WGL_NV_DX_interop;
-      #elif defined(GLE_UNIX_ENABLED)
-        bool gl_GLX_EXT_swap_control;
-        bool gl_GLX_OML_sync_control;
+      #if defined(GLE_WGL_ENABLED)
+        bool gle_WGL_ARB_buffer_region;
+        bool gle_WGL_ARB_create_context;
+        bool gle_WGL_ARB_create_context_profile;
+        bool gle_WGL_ARB_create_context_robustness;
+        bool gle_WGL_ARB_extensions_string;
+        bool gle_WGL_ARB_framebuffer_sRGB;
+        bool gle_WGL_ARB_make_current_read;
+        bool gle_WGL_ARB_pbuffer;
+        bool gle_WGL_ARB_pixel_format;
+        bool gle_WGL_ARB_pixel_format_float;
+        bool gle_WGL_ARB_render_texture;
+        bool gle_WGL_ATI_render_texture_rectangle;
+        bool gle_WGL_EXT_extensions_string;
+        bool gle_WGL_EXT_swap_control;
+        bool gle_WGL_NV_copy_image;
+        bool gle_WGL_NV_DX_interop;
+        bool gle_WGL_NV_DX_interop2;
+        bool gle_WGL_NV_present_video;
+        bool gle_WGL_NV_render_texture_rectangle;
+        bool gle_WGL_NV_swap_group;
+        bool gle_WGL_NV_video_capture;
+        bool gle_WGL_NV_video_output;
+        bool gle_WGL_OML_sync_control;
+      #elif defined(GLE_GLX_ENABLED)
+        bool gle_GLX_ARB_create_context;
+        bool gle_GLX_ARB_create_context_profile;
+		bool gle_GLX_ARB_create_context_robustness;
+        bool gle_GLX_EXT_swap_control;
+        bool gle_GLX_OML_sync_control;
+        bool gle_MESA_swap_control;
       #endif
         
     }; // class GLEContext

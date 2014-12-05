@@ -42,6 +42,7 @@ extern bool anyRiftsInExtendedMode();
 // Stack of destroy listeners (push/pop semantics)
 static SystemSingletonInternal *SystemShutdownListenerStack = 0;
 static Lock stackLock;
+static bool DisplayShimInitialized = false;
 
 void SystemSingletonInternal::PushDestroyCallbacks()
 {
@@ -69,8 +70,13 @@ void System::DirectDisplayInitialize()
 
 	bool anyExtendedRifts = anyRiftsInExtendedMode() || Display::InCompatibilityMode( false );
 	
-	Win32::DisplayShim::GetInstance().Initialize(anyExtendedRifts);
+    DisplayShimInitialized = Win32::DisplayShim::GetInstance().Initialize(anyExtendedRifts);
 #endif
+}
+
+bool System::DirectDisplayEnabled()
+{
+    return DisplayShimInitialized;
 }
 
 // Initializes System core, installing allocator.

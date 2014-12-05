@@ -55,6 +55,12 @@ struct ListNode
         void* pVoidNext;
     };
 
+    ListNode()
+    {
+        pPrev = NULL;
+        pNext = NULL;
+    }
+
     void    RemoveNode()
     {
         pPrev->pNext = pNext;

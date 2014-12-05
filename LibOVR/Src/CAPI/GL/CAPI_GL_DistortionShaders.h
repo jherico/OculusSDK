@@ -41,6 +41,7 @@ namespace OVR { namespace CAPI { namespace GL {
     "#define _FRAGCOLOR_DECLARATION\n"
     "#define _MRTFRAGCOLOR0_DECLARATION\n"
     "#define _MRTFRAGCOLOR1_DECLARATION\n"
+    "#define _GLFRAGCOORD_DECLARATION\n"
     "#define _VS_IN attribute\n"
     "#define _VS_OUT varying\n"
     "#define _FS_IN varying\n"
@@ -49,13 +50,16 @@ namespace OVR { namespace CAPI { namespace GL {
     "#define _FRAGCOLOR gl_FragColor\n"
     "#define _MRTFRAGCOLOR0 gl_FragData[0]\n"
     "#define _MRTFRAGCOLOR1 gl_FragData[1]\n"       // The texture coordinate [0.0,1.0] for texel i of a texture of size N is: (2i + 1)/2N
-    "#define _TEXELFETCHDECL vec4 texelFetch(sampler2D tex, ivec2 coord, int lod){ ivec2 size = textureSize2D(tex, lod); return texture2D(tex, vec2(float((coord.x * 2) + 1) / float(size.x * 2), float((coord.y * 2) + 1) / float(size.y * 2))); }\n";
+    "#ifdef GL_EXT_gpu_shader4\n"
+    "  #define _TEXELFETCHDECL vec4 texelFetch(sampler2D tex, ivec2 coord, int lod){ ivec2 size = textureSize2D(tex, lod); return texture2D(tex, vec2(float((coord.x * 2) + 1) / float(size.x * 2), float((coord.y * 2) + 1) / float(size.y * 2))); }\n"
+    "#endif\n";
     
     static const char glsl3Prefix[] =
     "#version 150\n"
     "#define _FRAGCOLOR_DECLARATION out vec4 FragColor;\n"
     "#define _MRTFRAGCOLOR0_DECLARATION out vec4 FragData0;\n"
     "#define _MRTFRAGCOLOR1_DECLARATION out vec4 FragData1;\n"
+    "#define _GLFRAGCOORD_DECLARATION in vec4 gl_FragCoord;\n"
     "#define _VS_IN in\n"
     "#define _VS_OUT out\n"
     "#define _FS_IN in\n"
@@ -309,10 +313,11 @@ namespace OVR { namespace CAPI { namespace GL {
     
     "_MRTFRAGCOLOR0_DECLARATION\n"   // Desired color (next frame's "PrevTexture")
     "_MRTFRAGCOLOR1_DECLARATION\n"   // Overdriven color (Back-buffer)
+    "_GLFRAGCOORD_DECLARATION\n"
 
-    "_FS_IN vec4 gl_FragCoord;\n"
-
-    "_TEXELFETCHDECL\n" // Defines texelFetch in case we're using GLSL 1.2 or earlier, which doesn't natively support it.
+    "#ifdef _TEXELFETCHDECL\n"
+    "_TEXELFETCHDECL\n"
+    "#endif\n"
     
     "void main()\n"
     "{\n"
@@ -324,6 +329,7 @@ namespace OVR { namespace CAPI { namespace GL {
     "   _MRTFRAGCOLOR0 = vec4(newColor, 1);\n"
     "   _MRTFRAGCOLOR1 = _MRTFRAGCOLOR0;\n"
 
+    "   #ifdef _TEXELFETCHDECL\n"
     // pixel luminance overdrive
     "   if(OverdriveScales_IsSrgb.x > 0.0)\n"
     "   {\n"
@@ -349,6 +355,11 @@ namespace OVR { namespace CAPI { namespace GL {
 
     "       _MRTFRAGCOLOR1 = vec4(overdriveColor, 1.0);\n"
     "   }\n"
+    "   #else\n"
+    // If statement to keep OverdriveScales_IsSrgb from being optimized out.
+    "   if(OverdriveScales_IsSrgb.x > 0.0)\n"
+    "     _MRTFRAGCOLOR1 = vec4(newColor, 1);\n"
+    "   #endif\n"
     "}\n";
 
     const OVR::CAPI::GL::ShaderBase::Uniform DistortionChroma_ps_refl[] =

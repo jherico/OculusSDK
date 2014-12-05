@@ -5,7 +5,7 @@ Content     :   RenderDevice implementation header for D3DX10/11.
 Created     :   September 10, 2012
 Authors     :   Andrew Reisse
 
-Copyright   :   Copyright 2012 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ class RenderDevice;
 typedef ID3D10Device1           ID3D1xDevice;
 typedef ID3D10Device1           ID3D1xDeviceContext;
 typedef ID3D10RenderTargetView  ID3D1xRenderTargetView;
+typedef int                     ID3D1xUnorderedAccessView;      // Typedeffing as int saves a lot of checking against DX version numbers when just copying around pointers.
 typedef ID3D10Texture2D         ID3D1xTexture2D;
 typedef ID3D10ShaderResourceView ID3D1xShaderResourceView;
 typedef ID3D10DepthStencilView  ID3D1xDepthStencilView;
@@ -94,6 +95,7 @@ typedef D3D10_QUERY_DESC        D3D1x_QUERY_DESC;
 typedef ID3D11Device            ID3D1xDevice;
 typedef ID3D11DeviceContext     ID3D1xDeviceContext;
 typedef ID3D11RenderTargetView  ID3D1xRenderTargetView;
+typedef ID3D11UnorderedAccessView ID3D1xUnorderedAccessView;
 typedef ID3D11Texture2D         ID3D1xTexture2D;
 typedef ID3D11ShaderResourceView ID3D1xShaderResourceView;
 typedef ID3D11DepthStencilView  ID3D1xDepthStencilView;
@@ -184,6 +186,10 @@ class Buffer : public Render::Buffer
 public:
     RenderDevice*     Ren;
     Ptr<ID3D1xBuffer> D3DBuffer;
+    Ptr<ID3D1xShaderResourceView> D3DSrv;
+#if (OVR_D3D_VERSION >= 11)
+    Ptr<ID3D1xUnorderedAccessView> D3DUav;
+#endif
     size_t            Size;
     int               Use;
     bool              Dynamic;
@@ -203,6 +209,18 @@ public:
         return D3DBuffer;
     }
 
+    ID3D1xShaderResourceView* GetSrv()
+    {
+        return D3DSrv;
+    }
+
+#if (OVR_D3D_VERSION >= 11)
+    ID3D1xUnorderedAccessView* GetUav()
+    {
+        return D3DUav;
+    }
+#endif
+
     virtual size_t GetSize()
     {
         return Size;
@@ -218,6 +236,7 @@ class Texture : public Render::Texture
 public:
     RenderDevice*                   Ren;
     Ptr<ID3D1xTexture2D>            Tex;
+    // TODO: Add UAV...
     Ptr<ID3D1xShaderResourceView>   TexSv;
     Ptr<ID3D1xRenderTargetView>     TexRtv;
     Ptr<ID3D1xDepthStencilView>     TexDsv;
@@ -256,32 +275,35 @@ public:
 class RenderDevice : public Render::RenderDevice
 {
 public:
-    Ptr<IDXGIFactory>           DXGIFactory;
-    HWND                        Window;
+    Ptr<IDXGIFactory>               DXGIFactory;
+    HWND                            Window;
 
-    Ptr<ID3D1xDevice>           Device;
-    Ptr<ID3D1xDeviceContext>    Context;
-    Ptr<IDXGISwapChain>         SwapChain;
-    Ptr<IDXGIAdapter>           Adapter;
-    Ptr<IDXGIOutput>            FullscreenOutput;
-    int                         FSDesktopX, FSDesktopY;
-    int                         PreFullscreenX, PreFullscreenY, PreFullscreenW, PreFullscreenH;
+    Ptr<ID3D1xDevice>               Device;
+    Ptr<ID3D1xDeviceContext>        Context;
+    Ptr<IDXGISwapChain>             SwapChain;
+    Ptr<IDXGIAdapter>               Adapter;
+    Ptr<IDXGIOutput>                FullscreenOutput;
+    int                             FSDesktopX, FSDesktopY;
+    int                             PreFullscreenX, PreFullscreenY, PreFullscreenW, PreFullscreenH;
 
-    Ptr<ID3D1xTexture2D>        BackBuffer;
-    Ptr<ID3D1xRenderTargetView> BackBufferRT;
-    Ptr<Texture>                CurRenderTarget;
-    Ptr<Texture>                CurDepthBuffer;
-    Ptr<ID3D1xRasterizerState>  Rasterizer;
-    Ptr<ID3D1xBlendState>       BlendState;
-    D3D1x_VIEWPORT              D3DViewport;
+    Ptr<ID3D1xTexture2D>            BackBuffer;
+    Ptr<ID3D1xRenderTargetView>     BackBufferRT;
+#if (OVR_D3D_VERSION>=11)
+    Ptr<ID3D1xUnorderedAccessView>  BackBufferUAV;
+#endif
+    Ptr<Texture>                    CurRenderTarget;
+    Ptr<Texture>                    CurDepthBuffer;
+    Ptr<ID3D1xRasterizerState>      Rasterizer;
+    Ptr<ID3D1xBlendState>           BlendState;
+    D3D1x_VIEWPORT                  D3DViewport;
 
-    Ptr<ID3D1xDepthStencilState> DepthStates[1 + 2 * Compare_Count];
-    Ptr<ID3D1xDepthStencilState> CurDepthState;
-    Ptr<ID3D1xInputLayout>      ModelVertexIL;
-    Ptr<ID3D1xInputLayout>      DistortionVertexIL;
-    Ptr<ID3D1xInputLayout>      HeightmapVertexIL;
+    Ptr<ID3D1xDepthStencilState>    DepthStates[1 + 2 * Compare_Count];
+    Ptr<ID3D1xDepthStencilState>    CurDepthState;
+    Ptr<ID3D1xInputLayout>          ModelVertexIL;
+    Ptr<ID3D1xInputLayout>          DistortionVertexIL;
+    Ptr<ID3D1xInputLayout>          HeightmapVertexIL;
 
-    Ptr<ID3D1xSamplerState>     SamplerStates[Sample_Count];
+    Ptr<ID3D1xSamplerState>         SamplerStates[Sample_Count];
 
     struct StandardUniformData
     {
@@ -372,7 +394,7 @@ public:
                         const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles, MeshType meshType = Mesh_Scene);
     virtual void RenderWithAlpha(   const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
                                     const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles);
-
+    virtual void RenderCompute(const Fill* fill, Render::Buffer* buffer, int invocationSizeInPixels );
     virtual Fill *CreateSimpleFill(int flags = Fill::F_Solid);
 
     virtual Render::Shader *LoadBuiltinShader(ShaderStage stage, int shader);

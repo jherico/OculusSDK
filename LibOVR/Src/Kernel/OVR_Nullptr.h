@@ -49,7 +49,7 @@ limitations under the License.
         #define OVR_HAVE_std_nullptr_t 1
     #elif defined(__clang__)
         #define OVR_HAVE_std_nullptr_t 1
-    #elif defined(OVR_CPP_GNUC) && (OVR_CPP_VERSION >= 406) // GCC 4.6+
+    #elif defined(OVR_CPP_GNUC) && (OVR_CC_VERSION >= 406) // GCC 4.6+
         #define OVR_HAVE_std_nullptr_t 1
     #endif
 #endif

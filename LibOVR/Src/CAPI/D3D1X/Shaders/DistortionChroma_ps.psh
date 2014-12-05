@@ -32,34 +32,41 @@ float AaDerivativeMult;
 float3 ToLinear(float3 inColor) { return inColor * inColor; }
 float3 ToGamma(float3 inColor)	{ return sqrt(inColor); }
 
-float3 ApplyHqAa(float3 inColor, float2 oTexCoord0, float2 oTexCoord1, float2 oTexCoord2)
+void SampleStep(float2 oTexCoord0, float2 oTexCoord1, float2 oTexCoord2, float colorWeight, float2 texOffset,
+				inout float3 totalColor, inout float totalWeight)
 {
-	float2 uvDeriv = float2(ddx(oTexCoord1.x), ddy(oTexCoord1.y)) * AaDerivativeMult;
-		
-	float ResultR = Texture.Sample(Linear, oTexCoord0 + float2(-uvDeriv.x, 0)).r;
-	float ResultG = Texture.Sample(Linear, oTexCoord1 + float2(-uvDeriv.x, 0)).g;
-	float ResultB = Texture.Sample(Linear, oTexCoord2 + float2(-uvDeriv.x, 0)).b;
-	float3 newColor0 = ToLinear(float3(ResultR, ResultG, ResultB));
-	
-	ResultR = Texture.Sample(Linear, oTexCoord0 + float2(uvDeriv.x, 0)).r;
-	ResultG = Texture.Sample(Linear, oTexCoord1 + float2(uvDeriv.x, 0)).g;
-	ResultB = Texture.Sample(Linear, oTexCoord2 + float2(uvDeriv.x, 0)).b;
-	float3 newColor1 = ToLinear(float3(ResultR, ResultG, ResultB));
+	float3 newColor = 0;
+	newColor.r += Texture.Sample(Linear, oTexCoord0 + texOffset).r;
+	newColor.g += Texture.Sample(Linear, oTexCoord1 + texOffset).g;
+	newColor.b += Texture.Sample(Linear, oTexCoord2 + texOffset).b;
+	newColor = ToLinear(newColor);
 
-	ResultR = Texture.Sample(Linear, oTexCoord0 + float2(0, uvDeriv.y)).r;
-	ResultG = Texture.Sample(Linear, oTexCoord1 + float2(0, uvDeriv.y)).g;
-	ResultB = Texture.Sample(Linear, oTexCoord2 + float2(0, uvDeriv.y)).b;
-	float3 newColor2 = ToLinear(float3(ResultR, ResultG, ResultB));
+	totalColor += newColor * colorWeight;
+	totalWeight += colorWeight;
+}
 
-	ResultR = Texture.Sample(Linear, oTexCoord0 + float2(0, -uvDeriv.y)).r;
-	ResultG = Texture.Sample(Linear, oTexCoord1 + float2(0, -uvDeriv.y)).g;
-	ResultB = Texture.Sample(Linear, oTexCoord2 + float2(0, -uvDeriv.y)).b;
-	float3 newColor3 = ToLinear(float3(ResultR, ResultG, ResultB));
+float3 ApplyHqAa(float2 oTexCoord0, float2 oTexCoord1, float2 oTexCoord2)
+{
+	float2 texWidth = fwidth(oTexCoord1);
+	float2 texStep = texWidth * AaDerivativeMult;
 
-	// apply gamma correct averaging
-	float3 outColor = ToLinear(inColor) + newColor0 + newColor1 + newColor2 + newColor3;
-	outColor = ToGamma(outColor * 0.2);
-	return outColor;
+	float totalWeight = 0;
+	float3 totalColor = 0;
+
+	// center sample
+	SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, 4, 0, totalColor, totalWeight);
+
+	float3 smplExp = 1.0 / 3.0;
+	float3 smplWgt = 1.0;
+
+	SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.x, -1.000 * smplExp.x * texStep, totalColor, totalWeight);
+	//SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.y, -1.250 * smplExp.y * texStep, totalColor, totalWeight);
+	SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.z, -1.875 * smplExp.z * texStep, totalColor, totalWeight);
+	SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.z,  1.875 * smplExp.z * texStep, totalColor, totalWeight);
+	//SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.y,  1.250 * smplExp.y * texStep, totalColor, totalWeight);
+	SampleStep(oTexCoord0, oTexCoord1, oTexCoord2, smplWgt.x,  1.000 * smplExp.x * texStep, totalColor, totalWeight);
+
+	return ToGamma(totalColor.rgb / totalWeight);
 }
 
 void   main(in float4 oPosition  : SV_Position,
@@ -70,24 +77,42 @@ void   main(in float4 oPosition  : SV_Position,
 			out float4 outColor0 : SV_Target0,
 			out float4 outColor1 : SV_Target1)
 {
-#if 0	// enable "SampleMode hqFilter = (distortionCaps ... " in code
-	// Using anisotropic sampling - requires sRGB sampling
-	float2 uvDeriv = float2(ddx(oTexCoord1.x), ddy(oTexCoord1.y));
-	float ResultR = Texture.SampleGrad(Linear, oTexCoord0, uvDeriv.x, uvDeriv.y).r;
-	float ResultG = Texture.SampleGrad(Linear, oTexCoord1, uvDeriv.x, uvDeriv.y).g;
-	float ResultB = Texture.SampleGrad(Linear, oTexCoord2, uvDeriv.x, uvDeriv.y).b;
-	float3 newColor = float3(ResultR, ResultG, ResultB);
-#else
-	float ResultR = Texture.Sample(Linear, oTexCoord0).r;
-	float ResultG = Texture.Sample(Linear, oTexCoord1).g;
-	float ResultB = Texture.Sample(Linear, oTexCoord2).b;
-	float3 newColor = float3(ResultR, ResultG, ResultB);
+#define USE_ANISO 0
 
+#if USE_ANISO	// enable "SampleMode hqFilter = (distortionCaps ... " in code
+				// Using anisotropic sampling - requires sRGB sampling
+
+	#if 1	// feeding in proper ddx & ddy does not yield better visuals
+		float2 uvDeriv = float2(ddx(oTexCoord1.x), ddy(oTexCoord1.y));
+		float ResultR = Texture.SampleGrad(Linear, oTexCoord0, uvDeriv.x, uvDeriv.y).r;
+		float ResultG = Texture.SampleGrad(Linear, oTexCoord1, uvDeriv.x, uvDeriv.y).g;
+		float ResultB = Texture.SampleGrad(Linear, oTexCoord2, uvDeriv.x, uvDeriv.y).b;
+		float3 newColor = float3(ResultR, ResultG, ResultB);
+	#else
+		float2 uvDerivX = ddx(oTexCoord1);
+		float2 uvDerivY = ddy(oTexCoord1);
+		float ResultR = Texture.SampleGrad(Linear, oTexCoord0, uvDerivX, uvDerivY).r;
+		float ResultG = Texture.SampleGrad(Linear, oTexCoord1, uvDerivX, uvDerivY).g;
+		float ResultB = Texture.SampleGrad(Linear, oTexCoord2, uvDerivX, uvDerivY).b;
+		float3 newColor = float3(ResultR, ResultG, ResultB);
+	#endif
+
+#else
+
+	float3 newColor;
 	// High quality anti-aliasing in distortion
 	if(AaDerivativeMult > 0)
 	{
-		newColor = ApplyHqAa(newColor, oTexCoord0, oTexCoord1, oTexCoord2);
+		newColor = ApplyHqAa(oTexCoord0, oTexCoord1, oTexCoord2);
 	}
+	else
+	{
+		float ResultR = Texture.Sample(Linear, oTexCoord0).r;
+		float ResultG = Texture.Sample(Linear, oTexCoord1).g;
+		float ResultB = Texture.Sample(Linear, oTexCoord2).b;
+		newColor = float3(ResultR, ResultG, ResultB);
+	}
+
 #endif
 
 	newColor = newColor * oColor.xxx;
