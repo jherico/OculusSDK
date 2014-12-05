@@ -929,18 +929,56 @@ int     Thread::GetCPUCount()
 }
 
 
-#if defined (OVR_OS_MAC)
-void    Thread::SetThreadName( const char* name )
+void Thread::SetThreadName( const char* name )
 {
-    pthread_setname_np( name );
+    #if defined (OVR_OS_APPLE)
+        if(ThreadHandle == pthread_self())
+            pthread_setname_np(name);
+        // Else there's nothing we can do.
+    #else
+        if(ThreadHandle != 0)
+            pthread_setname_np(ThreadHandle, name);
+        // Else we can possibly save this name and set it later when the thread starts.
+    #endif
 }
-#else
-void    Thread::SetThreadName( const char* name )
-{
-    pthread_setname_np( pthread_self(), name );
-}
-#endif
 
+
+void Thread::SetThreadName(const char* name, ThreadId threadId)
+{
+    #if defined (OVR_OS_APPLE)
+        if(pthread_equal((pthread_t)threadId, pthread_self()))
+            pthread_setname_np(name);
+        // Else there's no way to set the name of another thread.
+    #else
+        pthread_setname_np((pthread_t)threadId, name);
+    #endif
 }
+
+
+void Thread::SetCurrentThreadName(const char* name)
+{
+    #if defined (OVR_OS_APPLE)
+        pthread_setname_np(name);
+    #else
+        pthread_setname_np(pthread_self(), name);
+    #endif
+}
+
+
+void Thread::GetThreadName(char* name, size_t nameCapacity, ThreadId threadId)
+{
+    name[0] = 0;
+    pthread_getname_np((pthread_t)threadId, name, nameCapacity);
+}
+
+
+void Thread::GetCurrentThreadName(char* name, size_t nameCapacity)
+{
+    name[0] = 0;
+    pthread_getname_np(pthread_self(), name, nameCapacity);
+}
+
+
+} // namespace OVR
 
 #endif  // OVR_ENABLE_THREADS

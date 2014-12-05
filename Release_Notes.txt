@@ -1,4 +1,4 @@
-Oculus SDK 0.4.4 Release Notes - Runtime Rev 1
+﻿Oculus SDK 0.4.4 Release Notes - Runtime Rev 1
 ----------------------------------------------
 
 After installing the SDK, update the Oculus DK2 firmware

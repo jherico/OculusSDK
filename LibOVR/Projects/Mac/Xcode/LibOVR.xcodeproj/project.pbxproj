@@ -11,6 +11,19 @@
 		4683CEBF1970867300285E02 /* CAPI_GL_HSWDisplay.h in Headers */ = {isa = PBXBuildFile; fileRef = 4683CEBD1970867300285E02 /* CAPI_GL_HSWDisplay.h */; };
 		8864E8FD19D5289700ACEEC1 /* OVR_CAPI_Keys.h in Headers */ = {isa = PBXBuildFile; fileRef = 8864E8FC19D5289700ACEEC1 /* OVR_CAPI_Keys.h */; };
 		886FFB1E19E4898300775723 /* Util_SystemInfo_OSX.mm in Sources */ = {isa = PBXBuildFile; fileRef = 886FFB1D19E4898300775723 /* Util_SystemInfo_OSX.mm */; };
+		A42F68671A11F2000027C6E1 /* Util_SystemGUI_OSX.mm in Sources */ = {isa = PBXBuildFile; fileRef = A42F68641A11F2000027C6E1 /* Util_SystemGUI_OSX.mm */; };
+		A42F68681A11F2000027C6E1 /* Util_SystemGUI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A42F68651A11F2000027C6E1 /* Util_SystemGUI.cpp */; };
+		A42F68691A11F2000027C6E1 /* Util_SystemGUI.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F68661A11F2000027C6E1 /* Util_SystemGUI.h */; };
+		A42F68751A11F2B80027C6E1 /* OVR_Compiler.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F686E1A11F2B80027C6E1 /* OVR_Compiler.h */; };
+		A42F68761A11F2B80027C6E1 /* OVR_DebugHelp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A42F686F1A11F2B80027C6E1 /* OVR_DebugHelp.cpp */; };
+		A42F68771A11F2B80027C6E1 /* OVR_DebugHelp.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F68701A11F2B80027C6E1 /* OVR_DebugHelp.h */; };
+		A42F68781A11F2B80027C6E1 /* OVR_mach_exc_OSX.c in Sources */ = {isa = PBXBuildFile; fileRef = A42F68711A11F2B80027C6E1 /* OVR_mach_exc_OSX.c */; };
+		A42F68791A11F2B80027C6E1 /* OVR_mach_exc_OSX.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F68721A11F2B80027C6E1 /* OVR_mach_exc_OSX.h */; };
+		A42F687A1A11F2B80027C6E1 /* OVR_Nullptr.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F68731A11F2B80027C6E1 /* OVR_Nullptr.h */; };
+		A42F687B1A11F2B80027C6E1 /* OVR_Observer.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F68741A11F2B80027C6E1 /* OVR_Observer.h */; };
+		A42F687F1A11F2F10027C6E1 /* CAPI_GLE_GL.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F687C1A11F2F10027C6E1 /* CAPI_GLE_GL.h */; };
+		A42F68801A11F2F10027C6E1 /* CAPI_GLE.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A42F687D1A11F2F10027C6E1 /* CAPI_GLE.cpp */; };
+		A42F68811A11F2F10027C6E1 /* CAPI_GLE.h in Headers */ = {isa = PBXBuildFile; fileRef = A42F687E1A11F2F10027C6E1 /* CAPI_GLE.h */; };
 		A4A859B619D6310100ED2071 /* CAPI_LatencyStatistics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A4A859B419D6310100ED2071 /* CAPI_LatencyStatistics.cpp */; };
 		A4A859B719D6310100ED2071 /* CAPI_LatencyStatistics.h in Headers */ = {isa = PBXBuildFile; fileRef = A4A859B519D6310100ED2071 /* CAPI_LatencyStatistics.h */; };
 		A4A859BA19D6311500ED2071 /* Util_SystemInfo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A4A859B819D6311500ED2071 /* Util_SystemInfo.cpp */; };
@@ -130,6 +143,19 @@
 		4683CEBD1970867300285E02 /* CAPI_GL_HSWDisplay.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CAPI_GL_HSWDisplay.h; path = GL/CAPI_GL_HSWDisplay.h; sourceTree = "<group>"; };
 		8864E8FC19D5289700ACEEC1 /* OVR_CAPI_Keys.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OVR_CAPI_Keys.h; path = ../../../Src/OVR_CAPI_Keys.h; sourceTree = "<group>"; };
 		886FFB1D19E4898300775723 /* Util_SystemInfo_OSX.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Util_SystemInfo_OSX.mm; sourceTree = "<group>"; };
+		A42F68641A11F2000027C6E1 /* Util_SystemGUI_OSX.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = Util_SystemGUI_OSX.mm; sourceTree = "<group>"; };
+		A42F68651A11F2000027C6E1 /* Util_SystemGUI.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_SystemGUI.cpp; sourceTree = "<group>"; };
+		A42F68661A11F2000027C6E1 /* Util_SystemGUI.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Util_SystemGUI.h; sourceTree = "<group>"; };
+		A42F686E1A11F2B80027C6E1 /* OVR_Compiler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Compiler.h; sourceTree = "<group>"; };
+		A42F686F1A11F2B80027C6E1 /* OVR_DebugHelp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OVR_DebugHelp.cpp; sourceTree = "<group>"; };
+		A42F68701A11F2B80027C6E1 /* OVR_DebugHelp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_DebugHelp.h; sourceTree = "<group>"; };
+		A42F68711A11F2B80027C6E1 /* OVR_mach_exc_OSX.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = OVR_mach_exc_OSX.c; sourceTree = "<group>"; };
+		A42F68721A11F2B80027C6E1 /* OVR_mach_exc_OSX.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_mach_exc_OSX.h; sourceTree = "<group>"; };
+		A42F68731A11F2B80027C6E1 /* OVR_Nullptr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Nullptr.h; sourceTree = "<group>"; };
+		A42F68741A11F2B80027C6E1 /* OVR_Observer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OVR_Observer.h; sourceTree = "<group>"; };
+		A42F687C1A11F2F10027C6E1 /* CAPI_GLE_GL.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CAPI_GLE_GL.h; path = GL/CAPI_GLE_GL.h; sourceTree = "<group>"; };
+		A42F687D1A11F2F10027C6E1 /* CAPI_GLE.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = CAPI_GLE.cpp; path = GL/CAPI_GLE.cpp; sourceTree = "<group>"; };
+		A42F687E1A11F2F10027C6E1 /* CAPI_GLE.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = CAPI_GLE.h; path = GL/CAPI_GLE.h; sourceTree = "<group>"; };
 		A4A859B419D6310100ED2071 /* CAPI_LatencyStatistics.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CAPI_LatencyStatistics.cpp; sourceTree = "<group>"; };
 		A4A859B519D6310100ED2071 /* CAPI_LatencyStatistics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CAPI_LatencyStatistics.h; sourceTree = "<group>"; };
 		A4A859B819D6311500ED2071 /* Util_SystemInfo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Util_SystemInfo.cpp; sourceTree = "<group>"; };
@@ -357,6 +383,13 @@
 		E8AA40A51907221900D5F144 /* Kernel */ = {
 			isa = PBXGroup;
 			children = (
+				A42F686E1A11F2B80027C6E1 /* OVR_Compiler.h */,
+				A42F686F1A11F2B80027C6E1 /* OVR_DebugHelp.cpp */,
+				A42F68701A11F2B80027C6E1 /* OVR_DebugHelp.h */,
+				A42F68711A11F2B80027C6E1 /* OVR_mach_exc_OSX.c */,
+				A42F68721A11F2B80027C6E1 /* OVR_mach_exc_OSX.h */,
+				A42F68731A11F2B80027C6E1 /* OVR_Nullptr.h */,
+				A42F68741A11F2B80027C6E1 /* OVR_Observer.h */,
 				E87DF46A196A1BEF005E383C /* OVR_CRC32.cpp */,
 				E87DF46B196A1BEF005E383C /* OVR_CRC32.h */,
 				E87DF46C196A1BEF005E383C /* OVR_SharedMemory.cpp */,
@@ -413,6 +446,9 @@
 		E8AA40FC1907224700D5F144 /* Util */ = {
 			isa = PBXGroup;
 			children = (
+				A42F68641A11F2000027C6E1 /* Util_SystemGUI_OSX.mm */,
+				A42F68651A11F2000027C6E1 /* Util_SystemGUI.cpp */,
+				A42F68661A11F2000027C6E1 /* Util_SystemGUI.h */,
 				886FFB1D19E4898300775723 /* Util_SystemInfo_OSX.mm */,
 				A4A859B819D6311500ED2071 /* Util_SystemInfo.cpp */,
 				A4A859B919D6311500ED2071 /* Util_SystemInfo.h */,
@@ -431,6 +467,9 @@
 		E8AA41B8190724E600D5F144 /* CAPI */ = {
 			isa = PBXGroup;
 			children = (
+				A42F687C1A11F2F10027C6E1 /* CAPI_GLE_GL.h */,
+				A42F687D1A11F2F10027C6E1 /* CAPI_GLE.cpp */,
+				A42F687E1A11F2F10027C6E1 /* CAPI_GLE.h */,
 				A4A859B419D6310100ED2071 /* CAPI_LatencyStatistics.cpp */,
 				A4A859B519D6310100ED2071 /* CAPI_LatencyStatistics.h */,
 				4683CEBC1970867300285E02 /* CAPI_GL_HSWDisplay.cpp */,
@@ -480,6 +519,7 @@
 				E8AA40DF1907221900D5F144 /* OVR_KeyCodes.h in Headers */,
 				E8AA40D51907221900D5F144 /* OVR_Array.h in Headers */,
 				E8788D24196CF98000128BE5 /* Util_LatencyTest2State.h in Headers */,
+				A42F68791A11F2B80027C6E1 /* OVR_mach_exc_OSX.h in Headers */,
 				E8AA41F7190724E600D5F144 /* CAPI_GL_DistortionRenderer.h in Headers */,
 				E87DF47A196A1CEF005E383C /* OVR_Display.h in Headers */,
 				E87DF46F196A1BEF005E383C /* OVR_CRC32.h in Headers */,
@@ -500,14 +540,20 @@
 				E8AA40E61907221900D5F144 /* OVR_Math.h in Headers */,
 				E87DF4B0196A2161005E383C /* Service_NetSessionCommon.h in Headers */,
 				E8AA40F91907221900D5F144 /* OVR_Types.h in Headers */,
+				A42F68691A11F2000027C6E1 /* Util_SystemGUI.h in Headers */,
 				E8AA40D91907221900D5F144 /* OVR_ContainerAllocator.h in Headers */,
 				E87DF49B196A20E9005E383C /* OVR_Session.h in Headers */,
 				E87DF497196A20E9005E383C /* OVR_PacketizedTCPSocket.h in Headers */,
+				A42F687B1A11F2B80027C6E1 /* OVR_Observer.h in Headers */,
+				A42F68771A11F2B80027C6E1 /* OVR_DebugHelp.h in Headers */,
 				E87DF492196A20E9005E383C /* OVR_MessageIDTypes.h in Headers */,
 				E8AA40D71907221900D5F144 /* OVR_Atomic.h in Headers */,
 				E8AA41E4190724E600D5F144 /* CAPI_FrameTimeManager.h in Headers */,
+				A42F687F1A11F2F10027C6E1 /* CAPI_GLE_GL.h in Headers */,
+				A42F68811A11F2F10027C6E1 /* CAPI_GLE.h in Headers */,
 				E8AA40D21907221900D5F144 /* OVR_Alg.h in Headers */,
 				A4A859B719D6310100ED2071 /* CAPI_LatencyStatistics.h in Headers */,
+				A42F687A1A11F2B80027C6E1 /* OVR_Nullptr.h in Headers */,
 				E87DF494196A20E9005E383C /* OVR_NetworkPlugin.h in Headers */,
 				E87DF495196A20E9005E383C /* OVR_NetworkTypes.h in Headers */,
 				E8AA40E01907221900D5F144 /* OVR_List.h in Headers */,
@@ -532,6 +578,7 @@
 				E8AA40FB1907221900D5F144 /* OVR_UTF8Util.h in Headers */,
 				E87DF47E196A1CEF005E383C /* OVR_OSX_Display.h in Headers */,
 				E8AA40F41907221900D5F144 /* OVR_Threads.h in Headers */,
+				A42F68751A11F2B80027C6E1 /* OVR_Compiler.h in Headers */,
 				E8AA40F81907221900D5F144 /* OVR_Timer.h in Headers */,
 				E8AA40E41907221900D5F144 /* OVR_Log.h in Headers */,
 			);
@@ -597,6 +644,7 @@
 				E8788D22196CF98000128BE5 /* Util_LatencyTest2Reader.cpp in Sources */,
 				E8AA40ED1907221900D5F144 /* OVR_String_FormatUtil.cpp in Sources */,
 				E8AA4173190722BB00D5F144 /* OVR_JSON.cpp in Sources */,
+				A42F68801A11F2F10027C6E1 /* CAPI_GLE.cpp in Sources */,
 				E8AA40D61907221900D5F144 /* OVR_Atomic.cpp in Sources */,
 				E8AA40E31907221900D5F144 /* OVR_Log.cpp in Sources */,
 				E87DF4AF196A2161005E383C /* Service_NetSessionCommon.cpp in Sources */,
@@ -613,9 +661,11 @@
 				E8AA410D1907224700D5F144 /* Util_Interface.cpp in Sources */,
 				E8AA40F71907221900D5F144 /* OVR_Timer.cpp in Sources */,
 				E87DF49A196A20E9005E383C /* OVR_Session.cpp in Sources */,
+				A42F68681A11F2000027C6E1 /* Util_SystemGUI.cpp in Sources */,
 				E8AA40D11907221900D5F144 /* OVR_Alg.cpp in Sources */,
 				4683CEBE1970867300285E02 /* CAPI_GL_HSWDisplay.cpp in Sources */,
 				E8AA4197190722BB00D5F144 /* OVR_Stereo.cpp in Sources */,
+				A42F68781A11F2B80027C6E1 /* OVR_mach_exc_OSX.c in Sources */,
 				E87DF493196A20E9005E383C /* OVR_NetworkPlugin.cpp in Sources */,
 				E8AA40F21907221900D5F144 /* OVR_System.cpp in Sources */,
 				E8B18323196D376800555C29 /* OVR_ThreadCommandQueue.cpp in Sources */,
@@ -625,6 +675,8 @@
 				E8AA40E71907221900D5F144 /* OVR_RefCount.cpp in Sources */,
 				E85F262C1954204900AA807B /* OVR_SerialFormat.cpp in Sources */,
 				E87DF496196A20E9005E383C /* OVR_PacketizedTCPSocket.cpp in Sources */,
+				A42F68761A11F2B80027C6E1 /* OVR_DebugHelp.cpp in Sources */,
+				A42F68671A11F2000027C6E1 /* Util_SystemGUI_OSX.mm in Sources */,
 				E87DF46E196A1BEF005E383C /* OVR_CRC32.cpp in Sources */,
 				E8AA40E11907221900D5F144 /* OVR_Lockless.cpp in Sources */,
 				E8AA41E7190724E600D5F144 /* CAPI_HMDRenderState.cpp in Sources */,

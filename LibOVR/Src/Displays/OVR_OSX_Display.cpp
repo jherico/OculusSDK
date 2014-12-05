@@ -288,7 +288,7 @@ bool Display::GetDriverMode(bool& driverInstalled, bool& compatMode, bool& hideD
     return true;
 }
 
-bool Display::SetDriverMode(bool compatMode, bool hideDK1Mode)
+bool Display::SetDriverMode(bool /*compatMode*/, bool /*hideDK1Mode*/)
 {
     return false;
 }
