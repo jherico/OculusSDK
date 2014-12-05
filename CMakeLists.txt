@@ -3,9 +3,8 @@ project(OculusSDK)
 cmake_minimum_required(VERSION 2.8)
 
 # Support our own custom modules
-list(APPEND CMAKE_MODULE_PATH
-    ${CMAKE_SOURCE_DIR}/CMake/Modules
-)
+include(cmake/defaults.cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake )
 
 # First for the generic no-config case (e.g. with mingw)
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
@@ -65,4 +64,10 @@ if(OCULUS_BUILD_SAMPLES)
 
     add_subdirectory (Samples/OculusWorldDemo )
     set_target_properties(OculusWorldDemo PROPERTIES FOLDER "Samples")
+
+    if (WIN32)
+        add_subdirectory (Samples/OculusRoomTiny )
+        set_target_properties(OculusRoomTiny PROPERTIES FOLDER "Samples")
+    endif()
+    
 endif()
