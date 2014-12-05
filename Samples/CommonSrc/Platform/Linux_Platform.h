@@ -48,9 +48,11 @@ class PlatformCore : public OvrPlatform::PlatformCore
     XDisplayInfo    getXDisplayInfo(Render::DisplayId id);
 
 public:
-    _XDisplay*   Disp;
-    XVisualInfo* Vis;
-    Window       Win;
+    struct _XDisplay* Disp;
+    XVisualInfo*      Vis;
+    Window            Win;
+    int               FBConfigID;
+    GLXWindow         GLXWin;
 
     bool         Quit;
     int          ExitCode;
@@ -104,12 +106,12 @@ namespace Render { namespace GL { namespace Linux {
 
 class RenderDevice : public Render::GL::RenderDevice
 {
-    _XDisplay* Disp;
-    Window     Win;
-    GLXContext Context;
+    struct _XDisplay* Disp;
+    Window            Win;
+    GLXContext        Context;
 
 public:
-    RenderDevice(const Render::RendererParams& p, _XDisplay* disp, Window w, GLXContext gl)
+    RenderDevice(const Render::RendererParams& p, struct _XDisplay* disp, Window w, GLXContext gl)
     : GL::RenderDevice(p), Disp(disp), Win(w), Context(gl) {}
 
     virtual void Shutdown();

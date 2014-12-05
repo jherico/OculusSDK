@@ -1,26 +1,26 @@
 #############################################################################
 #
 # Filename    : Makefile
-# Content     : Makefile for building linux version of: libovr
+# Content     : Makefile for building Linux version of: libovr
 # Created     : 2014
 # Authors     : Simon Hallam, Peter Giokaris, Chris Taylor
 # Copyright   : Copyright 2014 OculusVR, Inc. All Rights Reserved
-# Instruction : The g++ compiler and stdndard lib packages need to be
+# Instruction : The g++ compiler and standard lib packages need to be
 #               installed on the system.  Navigate in a shell to the
 #               directory where this Makefile is located and enter:
 #
 #               make                builds the release version for the
-#                                   current architechture
+#                                   current architecture
 #               make clean          delete intermediate release object files
 #                                   and the library file
 #               make DEBUG=1        builds the debug version for the current
-#                                   architechture
+#                                   architecture
 #               make clean DEBUG=1  deletes intermediate debug object files
 #                                   and the library file
 #
 # Output      : Relative to the directory this Makefile lives in, libraries
 #               are built at the following locations depending upon the
-#               architechture of the system you are running:
+#               architecture of the system you are running:
 #
 #               ./Lib/Linux/Debug/i386/libovr.a
 #               ./Lib/Linux/Debug/x86_64/libovr.a
@@ -28,6 +28,9 @@
 #               ./Lib/Linux/Release/x86_64/libovr.a
 #
 #############################################################################
+
+####### Include auxiliary makefiles in current directory
+-include Makefile.*[^~]
 
 ####### Detect system architecture
 
@@ -44,7 +47,7 @@ DELETEFILE    = rm -f
 
 ####### Detect debug or release
 
-COMMONFLAGS   = -Wall -Wextra -pipe -fPIC -msse2
+COMMONFLAGS   = -Wall -Wextra -Werror -pipe -fPIC -msse2
 
 DEBUG         ?= 0
 CXXFLAGS 			?=
@@ -52,13 +55,8 @@ ifeq ($(DEBUG), 1)
 	CXXFLAGS      += $(COMMONFLAGS) -DDEBUG -DOVR_BUILD_DEBUG -g
 	RELEASETYPE   ?= Debug
 else
-	CXXFLAGS      += $(COMMONFLAGS) -O2
+	CXXFLAGS      += $(COMMONFLAGS) -O2 -fno-strict-aliasing
 	RELEASETYPE   ?= Release
-endif
-
-SINGLE_PROCESS    ?= 0
-ifeq ($(SINGLE_PROCESS), 1)
-	CXXFLAGS      += -DOVR_SINGLE_PROCESS
 endif
 
 ####### Paths
@@ -67,18 +65,18 @@ LIBOVRPATH    = .
 3RDPARTYPATH  = ../3rdParty
 INCPATH       = -I. -I.. -I$(LIBOVRPATH)/Include -I$(LIBOVRPATH)/Src
 OBJPATH       = ./Obj/Linux/$(RELEASETYPE)/$(SYSARCH)
+PREFIX        = /usr/local
 
 ####### Files
 
-STATIC_TARGET = ./Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.a
-SHARED_TARGET	= ./Lib/Linux/$(RELEASETYPE)/$(SYSARCH)/libovr.so
-SHARED_MAJOR = 0
-SHARED_MINOR = 1
-SHARED_RELEASE = 1
+TARGET_DIR      = ./Lib/Linux/$(RELEASETYPE)/$(SYSARCH)
+STATIC_NAME     = libovr.a
+STATIC_TARGET   = $(TARGET_DIR)/$(STATIC_NAME)
+LIBOVR_INST_HDR = Src/OVR_CAPI.h Src/OVR_CAPI_Keys.h Src/OVR_CAPI_GL.h
 
 ####### Rules
 
-all:    $(STATIC_TARGET) $(SHARED_TARGET)
+all:    $(STATIC_TARGET)
 
 OTHER_SOURCE =	$(3RDPARTYPATH)/EDID/edid.cpp \
 				$(3RDPARTYPATH)/TinyXml/tinyxml2.cpp
@@ -112,6 +110,7 @@ LIBOVR_SOURCE = 	$(LIBOVRPATH)/Src/Net/OVR_BitStream.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_Allocator.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_Atomic.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_CRC32.cpp \
+				$(LIBOVRPATH)/Src/Kernel/OVR_DebugHelp.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_File.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_FileFILE.cpp \
 				$(LIBOVRPATH)/Src/Kernel/OVR_Lockless.cpp \
@@ -133,6 +132,7 @@ LIBOVR_SOURCE = 	$(LIBOVRPATH)/Src/Net/OVR_BitStream.cpp \
 				$(LIBOVRPATH)/Src/Util/Util_LatencyTest2Reader.cpp \
 				$(LIBOVRPATH)/Src/Util/Util_Render_Stereo.cpp \
 				$(LIBOVRPATH)/Src/Util/Util_SystemInfo.cpp \
+				$(LIBOVRPATH)/Src/Util/Util_SystemGUI.cpp \
 				$(LIBOVRPATH)/Src/OVR_CAPI.cpp \
 				$(LIBOVRPATH)/Src/OVR_SerialFormat.cpp \
 				$(LIBOVRPATH)/Src/OVR_JSON.cpp \
@@ -151,14 +151,6 @@ $(STATIC_TARGET): $(OBJECTS)
 	@mkdir -p $(@D)
 	ar rvs $(STATIC_TARGET) $(OBJECTS)
 
-$(SHARED_TARGET): $(OBJECTS)
-	@mkdir -p $(@D)
-	g++ -shared -Wl,-soname,$(SHARED_TARGET).$(SHARED_MAJOR) \
-		-o $(SHARED_TARGET).$(SHARED_MAJOR).$(SHARED_MINOR).$(SHARED_RELEASE) \
-		$(OBJECTS) -lc
-
 clean:
 	-$(DELETEFILE) $(OBJECTS)
 	-$(DELETEFILE) $(STATIC_TARGET)
-	-$(DELETEFILE) $(SHARED_TARGET)
-

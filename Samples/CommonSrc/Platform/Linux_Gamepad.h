@@ -71,7 +71,7 @@ private:
         XBOX360GAMEPADWIRED
     };
 
-    UInt32               FileDescriptor;
+    int                  FileDescriptor;
     bool                 IsInitialized; 
     String               Name;
     GamepadType          Type;

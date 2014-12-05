@@ -1,26 +1,26 @@
 #############################################################################
 #
 # Filename    : Makefile
-# Content     : Makefile for building linux OculusWorldDemo
+# Content     : Makefile for building Linux OculusWorldDemo
 # Created     : 2013
 # Authors     : Simon Hallam and Peter Giokaris
 # Copyright   : Copyright 2013 OculusVR, Inc. All Rights Reserved
-# Instruction : The g++ compiler and stdndard lib packages need to be 
+# Instruction : The g++ compiler and standard lib packages need to be 
 #               installed on the system.  Navigate in a shell to the 
 #               directory where this Makefile is located and enter:
 #
 #               make                builds the release version for the 
-#                                   current architechture
+#                                   current architecture
 #               make clean          delete intermediate release object files 
-#                                   and the executabe file
+#                                   and the executable file
 #               make DEBUG=1        builds the debug version for the current
-#                                   architechture
+#                                   architecture
 #               make clean DEBUG=1  deletes intermediate debug object files 
 #                                   and the executable file
 #
 # Output      : Relative to the directory this Makefile lives in, executable
 #               files get built at the following locations depending upon the
-#               architechture of the system you are running:
+#               architecture of the system you are running:
 #
 #               ./Release/OculusWorldDemo_i386_Release
 #               ./Release/OculusWorldDemo_x86_64_Release
@@ -44,17 +44,18 @@ MAKE          = make
 DELETEFILE    = rm -f
 DELETEDIR     = rm -Rf
 DEFINES       = -DQT_WEBKIT -DGL_GLEXT_PROTOTYPES
+COMMONFLAGS   = -Wall -Wextra -Werror -pipe -msse2
 
 ####### Detect debug or release
 
 DEBUG         ?= 0
 CXXFLAGS 		  ?=
 ifeq ($(DEBUG), 1)
-	CXXFLAGS      += -pipe -DDEBUG -DOVR_BUILD_DEBUG -g $(DEFINES)
+	CXXFLAGS      += $(COMMONFLAGS) -DDEBUG -DOVR_BUILD_DEBUG -g $(DEFINES)
 	RELEASETYPE   ?= Debug
 	LFLAGS         = 
 else
-	CXXFLAGS      += -pipe -O2 $(DEFINES)
+	CXXFLAGS      += $(COMMONFLAGS) -O2 $(DEFINES)
 	RELEASETYPE   ?= Release
 	LFLAGS         = -O1  # Why O1?
 endif

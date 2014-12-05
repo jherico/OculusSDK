@@ -32,7 +32,7 @@ limitations under the License.
 namespace OVR {
 
 // Forward declarations
-static Window       constructWindow(_XDisplay* display, int xscreen,
+static Window       constructWindow(struct _XDisplay* display, int xscreen,
                                     XVisualInfo* xvisual,
                                     const LinuxDeviceScreen& screen);
 
@@ -55,7 +55,7 @@ static XRRModeInfo* findModeByXID(XRRScreenResources* screen, RRMode xid)
 ///   maxNumScreens  Maximum number of screens to store in screens.
 static int getDeviceScreens(LinuxDeviceScreen* screens, int maxNumDevices)
 {
-    _XDisplay* disp = XOpenDisplay(NULL);
+    struct _XDisplay* disp = XOpenDisplay(NULL);
     if (!disp)
     {
         OVR::LogError("[SDKWindow] Unable to open X Display.");
@@ -243,13 +243,23 @@ DistortionRotation SDKWindow::getRotation(const ovrHmd& hmd)
 
 bool SDKWindow::getVisualFromDrawable(GLXDrawable drawable, XVisualInfo* vinfoOut)
 {
-    _XDisplay* display = glXGetCurrentDisplay();
+    struct _XDisplay* display = glXGetCurrentDisplay();
 
     unsigned int value;
     glXQueryDrawable(display, drawable, GLX_FBCONFIG_ID, &value);
-    XVisualInfo* chosen = glXGetVisualFromFBConfig(display, reinterpret_cast<GLXFBConfig>(value));
-    *vinfoOut = *chosen;
-    return true;
+    const int attribs[] = {GLX_FBCONFIG_ID, (int)value, None};
+    int screen;
+    glXQueryContext(display, glXGetCurrentContext(), GLX_SCREEN, &screen);
+    int numElems;
+    GLXFBConfig* config = glXChooseFBConfig(display, screen, attribs, &numElems);
+    if (numElems > 0)
+    {
+        XVisualInfo* chosen = glXGetVisualFromFBConfig(display, *config);
+        *vinfoOut = *chosen;
+        XFree(config);
+        return true;
+    }
+    return false;
 }
 
 SDKWindow::SDKWindow(const ovrHmd& hmd) :
@@ -258,7 +268,7 @@ SDKWindow::SDKWindow(const ovrHmd& hmd) :
     mXVisual(NULL),
     mXUniqueContext(-1),
     mXWindow(0),
-    mFBConfig(NULL)
+    mFBConfigID(0)
 {
     OVR_UNUSED(hmd);
 }
@@ -273,7 +283,13 @@ SDKWindow::~SDKWindow()
         mXWindow = static_cast<Window>(0);
     }
 
-    if (mXDisplay != NULL)
+    if (mXVisual)
+    {
+        XFree(mXVisual);
+        mXVisual = NULL;
+    }
+
+    if (mXDisplay)
     {
         XCloseDisplay(mXDisplay);
     }
@@ -284,8 +300,9 @@ void SDKWindow::buildVisualAndWindow(const LinuxDeviceScreen& devScreen)
     mXDisplay       = XOpenDisplay(NULL);
     mXUniqueContext = XUniqueContext();
     mXScreen        = devScreen.screen;
+    mFBConfigID     = chooseFBConfigID(mXDisplay, mXScreen);
 
-    mXVisual = chooseVisual(mXDisplay, mXScreen, &mFBConfig);
+    mXVisual = getVisual(mXDisplay, mFBConfigID, mXScreen);
     if (mXVisual != NULL)
     {
         mXWindow = constructWindow(mXDisplay, mXScreen, mXVisual, devScreen);
@@ -317,7 +334,7 @@ struct FBConfig
   bool doubleBuffer;
   int  auxBuffers;
 
-  GLXFBConfig xcfg;
+  int xcfg;
 };
 
 static int fbCalcContrib(int desired, int current)
@@ -327,18 +344,16 @@ static int fbCalcContrib(int desired, int current)
     else               { return 0; }
 }
 
-/// Selects ideal visual for the given screen. Returns NULL on error.
-XVisualInfo* SDKWindow::chooseVisual(_XDisplay* display, int xscreen,
-                                     GLXFBConfig* cfg)
+// Choose frame buffer configuration and return fbConfigID.
+int SDKWindow::chooseFBConfigID(struct _XDisplay* display, int xscreen)
 {
-    // Select visual.
     int nativeCount = 0;
     GLXFBConfig* nativeConfigs =
         glXGetFBConfigs(display, xscreen, &nativeCount);
     if (!nativeCount)
     {
         OVR::LogError("[SDKWindow] No valid frame buffer configurations found.");
-        return NULL;
+        return 0;
     }
 
     FBConfig* usables = static_cast<FBConfig*>(calloc(nativeCount, sizeof(FBConfig)));
@@ -374,7 +389,7 @@ XVisualInfo* SDKWindow::chooseVisual(_XDisplay* display, int xscreen,
         glXGetFBConfigAttrib(display, native, GLX_DOUBLEBUFFER, &v);
         usable->doubleBuffer = v ? true : false;
 
-        usable->xcfg = native;
+        glXGetFBConfigAttrib(display, native, GLX_FBCONFIG_ID, &usable->xcfg);
 
         ++numUsables;
     }
@@ -435,30 +450,58 @@ XVisualInfo* SDKWindow::chooseVisual(_XDisplay* display, int xscreen,
         OVR::LogError("[SDKWindow] Failed to select appropriate frame buffer.");
         XFree(nativeConfigs);
         free(usables);
-        return NULL;
+        return 0;
     }
 
-    OVR_DEBUG_LOG(("[C] Chosen framebuffer config:"));
-    OVR_DEBUG_LOG(("[C]   Double buffer:  %d", closest->doubleBuffer));
-    OVR_DEBUG_LOG(("[C]   RGBA bits:     (%d,%d,%d,%d)",
-                   closest->redBits, closest->greenBits, closest->blueBits,
-                   closest->alphaBits));
-    OVR_DEBUG_LOG(("[C]   Depth bits:     %d", closest->depthBits));
-
-    XVisualInfo* viOut = glXGetVisualFromFBConfig(display, closest->xcfg);
-    if (cfg != NULL)
-    {
-        *cfg = closest->xcfg;
-    }
+    int retVal = closest->xcfg;
 
     XFree(nativeConfigs);
     free(usables);
 
+    return retVal;
+}
+
+// Obtain visual from frame buffer configuration ID.
+XVisualInfo* SDKWindow::getVisual(struct _XDisplay* display,
+                                  int fbConfigID, int xscreen)
+{
+    GLXFBConfig* cfg = getGLXFBConfig(display, fbConfigID, xscreen);
+    XVisualInfo* viOut = NULL;
+    if (cfg != NULL)
+    {
+        viOut = glXGetVisualFromFBConfig(display, *cfg);
+        XFree(cfg);
+        cfg = NULL;
+    }
+    else
+    {
+        OVR::LogError("Unable to find fb config ID.");
+    }
     return viOut;
 }
 
+// GLXFBConfig pointer from frame buffer configuration ID. You must call
+// XFree on the GLXFBConfig pointer.
+GLXFBConfig* SDKWindow::getGLXFBConfig(struct _XDisplay* display,
+                                       int fbConfigID, int xscreen)
+{
+    const int attribs[] = {GLX_FBCONFIG_ID, (int)fbConfigID, None};
+    int numElems;
+
+    GLXFBConfig* config = glXChooseFBConfig(display, xscreen, attribs, &numElems);
+    if (numElems > 0)
+    {
+        return config;
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+
 static int gXLastError = -1;
-static int handleXError(_XDisplay* display, XErrorEvent* event)
+static int handleXError(struct _XDisplay* display, XErrorEvent* event)
 {
   OVR_UNUSED(display);
   gXLastError = event->error_code;
@@ -471,14 +514,14 @@ static void obtainXErrorHandler()
   XSetErrorHandler(handleXError);
 }
 
-static void releaseXErrorHandler(_XDisplay* display)
+static void releaseXErrorHandler(struct _XDisplay* display)
 {
   XSync(display, False);
   XSetErrorHandler(NULL);
 }
 
 // Returns 0 on error, otherwise a valid X window is returned.
-static Window constructWindow(_XDisplay* xDisp, int xScreen,
+static Window constructWindow(struct _XDisplay* xDisp, int xScreen,
                               XVisualInfo* xVisual,
                               const LinuxDeviceScreen& devScreen)
 {

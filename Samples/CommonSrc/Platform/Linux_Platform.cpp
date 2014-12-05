@@ -34,8 +34,8 @@ limitations under the License.
 #include <X11/Xmd.h>
 #include <signal.h>
 
-//#include <CAPI/GL/CAPI_GLE.h>
-#include <GL/glx.h> // To be replaced with the above #include.
+#include <CAPI/GL/CAPI_GLE.h>
+//#include <GL/glx.h> // To be replaced with the above #include.
 
 #include "OVR_CAPI_GL.h"
 
@@ -67,8 +67,9 @@ static const char *AtomNames[] = {"WM_PROTOCOLS", "WM_DELETE_WINDOW"};
 PlatformCore::PlatformCore(Application* app)
     : OvrPlatform::PlatformCore(app),
 	  StartVP(0, 0, 0, 0),
-      HasWM(false), Disp(NULL), Vis(NULL), Win(0), Quit(0), ExitCode(0),
-      Width(0), Height(0), MMode(Mouse_Normal), InvisibleCursor(), Atoms()
+      HasWM(false), Disp(NULL), Vis(NULL), Win(0), FBConfigID(-1), GLXWin(0),
+      Quit(0), ExitCode(0), Width(0), Height(0), MMode(Mouse_Normal),
+      InvisibleCursor(), Atoms()
 {
     pGamepadManager = *new Linux::GamepadManager();
 }
@@ -81,6 +82,12 @@ PlatformCore::~PlatformCore()
     {
         XCloseDisplay(Disp);
         Disp = NULL;
+    }
+
+    if (Vis)
+    {
+        XFree(Vis);
+        Vis = NULL;
     }
 }
 
@@ -118,19 +125,20 @@ void* PlatformCore::SetupWindow(int w, int h)
         SubstructureNotifyMask;
     winattr.border_pixel = 0;
 
+    OVR::GLEContext* pGLEContext = OVR::GetGLEContext();
+    pGLEContext->PlatformInit();
+
+    // Choose frame buffer configuration and obtain visual associated with
+    // frame buffer ID. We will use this again when building the device
+    // context.
+    if (FBConfigID == -1)
+    {
+        FBConfigID = SDKWindow::chooseFBConfigID(Disp, screenNumber);
+    }
+
     if (!Vis)
     {
-        int attr[16];
-        int nattr = 2;
-
-        attr[0] = GLX_RGBA;
-        attr[1] = GLX_DOUBLEBUFFER;
-        attr[nattr++] = GLX_DEPTH_SIZE;
-        attr[nattr++] = 24;
-        attr[nattr] = 0;
-
-        Vis = glXChooseVisual(Disp, screenNumber, attr);
-
+        Vis = SDKWindow::getVisual(Disp, FBConfigID, screenNumber);
         if (!Vis)
         {
             OVR_DEBUG_LOG(("glXChooseVisual failed."));
@@ -143,7 +151,12 @@ void* PlatformCore::SetupWindow(int w, int h)
     winattr.colormap = XCreateColormap(Disp, rootWindow, Vis->visual, AllocNone);
     attrmask |= CWColormap;
 
-    Win = XCreateWindow(Disp, rootWindow, 0, 0, w, h, 0, Vis->depth,
+    // We are forcing the creation of a slightly smaller window. Depending on
+    // the user's WM, the maximum screen size is not the maximum window size on
+    // a particular screen. This accounts for various decorations. Screen
+    // positioning bugs crop up if this is not handled and the HMD view is
+    // to the left of the primary monitor (0,0).
+    Win = XCreateWindow(Disp, rootWindow, 0, 0, w - w/6, h - h/6, 0, Vis->depth,
                         InputOutput, Vis->visual, attrmask, &winattr);
 
     if (!Win)
@@ -260,7 +273,7 @@ static int KeyMap[][2] =
 
 static KeyCode MapXKToKeyCode(unsigned vk)
 {
-    unsigned key = Key_None;
+    int key = Key_None;
 
     if ((vk >= 'a') && (vk <= 'z'))
     {
@@ -280,9 +293,9 @@ static KeyCode MapXKToKeyCode(unsigned vk)
     }
     else 
     {
-        for (unsigned i = 0; i< (sizeof(KeyMap) / sizeof(KeyMap[1])); i++)
+        for (size_t i = 0; i< (sizeof(KeyMap) / sizeof(KeyMap[1])); i++)
         {
-            if (vk == KeyMap[i][0])
+            if ((int)vk == KeyMap[i][0])
             {                
                 key = KeyMap[i][1];
                 break;
@@ -612,9 +625,9 @@ bool PlatformCore::SetFullscreen(const Render::RendererParams& rp, int fullscree
         // decision about display modes.
         XDisplayInfo displayInfo = getXDisplayInfo(rp.Display);
 
-        XRRScreenResources* screen = XRRGetScreenResources(Disp, DefaultRootWindow(Disp));
-        XRRCrtcInfo* crtcInfo      = XRRGetCrtcInfo(Disp, screen, displayInfo.crtc);
-        XRROutputInfo* outputInfo  = XRRGetOutputInfo(Disp, screen, displayInfo.output);
+      //XRRScreenResources* screen = XRRGetScreenResources(Disp, DefaultRootWindow(Disp));
+      //XRRCrtcInfo* crtcInfo      = XRRGetCrtcInfo(Disp, screen, displayInfo.crtc);
+      //XRROutputInfo* outputInfo  = XRRGetOutputInfo(Disp, screen, displayInfo.output);
 
         int xOffset;
         int yOffset;
@@ -906,7 +919,7 @@ namespace Render { namespace GL { namespace Linux {
 
 
 // To do: We can do away with this function by using our GLEContext class, which already tracks extensions.
-static bool IsGLXExtensionSupported(const char* extension, _XDisplay* pDisplay, int screen = 0)
+static bool IsGLXExtensionSupported(const char* extension, struct _XDisplay* pDisplay, int /*screen*/ = 0)
 {
     // const char* extensionList = glXQueryExtensionsString(pDisplay, screen);
     const char* extensionList = glXGetClientString(pDisplay, GLX_EXTENSIONS);  // This is returning more extensions than glXQueryExtensionsString does.
@@ -946,11 +959,10 @@ static bool IsGLXExtensionSupported(const char* extension, _XDisplay* pDisplay, 
 ovrRenderAPIConfig RenderDevice::Get_ovrRenderAPIConfig() const
 {
     static ovrGLConfig cfg;
-    cfg.OGL.Header.API         = ovrRenderAPI_OpenGL;
-    cfg.OGL.Header.RTSize      = Sizei(WindowWidth, WindowHeight);
-    cfg.OGL.Header.Multisample = Params.Multisample;
-    cfg.OGL.Win                = Win;
-    cfg.OGL.Disp               = Disp;
+    cfg.OGL.Header.API            = ovrRenderAPI_OpenGL;
+    cfg.OGL.Header.BackBufferSize = Sizei(WindowWidth, WindowHeight);
+    cfg.OGL.Header.Multisample    = Params.Multisample;
+    cfg.OGL.Disp                  = NULL;
     return cfg.Config;
 }
 
@@ -958,18 +970,108 @@ Render::RenderDevice* RenderDevice::CreateDevice(const RendererParams& rp, void*
 {
     OvrPlatform::Linux::PlatformCore* PC = (OvrPlatform::Linux::PlatformCore*)oswnd;
 
-    GLXContext context = glXCreateContext(PC->Disp, PC->Vis, 0, GL_TRUE);
+    GLXContext context = 0;
+
+  //int targetScreen = DefaultScreen(PC->Disp);
+
+    // Print some version information.
+    const char * pGLXVendor = glXGetClientString(PC->Disp, GLX_VENDOR);
+    OVR_DEBUG_LOG(("GLX vendor: %s", pGLXVendor)); OVR_UNUSED(pGLXVendor);
+
+    const char * pGLXVersion = glXGetClientString(PC->Disp, GLX_VERSION);
+    OVR_DEBUG_LOG(("GLX version: %s", pGLXVersion)); OVR_UNUSED(pGLXVersion);
+
+    // http://www.opengl.org/registry/specs/ARB/glx_create_context.txt
+    // Usage of glXCreateContextAttribsARB requires the GLX_ARB_create_context glX extension.
+    if(IsGLXExtensionSupported("GLX_ARB_create_context", PC->Disp))
+    {
+        typedef GLXContext (*glXCreateContextAttribsARBProc)(struct _XDisplay*, GLXFBConfig, GLXContext, Bool, const int*);
+        glXCreateContextAttribsARBProc glXCreateContextAttribsARBImpl = (glXCreateContextAttribsARBProc) glXGetProcAddressARB((const GLubyte*)"glXCreateContextAttribsARB");
+
+        if(glXCreateContextAttribsARBImpl) // This should always succeed.
+        {
+            const int  MajorVersionRequested         = rp.GLMajorVersion;
+            const int  MinorVersionRequested         = rp.GLMinorVersion;
+            const bool DebugContextRequested         = rp.DebugEnabled;
+            const bool ForwardCompatibleRequested    = rp.GLForwardCompatibleProfile;
+            const bool CoreProfileRequested          = rp.GLCoreProfile && IsGLXExtensionSupported("GLX_ARB_create_context_profile", PC->Disp);
+            const bool CompatibilityProfileRequested = rp.GLCompatibilityProfile && IsGLXExtensionSupported("GLX_ARB_create_context_profile", PC->Disp);
+            const bool ContextRobustnessRequested    = rp.DebugEnabled && IsGLXExtensionSupported("GLX_ARB_create_context_robustness", PC->Disp);
+
+            // Setup the attributes.
+            int attribListSize = 4;
+            int attribList[20] = {
+                GLX_CONTEXT_MAJOR_VERSION_ARB, MajorVersionRequested,
+                GLX_CONTEXT_MINOR_VERSION_ARB, MinorVersionRequested
+            };
+
+            // Usage of GLX_CONTEXT_DEBUG_BIT_ARB is always available with the GLX_ARB_create_context glX extension (though in practice it may have no effect).
+            // Usage of GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB is always available with the GLX_ARB_create_context glX extension.
+            if(DebugContextRequested || ForwardCompatibleRequested || ContextRobustnessRequested)
+            {
+                attribList[attribListSize++] = GLX_CONTEXT_FLAGS_ARB;
+                int flags = (DebugContextRequested ? GLX_CONTEXT_DEBUG_BIT_ARB : 0) |
+                            (ForwardCompatibleRequested ? GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : 0) |
+                            (ContextRobustnessRequested ? GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB : 0);
+                attribList[attribListSize++] = flags;
+            }
+
+            if(CoreProfileRequested || CompatibilityProfileRequested)
+            {
+                attribList[attribListSize++] = GLX_CONTEXT_PROFILE_MASK_ARB;
+                attribList[attribListSize++] = CoreProfileRequested ? GLX_CONTEXT_CORE_PROFILE_BIT_ARB : GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
+            }
+
+            if(ContextRobustnessRequested)
+            {
+                attribList[attribListSize++] = GLX_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB;
+                attribList[attribListSize++] = GLX_LOSE_CONTEXT_ON_RESET_ARB; // or GLX_NO_RESET_NOTIFICATION_ARB
+            }
+
+            attribList[attribListSize++] = None;
+
+            // Obtain GLXFBConfig used when building visual for Window.
+            GLXFBConfig* cfg = SDKWindow::getGLXFBConfig(
+                PC->Disp, PC->FBConfigID, PC->Vis->screen);
+
+            if (cfg)
+            {
+                context = glXCreateContextAttribsARBImpl(PC->Disp, *cfg, 0,
+                                                         GL_TRUE, attribList);
+                if (context)
+                {
+                    // We call this to generate a valid GLXDrawable.
+                    PC->GLXWin = glXCreateWindow(PC->Disp, *cfg, PC->Win, NULL);
+                }
+
+                XFree(cfg);
+                cfg = NULL;
+            }
+        }
+    }
+
+    if(!context) // If glXCreateContextAttribsARB couldn't be used...
+    {
+        context = glXCreateContext(PC->Disp, PC->Vis, 0, GL_TRUE);
+        // XXX: Should we use FBConfigID to generate GLXFBConfig and call
+        //      glXCreateWindow like we do above (even though we do not
+        //      create the context with the GLXFBConfig)?
+        PC->GLXWin = PC->Win;
+    }
 
     if (!context)
-        return NULL;
-
-    if (!glXMakeCurrent(PC->Disp, PC->Win, context))
     {
+        return NULL;
+    }
+
+    if (!glXMakeCurrent(PC->Disp, PC->GLXWin, context))
+    {
+        OVR_DEBUG_LOG(("RenderDevice::CreateDevice: glXMakeCurrent failure."));
         glXDestroyContext(PC->Disp, context);
         return NULL;
     }
 
-    XMapRaised(PC->Disp, PC->Win);
+    XMapRaised(PC->Disp, PC->Win); // Marks the window and any sub-windows for display, while raising the Window to the top of the hierarchy.
 
     InitGLExtensions();
 
@@ -1009,7 +1111,7 @@ void RenderDevice::Shutdown()
 
 OVR::OvrPlatform::Linux::PlatformCore* gPlatform;
 
-static void handleSigInt(int sig)
+static void handleSigInt(int /*sig*/)
 {
     signal(SIGINT, SIG_IGN);
     gPlatform->Exit(0);
