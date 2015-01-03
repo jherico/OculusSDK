@@ -1243,7 +1243,6 @@ limitations under the License.
 //
 // Note: If C++11 alignas is supported, then alignas/OVR_ALIGNAS may take a const expression in addition to a constant.
 // Note: The C11 Standard species the _Alignas keyword and alignas as a macro for it in <stdalign.h>
-
 #if !defined(OVR_ALIGNAS)
     #if defined(OVR_CC_GNU) && !defined(OVR_CPP_NO_ALIGNAS)     // If C++11 alignas is supported...
         #define OVR_ALIGNAS(n) alignas(n)

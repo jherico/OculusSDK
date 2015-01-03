@@ -447,7 +447,7 @@ typedef struct OVR_ALIGNAS(8) ovrRenderAPIConfigHeader_
 typedef struct OVR_ALIGNAS(8) ovrRenderAPIConfig_
 {
     ovrRenderAPIConfigHeader Header;
-    uintptr_t                PlatformData[8];
+    uint32_t                 PlatformData[2];
 } ovrRenderAPIConfig;
 
 /// Platform-independent part of the eye texture descriptor.
@@ -465,7 +465,7 @@ typedef struct OVR_ALIGNAS(8) ovrTextureHeader_
 typedef struct OVR_ALIGNAS(8) ovrTexture_
 {
     ovrTextureHeader Header;
-    uintptr_t        PlatformData[8];
+    uint32_t         PlatformData[16];
 } ovrTexture;
 
 
@@ -641,6 +641,13 @@ OVR_EXPORT ovrBool ovrHmd_ConfigureRendering( ovrHmd hmd,
                                               const ovrFovPort eyeFovIn[2],
                                               ovrEyeRenderDesc eyeRenderDescOut[2] );
 
+OVR_EXPORT ovrBool ovrHmd_ConfigureRenderingNoArrays(ovrHmd hmd,
+                                              const ovrRenderAPIConfig* apiConfig,
+                                              unsigned int distortionCaps,
+                                              const ovrFovPort leftEyeFovIn,
+                                              const ovrFovPort rightEyeFovIn,
+                                              ovrEyeRenderDesc * leftEyeRenderDescOut,
+                                              ovrEyeRenderDesc * rightEyeRenderDescOut);
 
 /// Begins a frame, returning timing information.
 /// This should be called at the beginning of the game rendering loop (on the render thread).
@@ -660,6 +667,12 @@ OVR_EXPORT void     ovrHmd_EndFrame(ovrHmd hmd,
                                     const ovrPosef renderPose[2],
                                     const ovrTexture eyeTexture[2]);
 
+OVR_EXPORT void     ovrHmd_EndFrameNoArrays(ovrHmd hmd,
+                                    const ovrPosef leftEyeRnderPose,
+                                    const ovrPosef rightEyeRnderPose,
+                                    const ovrTexture leftEyeTexture,
+                                    const ovrTexture rightEyeTexture);
+
 /// Returns predicted head pose in outHmdTrackingState and offset eye poses in outEyePoses
 /// as an atomic operation. Caller need not worry about applying HmdToEyeViewOffset to the
 /// returned outEyePoses variables.
@@ -673,6 +686,13 @@ OVR_EXPORT void     ovrHmd_EndFrame(ovrHmd hmd,
 /// - If called doesn't need outHmdTrackingState, it can be NULL
 OVR_EXPORT void ovrHmd_GetEyePoses(ovrHmd hmd, unsigned int frameIndex, ovrVector3f hmdToEyeViewOffset[2],
                                    ovrPosef outEyePoses[2], ovrTrackingState* outHmdTrackingState);
+
+OVR_EXPORT void ovrHmd_GetEyePosesNoArrays(ovrHmd hmd, unsigned int frameIndex,
+    ovrVector3f leftHmdToEyeViewOffset,
+    ovrVector3f rightHmdToEyeViewOffset,
+    ovrPosef* outLeftEyePose,
+    ovrPosef* outRightEyePose,
+    ovrTrackingState* outHmdTrackingState);
 
 /// Function was previously called ovrHmd_GetEyePose
 /// Returns the predicted head pose to use when rendering the specified eye.
@@ -762,6 +782,11 @@ OVR_EXPORT void     ovrHmd_DestroyDistortionMesh( ovrDistortionMesh* meshData );
 OVR_EXPORT void     ovrHmd_GetRenderScaleAndOffset( ovrFovPort fov,
                                                     ovrSizei textureSize, ovrRecti renderViewport,
                                                     ovrVector2f uvScaleOffsetOut[2] );
+
+OVR_EXPORT void     ovrHmd_GetRenderScaleAndOffsetNoArrays( ovrFovPort fov,
+                                                    ovrSizei textureSize, ovrRecti renderViewport,
+                                                    ovrVector2f * uvLeftEyeScaleOffsetOut,
+                                                    ovrVector2f * uvRightEyeScaleOffsetOut);
 
 /// Thread-safe timing function for the main thread. Caller should increment frameIndex
 /// with every frame and pass the index where applicable to functions called on the

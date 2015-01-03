@@ -1,4 +1,5 @@
 %include "enums.swg"
+%include carrays.i
 %javaconst(1);
 %module ovr
 %{

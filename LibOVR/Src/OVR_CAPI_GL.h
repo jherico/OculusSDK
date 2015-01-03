@@ -62,7 +62,7 @@ typedef struct OVR_ALIGNAS(8) ovrGLTextureData_s
     GLuint           TexId;       
 } ovrGLTextureData;
 
-static_assert(offsetof(ovrGLTextureData, TexId) == offsetof(ovrTexture, PlatformData), "Mismatch of structs that are presumed binary equivalents.");
+//static_assert(offsetof(ovrGLTextureData, TexId) == offsetof(ovrTexture, PlatformData), "Mismatch of structs that are presumed binary equivalents.");
 
 /// Contains OpenGL-specific texture information.
 typedef union ovrGLTexture_s
