@@ -6,6 +6,8 @@ cmake_minimum_required(VERSION 2.8)
 include(cmake/defaults.cmake)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake )
 
+# Official path is like so: ${CMAKE_BINARY_DIR}/Lib/(Platform)/(Buildconfig)/(Arch)/libovr.a
+
 # First for the generic no-config case (e.g. with mingw)
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
 set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output )
@@ -29,6 +31,9 @@ if(CMAKE_COMPILER_IS_GNUCXX)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
     endif()
+	# Use official default CFLAGS
+	set(CMAKE_CXX_FLAGS "-O2 -msse2 ${CMAKE_CXX_FLAGS}")
+	set(CMAKE_C_FLAGS "-O2 -msse2 ${CMAKE_C_FLAGS}")
 endif()
 
 if(WIN32)
@@ -39,7 +44,7 @@ endif()
 
 # The primary SDK artifact, a static library for Oculus access 
 add_subdirectory(LibOVR)
-set_target_properties(OculusVR PROPERTIES FOLDER "Oculus")
+set_target_properties(ovr PROPERTIES FOLDER "Oculus")
 
 ###############################################################################
 #
@@ -54,10 +59,10 @@ if(OCULUS_BUILD_SAMPLES)
     include_directories(3rdParty/TinyXml)
 
     # Make sure to set up the OVR include paths
-    include_directories(${OculusVR_SOURCE_DIR}/Include)
-    include_directories(${OculusVR_SOURCE_DIR}/Src)
-    include_directories(${OculusVR_SOURCE_DIR}/Src/Kernel)
-    include_directories(${OculusVR_SOURCE_DIR}/Src/Util)
+    include_directories(${ovr_SOURCE_DIR}/Include)
+    include_directories(${ovr_SOURCE_DIR}/Src)
+    include_directories(${ovr_SOURCE_DIR}/Src/Kernel)
+    include_directories(${ovr_SOURCE_DIR}/Src/Util)
 
     add_subdirectory (Samples/CommonSrc )
     set_target_properties(CommonSrc PROPERTIES FOLDER "Samples")
