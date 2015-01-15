@@ -66,7 +66,7 @@ else()
     list(APPEND SOURCE_FILES ${UNIX_FILES})
 
     # Extra libs
-    # add_subdirectory(../3rdParty/EDID ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID)
+    add_subdirectory(../3rdParty/EDID ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID)
 	list(APPEND SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID/edid.cpp)    
 
     # Used by the SDK to read the EDID of the monitors
