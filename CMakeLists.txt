@@ -32,8 +32,8 @@ if(CMAKE_COMPILER_IS_GNUCXX)
         set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -fPIC")
     endif()
 	# Use official default CFLAGS
-	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -msse2")
-	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -msse2")
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -msse2 -fno-strict-aliasing")
+	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -msse2 -fno-strict-aliasing")
 endif()
 
 if(WIN32)
