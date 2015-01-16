@@ -1,7 +1,7 @@
 project(OculusRoomTiny)
 
 file(GLOB SOURCE_FILES *.cpp *.h)
-list(APPEND EXTRA_LIBS OculusVR)
+list(APPEND EXTRA_LIBS ovr)
 
 if (WIN32)
     find_package( DirectX REQUIRED)

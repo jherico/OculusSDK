@@ -1,4 +1,4 @@
-project (OculusVR)
+project (ovr)
 
 include_directories(Include Src Src/Kernel Src/Util)
 include_directories(../3rdParty/glext)
@@ -66,10 +66,10 @@ else()
     list(APPEND SOURCE_FILES ${UNIX_FILES})
 
     # Extra libs
-    add_subdirectory(../3rdParty/EDID ${CMAKE_CURRENT_BINARY_DIR}/../3rdParty/EDID)
-    
+	list(APPEND SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID/edid.cpp)    
+
     # Used by the SDK to read the EDID of the monitors
-    list(APPEND EXTRA_LIBS edid rt)
+    list(APPEND EXTRA_LIBS rt)
 
     # Used by the SDK to access the HID functions
     list(APPEND EXTRA_LIBS udev)
@@ -90,6 +90,6 @@ else()
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
-add_library(OculusVR ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
-target_link_libraries(OculusVR ${EXTRA_LIBS})
+add_library(ovr ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+target_link_libraries(ovr ${EXTRA_LIBS})
 set(OVR_LIBRARIES ${EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")

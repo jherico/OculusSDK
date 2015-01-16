@@ -4,7 +4,7 @@ file(GLOB SOURCE_FILES *.cpp *.h)
 file(GLOB_RECURSE ASSET_FILES Assets/Tuscany/*)
 
 # All the Oculus VR functionality comes from this DLL
-set(EXTRA_LIBS OculusVR)
+set(EXTRA_LIBS ovr)
 # While the samples use the C API, they also use the 
 # core SDK functionality quite a bit
 list(APPEND EXTRA_LIBS ${OVR_LIBRARIES})
