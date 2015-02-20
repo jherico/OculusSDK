@@ -93,3 +93,12 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
 add_library(ovr ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
 target_link_libraries(ovr ${EXTRA_LIBS})
 set(OVR_LIBRARIES ${EXTRA_LIBS} CACHE STRING "Dependencies of OculusVR")
+
+install(TARGETS ovr DESTINATION lib)
+install(
+    FILES 
+        Include/OVR_Version.h
+        Src/Kernel/OVR_Types.h
+        Src/OVR_CAPI.h
+        Src/OVR_CAPI_GL.h
+    DESTINATION include)
