@@ -98,7 +98,10 @@ install(TARGETS ovr DESTINATION lib)
 install(
     FILES 
         Include/OVR_Version.h
+        Src/Kernel/OVR_Compiler.h
+        Src/Kernel/OVR_Nullptr.h
         Src/Kernel/OVR_Types.h
         Src/OVR_CAPI.h
         Src/OVR_CAPI_GL.h
+        Src/OVR_CAPI_Keys.h
     DESTINATION include)
