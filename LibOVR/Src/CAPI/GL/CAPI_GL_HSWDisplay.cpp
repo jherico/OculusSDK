@@ -313,24 +313,24 @@ void HSWDisplay::UnloadGraphics()
         currentGLContext.InitFromCurrent();
         GLContext.Bind();
 
-    // RenderParams: No need to clear.
-    if(FrameBuffer != 0)
-    {
-        glDeleteFramebuffers(1, &FrameBuffer);
-        FrameBuffer = 0;
-    }
-    pTexture.Clear();
-    pShaderSet.Clear();
-    pVertexShader.Clear();
-    pFragmentShader.Clear();
-    pVB.Clear();
-    if(VAO)
-    {
+        // RenderParams: No need to clear.
+        if(FrameBuffer != 0)
+        {
+            glDeleteFramebuffers(1, &FrameBuffer);
+            FrameBuffer = 0;
+        }
+        pTexture.Clear();
+        pShaderSet.Clear();
+        pVertexShader.Clear();
+        pFragmentShader.Clear();
+        pVB.Clear();
+        if(VAO)
+        {
             glDeleteVertexArrays(1, &VAO);
+        }
         currentGLContext.Bind();
         GLContext.Destroy();
     }
-}
 }
 
 
