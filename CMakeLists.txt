@@ -68,7 +68,7 @@ set_target_properties(ovr PROPERTIES FOLDER "Oculus")
 # Sample code support
 #
 
-option(OCULUS_BUILD_SAMPLES "Build Oculus demos" TRUE)
+option(OCULUS_BUILD_SAMPLES "Build Oculus demos" FALSE)
 if(OCULUS_BUILD_SAMPLES)
     # Used by the sample code to read the tuscany resources
     add_subdirectory(3rdParty/TinyXml)
