@@ -27,11 +27,14 @@ limitations under the License.
 #ifndef OVR_Service_NetSessionCommon_h
 #define OVR_Service_NetSessionCommon_h
 
-#include "../OVR_CAPI.h"
-#include "../Net/OVR_RPC1.h"
-#include "../Kernel/OVR_Threads.h"
-#include "../Net/OVR_BitStream.h"
-#include "../Kernel/OVR_System.h"
+#include <atomic>
+
+#include "OVR_CAPI.h"
+#include "Kernel/OVR_Threads.h"
+#include "Kernel/OVR_System.h"
+#include "Net/OVR_RPC1.h"
+#include "Net/OVR_BitStream.h"
+
 
 namespace OVR {
 
@@ -52,6 +55,13 @@ static const int32_t InvalidVirtualHmdId = -1;
 // Localhost-bound TCP port that the service listens on for VR apps
 static const int VRServicePort = 30322; // 0x7672 = "vr" little-endian
 
+// Stores the names of shared memory regions
+struct SharedMemoryNames
+{
+    String Hmd;
+    String Camera;
+};
+
 // HMDInfo section related to networking
 struct HMDNetworkInfo
 {
@@ -63,19 +73,25 @@ struct HMDNetworkInfo
 	// Network identifier for HMD
 	VirtualHmdId NetId;
 
-	// Name of the shared memory object
-	String       SharedMemoryName;
+	// Names of the shared memory objects
+	SharedMemoryNames SharedMemoryName;
 
-	void Serialize(Net::BitStream* bs)
+    bool Serialize(Net::BitStream* bs, bool write = true)
 	{
-		bs->Write(NetId);
-		bs->Write(SharedMemoryName);
+        bs->Serialize(write, NetId);
+        bs->Serialize(write, SharedMemoryName.Hmd);
+        if (!bs->Serialize(write, SharedMemoryName.Camera))
+            return false;
+        return true;
 	}
-	bool Deserialize(Net::BitStream* bs)
-	{
-		bs->Read(NetId);
-		return bs->Read(SharedMemoryName);
-	}
+
+    // Assignment operator
+    HMDNetworkInfo& operator=(HMDNetworkInfo const & rhs)
+    {
+        NetId = rhs.NetId;
+        SharedMemoryName = rhs.SharedMemoryName;
+        return *this;
+    }
 };
 
 
@@ -103,8 +119,7 @@ public:
         return pSession;
     }
 
-	static void SerializeHMDInfo(Net::BitStream* bitStream, HMDInfo* hmdInfo);
-	static bool DeserializeHMDInfo(Net::BitStream* bitStream, HMDInfo* hmdInfo);
+	static bool SerializeHMDInfo(Net::BitStream* bitStream, HMDInfo* hmdInfo, bool write = true);
 
 public:
     // Getter/setter tools
@@ -131,9 +146,9 @@ public:
     static bool IsServiceProperty(EGetterSetters e, const char* key);
 
 protected:
-    bool                Terminated; // Thread termination flag
+    std::atomic<bool>   Terminated; // Thread termination flag
     Net::Session*       pSession;   // Networking session
-	Net::Plugins::RPC1* pRPC;       // Remote procedure calls object
+    Net::Plugins::RPC1* pRPC;       // Remote procedure calls object
 };
 
 

@@ -29,7 +29,12 @@ limitations under the License.
 
 #ifdef SERIAL_FORMAT_UNIT_TEST
 #include "Kernel/OVR_Log.h"
+#include "Kernel/OVR_Rand.h"
 #endif
+
+
+#include <cctype>
+#include <ctime>
 
 namespace OVR {
 
@@ -191,18 +196,18 @@ bool DK2BinarySerialFormat::operator==(const DK2BinarySerialFormat& rhs)
 // v, w, x, y, z => 27, 28, 29, 30, 31
 static const char Base32FromChar[256] = {
 	// Null - Unit Separator
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 0 - 15
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 16 - 31
 	// (sp)!"#$%&'()*+,-./
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 32 - 47
 	// 0123456789:;<=>?
-	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
-	// @ - _ (upper case)
-	-1, 10, 11, 12, 13, 14, 15, 16, 17,  1, 18, 19,  1, 20, 21,  0,
-	22, 23, 24, 25, 26, -1, 27, 28, 29, 30, 31, -1, -1, -1, -1, -1,
-	// ` - DEL (lower case)
-	-1, 10, 11, 12, 13, 14, 15, 16, 17,  1, 18, 19,  1, 20, 21,  0,
-	22, 23, 24, 25, 26, -1, 27, 28, 29, 30, 31, -1,  1, -1, -1, -1,
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1, // 48 - 63
+	// @A-Z[\]^_
+	-1, 10, 11, 12, 13, 14, 15, 16, 17,  1, 18, 19,  1, 20, 21,  0, // 64 - 79
+	22, 23, 24, 25, 26, -1, 27, 28, 29, 30, 31, -1, -1, -1, -1, -1, // 80 - 95
+	// `a-z{|}~DEL
+	-1, 10, 11, 12, 13, 14, 15, 16, 17,  1, 18, 19,  1, 20, 21,  0, // 96 - 111
+	22, 23, 24, 25, 26, -1, 27, 28, 29, 30, 31, -1,  1, -1, -1, -1, // 112 - 127
 
 	// Extended ASCII:
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -357,95 +362,6 @@ void DK2PrintedSerialFormat::FromBinary(const DK2BinarySerialFormat& bin)
 }
 
 
-//// Unit Tests
-
-#ifdef SERIAL_FORMAT_UNIT_TEST
-
-int DecodeBase32(char ch)
-{
-    if (ch >= '2' && ch <= '9')
-        return 2 + ch - '2';
-    if (ch >= 'a' && ch <= 'h')
-        return 10 + ch - 'a';
-    if (ch >= 'A' && ch <= 'H')
-        return 10 + ch - 'A';
-    if (ch >= 'j' && ch <= 'k')
-        return 18 + ch - 'j';
-    if (ch >= 'J' && ch <= 'K')
-        return 18 + ch - 'J';
-    if (ch >= 'm' && ch <= 'n')
-        return 20 + ch - 'm';
-    if (ch >= 'M' && ch <= 'N')
-        return 20 + ch - 'M';
-    if (ch >= 'p' && ch <= 't')
-        return 22 + ch - 'p';
-    if (ch >= 'P' && ch <= 'T')
-        return 22 + ch - 'P';
-    if (ch >= 'v' && ch <= 'z')
-        return 27 + ch - 'v';
-    if (ch >= 'V' && ch <= 'Z')
-        return 27 + ch - 'V';
-
-    switch (ch)
-    {
-    case '0':
-    case 'o':
-    case 'O':
-        return 0;
-    case '1':
-    case 'i':
-    case '|':
-    case 'I':
-    case 'L':
-    case 'l':
-        return 1;
-    }
-
-    return -1;
-}
-
-void TestSerialFormatStuff()
-{
-    for (int ii = 0; ii < 256; ++ii)
-    {
-        OVR_ASSERT(Base32FromChar[ii] == (char)DecodeBase32((char)ii));
-    }
-
-    DK2BinarySerialFormat sa;
-    sa.ProductId = DK2ProductId_DK2;
-    sa.PartId = DK2PartId_HMD;
-    sa.MinutesSinceEpoch = 65000;
-    sa.UnitNumber = 2;
-    sa.MacHash[0] = 0xa1;
-    sa.MacHash[1] = 0xb2;
-    sa.MacHash[2] = 0xc3;
-    sa.MacHash[3] = 0xd4;
-    sa.MacHash[4] = 0xe5;
-
-    uint8_t buffer[12];
-    sa.ToBuffer(buffer);
-
-    DK2BinarySerialFormat sb;
-    bool success = sb.FromBuffer(buffer);
-    OVR_ASSERT(success);
-    OVR_UNUSED(success);
-
-    OVR_ASSERT(sa == sb);
-
-    DK2PrintedSerialFormat psn;
-    psn.FromBinary(sb);
-
-    OVR_ASSERT(psn == sa);
-
-    String s = psn.ToBase32();
-
-    DK2PrintedSerialFormat psn2;
-    psn2.FromBase32(s.ToCStr());
-
-    OVR_ASSERT(psn == psn2);
-}
-
-#endif // SERIAL_FORMAT_UNIT_TEST
 
 
 } // OVR

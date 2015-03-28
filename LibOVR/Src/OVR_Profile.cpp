@@ -32,14 +32,13 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OVR_Profile.h"
-#include "OVR_JSON.h"
+#include "Kernel/OVR_JSON.h"
 #include "Kernel/OVR_SysFile.h"
 #include "Kernel/OVR_Allocator.h"
 #include "OVR_Stereo.h"
 
 #ifdef OVR_OS_WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include "Kernel/OVR_Win32_IncludeWindows.h"
 #include <Shlobj.h>
 #elif defined(OVR_OS_MS) // Other Microsoft OSs
 // Nothing, thanks.
@@ -53,6 +52,7 @@ limitations under the License.
 #endif
 
 #endif
+
 
 #define PROFILE_VERSION 2.0
 #define MAX_PROFILE_MAJOR_VERSION 2
@@ -805,25 +805,41 @@ const char* ProfileManager::GetDefaultUser(const char* product, const char* seri
     const char* tag_names[2] = {"Product", "Serial"};
     const char* tags[2];
 
+    Ptr<Profile> p;
     if (product && serial)
     {
         tags[0] = product;
         tags[1] = serial;
         // Look for a default user on this specific device
-        Ptr<Profile> p = *GetTaggedProfile(tag_names, tags, 2);
-        if (p == NULL)
+        Profile* tmp_ptr = GetTaggedProfile(tag_names, tags, 2);
+        if (tmp_ptr == nullptr)
         {   // Look for a default user on this product
-            p = *GetTaggedProfile(tag_names, tags, 1);
+            tmp_ptr = GetTaggedProfile(tag_names, tags, 1);
+        }
+        if (tmp_ptr != nullptr)
+        {
+            p = *tmp_ptr;
         }
 
-        if (p)
-        {   
-            const char* user = p->GetValue("DefaultUser");
-            if (user != NULL && user[0] != 0)
-            {
-                TempBuff = user;
-                return TempBuff.ToCStr();
-            }
+    }
+    else if (product)
+    {
+        tags[0] = product;
+        // Look for a default user on this specific device
+        Profile* tmp_ptr = GetTaggedProfile(tag_names, tags, 1);
+        if (tmp_ptr != nullptr)
+        {
+            p = *tmp_ptr;
+        }
+    }
+
+    if (p)
+    {
+        const char* user = p->GetValue("DefaultUser");
+        if (user != nullptr && user[0] != 0)
+        {
+            TempBuff = user;
+            return TempBuff.ToCStr();
         }
     }
 
@@ -1137,9 +1153,10 @@ bool Profile::LoadDeviceFile(unsigned int productId, const char* printedSerialNu
     String path = BasePath + "/Devices.json";
 
     // Load the device profiles
-    Ptr<JSON> root = *JSON::Load(path);
-    if (root == NULL)
+    JSON *tmp_ptr = JSON::Load(path);
+    if (tmp_ptr == NULL)
         return false;
+    Ptr<JSON> root = *tmp_ptr;
 
     // Quick sanity check of the file type and format before we parse it
     JSON* version = root->GetFirstItem();

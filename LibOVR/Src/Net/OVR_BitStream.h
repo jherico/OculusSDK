@@ -29,9 +29,13 @@ limitations under the License.
 #define OVR_Bitstream_h
 
 #include <math.h>
-#include "../Kernel/OVR_Types.h"
-#include "../Kernel/OVR_Std.h"
-#include "../Kernel/OVR_String.h"
+#include "Kernel/OVR_Types.h"
+#include "Kernel/OVR_Std.h"
+#include "Kernel/OVR_String.h"
+
+#if defined(OVR_CC_MSVC)
+#pragma warning(push)
+#endif
 
 namespace OVR { namespace Net {
 
@@ -75,6 +79,9 @@ public:
 public:
 	/// Resets the bitstream for reuse.
 	void Reset( void );
+
+    // Releases the current data and points the bitstream at the provided buffer
+    void WrapBuffer(unsigned char* data, const unsigned int lengthInBytes);
 
 	/// \brief Bidirectional serialize/deserialize any integral type to/from a bitstream.  
 	/// \details Undefine __BITSTREAM_NATIVE_END if you need endian swapping.
@@ -1740,5 +1747,9 @@ BitStream& operator>>(BitStream& in, templateType& c)
 
 
 }} // OVR::Net
+
+#if defined(OVR_CC_MSVC)
+#pragma warning(pop)
+#endif
 
 #endif

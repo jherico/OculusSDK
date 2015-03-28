@@ -25,7 +25,7 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_OSX_Display.h"
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -197,15 +197,17 @@ static int discoverExtendedRifts(OVR::OSX::DisplayDesc* descriptorArray, int inp
 
     for (unsigned int i = 0; i < NDisplays; i++)
     {
-        io_service_t port = CGDisplayIOServicePort(Displays[i]);
+        CGDirectDisplayID dispId = Displays[i];
+
+        io_service_t port = CGDisplayIOServicePort(dispId);
         CFDictionaryRef DispInfo = IODisplayCreateInfoDictionary(port, kNilOptions);
 
         // Display[i]
 
-        uint32_t vendor = CGDisplayVendorNumber(Displays[i]);
-        uint32_t product = CGDisplayModelNumber(Displays[i]);
+        uint32_t vendor = CGDisplayVendorNumber(dispId);
+        uint32_t product = CGDisplayModelNumber(dispId);
 
-        CGRect desktop = CGDisplayBounds(Displays[i]);
+        CGRect desktop = CGDisplayBounds(dispId);
         Vector2i desktopOffset(desktop.origin.x, desktop.origin.y);
         
         if (vendor == 16082 && ( (product == 1)||(product == 2)||(product == 3) ) ) // 7" or HD
@@ -216,7 +218,9 @@ static int discoverExtendedRifts(OVR::OSX::DisplayDesc* descriptorArray, int inp
                 return result;
             }
 
-            Sizei    monitorResolution(1280, 800);                
+            int width  = static_cast<int>(CGDisplayPixelsWide(dispId));
+            int height = static_cast<int>(CGDisplayPixelsHigh(dispId));
+            Sizei monitorResolution(width, height);
             
             // Obtain and parse EDID data.
             CFDataRef data = 
@@ -232,20 +236,46 @@ static int discoverExtendedRifts(OVR::OSX::DisplayDesc* descriptorArray, int inp
             parseEdid( edid, edidResult );
 
             OVR::OSX::DisplayDesc& desc = descriptorArray[result++];
-            desc.DisplayID          = Displays[i];
-            desc.ModelName          = edidResult.MonitorName;   // User friendly string.
-            desc.EdidSerialNumber   = edidResult.SerialNumber;
+            desc.DisplayID                  = dispId;
+            desc.ModelName                  = edidResult.MonitorName;   // User friendly string.
+            desc.EdidSerialNumber           = edidResult.SerialNumber;
             desc.LogicalResolutionInPixels  = monitorResolution;
+            desc.NativeResolutionInPixels   = monitorResolution;
             desc.DesktopDisplayOffset       = desktopOffset;
+            desc.Rotation                   = 0;
+
+            auto roughEqual = [](double a, double b) -> bool
+            {
+                return fabs(a - b) < 1.0;
+            };
 
             switch (product)
             {
-                case 3: desc.DeviceTypeGuess = HmdType_DK2;       break;
-                case 2: desc.DeviceTypeGuess = HmdType_DKHDProto; break;
-                case 1: desc.DeviceTypeGuess = HmdType_DK1;       break;
+                    case 3: desc.DeviceTypeGuess = HmdType_DK2;       break;
+                    case 2: desc.DeviceTypeGuess = HmdType_DKHDProto; break;
+                    case 1: desc.DeviceTypeGuess = HmdType_DK1;       break;
 
                 default:
-                case 0: desc.DeviceTypeGuess = HmdType_Unknown;   break;
+                    case 0: desc.DeviceTypeGuess = HmdType_Unknown;   break;
+            }
+
+            bool portraitDevice = (desc.DeviceTypeGuess == HmdType_DK2);
+            double rotation = fabs(CGDisplayRotation(dispId));
+            if (roughEqual(rotation, 0))
+            {
+                desc.Rotation = portraitDevice ? 270 : 0;
+            }
+            else if (roughEqual(rotation, 90))
+            {
+                desc.Rotation = portraitDevice ? 0 : 90;
+            }
+            else if (roughEqual(rotation, 180))
+            {
+                desc.Rotation = portraitDevice ? 90 : 180;
+            }
+            else if (roughEqual(rotation, 270))
+            {
+                desc.Rotation = portraitDevice ? 180 : 270;
             }
 
             // Hard-coded defaults in case the device doesn't have the data itself.
@@ -277,6 +307,10 @@ bool Display::Initialize()
 {
     // Nothing to initialize. OS X only supports compatibility mode.
     return true;
+}
+
+void Display::Shutdown()
+{
 }
 
 

@@ -25,16 +25,46 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_GL_Util.h"
-#include "../../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 #include <string.h>
 
 #if defined(OVR_OS_LINUX)
- #include "../../Displays/OVR_Linux_SDKWindow.h"
+ #include "Displays/OVR_Linux_SDKWindow.h"
 #endif
 
 #if defined(OVR_OS_MAC)
     #include <CoreGraphics/CGDirectDisplay.h>
     #include <OpenGL/OpenGL.h>
+    #import <Cocoa/Cocoa.h>
+
+    // Hides Objective C NSOpenGLContext.
+    class MacContextImpl
+    {
+    public:
+        MacContextImpl(NSOpenGLContext* ctxIn, NSOpenGLPixelFormat* fmt) :
+            ctx(ctxIn),
+            pixelFormat(fmt)
+        { }
+        MacContextImpl(NSOpenGLContext* ctxIn) :
+          MacContextImpl(ctxIn, nil)
+        { }
+
+        ~MacContextImpl()
+        {
+#if !__has_feature(objc_arc)
+            if (pixelFormat != nil)
+            {
+                [pixelFormat release];
+                pixelFormat = nil;
+            }
+            [ctx release];
+            ctx = nil;
+#endif
+        }
+        // ARC will properly clean up NSOpenGLContext and NSOpenGLPixelFormat.
+        NSOpenGLPixelFormat* pixelFormat;
+        NSOpenGLContext*     ctx;
+    };
 
 typedef void *CGSConnectionID;
 typedef int32_t CGSWindowID;
@@ -312,17 +342,17 @@ bool ShaderBase::SetUniformBool(const char* name, int n, const bool* v)
 
 void ShaderBase::InitUniforms(const Uniform* refl, size_t reflSize)
 {
-    if(!refl)
+    UniformsSize = 0;
+    if (UniformData)
+    {
+        OVR_FREE(UniformData);
+        UniformData = 0;
+    }
+
+    if (!refl)
     {
         UniformRefl = NULL;
         UniformReflSize = 0;
-
-        UniformsSize = 0;
-        if (UniformData)
-        {
-            OVR_FREE(UniformData);
-            UniformData = 0;
-        }
         return; // no reflection data
     }
 
@@ -429,6 +459,10 @@ Context::Context() : initialized(false), ownsContext(true), incarnation(0)
 
 }
 
+// This destructor is mandatory for unique_ptr destruction on forward
+// declared MacContextImpl.
+Context::~Context() { }
+
 void Context::InitFromCurrent()
 {
     Destroy();
@@ -436,18 +470,14 @@ void Context::InitFromCurrent()
     initialized = true;
     ownsContext = false;
     incarnation++;
-    
-#if defined(OVR_OS_MAC)
-    systemContext = CGLGetCurrentContext();
-    {
-        CGSConnectionID cid;
-        CGSWindowID wid;
-        CGSSurfaceID sid;
-        CGLError e  = kCGLNoError;
-        e = CGLGetSurface(systemContext, &cid, &wid, &sid);
-        OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    }
 
+#if defined(OVR_OS_MAC)
+    NSOpenGLContext* glctx = [NSOpenGLContext currentContext];
+#if !__has_feature(objc_arc)
+    // MacContextImpl *will* release all given resources. Retain reference.
+    [glctx retain];
+#endif
+    systemContext.reset(new MacContextImpl(glctx));
 #elif defined(OVR_OS_WIN32)
     hdc = wglGetCurrentDC();
     systemContext = wglGetCurrentContext();
@@ -463,24 +493,30 @@ void Context::InitFromCurrent()
 #endif
 }
 
-
 void Context::CreateShared( Context & ctx )
 {
-    Destroy();
     OVR_ASSERT( ctx.initialized == true );
     if( ctx.initialized == false )
     {
         return;
     }
 
+    Destroy();
+
     initialized = true;
     ownsContext = true;
     incarnation++;
-    
+
 #if defined(OVR_OS_MAC)
-    CGLPixelFormatObj pixelFormat = CGLGetPixelFormat( ctx.systemContext );
-    CGLError e = CGLCreateContext( pixelFormat, ctx.systemContext, &systemContext );
-    OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
+    CGLContextObj shareCGL = (CGLContextObj)[ctx.systemContext->ctx CGLContextObj];
+    CGLPixelFormatObj sharePixelFormat = CGLGetPixelFormat(shareCGL);
+
+    NSOpenGLPixelFormat* nsOGLPixelFormat =
+        [[NSOpenGLPixelFormat alloc] initWithCGLPixelFormatObj:sharePixelFormat];
+    systemContext.reset(new MacContextImpl(
+        [[NSOpenGLContext alloc] initWithFormat:nsOGLPixelFormat shareContext:ctx.systemContext->ctx],
+        nsOGLPixelFormat));
+
     SetSurface(ctx);
 #elif defined(OVR_OS_WIN32)
     hdc = ctx.hdc;
@@ -492,24 +528,29 @@ void Context::CreateShared( Context & ctx )
     x11Display = ctx.x11Display;
     x11Drawable = ctx.x11Drawable;
     x11Visual = ctx.x11Visual;
-        systemContext = glXCreateContext( ctx.x11Display, &x11Visual, ctx.systemContext, True );
-        OVR_ASSERT( systemContext != NULL );
+    systemContext = glXCreateContext( ctx.x11Display, &x11Visual, ctx.systemContext, True );
+    OVR_ASSERT( systemContext != NULL );
 #endif
 }
 
 #if defined(OVR_OS_MAC)
-void Context::SetSurface( Context & ctx ) {
+void Context::SetSurface( Context & ctx )
+{
+    CGLContextObj cgl       = (CGLContextObj)[systemContext->ctx CGLContextObj];
+    CGLContextObj cglShared = (CGLContextObj)[ctx.systemContext->ctx CGLContextObj];
+
     CGLError e = kCGLNoError;
     CGSConnectionID cid, cid2;
     CGSWindowID wid, wid2;
     CGSSurfaceID sid, sid2;
 
-    e = CGLGetSurface(ctx.systemContext, &cid, &wid, &sid);
+    e = CGLGetSurface(cglShared, &cid, &wid, &sid);
     OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    e = CGLGetSurface(systemContext, &cid2, &wid2, &sid2);
+    e = CGLGetSurface(cgl, &cid2, &wid2, &sid2);
     OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
-    if( sid && sid != sid2 ) {
-        e = CGLSetSurface(systemContext, cid, wid, sid);
+    if( sid && sid != sid2 )
+    {
+        e = CGLSetSurface(cgl, cid, wid, sid);
         OVR_ASSERT(e == kCGLNoError); OVR_UNUSED(e);
     }
 }
@@ -525,7 +566,7 @@ void Context::Destroy()
     if (systemContext)
     {
 #if defined(OVR_OS_MAC)
-        CGLDestroyContext( systemContext );
+        systemContext.reset();
 #elif defined(OVR_OS_WIN32)
         BOOL success = wglDeleteContext( systemContext );
         OVR_ASSERT( success == TRUE );
@@ -547,7 +588,10 @@ void Context::Bind()
     {
 #if defined(OVR_OS_MAC)
         glFlush(); //Apple doesn't automatically flush within CGLSetCurrentContext, unlike other platforms.
-        CGLSetCurrentContext( systemContext );
+        CGLContextObj cgl = (CGLContextObj)[systemContext->ctx CGLContextObj];
+        CGLSetCurrentContext(cgl);
+        // Consider the following instead of using CGLSetCurrentContext:
+        // [systemContext->ctx makeCurrentContext];
 #elif defined(OVR_OS_WIN32)
         wglMakeCurrent( hdc, systemContext );
 #elif defined(OVR_OS_LINUX)

@@ -29,12 +29,12 @@ limitations under the License.
 #define OVR_Net_RPC_h
 
 #include "OVR_NetworkPlugin.h"
-#include "../Kernel/OVR_Hash.h"
-#include "../Kernel/OVR_String.h"
+#include "Kernel/OVR_Hash.h"
+#include "Kernel/OVR_String.h"
 #include "OVR_BitStream.h"
-#include "../Kernel/OVR_Threads.h"
-#include "../Kernel/OVR_Delegates.h"
-#include "../Kernel//OVR_Observer.h"
+#include "Kernel/OVR_Threads.h"
+#include "Kernel/OVR_Delegates.h"
+#include "Kernel/OVR_Callbacks.h"
 
 namespace OVR { namespace Net { namespace Plugins {
 
@@ -55,7 +55,7 @@ public:
 	/// \param[in] sharedIdentifier A string to identify the slot. Recommended to be the same as the name of the function.
 	/// \param[in] functionPtr Pointer to the function.
 	/// \param[in] callPriority Slots are called by order of the highest callPriority first. For slots with the same priority, they are called in the order they are registered
-	void RegisterSlot(OVR::String sharedIdentifier,  OVR::Observer<RPCSlot> *rpcSlotObserver);
+	void RegisterSlot(OVR::String sharedIdentifier,  CallbackListener<RPCSlot>* rpcSlotListener);
 
 	/// \brief Same as \a RegisterFunction, but is called with CallBlocking() instead of Call() and returns a value to the caller
 	bool RegisterBlockingFunction(OVR::String uniqueID, RPCDelegate blockingFunction);
@@ -88,7 +88,8 @@ protected:
     virtual void OnConnected(Connection* conn);
 
 	Hash< String, RPCDelegate, String::HashFunctor > registeredBlockingFunctions;
-	ObserverHash< RPCSlot > slotHash;
+
+	CallbackHash< RPCSlot > slotHash;
 
     // Synchronization for RPC caller
     Lock            singleRPCLock;

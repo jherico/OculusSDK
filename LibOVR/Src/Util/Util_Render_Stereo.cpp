@@ -28,8 +28,12 @@ limitations under the License.
 
 namespace OVR { namespace Util { namespace Render {
 
-using namespace OVR::Tracking;
+using namespace OVR::Vision;
 
+
+#if defined (OVR_CC_MSVC)
+static_assert(sizeof(DistortionMeshVertexData) == sizeof(ovrDistortionVertex), "DistortionMeshVertexData size mismatch");
+#endif
 
 //-----------------------------------------------------------------------------------
 // **** Useful debug functions.
@@ -51,8 +55,10 @@ char const* GetDebugNameEyeCupType ( EyeCupType eyeCupType )
     case EyeCup_JamesA:         return "James A";
     case EyeCup_SunMandalaA:    return "Sun Mandala A";
     case EyeCup_DK2A:           return "DK2 A";
+    case EyeCup_BlackStar:      return "BlackStar";
+    case EyeCup_EVTProto:       return "EVT A";
     case EyeCup_LAST:           return "LAST";
-    default: OVR_ASSERT ( false ); return "Error";
+    default: OVR_ASSERT ( false ); return "Error"; break;
     }
 }
 
@@ -68,9 +74,11 @@ char const* GetDebugNameHmdType ( HmdTypeEnum hmdType )
     case HmdType_DKHD2Proto:        return "DK HD prototype 585";
     case HmdType_CrystalCoveProto:  return "Crystal Cove";
     case HmdType_DK2:               return "DK2";
+    case HmdType_BlackStar:         return "BlackStar";
+    case HmdType_CB:                return "Crescent Bay";
     case HmdType_Unknown:           return "Unknown";
     case HmdType_LAST:              return "LAST";
-    default: OVR_ASSERT ( false ); return "Error";
+    default: OVR_ASSERT ( false );  return "Error";
     }
 }
 
@@ -180,7 +188,8 @@ static StereoEyeParams CalculateStereoEyeParamsInternal ( StereoEye eyeType, Hmd
                                                           FovPort const &fov,
                                                           Sizei const &actualRendertargetSurfaceSize,
                                                           Recti const &renderedViewport,
-                                                          bool bRightHanded = true, float zNear = 0.01f, float zFar = 10000.0f,
+                                                          bool bRightHanded = true, bool isOpenGL = false,
+                                                          float zNear = 0.01f, float zFar = 10000.0f,
                                                           bool bMonoRenderingMode = false,
                                                           float zoomFactor = 1.0f )
 {
@@ -192,7 +201,7 @@ static StereoEyeParams CalculateStereoEyeParamsInternal ( StereoEye eyeType, Hmd
     zoomedFov.RightTan *= fovScale;
     zoomedFov.UpTan    *= fovScale;
     zoomedFov.DownTan  *= fovScale;
-    Matrix4f projection = CreateProjection ( bRightHanded, zoomedFov, zNear, zFar );
+    Matrix4f projection = CreateProjection ( bRightHanded, isOpenGL, zoomedFov, eyeType, zNear, zFar );
 
     // Find the mapping from TanAngle space to target NDC space.
     // Note this does NOT take the zoom factor into account because
@@ -280,6 +289,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                            Sizei const &actualRendertargetSurfaceSize,
                                            bool bRendertargetSharedByBothEyes,
                                            bool bRightHanded /*= true*/,
+                                           bool bOpenGL /*= false*/,
                                            float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/,
 										   Sizei const *pOverrideRenderedPixelSize /* = NULL*/,
                                            FovPort const *pOverrideFovport /*= NULL*/,
@@ -309,7 +319,7 @@ StereoEyeParams CalculateStereoEyeParams ( HmdRenderInfo const &hmd,
                                 distortionAndFov.Distortion,
                                 distortionAndFov.Fov,
                                 actualRendertargetSurfaceSize, viewport,
-                                bRightHanded, zNear, zFar, false, zoomFactor );
+                                bRightHanded, bOpenGL, zNear, zFar, false, zoomFactor );
 }
 
 
@@ -416,6 +426,7 @@ StereoConfig::StereoConfig(StereoMode mode)
     ExtraEyeRotationInRadians = OVR_DEFAULT_EXTRA_EYE_ROTATION;
     IsRendertargetSharedByBothEyes = true;
     RightHandedProjection = true;
+    UsingOpenGL = false;
 
     // This should cause an assert if the app does not call SetRendertargetSize()
     RendertargetSize = Sizei ( 0, 0 );
@@ -507,12 +518,14 @@ void StereoConfig::SetZeroVirtualIpdOverride ( bool enableOverride )
 }
 
 
-void StereoConfig::SetZClipPlanesAndHandedness ( float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/, bool rightHandedProjection /*= true*/ )
+void StereoConfig::SetZClipPlanesAndHandedness ( float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/,
+                                                 bool rightHandedProjection /*= true*/, bool isOpenGL /*= false*/ )
 {
     DirtyFlag = true;
     ZNear = zNear;
     ZFar = zFar;
     RightHandedProjection = rightHandedProjection;
+    UsingOpenGL = isOpenGL;
 }
 
 void StereoConfig::SetExtraEyeRotation ( float extraEyeRotationInRadians )
@@ -620,7 +633,7 @@ void StereoConfig::UpdateComputedState()
         EyeRenderParams[eyeNum].StereoEye = CalculateStereoEyeParamsInternal (
                                         eyeType, Hmd, localDistortion, fov,
                                         RendertargetSize, tempViewport,
-                                        RightHandedProjection, ZNear, ZFar,
+                                        RightHandedProjection, UsingOpenGL, ZNear, ZFar,
                                         OverrideZeroIpd );
 
         // We want to create a virtual 2D surface we can draw debug text messages to.
@@ -771,7 +784,7 @@ Matrix4f StereoConfig::GetProjectionWithZoom ( StereoEye eye, float fovZoom ) co
     fovPort.RightTan *= fovScale;
     fovPort.UpTan    *= fovScale;
     fovPort.DownTan  *= fovScale;
-    return CreateProjection ( RightHandedProjection, fovPort, ZNear, ZFar );
+    return CreateProjection ( RightHandedProjection, UsingOpenGL, fovPort, eye, ZNear, ZFar );
 }
 
 
@@ -798,12 +811,6 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
                                                     const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC )
 {
     DistortionMeshVertexData result;
-
-    float xOffset = 0.0f;
-    if (rightEye)
-    {
-        xOffset = 1.0f;
-    }
 
     Vector2f tanEyeAnglesR, tanEyeAnglesG, tanEyeAnglesB;
     TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
@@ -878,8 +885,32 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
 	// Note - this is NOT clamped negatively.
 	// For rendering methods that interpolate over a coarse grid, we need the values to go negative for correct intersection with zero.
     result.Shade = Alg::Min ( edgeFadeIn, 1.0f );
-    result.ScreenPosNDC.x = 0.5f * screenNDC.x - 0.5f + xOffset;
-    result.ScreenPosNDC.y = -screenNDC.y;
+
+    float eyeOffset = rightEye ? 1.0f : 0.0f;
+    float xOffset = 0.5f * screenNDC.x - 0.5f + eyeOffset;
+    float yOffset = -screenNDC.y;
+
+    // Rotate the mesh to match screen orientation.
+    if (hmdRenderInfo.Rotation == 270)
+    {
+        result.ScreenPosNDC.x = -yOffset;
+        result.ScreenPosNDC.y = xOffset;
+    }
+    else if (hmdRenderInfo.Rotation == 0)
+    {
+        result.ScreenPosNDC.x = xOffset;
+        result.ScreenPosNDC.y = yOffset;
+    }
+    else if (hmdRenderInfo.Rotation == 180)
+    {
+        result.ScreenPosNDC.x = -xOffset;
+        result.ScreenPosNDC.y = -yOffset;
+    }
+    else if (hmdRenderInfo.Rotation == 90)
+    {
+        result.ScreenPosNDC.x = yOffset;
+        result.ScreenPosNDC.y = -xOffset;
+    }
 
     return result;
 }
@@ -1345,6 +1376,10 @@ Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorl
     return matRenderXform.Inverted();
 }
 
+
+#if defined(OVR_ENABLE_TIMEWARP_MACHINE)
+// This is deprecated by DistortionTiming code. -cat
+
 TimewarpMachine::TimewarpMachine()
   : VsyncEnabled(false),
     RenderInfo(),
@@ -1409,7 +1444,7 @@ double TimewarpMachine::GetViewRenderPredictionTime()
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToRenderedScene;
 }
 
-bool TimewarpMachine::GetViewRenderPredictionPose(SensorStateReader* reader, Posef& pose)
+bool TimewarpMachine::GetViewRenderPredictionPose(TrackingStateReader* reader, Posef& pose)
 {
 	return reader->GetPoseAtTime(GetViewRenderPredictionTime(), pose);
 }
@@ -1424,15 +1459,15 @@ double TimewarpMachine::GetVisiblePixelTimeEnd()
     // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
     return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToTimewarpEnd;
 }
-bool TimewarpMachine::GetPredictedVisiblePixelPoseStart(SensorStateReader* reader, Posef& pose)
+bool TimewarpMachine::GetPredictedVisiblePixelPoseStart(TrackingStateReader* reader, Posef& pose)
 {
 	return reader->GetPoseAtTime(GetVisiblePixelTimeStart(), pose);
 }
-bool TimewarpMachine::GetPredictedVisiblePixelPoseEnd(SensorStateReader* reader, Posef& pose)
+bool TimewarpMachine::GetPredictedVisiblePixelPoseEnd(TrackingStateReader* reader, Posef& pose)
 {
 	return reader->GetPoseAtTime(GetVisiblePixelTimeEnd(), pose);
 }
-bool TimewarpMachine::GetTimewarpDeltaStart(SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
+bool TimewarpMachine::GetTimewarpDeltaStart(TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
 {
 	Posef visiblePose;
 	if (!GetPredictedVisiblePixelPoseStart(reader, visiblePose))
@@ -1447,7 +1482,7 @@ bool TimewarpMachine::GetTimewarpDeltaStart(SensorStateReader* reader, Posef con
 
 	return true;
 }
-bool TimewarpMachine::GetTimewarpDeltaEnd(SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
+bool TimewarpMachine::GetTimewarpDeltaEnd(TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
 {
 	Posef visiblePose;
 	if (!GetPredictedVisiblePixelPoseEnd(reader, visiblePose))
@@ -1548,6 +1583,8 @@ void    TimewarpMachine::JustInTime_AfterDistortionTimeMeasurement(double timeNo
         OVR_ASSERT ( !"Really didn't need more measurements, thanks" );
     }
 }
+
+#endif // OVR_ENABLE_TIMEWARP_MACHINE
 
 
 }}}  // OVR::Util::Render

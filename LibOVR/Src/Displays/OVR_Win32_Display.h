@@ -34,49 +34,20 @@ OVR_DISABLE_MSVC_WARNING(4351) // new behavior: elements of array will be defaul
 namespace OVR { namespace Win32 {
 
 
-//-------------------------------------------------------------------------------------
-// DisplayDesc
-
-// Display information enumerable through Win32.
-// TBD: Should we just move this to public header, so it's a const member of Display?
-struct DisplayDesc
-{
-    HmdTypeEnum DeviceTypeGuess; // This is a guess about what type of HMD it is connected to
-	String      DisplayID;       // This is the device identifier string from MONITORINFO (for app usage)
-    String      ModelName;       // This is a "DK2" type string
-    String      EdidSerialNumber;
-    Sizei       LogicalResolutionInPixels;
-    Sizei       NativeResolutionInPixels;
-    Vector2i    DesktopDisplayOffset;
-};
-
-
-//-------------------------------------------------------------------------------------
-// DisplayEDID
-
-// Describes EDID information as reported from our display driver.
-struct DisplayEDID
-{
-	String MonitorName;
-	UINT16 ModelNumber;
-	String VendorName;
-	String SerialNumber;
-};
-
 class Win32DisplaySearchHandle : public DisplaySearchHandle
 {
 public:
     static const int ArraySize = 16;
 
-    Win32::DisplayDesc cachedDescriptorArray[ArraySize];
+    DisplayDesc        cachedDescriptorArray[ArraySize];
     bool			   extended;
     bool			   application;
     int				   extendedDisplayCount;
     int				   applicationDisplayCount;
     int				   displayCount;
 
-    Win32DisplaySearchHandle()
-      : cachedDescriptorArray(),
+    Win32DisplaySearchHandle() :
+        cachedDescriptorArray(),
         extended(),
         application(false),
         extendedDisplayCount(0),
@@ -97,30 +68,30 @@ public:
 class Win32DisplayGeneric : public Display
 {
 public:
-	Win32DisplayGeneric( const DisplayDesc& dd ) :
-		Display(dd.DeviceTypeGuess,
-				dd.DisplayID,
-				dd.ModelName,
-				dd.EdidSerialNumber,
-				dd.LogicalResolutionInPixels,
-				dd.NativeResolutionInPixels,
-				dd.DesktopDisplayOffset,
-				0,
-				0,
-				false)
+    Win32DisplayGeneric( const DisplayDesc& dd ) :
+        Display(dd.DeviceTypeGuess,
+                dd.DisplayID,
+                dd.ModelName,
+                dd.EdidSerialNumber,
+                dd.ResolutionInPixels,
+                dd.ResolutionInPixels,
+                dd.DesktopDisplayOffset,
+                0,
+                dd.Rotation,
+                false)
     {
-	}
+    }
 
-	virtual ~Win32DisplayGeneric()
-	{
-	}
+    virtual ~Win32DisplayGeneric()
+    {
+    }
 
-	// Generic displays are not capable of mirroring
-	virtual MirrorMode SetMirrorMode( MirrorMode newMode ) 
-	{ 
-		OVR_UNUSED( newMode ); 
-		return MirrorDisabled; 
-	} 
+    // Generic displays are not capable of mirroring
+    virtual MirrorMode SetMirrorMode( MirrorMode newMode ) 
+    { 
+        OVR_UNUSED( newMode ); 
+        return MirrorDisabled; 
+    }
 };
 
 

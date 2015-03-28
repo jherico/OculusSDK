@@ -26,6 +26,7 @@ limitations under the License.
 
 #include "CAPI_HMDRenderState.h"
 
+
 namespace OVR { namespace CAPI {
 
 
@@ -38,9 +39,10 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     memset(&d, 0, sizeof(d));
     
     d.Type = ovrHmd_Other;
-     
+    
     d.ProductName       = OurHMDInfo.ProductName;    
     d.Manufacturer      = OurHMDInfo.Manufacturer;
+
     d.Resolution.w      = OurHMDInfo.ResolutionInPixels.w;
     d.Resolution.h      = OurHMDInfo.ResolutionInPixels.h;
     d.WindowsPos.x      = OurHMDInfo.DesktopX;
@@ -60,9 +62,9 @@ ovrHmdDesc HMDRenderState::GetDesc() const
 
     d.HmdCaps           = ovrHmdCap_Present | ovrHmdCap_NoVSync;
     d.TrackingCaps      = ovrTrackingCap_MagYawCorrection | ovrTrackingCap_Orientation;
-    d.DistortionCaps    = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp |
-                          ovrDistortionCap_Vignette | ovrDistortionCap_SRGB |
-                          ovrDistortionCap_FlipInput | ovrDistortionCap_ProfileNoTimewarpSpinWaits |
+    d.DistortionCaps    = ovrDistortionCap_TimeWarp | //ovrDistortionCap_DepthProjectedTimeWarp |
+                          ovrDistortionCap_Vignette | ovrDistortionCap_SRGB | ovrDistortionCap_FlipInput |
+                          ovrDistortionCap_TimewarpJitDelay | ovrDistortionCap_ProfileNoSpinWaits |
                           ovrDistortionCap_HqDistortion | ovrDistortionCap_LinuxDevFullscreen;
 
 #if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
@@ -71,20 +73,22 @@ ovrHmdDesc HMDRenderState::GetDesc() const
 #endif
 
     if( OurHMDInfo.InCompatibilityMode )
+    {
         d.HmdCaps |= ovrHmdCap_ExtendDesktop;
+    }
 
-    if (strstr(OurHMDInfo.ProductName, "DK1"))
+    if (OurHMDInfo.HmdType == HmdType_DK1)
     {
         d.Type = ovrHmd_DK1;        
     }
-    else if (strstr(OurHMDInfo.ProductName, "DK2"))
+    else if (OurHMDInfo.HmdType == HmdType_DK2)
     {
-        d.Type        = ovrHmd_DK2;
-        d.HmdCaps    |= ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction;
+        d.Type = ovrHmd_DK2;
+        d.HmdCaps |= ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction;
         d.TrackingCaps |= ovrTrackingCap_Position;
-		d.DistortionCaps |= ovrDistortionCap_Overdrive;
+        d.DistortionCaps |= ovrDistortionCap_Overdrive;
     }
-        
+
     const DistortionRenderDesc& leftDistortion  = Distortion[0];
     const DistortionRenderDesc& rightDistortion = Distortion[1];
   
@@ -108,14 +112,18 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     }    
 
     // MA: Taking this out on purpose.
-	// Important information for those that are required to do their own timing,
+    // Important information for those that are required to do their own timing,
     // because of shortfalls in timing code.
-	//d.VsyncToNextVsync = OurHMDInfo.Shutter.VsyncToNextVsync;
-	//d.PixelPersistence = OurHMDInfo.Shutter.PixelPersistence;
+    //d.VsyncToNextVsync = OurHMDInfo.Shutter.VsyncToNextVsync;
+    //d.PixelPersistence = OurHMDInfo.Shutter.PixelPersistence;
+
+    if (OurHMDInfo.DebugDevice)
+    {
+        d.HmdCaps |= ovrHmdCap_DebugDevice;
+    }
 
     return d;
 }
-
 
 ovrSizei HMDRenderState::GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel) const
 {

@@ -31,7 +31,7 @@ limitations under the License.
 
 namespace OVR {
 
-struct Win32ShimInfo;
+struct ExtraMonitorInfo;
 
 namespace Win32 {  
 
@@ -50,7 +50,7 @@ public:
 	bool Initialize( bool inCompatibility );
 	bool Shutdown();
 
-	bool Update( Win32ShimInfo* shimInfo );
+	bool Update( ExtraMonitorInfo* shimInfo );
 
 	void* GetDX11SwapChain();
 

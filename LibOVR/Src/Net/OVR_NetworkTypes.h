@@ -28,7 +28,7 @@ limitations under the License.
 #ifndef OVR_NetworkTypes_h
 #define OVR_NetworkTypes_h
 
-#include "../Kernel/OVR_Types.h"
+#include "Kernel/OVR_Types.h"
 
 namespace OVR {	namespace Net {
 

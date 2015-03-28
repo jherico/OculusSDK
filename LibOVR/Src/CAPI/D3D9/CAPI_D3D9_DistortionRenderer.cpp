@@ -1,6 +1,6 @@
 /************************************************************************************
 
-Filename    :   CAPI_D3D1X_DistortionRenderer.cpp
+Filename    :   CAPI_D3D11_DistortionRenderer.cpp
 Content     :   Experimental distortion renderer
 Created     :   March 7th, 2014
 Authors     :   Tom Heath
@@ -25,26 +25,23 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_D3D9_DistortionRenderer.h"
-#define OVR_D3D_VERSION 9
-#include "../../OVR_CAPI_D3D.h"
+#include "OVR_CAPI_D3D.h"
 
 #include <initguid.h>
 DEFINE_GUID(IID_OVRDirect3DDevice9EX, 0xe6d58f10, 0xffa1, 0x4748, 0x85, 0x9f, 0xbc, 0xd7, 0xea, 0xe8, 0xfc, 0x1);
+
+OVR_DISABLE_MSVC_WARNING(4996) // Disable deprecation warning
 
 namespace OVR { namespace CAPI { namespace D3D9 {
 
 
 ///QUESTION : Why not just a normal constructor?
-CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
-                                                     FrameTimeManager& timeManager,
-                                                     const HMDRenderState& renderState)
+CAPI::DistortionRenderer* DistortionRenderer::Create()
 {
-    return new DistortionRenderer(hmd, timeManager, renderState);
+    return new DistortionRenderer();
 }
 
-DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager,
-                                       const HMDRenderState& renderState)
-  : CAPI::DistortionRenderer(ovrRenderAPI_D3D9, hmd, timeManager, renderState),
+DistortionRenderer::DistortionRenderer() :
     Device(NULL),
     SwapChain(NULL),
     VertexDecl(NULL),
@@ -57,7 +54,6 @@ DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager
 {
     ScreenSize.w = 0;
     ScreenSize.h = 0;
-    InitLatencyTester(renderState);
 
     for (int i = 0; i < 2; ++i)
     {
@@ -91,14 +87,16 @@ DistortionRenderer::~DistortionRenderer()
 
 
 /******************************************************************************/
-bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
+bool DistortionRenderer::initializeRenderer(const ovrRenderAPIConfig* apiConfig)
 {
+    initLatencyTester();
+
 	///QUESTION - what is returned bool for???  Are we happy with this true, if not config.
     const ovrD3D9Config * config = (const ovrD3D9Config*)apiConfig;
     if (!config)                return true; 
     if (!config->D3D9.pDevice)  return false;
 
-    if (System::DirectDisplayEnabled())
+    if (Display::GetDirectDisplayInitialized())
     {
         Ptr<IUnknown> ovrDevice;
         if (config->D3D9.pDevice->QueryInterface(IID_OVRDirect3DDevice9EX, (void**)&ovrDevice.GetRawRef()) == E_NOINTERFACE)
@@ -112,46 +110,54 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     SwapChain      = config->D3D9.pSwapChain;
 	ScreenSize     = config->D3D9.Header.BackBufferSize;
 
-	GfxState = *new GraphicsState(Device, RState.DistortionCaps);
+	GfxState = *new GraphicsState(Device, RenderState->DistortionCaps);
 
 	CreateVertexDeclaration();
 	CreateDistortionShaders();
-	CreateDistortionModels();
-
-    return true;
+	return CreateDistortionModels();
 }
 
-void DistortionRenderer::InitLatencyTester(const HMDRenderState& RenderState)
+void DistortionRenderer::initLatencyTester()
 {
-    ResolutionInPixels = RenderState.OurHMDInfo.ResolutionInPixels;
+    ResolutionInPixels = RenderState->OurHMDInfo.ResolutionInPixels;
 }
 
 
 /**************************************************************/
 void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
 {
-	//Doesn't do a lot in here??
-	const ovrD3D9Texture* tex = (const ovrD3D9Texture*)eyeTexture;
+    if (eyeTexture)
+    {
+        //Doesn't do a lot in here??
+        const ovrD3D9Texture* tex = (const ovrD3D9Texture*)eyeTexture;
 
-	//Write in values
-    eachEye[eyeId].texture = tex->D3D9.pTexture;
+        //Write in values
+        eachEye[eyeId].texture = tex->D3D9.pTexture;
 
-	// Its only at this point we discover what the viewport of the texture is.
-	// because presumably we allow users to realtime adjust the resolution.
-    eachEye[eyeId].TextureSize    = tex->D3D9.Header.TextureSize;
-    eachEye[eyeId].RenderViewport = tex->D3D9.Header.RenderViewport;
+        // Its only at this point we discover what the viewport of the texture is.
+        // because presumably we allow users to realtime adjust the resolution.
+        eachEye[eyeId].TextureSize = tex->D3D9.Header.TextureSize;
+        eachEye[eyeId].RenderViewport = tex->D3D9.Header.RenderViewport;
 
-    const ovrEyeRenderDesc& erd = RState.EyeRenderDesc[eyeId];
-    
-    ovrHmd_GetRenderScaleAndOffset( erd.Fov,
-                                    eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
-                                    eachEye[eyeId].UVScaleOffset );
+        const ovrEyeRenderDesc& erd = RenderState->EyeRenderDesc[eyeId];
 
-	if (RState.DistortionCaps & ovrDistortionCap_FlipInput)
-	{
-		eachEye[eyeId].UVScaleOffset[0].y = -eachEye[eyeId].UVScaleOffset[0].y;
-		eachEye[eyeId].UVScaleOffset[1].y = 1.0f - eachEye[eyeId].UVScaleOffset[1].y;
-	}
+        ovrHmd_GetRenderScaleAndOffset(erd.Fov,
+            eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
+            eachEye[eyeId].UVScaleOffset);
+
+        if (RenderState->DistortionCaps & ovrDistortionCap_FlipInput)
+        {
+            eachEye[eyeId].UVScaleOffset[0].y = -eachEye[eyeId].UVScaleOffset[0].y;
+            eachEye[eyeId].UVScaleOffset[1].y = 1.0f - eachEye[eyeId].UVScaleOffset[1].y;
+        }
+    }
+}
+
+void DistortionRenderer::SubmitEyeWithDepth(int eyeId, const ovrTexture* eyeColorTexture, const ovrTexture* eyeDepthTexture)
+{
+    SubmitEye(eyeId, eyeColorTexture);
+
+    OVR_UNUSED(eyeDepthTexture);
 }
 
 void DistortionRenderer::renderEndFrame()
@@ -168,19 +174,22 @@ void DistortionRenderer::renderEndFrame()
 }
 
 /******************************************************************/
-void DistortionRenderer::EndFrame(bool swapBuffers)
+void DistortionRenderer::EndFrame(uint32_t frameIndex, bool swapBuffers)
 {
 	///QUESTION : Clear the screen? 
 	///QUESTION : Ensure the screen is the render target
 
+    // D3D9 does not provide any frame timing information.
+    Timing->CalculateTimewarpTiming(frameIndex);
+
     // Don't spin if we are explicitly asked not to
-    if (RState.DistortionCaps & ovrDistortionCap_TimeWarp &&
-        !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+    if ( (RenderState->DistortionCaps & ovrDistortionCap_TimeWarp) &&
+         (RenderState->DistortionCaps & ovrDistortionCap_TimewarpJitDelay) &&
+        !(RenderState->DistortionCaps & ovrDistortionCap_ProfileNoSpinWaits))
     {
-        if (!TimeManager.NeedDistortionTimeMeasurement())
+        if (!Timing->NeedDistortionTimeMeasurement())
         {
-            // Wait for timewarp distortion if it is time and Gpu idle
-            FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
+            FlushGpuAndWaitTillTime(Timing->GetTimewarpTiming()->JIT_TimewarpTime);
 
             renderEndFrame();
         }
@@ -189,12 +198,12 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             // If needed, measure distortion time so that TimeManager can better estimate
             // latency-reducing time-warp wait timing.
             WaitUntilGpuIdle();
-            double  distortionStartTime = ovr_GetTimeInSeconds();
+            double distortionStartTime = ovr_GetTimeInSeconds();
 
             renderEndFrame();
 
             WaitUntilGpuIdle();
-            TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+            Timing->AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
         }
     }
     else
@@ -221,11 +230,11 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         // Force GPU to flush the scene, resulting in the lowest possible latency.
         // It's critical that this flush is *after* present.
         // Doesn't need to be done if running through the Oculus driver.
-        if (RState.OurHMDInfo.InCompatibilityMode &&
-            !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+        if (RenderState->OurHMDInfo.InCompatibilityMode &&
+            !(RenderState->DistortionCaps & ovrDistortionCap_ProfileNoSpinWaits))
         {
             WaitUntilGpuIdle();
-        }
+       }
     }
 }
 
@@ -296,7 +305,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* color)
     D3DRECT rect = { ResolutionInPixels.w / 4, ResolutionInPixels.h / 4, ResolutionInPixels.w * 3 / 4, ResolutionInPixels.h * 3 / 4 };
     unsigned char c[3] = { color[0], color[1], color[2] };
 
-    if (RState.DistortionCaps & ovrDistortionCap_SRGB)
+    if (RenderState->DistortionCaps & ovrDistortionCap_SRGB)
     {
         ConvertSRGB(c);
     }
@@ -312,10 +321,28 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* color)
 
 void DistortionRenderer::renderLatencyPixel(unsigned char* color)
 {
-    D3DRECT rect = { ResolutionInPixels.w - OVR_LATENCY_PIXEL_SIZE, 0, ResolutionInPixels.w, OVR_LATENCY_PIXEL_SIZE };
+    D3DRECT rect;
+
+    if (RenderState->RenderInfo.OffsetLatencyTester)
+    {
+        // TBD: Is this correct?
+        rect.x1 = ResolutionInPixels.w / 2;
+        rect.y1 = 0;
+    }
+    else
+    {
+        rect.x1 = ResolutionInPixels.w - OVR_LATENCY_PIXEL_SIZE;
+        rect.y1 = 0;
+    }
+
+    rect.x2 = rect.x1 + OVR_LATENCY_PIXEL_SIZE;
+    rect.y2 = rect.y1 + OVR_LATENCY_PIXEL_SIZE;
+
+    // TBD: Does (RenderState->RenderInfo.RotateCCW90) affect this?
+
     unsigned char c[3] = { color[0], color[1], color[2] };
 
-    if (RState.DistortionCaps & ovrDistortionCap_SRGB)
+    if (RenderState->DistortionCaps & ovrDistortionCap_SRGB)
     {
         ConvertSRGB(c);
     }
@@ -404,6 +431,6 @@ void DistortionRenderer::GraphicsState::Restore()
 }
 
 
-}}} // OVR::CAPI::D3D1X
+}}} // OVR::CAPI::D3D11
 
-
+OVR_RESTORE_MSVC_WARNING()
