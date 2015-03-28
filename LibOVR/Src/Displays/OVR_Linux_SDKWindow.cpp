@@ -25,8 +25,8 @@ limitations under the License.
 *******************************************************************************/
 
 #include "OVR_Linux_SDKWindow.h"
-#include "../Kernel/OVR_Log.h"
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 #include "../../../3rdParty/EDID/edid.h"
 
 namespace OVR {
@@ -257,6 +257,7 @@ bool SDKWindow::getVisualFromDrawable(GLXDrawable drawable, XVisualInfo* vinfoOu
         XVisualInfo* chosen = glXGetVisualFromFBConfig(display, *config);
         *vinfoOut = *chosen;
         XFree(config);
+        XFree(chosen);
         return true;
     }
     return false;

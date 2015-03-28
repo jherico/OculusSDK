@@ -1,6 +1,6 @@
 /************************************************************************************
 
-Filename    :   CAPI_D3D1X_Util.cpp
+Filename    :   CAPI_D3D11_Util.cpp
 Content     :   D3D9 utility functions for rendering
 Created     :   March 7 , 2014
 Authors     :   Tom Heath
@@ -25,8 +25,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_D3D9_DistortionRenderer.h"
-#define OVR_D3D_VERSION 9
-#include "../../OVR_CAPI_D3D.h"
+#include "OVR_CAPI_D3D.h"
 
 
 namespace OVR { namespace CAPI { namespace D3D9 {
@@ -163,7 +162,7 @@ void DistortionRenderer::CreateDistortionShaders(void)
 
 
 /***************************************************/
-void DistortionRenderer::CreateVertexDeclaration(void)
+void DistortionRenderer::CreateVertexDeclaration()
 {
 	static const D3DVERTEXELEMENT9 VertexElements[7] =	{
         { 0,  0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
@@ -178,18 +177,25 @@ void DistortionRenderer::CreateVertexDeclaration(void)
 
 
 /******************************************************/
-void DistortionRenderer::CreateDistortionModels(void)
+bool DistortionRenderer::CreateDistortionModels()
 {
 	//Make the distortion models
 	for (int eye=0;eye<2;eye++)
 	{		
 		FOR_EACH_EYE * e = &eachEye[eye];
 		ovrDistortionMesh meshData;
-		ovrHmd_CreateDistortionMesh(HMD,
-            RState.EyeRenderDesc[eye].Eye,
-            RState.EyeRenderDesc[eye].Fov,
-                                    RState.DistortionCaps,
-                                    &meshData);
+
+        if (!CalculateDistortionMeshFromFOV(
+            RenderState->RenderInfo,
+            RenderState->Distortion[eye],
+            (RenderState->EyeRenderDesc[eye].Eye == ovrEye_Left ? StereoEye_Left : StereoEye_Right),
+            RenderState->EyeRenderDesc[eye].Fov,
+            RenderState->DistortionCaps,
+            &meshData))
+        {
+            OVR_ASSERT(false);
+            return false;
+        }
 
 		e->numVerts = meshData.VertexCount;
 		e->numIndices = meshData.IndexCount;
@@ -208,24 +214,26 @@ void DistortionRenderer::CreateDistortionModels(void)
 
 		ovrHmd_DestroyDistortionMesh( &meshData );
 	}
+
+    return true;
 }
 
 /**********************************************************/
-void DistortionRenderer::RenderBothDistortionMeshes(void)
+void DistortionRenderer::RenderBothDistortionMeshes()
 {
 	Device->BeginScene();
 
 	D3DCOLOR clearColor = D3DCOLOR_RGBA(
-		(int)(RState.ClearColor[0] * 255.0f),
-		(int)(RState.ClearColor[1] * 255.0f),
-		(int)(RState.ClearColor[2] * 255.0f),
-		(int)(RState.ClearColor[3] * 255.0f));
+		(int)(RenderState->ClearColor[0] * 255.0f),
+		(int)(RenderState->ClearColor[1] * 255.0f),
+		(int)(RenderState->ClearColor[2] * 255.0f),
+		(int)(RenderState->ClearColor[3] * 255.0f));
 
 	Device->Clear(0, NULL, D3DCLEAR_TARGET | D3DCLEAR_STENCIL | D3DCLEAR_ZBUFFER, clearColor, 0, 0);
 
-	for (int eye=0; eye<2; eye++)
-	{
-		FOR_EACH_EYE * e = &eachEye[eye];
+    for (int eyeNum = 0; eyeNum < 2; eyeNum++)
+    {
+		FOR_EACH_EYE * e = &eachEye[eyeNum];
 		D3DVIEWPORT9 vp;
         vp.X=0; vp.Y=0;
         vp.Width=ScreenSize.w;	vp.Height=ScreenSize.h;
@@ -239,21 +247,25 @@ void DistortionRenderer::RenderBothDistortionMeshes(void)
 		Device->SetTexture( 0, e->texture);
 
 		//Choose which vertex shader, with associated additional inputs
-		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
+        if (RenderState->DistortionCaps & ovrDistortionCap_TimeWarp)
 		{          
 			Device->SetVertexShader( VertexShaderTimewarp );  
 
-            ovrMatrix4f timeWarpMatrices[2];            
-            ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eye,
-                                          RState.EyeRenderPoses[eye], timeWarpMatrices);
+            Matrix4f startEndMatrices[2];
+            double timewarpIMUTime = 0.;
+            CalculateOrientationTimewarpFromSensors(
+                RenderState->EyeRenderPoses[eyeNum].Orientation,
+                SensorReader, Timing->GetTimewarpTiming()->EyeStartEndTimes[eyeNum],
+                startEndMatrices, timewarpIMUTime);
+            Timing->SetTimewarpIMUTime(timewarpIMUTime);
 
 			//Need to transpose the matrices
-			timeWarpMatrices[0] = Matrix4f(timeWarpMatrices[0]).Transposed();
-			timeWarpMatrices[1] = Matrix4f(timeWarpMatrices[1]).Transposed();
+            startEndMatrices[0].Transpose();
+            startEndMatrices[1].Transpose();
 
             // Feed identity like matrices in until we get proper timewarp calculation going on
-			Device->SetVertexShaderConstantF(4, (float *) &timeWarpMatrices[0],4);
-			Device->SetVertexShaderConstantF(20,(float *) &timeWarpMatrices[1],4);
+            Device->SetVertexShaderConstantF(4, (float *)&startEndMatrices[0], 4);
+            Device->SetVertexShaderConstantF(20, (float *)&startEndMatrices[1], 4);
         }
 		else
 		{
@@ -270,4 +282,5 @@ void DistortionRenderer::RenderBothDistortionMeshes(void)
 	Device->EndScene();
 }
 
-}}}
+
+}}} // namespace OVR::CAPI::D3D9

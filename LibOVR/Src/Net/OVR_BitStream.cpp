@@ -107,6 +107,18 @@ BitStream::BitStream( char* _data, const unsigned int lengthInBytes, bool _copyD
 		data = ( unsigned char* ) _data;
 }
 
+void BitStream::WrapBuffer(unsigned char* _data, const unsigned int lengthInBytes)
+{
+    if (copyData && numberOfBitsAllocated > (BITSTREAM_STACK_ALLOCATION_SIZE << 3))
+        OVR_FREE(data);  // Use realloc and free so we are more efficient than delete and new for resizing
+
+    numberOfBitsUsed = lengthInBytes << 3;
+    readOffset = 0;
+    copyData = false;
+    numberOfBitsAllocated = lengthInBytes << 3;
+    data = (unsigned char*)_data;
+}
+
 // Use this if you pass a pointer copy to the constructor (_copyData==false) and want to overallocate to prevent reallocation
 void BitStream::SetNumberOfBitsAllocated( const BitSize_t lengthInBits )
 {
@@ -183,8 +195,9 @@ void BitStream::Write( BitStream *bitStream, BitSize_t numberOfBits )
 		numberOfBitsUsed+=BYTES_TO_BITS(numBytes);
 	}
 
-	while (numberOfBits-->0 && bitStream->readOffset + 1 <= bitStream->numberOfBitsUsed)
+	while (numberOfBits > 0 && bitStream->readOffset + 1 <= bitStream->numberOfBitsUsed)
 	{
+		--numberOfBits;
 		numberOfBitsMod8 = numberOfBitsUsed & 7;
 		if ( numberOfBitsMod8 == 0 )
 		{
@@ -974,14 +987,8 @@ void BitStream::AssertCopyData( void )
 }
 bool BitStream::IsNetworkOrderInternal(void)
 {
-#if defined(_PS3) || defined(__PS3__) || defined(SN_TARGET_PS3)
-	return true;
-#elif defined(SN_TARGET_PSP2)
-	return false;
-#else
-	static unsigned long htonlValue = htonl(12345);
-	return htonlValue == 12345;
-#endif
+    static unsigned long htonlValue = htonl(12345);
+    return htonlValue == 12345;
 }
 void BitStream::ReverseBytes(unsigned char *inByteArray, unsigned char *inOutByteArray, const unsigned int length)
 {

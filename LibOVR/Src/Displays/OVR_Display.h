@@ -28,19 +28,63 @@ limitations under the License.
 #ifndef OVR_Display_h
 #define OVR_Display_h
 
-#include "../Sensors/OVR_DeviceConstants.h" // Required for HmdTypeEnum
+#include "Sensors/OVR_DeviceConstants.h" // Required for HmdTypeEnum
 
-#include "../Kernel/OVR_Types.h"
-#include "../Kernel/OVR_Atomic.h"
-#include "../Kernel/OVR_RefCount.h"
-#include "../Kernel/OVR_Array.h"
-#include "../Kernel/OVR_String.h"
-#include "../Kernel/OVR_Math.h"
+#include "Kernel/OVR_Types.h"
+#include "Kernel/OVR_Atomic.h"
+#include "Kernel/OVR_RefCount.h"
+#include "Kernel/OVR_Array.h"
+#include "Kernel/OVR_String.h"
+#include "Extras/OVR_Math.h"
+#include <stdint.h> // uint32_t
 
 namespace OVR {
 
 
-class DisplaySearchHandle : virtual public RefCountBaseV<DisplaySearchHandle>
+
+//-------------------------------------------------------------------------------------
+// DisplayEDID
+//
+// Parses binary EDID information for the pieces we need
+struct DisplayEDID
+{
+    char VendorName[4];
+    char MonitorName[14];
+    char SerialNumber[14];
+    uint16_t ModelNumber;
+
+    uint32_t Width;
+    uint32_t Height;
+
+    uint32_t RefreshNumerator;
+    uint32_t RefreshDenominator;
+
+    bool Parse(const unsigned char* edid);
+};
+
+HmdTypeEnum HmdTypeFromModelNumber(int modelNumber);
+
+
+//-------------------------------------------------------------------------------------
+// DisplayDesc
+
+// Display information that is enumerable
+struct DisplayDesc
+{
+    HmdTypeEnum DeviceTypeGuess; // This is a guess about what type of HMD it is connected to
+    char        DisplayID[64];   // This is the device identifier string from MONITORINFO (for app usage)
+    char        ModelName[14];   // This is a "DK2" type string
+    char        EdidSerialNumber[14];
+    Sizei       ResolutionInPixels;
+    Vector2i    DesktopDisplayOffset;
+    int         Rotation;
+};
+
+
+//-----------------------------------------------------------------------------
+// Display Search Handle
+//
+class DisplaySearchHandle
 {
 public:
 	DisplaySearchHandle() {}
@@ -116,7 +160,8 @@ public:
 	// any necessary shimming and function hooks. This should be one
 	// of the very first things your application does when it
 	// initializes LibOVR
-	static bool         Initialize();
+	static bool Initialize();
+    static void Shutdown();
 
 	// Returns a count of the detected displays. These are Rift displays
 	// attached directly to an active display port
@@ -127,16 +172,7 @@ public:
 
     // Returns true if we are referencing the same display; useful for matching display
     // objects with the ones already detected.
-    bool MatchDisplay(const Display* other)
-    {
-		// Note this is not checking the DeviceName, which corresponds to which monitor the device is.
-		// This allows matching to match a display that has changed how it is plugged in.
-		return (DisplayID == other->DisplayID) &&
-               (EdidSerialNumber == other->EdidSerialNumber) &&
-               (NativeResolutionInPixels == other->NativeResolutionInPixels) &&
-               (DesktopDisplayOffset == other->DesktopDisplayOffset) &&
-               (ApplicationExclusive == other->ApplicationExclusive);
-    }
+    bool MatchDisplay(const Display* other);
 
 
 	// ----- Device independent instance based Display functionality -----
@@ -187,8 +223,17 @@ public:
         return false;
     }
 
-    // Check if right now the current rendering application should be in compatibility mode
+    // Check if right now the current rendering application should be in monitor-extended mode.
+    // If displaySearch is true then this function attempts to discover extended mode devices. Otherwise this 
+    // function modifies no data. 
     static bool InCompatibilityMode( bool displaySearch = true );
+
+    // Polls the computer's displays to see if any of them are extended mode Rift devices.
+    static bool ExtendedModeDevicesExist(); 
+
+    // Tracks the initialization state of direct mode.
+    static bool GetDirectDisplayInitialized();
+    static void SetDirectDisplayInitialized(bool initialized);
 
     // Get/set the mode for all applications
     static bool GetDriverMode(bool& driverInstalled, bool& compatMode, bool& hideDK1Mode);

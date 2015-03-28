@@ -27,7 +27,7 @@ limitations under the License.
 #ifndef OVR_Util_LatencyTest2Reader_h
 #define OVR_Util_LatencyTest2Reader_h
 
-#include "../Tracking/Tracking_SensorState.h"
+#include "Vision/SensorFusion/Vision_SensorState.h"
 #include "Util_LatencyTest2State.h"
 
 namespace OVR { namespace Util {
@@ -40,7 +40,7 @@ namespace OVR { namespace Util {
 class RecordStateReader : public NewOverrideBase
 {
 protected:
-    const Tracking::CombinedSharedStateUpdater* Updater;
+    const Vision::CombinedHmdUpdater* Updater;
 
 public:
     RecordStateReader()
@@ -49,7 +49,7 @@ public:
     }
 
     // Initialize the updater
-    void SetUpdater(const Tracking::CombinedSharedStateUpdater *updater)
+    void SetUpdater(const Vision::CombinedHmdUpdater *updater)
     {
         Updater = updater;
     }

@@ -27,7 +27,7 @@ limitations under the License.
 #ifndef OVR_Util_LatencyTest2_State_h
 #define OVR_Util_LatencyTest2_State_h
 
-#include "../Kernel/OVR_Lockless.h"
+#include "Kernel/OVR_Lockless.h"
 
 namespace OVR { namespace Util {
 
@@ -45,10 +45,11 @@ enum LatencyTester2Constants
 // FrameTimeRecord
 
 // Describes frame scan-out time used for latency testing.
-struct FrameTimeRecord
+struct OVR_ALIGNAS(8) FrameTimeRecord
 {
-    int    ReadbackIndex;
-    double TimeSeconds;
+    int32_t ReadbackIndex;
+    int32_t Pad;
+    double  TimeSeconds;
 
     // Utility functions to convert color to readBack indices and back.
     // The purpose of ReadbackIndex is to allow direct comparison by value.
@@ -63,14 +64,15 @@ struct FrameTimeRecord
 
 // FrameTimeRecordSet is a container holding multiple consecutive frame timing records
 // returned from the lock-less state. Used by FrameTimeManager. 
-struct FrameTimeRecordSet
+struct OVR_ALIGNAS(8) FrameTimeRecordSet
 {
     enum {
         RecordCount = 4,
         RecordMask  = RecordCount - 1
     };
     FrameTimeRecord Records[RecordCount];    
-    int             NextWriteIndex;
+    int32_t         NextWriteIndex;
+    int32_t         Pad4;
 
     FrameTimeRecordSet();
 
@@ -87,9 +89,6 @@ struct FrameTimeRecordSet
 
     bool IsAllZeroes() const;
 };
-
-typedef LocklessUpdater<FrameTimeRecordSet, FrameTimeRecordSet> LockessRecordUpdater;
-
 
 }} // namespace OVR::Util
 

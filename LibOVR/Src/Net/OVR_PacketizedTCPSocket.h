@@ -29,8 +29,8 @@ limitations under the License.
 #define OVR_PacketizedTCPSocket_h
 
 #include "OVR_Socket.h"
-#include "../Kernel/OVR_Allocator.h"
-#include "../Kernel/OVR_Atomic.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_Atomic.h"
 
 #ifdef OVR_OS_WIN32
 #include "OVR_Win32_Socket.h"

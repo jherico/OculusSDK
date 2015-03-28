@@ -29,10 +29,11 @@ limitations under the License.
 
 #include "../CAPI_DistortionRenderer.h"
 
-#include "../../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 #include "CAPI_GL_Util.h"
 
 namespace OVR { namespace CAPI { namespace GL {
+
 
 // ***** GL::DistortionRenderer
 
@@ -41,25 +42,20 @@ namespace OVR { namespace CAPI { namespace GL {
 class DistortionRenderer : public CAPI::DistortionRenderer
 {
 public:    
-    DistortionRenderer(ovrHmd hmd,
-                       FrameTimeManager& timeManager,
-                       const HMDRenderState& renderState);
+    DistortionRenderer();
     virtual ~DistortionRenderer();
 
     
     // Creation function for the device.    
-    static CAPI::DistortionRenderer* Create(ovrHmd hmd,
-                                            FrameTimeManager& timeManager,
-                                            const HMDRenderState& renderState);
+    static CAPI::DistortionRenderer* Create();
 
 
     // ***** Public DistortionRenderer interface
-	
-    virtual bool Initialize(const ovrRenderAPIConfig* apiConfig) OVR_OVERRIDE;
 
-    virtual void SubmitEye(int eyeId, const ovrTexture* eyeTexture);
+    virtual void SubmitEye(int eyeId, const ovrTexture* eyeTexture) OVR_OVERRIDE;
+    virtual void SubmitEyeWithDepth(int eyeId, const ovrTexture* eyeColorTexture, const ovrTexture* eyeDepthTexture) OVR_OVERRIDE;
 
-    virtual void EndFrame(bool swapBuffers);
+    virtual void EndFrame(uint32_t frameIndex, bool swapBuffers);
 
     void         WaitUntilGpuIdle();
 
@@ -68,7 +64,6 @@ public:
 	double       FlushGpuAndWaitTillTime(double absTime);
 
 protected:
-
 	struct FOR_EACH_EYE
 	{
         FOR_EACH_EYE() : numVerts(0), numIndices(0), texture(0), /*UVScaleOffset[],*/ TextureSize(0, 0), RenderViewport(0, 0, 0, 0) { }
@@ -90,9 +85,11 @@ protected:
     RenderParams        RParams;
     Context             distortionContext;  // We are currently using this private OpenGL context instead of using the CAPI SaveGraphicsState/RestoreGraphicsState mechanism. To consider: Move this Context into SaveGraphicsState/RestoreGraphicState so there's consistency between DirectX and OpenGL.
 
+    virtual bool initializeRenderer(const ovrRenderAPIConfig* apiConfig) OVR_OVERRIDE;
+
 	// Helpers
     void initOverdrive();
-    void initBuffersAndShaders();
+    bool initBuffersAndShaders();
     void initShaders();
     void initFullscreenQuad();
     void destroy();
@@ -119,8 +116,6 @@ protected:
 
 	Ptr<ShaderSet>      DistortionShader;
 
-    bool                RotateCCW90;
-
     struct StandardUniformData
     {
         Matrix4f  Proj;
@@ -144,6 +139,7 @@ protected:
 	GLint SavedVertexArray;
     GLint SavedBoundFrameBuffer;
 };
+
 
 }}} // OVR::CAPI::GL
 

@@ -27,7 +27,7 @@ limitations under the License.
 #ifndef OVR_CAPI_HSWDisplay_h
 #define OVR_CAPI_HSWDisplay_h
 
-#include "../OVR_CAPI.h"
+#include "OVR_CAPI.h"
 #include "CAPI_HMDRenderState.h"
 #include <time.h>
 
@@ -76,23 +76,6 @@ limitations under the License.
 #endif
 
 
-
-
-//-------------------------------------------------------------------------------------
-// ***** Experimental C API functions
-//
-// These are currently not formally supported and may be promoted to the formal C API
-// or may be removed in the future.
-
-extern "C"
-{
-    // Normally if an application uses SDK-based distortion rendering 
-    // (ovrHmd_BeginFrame / ovrHmd_EndFrame) then the SDK also takes care of 
-    // drawing the health and safety warning. If an application is using 
-    // SDK-based rendering but wants to draw the warning display itself, 
-    // it call this function with enabled set to false.
-    OVR_EXPORT void ovrhmd_EnableHSWDisplaySDKRender(ovrHmd hmd, ovrBool enabled);
-}
 
 
 namespace OVR { namespace CAPI {
@@ -214,7 +197,7 @@ protected:
     void   SetCurrentProfileLastHSWTime(time_t t);
 
     // Generates an appropriate stereo ortho projection matrix.
-    static void GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f OrthoProjection[2]);
+    void GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f OrthoProjection[2]);
 
     // Returns the default HSW display texture data.
     static const uint8_t* GetDefaultTexture(size_t& TextureSize);
