@@ -26,10 +26,7 @@ limitations under the License.
 
 #include "Gamepad.h"
 
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include "Kernel/OVR_Win32_IncludeWindows.h"
 #include <xinput.h>
 
 namespace OVR { namespace OvrPlatform { namespace Win32 {

@@ -60,8 +60,10 @@ GamepadManager::GamepadManager() :
 
             // we don't know why the device was not useable, make sure it gets closed cleanly
             pDevice->Close();
+            delete pDevice;
             pDevice = NULL;
         }
+        globfree(&joystickGlobBuffer);
     }
 }
 
@@ -71,6 +73,7 @@ GamepadManager::~GamepadManager()
     if (pDevice)
     {
         pDevice->Close();
+        delete pDevice;
         pDevice = NULL;
     }
 }

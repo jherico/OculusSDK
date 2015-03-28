@@ -29,7 +29,11 @@ limitations under the License.
 
 #include "Sensors/OVR_DeviceConstants.h"
 #include "Displays/OVR_Display.h"
+#include "Vision/SensorFusion/Vision_SensorStateReader.h"
 #include "OVR_Profile.h"
+#include "OVR_CAPI.h" // ovrDistortionMesh
+#include "OVR_StereoProjection.h"
+
 
 // CAPI Forward declaration.
 typedef struct ovrFovPort_ ovrFovPort;
@@ -38,117 +42,6 @@ typedef struct ovrRecti_ ovrRecti;
 namespace OVR {
 
 class SensorDevice; // Opaque forward declaration
-
-
-//-----------------------------------------------------------------------------------
-// ***** Stereo Enumerations
-
-// StereoEye specifies which eye we are rendering for; it is used to
-// retrieve StereoEyeParams.
-enum StereoEye
-{
-    StereoEye_Center,
-    StereoEye_Left,
-    StereoEye_Right    
-};
-
-
-//-----------------------------------------------------------------------------------
-// ***** FovPort
-
-// FovPort describes Field Of View (FOV) of a viewport.
-// This class has values for up, down, left and right, stored in 
-// tangent of the angle units to simplify calculations.
-//
-// As an example, for a standard 90 degree vertical FOV, we would 
-// have: { UpTan = tan(90 degrees / 2), DownTan = tan(90 degrees / 2) }.
-//
-// CreateFromRadians/Degrees helper functions can be used to
-// access FOV in different units.
-
-struct FovPort
-{
-    float UpTan;
-    float DownTan;
-    float LeftTan;
-    float RightTan;
-
-    FovPort ( float sideTan = 0.0f ) :
-        UpTan(sideTan), DownTan(sideTan), LeftTan(sideTan), RightTan(sideTan) { }
-    FovPort ( float u, float d, float l, float r ) :
-        UpTan(u), DownTan(d), LeftTan(l), RightTan(r) { }
-
-    // C-interop support: FovPort <-> ovrFovPort (implementation in OVR_CAPI.cpp).
-    FovPort(const ovrFovPort& src);
-    operator ovrFovPort () const;
-
-    static FovPort CreateFromRadians(float horizontalFov, float verticalFov)
-    {
-        FovPort result;
-        result.UpTan    = tanf (   verticalFov * 0.5f );
-        result.DownTan  = tanf (   verticalFov * 0.5f );
-        result.LeftTan  = tanf ( horizontalFov * 0.5f );
-        result.RightTan = tanf ( horizontalFov * 0.5f );
-        return result;
-    }
-
-    static FovPort CreateFromDegrees(float horizontalFovDegrees,
-                                     float verticalFovDegrees)
-    {
-        return CreateFromRadians(DegreeToRad(horizontalFovDegrees),
-                                 DegreeToRad(verticalFovDegrees));
-    }
-
-    //  Get Horizontal/Vertical components of Fov in radians.
-    float GetVerticalFovRadians() const     { return atanf(UpTan)    + atanf(DownTan); }
-    float GetHorizontalFovRadians() const   { return atanf(LeftTan)  + atanf(RightTan); }
-    //  Get Horizontal/Vertical components of Fov in degrees.
-    float GetVerticalFovDegrees() const     { return RadToDegree(GetVerticalFovRadians()); }
-    float GetHorizontalFovDegrees() const   { return RadToDegree(GetHorizontalFovRadians()); }
-
-    // Compute maximum tangent value among all four sides.
-    float GetMaxSideTan() const
-    {
-        return Alg::Max(Alg::Max(UpTan, DownTan), Alg::Max(LeftTan, RightTan));
-    }
-
-    // Converts Fov Tan angle units to [-1,1] render target NDC space
-    Vector2f TanAngleToRendertargetNDC(Vector2f const &tanEyeAngle);
-
-
-    // Compute per-channel minimum and maximum of Fov.
-    static FovPort Min(const FovPort& a, const FovPort& b)
-    {   
-        FovPort fov( Alg::Min( a.UpTan   , b.UpTan    ),   
-                     Alg::Min( a.DownTan , b.DownTan  ),
-                     Alg::Min( a.LeftTan , b.LeftTan  ),
-                     Alg::Min( a.RightTan, b.RightTan ) );
-        return fov;
-    }
-
-    static FovPort Max(const FovPort& a, const FovPort& b)
-    {   
-        FovPort fov( Alg::Max( a.UpTan   , b.UpTan    ),   
-                     Alg::Max( a.DownTan , b.DownTan  ),
-                     Alg::Max( a.LeftTan , b.LeftTan  ),
-                     Alg::Max( a.RightTan, b.RightTan ) );
-        return fov;
-    }
-};
-
-
-//-----------------------------------------------------------------------------------
-// ***** ScaleAndOffset
-
-struct ScaleAndOffset2D
-{
-    Vector2f Scale;
-    Vector2f Offset;
-
-    ScaleAndOffset2D(float sx = 0.0f, float sy = 0.0f, float ox = 0.0f, float oy = 0.0f)
-      : Scale(sx, sy), Offset(ox, oy)        
-    { }
-};
 
 
 //-----------------------------------------------------------------------------------
@@ -285,8 +178,8 @@ struct DistortionRenderDesc
 //      Set update mode: Stereo (both sides together), mono (same in both eyes),
 //                       Alternating, Alternating scan-lines.
 
-// Win32 Oculus VR Display Driver Shim Information
-struct Win32ShimInfo
+// Oculus VR Display Driver Shim Information
+struct ExtraMonitorInfo
 {
 	int DeviceNumber;
 	int NativeWidth;
@@ -294,11 +187,11 @@ struct Win32ShimInfo
 	int Rotation;
 	int UseMirroring;
 
-	Win32ShimInfo() :
-		DeviceNumber(-1),
-		NativeWidth(-1),
-		NativeHeight(-1),
-		Rotation(-1),
+	ExtraMonitorInfo() :
+		DeviceNumber(0),
+		NativeWidth(1920),
+		NativeHeight(1080),
+		Rotation(0),
 		UseMirroring(1)
 	{
 	}
@@ -315,6 +208,7 @@ public:
 
 	// Characteristics of the HMD screen and enclosure
 	HmdTypeEnum HmdType;
+    bool        DebugDevice;                    // Indicates if the HMD is a virtual debug device, such as when there is no HMD present.
 	Size<int>   ResolutionInPixels;
 	Size<float> ScreenSizeInMeters;
 	float       ScreenGapSizeInMeters;
@@ -322,7 +216,6 @@ public:
 	float       LensSeparationInMeters;
     Vector2f    PelOffsetR;                     // Offsets from the green pel in pixels (i.e. usual values are 0.5 or 0.333)
     Vector2f    PelOffsetB;
-
 
 	// Timing & shutter data. All values in seconds.
 	struct ShutterInfo
@@ -342,7 +235,7 @@ public:
 	// Windows:
 	// "\\\\.\\DISPLAY3", etc. Can be used in EnumDisplaySettings/CreateDC.
 	String      DisplayDeviceName;
-	Win32ShimInfo ShimInfo;
+	ExtraMonitorInfo ShimInfo;
 
 	// MacOS:
 	int         DisplayId;
@@ -370,6 +263,7 @@ public:
         Manufacturer(),
         Version(0),
 		HmdType(HmdType_None),
+        DebugDevice(false),
 		ResolutionInPixels(0),
 		ScreenSizeInMeters(0.0f),
 		ScreenGapSizeInMeters(0.0f),
@@ -409,6 +303,7 @@ public:
 		Manufacturer = src.Manufacturer;
 		Version = src.Version;
 		HmdType = src.HmdType;
+        DebugDevice = src.DebugDevice;
 		ResolutionInPixels = src.ResolutionInPixels;
 		ScreenSizeInMeters = src.ScreenSizeInMeters;
 		ScreenGapSizeInMeters = src.ScreenGapSizeInMeters;
@@ -475,6 +370,13 @@ struct HmdRenderInfo
     Vector2f    PelOffsetR;                     // Offsets from the green pel in pixels (i.e. usual values are 0.5 or 0.333)
     Vector2f    PelOffsetB;
 
+    // Display is rotated 0/90/180/270 degrees counter-clockwise?
+    int         Rotation;
+
+    // Some displays scan out in different directions, so this flag can be used to change
+    // where we render the latency test pixel.
+    bool        OffsetLatencyTester;
+
     // Characteristics of the lenses.
     float       CenterFromTopInMeters;
     float       LensSeparationInMeters;
@@ -491,7 +393,7 @@ struct HmdRenderInfo
         float               FirstScanlineToLastScanline;     // for global shutter, will be zero.
         float               PixelSettleTime;                 // estimated.
         float               PixelPersistence;                // Full persistence = 1/framerate.
-    }           Shutter;
+    } Shutter;
 
 
     // These are all set from the user's profile.
@@ -520,6 +422,8 @@ struct HmdRenderInfo
         LensSurfaceToMidplateInMeters = 0.0f;
         PelOffsetR = Vector2f ( 0.0f, 0.0f );
         PelOffsetB = Vector2f ( 0.0f, 0.0f );
+        Rotation = 0;
+        OffsetLatencyTester = false;
         Shutter.Type = HmdShutter_LAST;
         Shutter.VsyncToNextVsync = 0.0f;
         Shutter.VsyncToFirstScanline = 0.0f;
@@ -547,6 +451,30 @@ struct HmdRenderInfo
 };
 
 
+//-----------------------------------------------------------------------------
+// ProfileRenderInfo
+//
+// Render-related information from the user profile.
+struct ProfileRenderInfo
+{
+    // Type of eye cup on the headset
+    // ie. "A", "Orange A"
+    String EyeCupType;
+
+    // IPD/2 offset for each eye
+    float Eye2Nose[2];
+
+    // Eye to plate distance for each eye
+    float Eye2Plate[2];
+
+    // Eye relief dial
+    int EyeReliefDial;
+
+
+    ProfileRenderInfo();
+};
+
+
 //-----------------------------------------------------------------------------------
 
 // Stateless computation functions, in somewhat recommended execution order.
@@ -558,12 +486,16 @@ const float OVR_DEFAULT_EXTRA_EYE_ROTATION = 30.0f * MATH_FLOAT_DEGREETORADFACTO
 // Useful for development without an actual HMD attached.
 HMDInfo             CreateDebugHMDInfo(HmdTypeEnum hmdType);
 
+// Fills in a render info object from a user Profile object.
+// It may need to fill in some defaults, so it also takes in the HMD type.
+ProfileRenderInfo   GenerateProfileRenderInfoFromProfile( HMDInfo const& hmdInfo,
+                                                          Profile const* profile );
 
 // profile may be NULL, in which case it uses the hard-coded defaults.
 // distortionType should be left at the default unless you require something specific for your distortion shaders.
 // eyeCupOverride can be EyeCup_LAST, in which case it uses the one in the profile.
 HmdRenderInfo       GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
-                                                       Profile const *profile = NULL,
+                                                       ProfileRenderInfo const& profileRenderInfo,
                                                        DistortionEqnType distortionType = Distortion_CatmullRom10,
                                                        EyeCupType eyeCupOverride = EyeCup_LAST );
 
@@ -593,17 +525,6 @@ Sizei               CalculateIdealPixelSize ( StereoEye eyeType, DistortionRende
                                               FovPort fov, float pixelsPerDisplayPixel );
 
 Recti               GetFramebufferViewport ( StereoEye eyeType, HmdRenderInfo const &hmd );
-
-Matrix4f            CreateProjection ( bool rightHanded, FovPort fov,
-                                       float zNear = 0.01f, float zFar = 10000.0f );
-
-Matrix4f            CreateOrthoSubProjection ( bool rightHanded, StereoEye eyeType,
-                                               float tanHalfFovX, float tanHalfFovY,
-                                               float unitsX, float unitsY, float distanceFromCamera,
-                                               float interpupillaryDistance, Matrix4f const &projection,
-                                               float zNear = 0.0f, float zFar = 0.0f );
-
-ScaleAndOffset2D    CreateNDCScaleAndOffsetFromFov ( FovPort fov );
 
 ScaleAndOffset2D    CreateUVScaleAndOffsetfromNDCScaleandOffset ( ScaleAndOffset2D scaleAndOffsetNDC,
                                                                   Recti renderedViewport,
@@ -675,6 +596,97 @@ inline Vector2f TransformTanFovSpaceToRendertargetNDC ( StereoEyeParams const &e
 {
     return TransformTanFovSpaceToRendertargetNDC ( eyeParams.EyeToSourceNDC, tanEyeAngle );
 }
+
+
+//-----------------------------------------------------------------------------
+// CalculateOrientationTimewarpMatrix
+//
+// For Orientation-only Timewarp, the inputs are quaternions and the output is
+// a transform matrix.  The matrix may need to be transposed depending on which
+// renderer is used.  This function produces one compatible with D3D11.
+//
+// eye: Input quaternion of EyeRenderPose.Orientation inverted.
+// pred: Input quaternion of predicted eye pose at scanout.
+// M: Output D3D11-compatible transform matrix for the Timewarp shader.
+void CalculateOrientationTimewarpMatrix(Quatf const & eye, Quatf const & pred, Matrix4f& M);
+
+//-----------------------------------------------------------------------------
+// CalculatePositionalTimewarpMatrix
+//
+// The matrix may need to be transposed depending on which
+// renderer is used.  This function produces one compatible with D3D11.
+//
+// renderFromEyeInverted: Input render transform from eye inverted.
+// hmdPose: Input predicted head pose from HMD tracking code.
+// extraEyeOffset: Input extra eye position offset applied to calculations.
+// M: Output D3D11-compatible transform matrix for the Timewarp shader.
+void CalculatePositionalTimewarpMatrix(Posef const & renderFromEyeInverted, Posef const & hmdPose,
+                                       Vector3f const & extraEyeOffset, Matrix4f& M);
+
+//-----------------------------------------------------------------------------
+// CalculateTimewarpFromSensors
+//
+// Read current pose from sensors and construct timewarp matrices for start/end
+// predicted poses.
+//
+// hmdPose: RenderPose eye quaternion, *not* inverted.
+// reader: the tracking state
+// poseInFaceSpace: true if the pose supplied is stuck-to-your-face rather than fixed-in-place
+// calcPosition: true if the position part of the result is actually used (false = orientation only)
+// hmdToEyeViewOffset: offset from the HMD "middle eye" to actual eye.
+// startEndTimes: start and end times of the screen - typically fed direct from Timing->GetTimewarpTiming()->EyeStartEndTimes[eyeNum]
+//
+// Results:
+// startEndMatrices: Timewarp matrices for the start and end times respectively.
+// timewarpIMUTime: On success it contains the raw IMU sample time for the pose.
+// Returns false on failure to read state.
+bool CalculateTimewarpFromSensors(Posef const & hmdPose,
+                                  Vision::TrackingStateReader* reader,
+                                  bool poseInFaceSpace,
+                                  bool calcPosition, 
+                                  ovrVector3f const &hmdToEyeViewOffset,
+                                  const double startEndTimes[2],
+                                  Matrix4f startEndMatrices[2],
+                                  double& timewarpIMUTime);
+
+// Orientation-only version.
+bool CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
+                                             Vision::TrackingStateReader* reader,
+                                             const double startEndTimes[2], Matrix4f startEndMatrices[2],
+                                             double& timewarpIMUTime);
+
+//-----------------------------------------------------------------------------
+// CalculateEyeTimewarpTimes
+//
+// Given the scanout start time, duration of scanout, and shutter type, this
+// function returns the timewarp left/right eye start and end prediction times.
+void CalculateEyeTimewarpTimes(double scanoutStartTime, double scanoutDuration,
+                               HmdShutterTypeEnum shutterType,
+                               double leftEyeStartEndTime[2], double rightEyeStartEndTime[2]);
+
+//-----------------------------------------------------------------------------
+// CalculateEyeRenderTimes
+//
+// Given the scanout start time, duration of scanout, and shutter type, this
+// function returns the left/right eye render times.
+void CalculateEyeRenderTimes(double scanoutStartTime, double scanoutDuration,
+                             HmdShutterTypeEnum shutterType,
+                             double& leftEyeRenderTime, double& rightEyeRenderTime);
+
+
+//-----------------------------------------------------------------------------
+// CalculateDistortionMeshFromFOV
+//
+// This function fills in the target meshData object given the provided
+// parameters, for a single specified eye.
+//
+// Returns false on failure.
+bool CalculateDistortionMeshFromFOV(HmdRenderInfo const & renderInfo,
+                                    DistortionRenderDesc const & distortionDesc,
+                                    StereoEye stereoEye, FovPort fov,
+                                    unsigned distortionCaps,
+                                    ovrDistortionMesh *meshData);
+
 
 } //namespace OVR
 

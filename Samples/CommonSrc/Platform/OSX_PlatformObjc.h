@@ -29,6 +29,11 @@ limitations under the License.
 #import <CoreGraphics/CGDirectDisplay.h>
 
 @interface OVRApp : NSApplication
+{
+    NSWindow* _win;
+    OVR::OvrPlatform::OSX::PlatformCore* _Platform;
+    OVR::OvrPlatform::Application* _App;
+};
 
 @property (assign) IBOutlet NSWindow* win;
 @property (assign) OVR::OvrPlatform::OSX::PlatformCore* Platform;
@@ -39,6 +44,11 @@ limitations under the License.
 @end
 
 @interface OVRView : NSOpenGLView <NSWindowDelegate>
+{
+    OVR::OvrPlatform::OSX::PlatformCore* _Platform;
+    OVR::OvrPlatform::Application* _App;
+    unsigned long _Modifiers;
+}
 
 @property (assign) OVR::OvrPlatform::OSX::PlatformCore* Platform;
 @property (assign) OVR::OvrPlatform::Application* App;

@@ -27,8 +27,8 @@ limitations under the License.
 #ifndef OVR_Linux_SDKWindow_h
 #define OVR_Linux_SDKWindow_h
 
-#include "../OVR_CAPI.h"
-#include "../CAPI/GL/CAPI_GL_Util.h"
+#include "OVR_CAPI.h"
+#include "CAPI/GL/CAPI_GL_Util.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>

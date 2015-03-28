@@ -95,11 +95,19 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 		if (textureName[dotpos + 1] == 'd' || textureName[dotpos + 1] == 'D')
 		{
 			// DDS file
-			texture.SetPtr(*LoadTextureDDS(pRender, pFile));
+			Texture* tmp_ptr = LoadTextureDDS(pRender, pFile);
+			if(tmp_ptr)
+			{
+				texture.SetPtr(*tmp_ptr);
+			}
 		}
 		else
 		{
-			texture.SetPtr(*LoadTextureTga(pRender, pFile));
+			Texture* tmp_ptr = LoadTextureTga(pRender, pFile);
+			if(tmp_ptr)
+			{
+				texture.SetPtr(*tmp_ptr);
+			}
 		}
 
         Textures.PushBack(texture);
@@ -309,28 +317,29 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         OVR_ASSERT(pXmlCollisionModel != NULL); // collisionModelCount should guarantee this.
         if (pXmlCollisionModel)
         {
-            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
+        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
 
-            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-            for(int j = 0; j < planeCount; ++j)
-            {
-                Vector3f norm;
-                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
-                float D;
-                pXmlPlane->QueryFloatAttribute("d", &D);
-                D -= 0.5f;
-                if (i == 26)
-                    D += 0.5f;  // tighten the terrace collision so player can move right up to rail
-                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-                cm->Add(p);
-                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-            }
-
-            pCollisions->PushBack(cm);
-            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+        for(int j = 0; j < planeCount; ++j)
+        {
+            Vector3f norm;
+            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+            float D;
+            pXmlPlane->QueryFloatAttribute("d", &D);
+            D -= 0.5f;
+            if (i == 26)
+                D += 0.5f;  // tighten the terrace collision so player can move right up to rail
+            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+            cm->Add(p);
+            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
         }
+
+        if (pCollisions)
+        pCollisions->PushBack(cm);
+        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+    }
     }
 	OVR_DEBUG_LOG(("done."));
 
@@ -343,30 +352,31 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 		pXmlCollisionModel->QueryIntAttribute("count", &groundCollisionModelCount);
         pXmlCollisionModel = pXmlCollisionModel->FirstChildElement("collisionModel");
 
-        pXmlPlane = NULL;
-        for (int i = 0; i < groundCollisionModelCount; ++i)
+    pXmlPlane = NULL;
+    for(int i = 0; i < groundCollisionModelCount; ++i)
+    {
+        Ptr<CollisionModel> cm = *new CollisionModel();
+        int planeCount = 0;
+        pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
+
+        pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
+        for(int j = 0; j < planeCount; ++j)
         {
-            Ptr<CollisionModel> cm = *new CollisionModel();
-            int planeCount = 0;
-            pXmlCollisionModel->QueryIntAttribute("planeCount", &planeCount);
-
-            pXmlPlane = pXmlCollisionModel->FirstChildElement("plane");
-            for (int j = 0; j < planeCount; ++j)
-            {
-                Vector3f norm;
-                pXmlPlane->QueryFloatAttribute("nx", &norm.x);
-                pXmlPlane->QueryFloatAttribute("ny", &norm.y);
-                pXmlPlane->QueryFloatAttribute("nz", &norm.z);
+            Vector3f norm;
+            pXmlPlane->QueryFloatAttribute("nx", &norm.x);
+            pXmlPlane->QueryFloatAttribute("ny", &norm.y);
+            pXmlPlane->QueryFloatAttribute("nz", &norm.z);
                 float D = 0.f;
-                pXmlPlane->QueryFloatAttribute("d", &D);
-                Planef p(norm.z, norm.y, norm.x * -1.0f, D);
-                cm->Add(p);
-                pXmlPlane = pXmlPlane->NextSiblingElement("plane");
-            }
-
-            pGroundCollisions->PushBack(cm);
-            pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+            pXmlPlane->QueryFloatAttribute("d", &D);
+            Planef p(norm.z, norm.y, norm.x * -1.0f, D);
+            cm->Add(p);
+            pXmlPlane = pXmlPlane->NextSiblingElement("plane");
         }
+
+        if (pGroundCollisions)
+        pGroundCollisions->PushBack(cm);
+        pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
+    }
     }
 	OVR_DEBUG_LOG(("done."));
 	return true;

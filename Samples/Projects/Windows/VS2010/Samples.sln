@@ -1,0 +1,62 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVR", "..\..\..\..\LibOVR\Projects\Windows\VS2010\LibOVR.vcxproj", "{EA50E705-5113-49E5-B105-2512EDC8DDC6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusRoomTiny", "..\..\..\OculusRoomTiny\Projects\Windows\VS2010\OculusRoomTiny.vcxproj", "{396D645E-3224-433C-AFBA-6EF6919A2214}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6} = {EA50E705-5113-49E5-B105-2512EDC8DDC6}
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279} = {29FA0962-DDC6-4F72-9D12-E150DF29E279}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusRoomTiny_Advanced", "..\..\..\OculusRoomTiny_Advanced\Projects\Windows\VS2010\OculusRoomTiny_Advanced.vcxproj", "{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6} = {EA50E705-5113-49E5-B105-2512EDC8DDC6}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVRKernel", "..\..\..\..\LibOVRKernel\Projects\Windows\VS2010\LibOVRKernel.vcxproj", "{29FA0962-DDC6-4F72-9D12-E150DF29E279}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Debug|Win32.Build.0 = Debug|Win32
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Debug|x64.ActiveCfg = Debug|x64
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Debug|x64.Build.0 = Debug|x64
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Release|Win32.ActiveCfg = Release|Win32
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Release|Win32.Build.0 = Release|Win32
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Release|x64.ActiveCfg = Release|x64
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6}.Release|x64.Build.0 = Release|x64
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Debug|Win32.ActiveCfg = Debug|Win32
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Debug|Win32.Build.0 = Debug|Win32
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Debug|x64.ActiveCfg = Debug|x64
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Debug|x64.Build.0 = Debug|x64
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Release|Win32.ActiveCfg = Release|Win32
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Release|Win32.Build.0 = Release|Win32
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Release|x64.ActiveCfg = Release|x64
+		{396D645E-3224-433C-AFBA-6EF6919A2214}.Release|x64.Build.0 = Release|x64
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Debug|Win32.Build.0 = Debug|Win32
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Debug|x64.ActiveCfg = Debug|x64
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Debug|x64.Build.0 = Debug|x64
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Release|Win32.ActiveCfg = Release|Win32
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Release|Win32.Build.0 = Release|Win32
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Release|x64.ActiveCfg = Release|x64
+		{BEEB92C6-80B7-460F-826A-DD6273DC2ECF}.Release|x64.Build.0 = Release|x64
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Debug|Win32.ActiveCfg = Debug|Win32
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Debug|Win32.Build.0 = Debug|Win32
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Debug|x64.ActiveCfg = Debug|x64
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Debug|x64.Build.0 = Debug|x64
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Release|Win32.ActiveCfg = Release|Win32
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Release|Win32.Build.0 = Release|Win32
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Release|x64.ActiveCfg = Release|x64
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

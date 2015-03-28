@@ -1,0 +1,456 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Include\Extras\OVR_Math.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_0_5_0.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_D3D.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_GL.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Keys.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Util.h" />
+    <ClInclude Include="..\..\..\Include\OVR_Version.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_DistortionTiming.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_FrameLatencyTracker.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_FrameTimeManager3.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDState.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_Util.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Display.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_Display.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_Dxgi_Display.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_FocusReader.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_ShimFunctions.h" />
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_ShimVersion.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_BitStream.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_NetworkPlugin.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_NetworkTypes.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_PacketizedTCPSocket.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_RPC1.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_Session.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_Socket.h" />
+    <ClInclude Include="..\..\..\Src\Net\OVR_Win32_Socket.h" />
+    <ClInclude Include="..\..\..\Src\OVR_Profile.h" />
+    <ClInclude Include="..\..\..\Src\OVR_SerialFormat.h" />
+    <ClInclude Include="..\..\..\Src\OVR_Stereo.h" />
+    <ClInclude Include="..\..\..\Src\OVR_StereoProjection.h" />
+    <ClInclude Include="..\..\..\Src\Service\Service_NetClient.h" />
+    <ClInclude Include="..\..\..\Src\Service\Service_NetSessionCommon.h" />
+    <ClInclude Include="..\..\..\Src\Tracing\ETW_Tracing.h" />
+    <ClInclude Include="..\..\..\Src\Tracing\Tracing.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_Interface.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h" />
+    <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h" />
+    <ClInclude Include="..\..\..\Src\Vision\SensorFusion\Vision_SensorStateReader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionTiming.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_FrameLatencyTracker.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_FrameTimeManager3.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDState.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Display.cpp" />
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_Display.cpp" />
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_FocusReader.cpp" />
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_RenderShim.cpp" />
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_ShimFunctions.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_BitStream.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_NetworkPlugin.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_PacketizedTCPSocket.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_RPC1.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_Session.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_Socket.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_Win32_Socket.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_CAPI.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_CAPI_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Profile.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_SerialFormat.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Stereo.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.cpp" />
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_StereoProjection.cpp" />
+    <ClCompile Include="..\..\..\Src\Service\Service_NetClient.cpp" />
+    <ClCompile Include="..\..\..\Src\Service\Service_NetSessionCommon.cpp" />
+    <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp" />
+    <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp" />
+    <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp" />
+    <ClCompile Include="..\..\..\Src\Vision\SensorFusion\Vision_SensorStateReader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_ps.psh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarpChroma_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_ps.psh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_ps.psh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_ps.psh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genPixelShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_vs.vsh">
+      <FileType>Document</FileType>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genVertexShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionCS2x2.csh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(RelativeDir)%(Filename).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">call %(RelativeDir)genComputeShaderHeader.bat %(Filename) "%(Fullpath)"</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(RelativeDir)%(Filename).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\Src\Resources\Windows\LibOVR.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\Src\Tracing\ETW_Tracing.man" />
+    <None Include="..\..\..\Src\Tracing\README.md" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{934B40C7-F40A-4E4C-97A7-B9659BE0A441}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>LibOVRRT</RootNamespace>
+    <ProjectName>LibOVRRT</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\LibOVR.props" />
+    <Import Project="..\OVRRootPath.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\LibOVR.props" />
+    <Import Project="..\OVRRootPath.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\LibOVR.props" />
+    <Import Project="..\OVRRootPath.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\LibOVR.props" />
+    <Import Project="..\OVRRootPath.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>../../../Lib/Windows/$(Platform)/$(Configuration)/VS2013/</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>../../../Lib/Windows/$(Platform)/$(Configuration)/VS2013/</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IntDir>../../../Obj/Windows/$(Platform)/$(Configuration)/VS2013/</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>../../../Obj/Windows/$(Platform)/$(Configuration)/VS2013/</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <TargetName>LibOVRRT32_$(OVR_PRODUCT_VERSION)_$(OVR_MAJOR_VERSION)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>LibOVRRT64_$(OVR_PRODUCT_VERSION)_$(OVR_MAJOR_VERSION)</TargetName>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>../../../Lib/Windows/$(Platform)/$(Configuration)/VS2013/</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>../../../Lib/Windows/$(Platform)/$(Configuration)/VS2013/</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IntDir>../../../Obj/Windows/$(Platform)/$(Configuration)/VS2013/</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>../../../Obj/Windows/$(Platform)/$(Configuration)/VS2013/</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <TargetName>LibOVRRT32_$(OVR_PRODUCT_VERSION)_$(OVR_MAJOR_VERSION)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>LibOVRRT64_$(OVR_PRODUCT_VERSION)_$(OVR_MAJOR_VERSION)</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>OVR_BUILD_DEBUG;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions);OVR_DLL_BUILD</PreprocessorDefinitions>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>false</MinimalRebuild>
+      <OmitDefaultLibName>false</OmitDefaultLibName>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);../../../Include;../../../Src;../../../../LibOVRKernel/Src/Kernel;../../../../LibOVRKernel/Src</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalOptions>/d2Zi+ /we4263 /we4264 /we4265 /we4266 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>LibOVRKernel.lib;kernel32.lib;ws2_32.lib;Dbghelp.lib;user32.lib;gdi32.lib;uuid.lib;dxgi.lib;d3d11.lib;d3dcompiler.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../../../../LibOVRKernel/Lib/Windows/$(Platform)/$(Configuration)/VS2013</AdditionalLibraryDirectories>
+      <DelayLoadDLLs>OpenGL32.dll;DbgHelp.dll;gdi32.dll</DelayLoadDLLs>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>Setupapi.lib</AdditionalDependencies>
+    </Lib>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>OVR_BUILD_DEBUG;_WIN64;_DEBUG;_LIB;%(PreprocessorDefinitions);OVR_DLL_BUILD</PreprocessorDefinitions>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>false</MinimalRebuild>
+      <OmitDefaultLibName>false</OmitDefaultLibName>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);../../../Include;../../../Src;../../../../LibOVRKernel/Src/Kernel;../../../../LibOVRKernel/Src</AdditionalIncludeDirectories>
+      <OmitFramePointers>false</OmitFramePointers>
+      <EnablePREfast>false</EnablePREfast>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalOptions>/d2Zi+ /we4263 /we4264 /we4265 /we4266 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>LibOVRKernel.lib;kernel32.lib;ws2_32.lib;Dbghelp.lib;user32.lib;gdi32.lib;uuid.lib;dxgi.lib;d3d11.lib;d3dcompiler.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../../../../LibOVRKernel/Lib/Windows/$(Platform)/$(Configuration)/VS2013</AdditionalLibraryDirectories>
+      <DelayLoadDLLs>OpenGL32.dll;DbgHelp.dll;gdi32.dll</DelayLoadDLLs>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>Setupapi.lib</AdditionalDependencies>
+    </Lib>
+    <ResourceCompile>
+      <PreprocessorDefinitions>_DEBUG;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions);OVR_DLL_BUILD</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <OmitDefaultLibName>false</OmitDefaultLibName>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);../../../Include;../../../Src;../../../../LibOVRKernel/Src/Kernel;../../../../LibOVRKernel/Src</AdditionalIncludeDirectories>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <AdditionalOptions>/d2Zi+ /we4263 /we4264 /we4265 /we4266 %(AdditionalOptions)</AdditionalOptions>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <StringPooling>false</StringPooling>
+      <ExceptionHandling>false</ExceptionHandling>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <TreatWarningAsError>true</TreatWarningAsError>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>LibOVRKernel.lib;kernel32.lib;ws2_32.lib;Dbghelp.lib;user32.lib;gdi32.lib;uuid.lib;dxgi.lib;d3d11.lib;d3dcompiler.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../../../../LibOVRKernel/Lib/Windows/$(Platform)/$(Configuration)/VS2013</AdditionalLibraryDirectories>
+      <DelayLoadDLLs>OpenGL32.dll;DbgHelp.dll;gdi32.dll</DelayLoadDLLs>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>Setupapi.lib</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WIN64;NDEBUG;_LIB;%(PreprocessorDefinitions);OVR_DLL_BUILD</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <OmitDefaultLibName>false</OmitDefaultLibName>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);../../../Include;../../../Src;../../../../LibOVRKernel/Src/Kernel;../../../../LibOVRKernel/Src</AdditionalIncludeDirectories>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalOptions>/d2Zi+ /we4263 /we4264 /we4265 /we4266 %(AdditionalOptions)</AdditionalOptions>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <StringPooling>false</StringPooling>
+      <ExceptionHandling>false</ExceptionHandling>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <TreatWarningAsError>true</TreatWarningAsError>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>LibOVRKernel.lib;kernel32.lib;ws2_32.lib;Dbghelp.lib;user32.lib;gdi32.lib;uuid.lib;dxgi.lib;d3d11.lib;d3dcompiler.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>../../../../LibOVRKernel/Lib/Windows/$(Platform)/$(Configuration)/VS2013</AdditionalLibraryDirectories>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <DelayLoadDLLs>OpenGL32.dll;DbgHelp.dll;gdi32.dll</DelayLoadDLLs>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>Setupapi.lib</AdditionalDependencies>
+    </Lib>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

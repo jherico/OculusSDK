@@ -28,12 +28,10 @@ limitations under the License.
 
 #include "CAPI_GL_DistortionShaders.h"
 
-#include "../../OVR_CAPI_GL.h"
-#include "../../Kernel/OVR_Color.h"
+#include "OVR_CAPI_GL.h"
+#include "Kernel/OVR_Color.h"
 
-#if defined(OVR_OS_LINUX)
-    #include "../../Displays/OVR_Linux_SDKWindow.h"
-#elif defined(OVR_OS_MAC)
+#if defined(OVR_OS_MAC)
     #include <CoreGraphics/CGDirectDisplay.h>
     #include <OpenGL/OpenGL.h>
 #endif
@@ -42,13 +40,13 @@ namespace OVR { namespace CAPI { namespace GL {
 
 
 // Distortion pixel shader lookup.
-//  Bit 0: Chroma Correction
-//  Bit 1: Timewarp
+//  Bit 0: Orientation Timewarp
+//  Bit 1: Depth-based Timewarp
 
 enum {
     DistortionVertexShaderBitMask = 3,
     DistortionVertexShaderCount   = DistortionVertexShaderBitMask + 1,
-    DistortionPixelShaderBitMask  = 1,
+    DistortionPixelShaderBitMask  = 0,
     DistortionPixelShaderCount    = DistortionPixelShaderBitMask + 1
 };
 
@@ -67,21 +65,19 @@ struct ShaderInfo
 
 static ShaderInfo DistortionVertexShaderLookup[DistortionVertexShaderCount] =
 {
-    SI_REFL__(Distortion_vs),
     SI_REFL__(DistortionChroma_vs),
-    SI_REFL__(DistortionTimewarp_vs),
-    SI_REFL__(DistortionTimewarpChroma_vs)
+    { NULL, 0, NULL, 0 },
+    SI_REFL__(DistortionTimewarpChroma_vs),
+    { NULL, 0, NULL, 0 },
 };
 
 static ShaderInfo DistortionPixelShaderLookup[DistortionPixelShaderCount] =
 {
-    SI_NOREFL(Distortion_fs),
     SI_NOREFL(DistortionChroma_fs)
 };
 
 void DistortionShaderBitIndexCheck()
 {
-    OVR_COMPILER_ASSERT(ovrDistortionCap_Chromatic == 1);
     OVR_COMPILER_ASSERT(ovrDistortionCap_TimeWarp  == 2);
 }
 
@@ -109,12 +105,9 @@ struct LatencyVertex
 //----------------------------------------------------------------------------
 // ***** GL::DistortionRenderer
 
-DistortionRenderer::DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager,
-                                       const HMDRenderState& renderState)
-    : CAPI::DistortionRenderer(ovrRenderAPI_OpenGL, hmd, timeManager, renderState)
-    , RotateCCW90(false)
-	, LatencyVAO(0)
-    , OverdriveFbo(0)
+DistortionRenderer::DistortionRenderer() :
+    LatencyVAO(0),
+    OverdriveFbo(0)
 {
 	DistortionMeshVAOs[0] = 0;
 	DistortionMeshVAOs[1] = 0;
@@ -129,17 +122,15 @@ DistortionRenderer::~DistortionRenderer()
 }
 
 // static
-CAPI::DistortionRenderer* DistortionRenderer::Create(ovrHmd hmd,
-                                                     FrameTimeManager& timeManager,
-                                                     const HMDRenderState& renderState)
+CAPI::DistortionRenderer* DistortionRenderer::Create()
 {
     InitGLExtensions();
 
-    return new DistortionRenderer(hmd, timeManager, renderState);
+    return new DistortionRenderer;
 }
 
 
-bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
+bool DistortionRenderer::initializeRenderer(const ovrRenderAPIConfig* apiConfig)
 {
     const ovrGLConfig* config = (const ovrGLConfig*)apiConfig;
 
@@ -158,12 +149,6 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 	RParams.Window      = (config->OGL.Window) ? config->OGL.Window : GetActiveWindow();
     RParams.DC          = config->OGL.DC;
 #elif defined(OVR_OS_LINUX)
-    RotateCCW90 = false;
-    if (   RState.DistortionCaps & ovrDistortionCap_LinuxDevFullscreen
-        && SDKWindow::getRotation(HMD) == DistRotateCCW90)
-    {
-        RotateCCW90 = true;
-    }
     if (config->OGL.Disp)
     {
         RParams.Disp = config->OGL.Disp;
@@ -189,7 +174,10 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
     pEyeTextures[0] = *new Texture(&RParams, 0, 0);
     pEyeTextures[1] = *new Texture(&RParams, 0, 0);
 
-    initBuffersAndShaders();
+    if (!initBuffersAndShaders())
+    {
+        return false;
+    }
 
     initOverdrive();
 
@@ -199,13 +187,13 @@ bool DistortionRenderer::Initialize(const ovrRenderAPIConfig* apiConfig)
 
 void DistortionRenderer::initOverdrive()
 {
-	if(RState.DistortionCaps & ovrDistortionCap_Overdrive)
+	if(RenderState->DistortionCaps & ovrDistortionCap_Overdrive)
 	{
 		LastUsedOverdriveTextureIndex = 0;
         
         glGenFramebuffers(1, &OverdriveFbo);
         
-        GLint internalFormat = (RState.DistortionCaps & ovrDistortionCap_SRGB) ? GL_SRGB_ALPHA : GL_RGBA;
+        GLint internalFormat = (RenderState->DistortionCaps & ovrDistortionCap_SRGB) ? GL_SRGB_ALPHA : GL_RGBA;
         
 		for (int i = 0; i < NumOverdriveTextures ; i++)
 		{
@@ -264,11 +252,11 @@ void DistortionRenderer::initOverdrive()
 
 void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
 {
-    // Doesn't do a lot in here??
-	const ovrGLTexture* tex = (const ovrGLTexture*)eyeTexture;
-
-	if (tex)
+	if (eyeTexture)
 	{
+        // Doesn't do a lot in here??
+        const ovrGLTexture* tex = (const ovrGLTexture*)eyeTexture;
+
         // Write in values
         eachEye[eyeId].texture = tex->OGL.TexId;
 
@@ -277,13 +265,16 @@ void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
         eachEye[eyeId].TextureSize    = tex->OGL.Header.TextureSize;
         eachEye[eyeId].RenderViewport = tex->OGL.Header.RenderViewport;
 
-        const ovrEyeRenderDesc& erd = RState.EyeRenderDesc[eyeId];
+        const ovrEyeRenderDesc& erd = RenderState->EyeRenderDesc[eyeId];
     
+        // Modify viewport offset since OpenGL uses bottom left as the origin
+        eachEye[eyeId].RenderViewport.y = eachEye[eyeId].TextureSize.h - eachEye[eyeId].RenderViewport.h - eachEye[eyeId].RenderViewport.y;
+
         ovrHmd_GetRenderScaleAndOffset( erd.Fov,
                                         eachEye[eyeId].TextureSize, eachEye[eyeId].RenderViewport,
                                         eachEye[eyeId].UVScaleOffset );
 
-		if (!(RState.DistortionCaps & ovrDistortionCap_FlipInput))
+		if (!(RenderState->DistortionCaps & ovrDistortionCap_FlipInput))
 		{
 			eachEye[eyeId].UVScaleOffset[0].y = -eachEye[eyeId].UVScaleOffset[0].y;
 			eachEye[eyeId].UVScaleOffset[1].y = 1.0f - eachEye[eyeId].UVScaleOffset[1].y;
@@ -292,6 +283,13 @@ void DistortionRenderer::SubmitEye(int eyeId, const ovrTexture* eyeTexture)
         pEyeTextures[eyeId]->UpdatePlaceholderTexture(tex->OGL.TexId,
                                                       tex->OGL.Header.TextureSize);
 	}
+}
+
+void DistortionRenderer::SubmitEyeWithDepth(int eyeId, const ovrTexture* eyeColorTexture, const ovrTexture* eyeDepthTexture)
+{
+    SubmitEye(eyeId, eyeColorTexture);
+
+    OVR_UNUSED(eyeDepthTexture);
 }
 
 void DistortionRenderer::renderEndFrame()
@@ -308,8 +306,11 @@ void DistortionRenderer::renderEndFrame()
     }
 }
 
-void DistortionRenderer::EndFrame(bool swapBuffers)
+void DistortionRenderer::EndFrame(uint32_t frameIndex, bool swapBuffers)
 {
+    // OGL does not support frame timing statistics.
+    Timing->CalculateTimewarpTiming(frameIndex);
+
     Context currContext;
     currContext.InitFromCurrent();
 #if defined(OVR_OS_MAC)
@@ -317,13 +318,14 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
 #endif
 
     // Don't spin if we are explicitly asked not to
-    if ((RState.DistortionCaps & ovrDistortionCap_TimeWarp) &&
-        !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+    if ( (RenderState->DistortionCaps & ovrDistortionCap_TimeWarp) &&
+         (RenderState->DistortionCaps & ovrDistortionCap_TimewarpJitDelay) &&
+        !(RenderState->DistortionCaps & ovrDistortionCap_ProfileNoSpinWaits))
     {
-        if (!TimeManager.NeedDistortionTimeMeasurement())
+        if (!Timing->NeedDistortionTimeMeasurement())
         {
             // Wait for timewarp distortion if it is time and Gpu idle
-            FlushGpuAndWaitTillTime(TimeManager.GetFrameTiming().TimewarpPointTime);
+            FlushGpuAndWaitTillTime(Timing->GetTimewarpTiming()->JIT_TimewarpTime);
 
             distortionContext.Bind();
             renderEndFrame();
@@ -339,7 +341,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
             renderEndFrame();
 
             WaitUntilGpuIdle();
-            TimeManager.AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
+            Timing->AddDistortionTimeMeasurement(ovr_GetTimeInSeconds() - distortionStartTime);
         }
     }
     else
@@ -355,7 +357,7 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
 
     if (swapBuffers)
     {
-		bool useVsync = ((RState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
+		bool useVsync = ((RenderState->EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
         int ourSwapInterval = (useVsync) ? 1 : 0;
         int originalSwapInterval;
         
@@ -412,10 +414,12 @@ void DistortionRenderer::EndFrame(bool swapBuffers)
         // below completing after the vsync.
         // With the display driver (direct mode) this flush is obsolete and theoretically
         // should be a no-op and so doesn't need to be done if running in direct mode.
-        if (RState.OurHMDInfo.InCompatibilityMode &&
-            !(RState.DistortionCaps & ovrDistortionCap_ProfileNoTimewarpSpinWaits))
+        if (RenderState->OurHMDInfo.InCompatibilityMode &&
+            !(RenderState->DistortionCaps & ovrDistortionCap_ProfileNoSpinWaits))
+        {
             WaitUntilGpuIdle();
-        
+        }
+
         // Restore the original swap interval if we changed it above.
         if (originalSwapInterval != ourSwapInterval)
         {
@@ -454,21 +458,22 @@ double DistortionRenderer::FlushGpuAndWaitTillTime(double absTime)
     return WaitTillTime(absTime);
 }
 
-void DistortionRenderer::initBuffersAndShaders()
+bool DistortionRenderer::initBuffersAndShaders()
 {
     for ( int eyeNum = 0; eyeNum < 2; eyeNum++ )
     {
         // Allocate & generate distortion mesh vertices.
         ovrDistortionMesh meshData;
 
-        if (!ovrHmd_CreateDistortionMesh( HMD,
-                                          RState.EyeRenderDesc[eyeNum].Eye,
-                                          RState.EyeRenderDesc[eyeNum].Fov,
-                                          RState.DistortionCaps,
-                                          &meshData) )
+        if (!CalculateDistortionMeshFromFOV(RenderState->RenderInfo,
+                                    RenderState->Distortion[eyeNum],
+                                    (RenderState->EyeRenderDesc[eyeNum].Eye == ovrEye_Left ? StereoEye_Left : StereoEye_Right),
+                                    RenderState->EyeRenderDesc[eyeNum].Fov,
+                                    RenderState->DistortionCaps,
+                                    &meshData))
         {
             OVR_ASSERT(false);
-            continue;
+            return false;
         }
 
         // Now parse the vertex data and create a render ready vertex buffer from it
@@ -481,12 +486,6 @@ void DistortionRenderer::initBuffersAndShaders()
             pCurVBVert->ScreenPosNDC.x = pCurOvrVert->ScreenPosNDC.x;
             pCurVBVert->ScreenPosNDC.y = pCurOvrVert->ScreenPosNDC.y;
 
-            if (RotateCCW90)
-            {
-                OVR::Alg::Swap(pCurVBVert->ScreenPosNDC.x, pCurVBVert->ScreenPosNDC.y);
-                pCurVBVert->ScreenPosNDC.x = -pCurVBVert->ScreenPosNDC.x;
-            }
-
             // Previous code here did this: pCurVBVert->TanEyeAnglesR = (*(Vector2f*)&pCurOvrVert->TanEyeAnglesR); However that's an usafe
             // cast of unrelated types which can result in undefined behavior by a conforming compiler. A safe equivalent is simply memcpy.
             static_assert(sizeof(OVR::Vector2f) == sizeof(ovrVector2f), "Mismatch of structs that are presumed binary equivalents.");
@@ -495,9 +494,9 @@ void DistortionRenderer::initBuffersAndShaders()
             memcpy(&pCurVBVert->TanEyeAnglesB, &pCurOvrVert->TanEyeAnglesB, sizeof(pCurVBVert->TanEyeAnglesB));
 
             // Convert [0.0f,1.0f] to [0,255]
-			if (RState.DistortionCaps & ovrDistortionCap_Vignette)
+			if (RenderState->DistortionCaps & ovrDistortionCap_Vignette)
             {
-                if(RState.DistortionCaps & ovrDistortionCap_SRGB)
+                if(RenderState->DistortionCaps & ovrDistortionCap_SRGB)
                     pCurOvrVert->VignetteFactor = pow(pCurOvrVert->VignetteFactor, 2.1f);
 
                 pCurVBVert->Col.R = (uint8_t)( Alg::Max ( pCurOvrVert->VignetteFactor, 0.0f ) * 255.99f );
@@ -522,6 +521,8 @@ void DistortionRenderer::initBuffersAndShaders()
     }
 
     initShaders();
+
+    return true;
 }
 
 void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* rightEyeTexture)
@@ -551,7 +552,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
 
     setViewport( Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h) );
 
-	if (RState.DistortionCaps & ovrDistortionCap_SRGB)
+	if (RenderState->DistortionCaps & ovrDistortionCap_SRGB)
 		glEnable(GL_FRAMEBUFFER_SRGB);
     else
         glDisable(GL_FRAMEBUFFER_SRGB);
@@ -578,10 +579,10 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
     }
         
 	glClearColor(
-		RState.ClearColor[0],
-		RState.ClearColor[1],
-		RState.ClearColor[2],
-		RState.ClearColor[3] );
+		RenderState->ClearColor[0],
+		RenderState->ClearColor[1],
+		RenderState->ClearColor[2],
+		RenderState->ClearColor[3] );
 
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -598,7 +599,7 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
             float overdriveScaleRegularFall;
             GetOverdriveScales(overdriveScaleRegularRise, overdriveScaleRegularFall);
             DistortionShader->SetUniform3f("OverdriveScales_IsSrgb", overdriveScaleRegularRise, overdriveScaleRegularFall,
-																	(RState.DistortionCaps & ovrDistortionCap_SRGB) ? 1.0f : -1.0f);
+																	(RenderState->DistortionCaps & ovrDistortionCap_SRGB) ? 1.0f : -1.0f);
         }
         else
         {
@@ -607,18 +608,21 @@ void DistortionRenderer::renderDistortion(Texture* leftEyeTexture, Texture* righ
         }
 
 		DistortionShader->SetUniform2f("EyeToSourceUVScale",  eachEye[eyeNum].UVScaleOffset[0].x, eachEye[eyeNum].UVScaleOffset[0].y);
-        // Convert Y to 1-Y as OpenGL is inverse of D3D
-		DistortionShader->SetUniform2f("EyeToSourceUVOffset", eachEye[eyeNum].UVScaleOffset[1].x, 1.0f - eachEye[eyeNum].UVScaleOffset[1].y);
+		DistortionShader->SetUniform2f("EyeToSourceUVOffset", eachEye[eyeNum].UVScaleOffset[1].x, eachEye[eyeNum].UVScaleOffset[1].y);
         
-		if (RState.DistortionCaps & ovrDistortionCap_TimeWarp)
+        if (RenderState->DistortionCaps & ovrDistortionCap_TimeWarp)
 		{                       
-            ovrMatrix4f timeWarpMatrices[2];            
-            ovrHmd_GetEyeTimewarpMatrices(HMD, (ovrEyeType)eyeNum,
-                                          RState.EyeRenderPoses[eyeNum], timeWarpMatrices);
+            Matrix4f startEndMatrices[2];
+            double timewarpIMUTime = 0.;
+            CalculateOrientationTimewarpFromSensors(
+                RenderState->EyeRenderPoses[eyeNum].Orientation,
+                SensorReader, Timing->GetTimewarpTiming()->EyeStartEndTimes[eyeNum],
+                startEndMatrices, timewarpIMUTime);
+            Timing->SetTimewarpIMUTime(timewarpIMUTime);
 
             // Feed identity like matrices in until we get proper timewarp calculation going on
-			DistortionShader->SetUniform4x4f("EyeRotationStart", Matrix4f(timeWarpMatrices[0]).Transposed());
-			DistortionShader->SetUniform4x4f("EyeRotationEnd",   Matrix4f(timeWarpMatrices[1]).Transposed());
+            DistortionShader->SetUniform4x4f("EyeRotationStart", startEndMatrices[0].Transposed());
+            DistortionShader->SetUniform4x4f("EyeRotationEnd", startEndMatrices[1].Transposed());
 
             renderPrimitives(&distortionShaderFill, DistortionMeshVBs[eyeNum], DistortionMeshIBs[eyeNum],
                             0, (int)DistortionMeshIBs[eyeNum]->GetSize()/2, Prim_Triangles, &DistortionMeshVAOs[eyeNum], true);
@@ -698,7 +702,7 @@ void DistortionRenderer::renderLatencyQuad(unsigned char* latencyTesterDrawColor
         createDrawQuad();
     }
        
-    Ptr<ShaderSet> quadShader = (RState.DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
+    Ptr<ShaderSet> quadShader = (RenderState->DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
     ShaderFill quadFill(quadShader);
     //quadFill.SetInputLayout(SimpleQuadVertexIL);
 
@@ -726,7 +730,7 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
         createDrawQuad();
     }
 
-    Ptr<ShaderSet> quadShader = (RState.DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
+    Ptr<ShaderSet> quadShader = (RenderState->DistortionCaps & ovrDistortionCap_SRGB) ? SimpleQuadGammaShader : SimpleQuadShader;
     ShaderFill quadFill(quadShader);
 
     setViewport(Recti(0,0, RParams.BackBufferSize.w, RParams.BackBufferSize.h));
@@ -747,11 +751,28 @@ void DistortionRenderer::renderLatencyPixel(unsigned char* latencyTesterPixelCol
     Vector2f scale(1.0f / RParams.BackBufferSize.w, 1.0f / RParams.BackBufferSize.h); 
 #endif
     quadShader->SetUniform2f("Scale", scale.x, scale.y);
-    if (!RotateCCW90)
-        quadShader->SetUniform2f("PositionOffset", 1.0f-scale.x, 1.0f-scale.y);
-    else
-        quadShader->SetUniform2f("PositionOffset", -(1.0f-scale.x), 1.0f-scale.y);
-	renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
+
+    float xOffset = RenderState->RenderInfo.OffsetLatencyTester ? -0.5f * scale.x : 1.0f - scale.x;
+    float yOffset = 1.0f - scale.y;
+
+    // Render the latency tester quad in the correct location.
+    if (RenderState->RenderInfo.Rotation == 270)
+    {
+        xOffset = -xOffset;
+    }
+    else if (RenderState->RenderInfo.Rotation == 180)
+    {
+        xOffset = -xOffset;
+        yOffset = -yOffset;
+    }
+    else if (RenderState->RenderInfo.Rotation == 90)
+    {
+        yOffset = -yOffset;
+    }
+
+    quadShader->SetUniform2f("PositionOffset", xOffset, yOffset);
+
+    renderPrimitives(&quadFill, LatencyTesterQuadVB, NULL, 0, numQuadVerts, Prim_TriangleStrip, &LatencyVAO, false);
 }
 
 void DistortionRenderer::renderPrimitives(
@@ -866,38 +887,50 @@ void DistortionRenderer::initShaders()
     const char* shaderPrefix = (GLEContext::GetCurrentContext()->WholeVersion >= 302) ? glsl3Prefix : glsl2Prefix;
 
     {
-		ShaderInfo vsInfo = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & RState.DistortionCaps];
+		ShaderInfo vsInfo = DistortionVertexShaderLookup[DistortionVertexShaderBitMask & RenderState->DistortionCaps];
+        if(vsInfo.ShaderData != NULL)
+        {
+            size_t vsSize = strlen(shaderPrefix)+vsInfo.ShaderSize;
+            char* vsSource = new char[vsSize];
+            OVR_strcpy(vsSource, vsSize, shaderPrefix);
+            OVR_strcat(vsSource, vsSize, vsInfo.ShaderData);
 
-		size_t vsSize = strlen(shaderPrefix)+vsInfo.ShaderSize;
-		char* vsSource = new char[vsSize];
-		OVR_strcpy(vsSource, vsSize, shaderPrefix);
-		OVR_strcat(vsSource, vsSize, vsInfo.ShaderData);
+            Ptr<GL::VertexShader> vs = *new GL::VertexShader(
+                &RParams,
+                (void*)vsSource, vsSize,
+                vsInfo.ReflectionData, vsInfo.ReflectionSize);
 
-        Ptr<GL::VertexShader> vs = *new GL::VertexShader(
-            &RParams,
-			(void*)vsSource, vsSize,
-			vsInfo.ReflectionData, vsInfo.ReflectionSize);
+            DistortionShader = *new ShaderSet;
+            DistortionShader->SetShader(vs);
 
-        DistortionShader = *new ShaderSet;
-        DistortionShader->SetShader(vs);
+            delete[](vsSource);
+        }
+        else
+        {
+            OVR_ASSERT_M(false, "Unsupported distortion feature used\n");
+        }
 
-		delete[](vsSource);
+		ShaderInfo psInfo = DistortionPixelShaderLookup[DistortionPixelShaderBitMask & RenderState->DistortionCaps];
+        if(psInfo.ShaderData != NULL)
+        {
+            size_t psSize = strlen(shaderPrefix)+psInfo.ShaderSize;
+            char* psSource = new char[psSize];
+            OVR_strcpy(psSource, psSize, shaderPrefix);
+            OVR_strcat(psSource, psSize, psInfo.ShaderData);
 
-		ShaderInfo psInfo = DistortionPixelShaderLookup[DistortionPixelShaderBitMask & RState.DistortionCaps];
+            Ptr<GL::FragmentShader> ps  = *new GL::FragmentShader(
+                &RParams,
+                (void*)psSource, psSize,
+                psInfo.ReflectionData, psInfo.ReflectionSize);
 
-		size_t psSize = strlen(shaderPrefix)+psInfo.ShaderSize;
-		char* psSource = new char[psSize];
-		OVR_strcpy(psSource, psSize, shaderPrefix);
-		OVR_strcat(psSource, psSize, psInfo.ShaderData);
+            DistortionShader->SetShader(ps);
 
-        Ptr<GL::FragmentShader> ps  = *new GL::FragmentShader(
-            &RParams,
-			(void*)psSource, psSize,
-			psInfo.ReflectionData, psInfo.ReflectionSize);
-
-        DistortionShader->SetShader(ps);
-
-		delete[](psSource);
+            delete[](psSource);
+        }
+        else
+        {
+            OVR_ASSERT_M(false, "Unsupported distortion feature used\n");
+        }
     }
 	{
 		size_t vsSize = strlen(shaderPrefix)+sizeof(SimpleQuad_vs);

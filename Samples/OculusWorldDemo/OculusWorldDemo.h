@@ -4,7 +4,7 @@ Filename    :   OculusWorldDemo.h
 Content     :   First-person view test application for Oculus Rift - Header file
 Created     :   October 4, 2012
 Authors     :   Michael Antonov, Andrew Reisse, Steve LaValle, Dov Katz
-				Peter Hoff, Dan Goodman, Bryan Croteau                
+                Peter Hoff, Dan Goodman, Bryan Croteau                
 
 Copyright   :   Copyright 2012 Oculus VR, LLC. All Rights reserved.
 
@@ -22,10 +22,20 @@ limitations under the License.
 
 *************************************************************************************/
 
-#ifndef INC_OculusWorldDemo_h
-#define INC_OculusWorldDemo_h
+#ifndef OVR_OculusWorldDemo_h
+#define OVR_OculusWorldDemo_h
 
-#include "OVR_Kernel.h"
+#include "Kernel/OVR_Types.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_RefCount.h"
+#include "Kernel/OVR_Log.h"
+#include "Kernel/OVR_System.h"
+#include "Kernel/OVR_Nullptr.h"
+#include "Kernel/OVR_String.h"
+#include "Kernel/OVR_Array.h"
+#include "Kernel/OVR_Timer.h"
+#include "Kernel/OVR_DebugHelp.h"
+#include "Extras/OVR_Math.h"
 
 #include "../CommonSrc/Platform/Platform_Default.h"
 #include "../CommonSrc/Render/Render_Device.h"
@@ -34,22 +44,19 @@ limitations under the License.
 #include "../CommonSrc/Util/OptionMenu.h"
 #include "../CommonSrc/Util/RenderProfiler.h"
 
-#include "Util/Util_Render_Stereo.h"
-using namespace OVR::Util::Render;
-
-#include "Kernel/OVR_DebugHelp.h"
 
 #include "Player.h"
-#include "Sensors/OVR_DeviceConstants.h"
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
 
 #define WORLDDEMO_ASSET_PATH1 "Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH2 "../../../Assets/Tuscany/"
-// This path allows the shortcut to work.
-#define WORLDDEMO_ASSET_PATH3 "Samples/OculusWorldDemo/Assets/Tuscany/"
-#define WORLDDEMO_ASSET_PATH4 "../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH2 "../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH3 "../../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH4 "../../../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH5 "../../../../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH6 "../../../../../Assets/Tuscany/"
+#define WORLDDEMO_ASSET_PATH7 "Samples/OculusWorldDemo/Assets/Tuscany/" // This path allows the shortcut to work.
 
 using namespace OVR;
 using namespace OVR::OvrPlatform;
@@ -95,7 +102,7 @@ using namespace OVR::Render;
 //
 //  - Additional input processing is done in OnMouse, OnKey.
 
-class OculusWorldDemoApp : public Application, public OVR::ExceptionHandler::ExceptionListener
+class OculusWorldDemoApp : public Application
 {
 public:
     OculusWorldDemoApp();
@@ -137,7 +144,6 @@ public:
     bool        FrameNeedsRendering(double curtime);
     void        ApplyDynamicResolutionScaling();
     void        UpdateFrameRateCounter(double curtime);
-    void        UpdateVisionProcessingTime(const ovrTrackingState& trackState);
 
     // Model creation and misc functions.
     Model*      CreateModel(Vector3f pos, struct SlabModel* sm);
@@ -147,9 +153,6 @@ public:
 
     // Processes DeviceNotificationStatus queue to handles plug/unplug.
     void         ProcessDeviceNotificationQueue();
-
-    // ExceptionHandler callback
-    int HandleException(uintptr_t userValue, OVR::ExceptionHandler* pExceptionHandler, OVR::ExceptionInfo* pExceptionInfo, const char* reportFilePath);
 
     // ***** Callbacks for Menu option changes
 
@@ -165,16 +168,18 @@ public:
         ThePlayer.BodyPos.y = ThePlayer.GetScaledEyeHeight();
     }
 
-	void HmdSensorToggle(OptionVar* = 0);
+    void HmdSensorToggle(OptionVar* = 0);
     void HmdSettingChangeFreeRTs(OptionVar* = 0);
     void MultisampleChange(OptionVar* = 0);
     void CenterPupilDepthChange(OptionVar* = 0);
     void DistortionClearColorChange(OptionVar* = 0);
-    void ToggleLogging(OptionVar* = 0);
 
     void ResetHmdPose(OptionVar* = 0);
 
 protected:
+    ExceptionHandler     OVR_ExceptionHandler;
+    GUIExceptionListener OVR_GUIExceptionListener;
+
     RenderDevice*       pRender;
     RendererParams      RenderParams;
     Sizei               WindowSize;
@@ -182,17 +187,13 @@ protected:
     int                 FirstScreenInCycle;
     bool                SupportsSrgb;
     bool                SupportsMultisampling;
-
-    // Last vision processing statistics
-    double              LastVisionProcessingTime;
-    int                 VisionTimesCount;
-    double              VisionProcessingSum;
-    double              VisionProcessingAverage;
-
+    
     struct RenderTarget
     {
-        Ptr<Texture>     pTex;
-        ovrTexture       OvrTex;
+        Ptr<Texture>     pColorTex;
+        Ptr<Texture>     pDepthTex;
+        ovrTexture       OvrColorTex;
+        ovrTexture       OvrDepthTex;
     };
     enum RendertargetsEnum
     {
@@ -213,15 +214,16 @@ protected:
     Matrix4f            OrthoProjection[2];     // Projection for 2D.
     ovrPosef            EyeRenderPose[2];       // Poses we used for rendering.
     ovrTexture          EyeTexture[2];
+    ovrTexture          EyeDepthTexture[2];
     Sizei               EyeRenderSize[2];       // Saved render eye sizes; base for dynamic sizing.
     // Sensor caps applied.
     unsigned            StartTrackingCaps;    
     bool                UsingDebugHmd;
 
     // Frame timing logic.
-    enum { SecondsOfFpsMeasurement = 1 };
+    float               SecondsOfFpsMeasurement;
     int                 FrameCounter;
-	int					TotalFrameCounter;
+    int					TotalFrameCounter;
     float               SecondsPerFrame;
     float               FPS;
     double              LastFpsUpdate;
@@ -247,18 +249,31 @@ protected:
     bool                HaveVisionTracking;
     bool                HavePositionTracker;
     bool                HaveHMDConnected;
+    bool                HaveSync;
+    
+    double              LastSyncTime;
+    unsigned int        LastCameraFrame;
     
     GamepadState        LastGamepadState;
 
     Player				ThePlayer;
-    Matrix4f            View;
+    Matrix4f            ViewFromWorld[2];   // One per eye.
     Scene               MainScene;
     Scene               LoadingScene;
     Scene               SmallGreenCube;
 
-	Scene				OculusCubesScene;
-	Scene               RedCubesScene;
-	Scene				BlueCubesScene;
+    Scene				OculusCubesScene;
+    Scene               RedCubesScene;
+    Scene				BlueCubesScene;
+
+#ifdef DISTORTION_TUNING
+    Scene               DistortTuneScene;
+    Ptr<ShaderFill>     LitSolid;
+    Ptr<ShaderFill>     GridTexture;
+    float               CenterFromTopInMeters;
+    float               SavedCenterFromTopInMeters;
+    float               LensSeparationInMeters;
+#endif
 
     // Last frame asn sensor data reported by BeginFrame().
     ovrFrameTiming      HmdFrameTiming;
@@ -275,8 +290,17 @@ protected:
     // Render Target - affecting state.
     bool                RendertargetIsSharedByBothEyes;
     bool                DynamicRezScalingEnabled;
-	bool                EnableSensor;
-    bool                MonoscopicRender;
+    bool                EnableSensor;
+
+    enum MonoscopicMode
+    {
+        Mono_Off,               // Disabled.
+        Mono_ZeroIpd,           // Set the player's IPD to zero (but still hve head-tracking - WARNING - UNPLEASANT FOR SOME)
+        Mono_ZeroPlayerScale,   // Set the player's scale to zero (removes head-tracking)
+
+        Mono_Count
+    };
+    MonoscopicMode      MonoscopicRenderMode;
     float               PositionTrackingScale;
     bool                ScaleAffectsEyeHeight;
     float               DesiredPixelDensity;    
@@ -284,9 +308,36 @@ protected:
     float               FovSideTanLimit; // Limit value for Fov.
     bool                FadedBorder;
 
+    float               NearClip;
+    float               FarClip;
+    enum DepthMod
+    {
+        NearLessThanFar,
+        FarLessThanNear,
+        FarLessThanNearAndInfiniteFarClip,
+    };
+    DepthMod            DepthModifier;
+
+    enum SceneRenderCountEnum
+    {
+        SceneRenderCount_FixedLow,
+        SceneRenderCount_SineTenSec,
+        SceneRenderCount_SquareTenSec,
+        SceneRenderCount_Spikes,
+
+        SceneRenderCount_LAST
+    } SceneRenderCountType;
+    int32_t             SceneRenderCountLow;
+    int32_t             SceneRenderCountHigh;
+
     // Time-warp.
-    bool                TimewarpEnabled;
-    bool                TimewarpNoJitEnabled;
+    enum TimewarpMode
+    {
+        Timewarp_Off,
+        Timewarp_Orientation,
+    };
+    TimewarpMode        TimewarpOption;
+    bool                TimewarpJitDelayEnabled;
     float               TimewarpRenderIntervalInSeconds;    
     bool                FreezeEyeUpdate;
     bool                FreezeEyeOneFrameRendered;
@@ -305,7 +356,7 @@ protected:
     bool                DynamicPrediction;
     bool                DisplaySleep;
     bool                PositionTrackingEnabled;
-	bool				PixelLuminanceOverdrive;
+    bool				PixelLuminanceOverdrive;
     bool                HqAaDistortion;
     bool                MirrorToWindow;
 
@@ -325,8 +376,9 @@ protected:
     enum SceneRenderMode
     {
         Scene_World,
-		Scene_Cubes,
-		Scene_OculusCubes
+        Scene_Cubes,
+		Scene_OculusCubes,
+        Scene_DistortTune
     };
     SceneRenderMode    SceneMode;
 
@@ -362,19 +414,22 @@ protected:
 
     // Whether we are displaying animated blocks and what type.
     int                 BlocksShowType;
+    float               BlocksSpeed;
     Vector3f            BlocksCenter;
 
 
     // User configurable options, brought up by 'Tab' key.
     // Also handles shortcuts and pop-up overlay messages.
     OptionSelectionMenu Menu;
+    bool                ShortcutChangeMessageEnable;
 
     // Profiler for rendering - displays timing stats.
     RenderProfiler      Profiler;
 
-    OVR::ExceptionHandler ExceptionHandler;
+    // true if logging tracking data to file
+    bool IsVisionLogging;
 };
 
 
 
-#endif // INC_OculusWorldDemo_h
+#endif // OVR_OculusWorldDemo_h

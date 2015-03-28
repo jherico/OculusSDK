@@ -53,6 +53,7 @@ struct DisplayDesc
     Sizei       LogicalResolutionInPixels;
     Sizei       NativeResolutionInPixels;
     Vector2i    DesktopDisplayOffset;
+    int         Rotation;
 };
 
 
@@ -112,8 +113,8 @@ public:
                 dd.NativeResolutionInPixels,
                 dd.DesktopDisplayOffset,
                 0,
-                0,
-				false)
+                dd.Rotation,
+				        false)
     {
     }
 

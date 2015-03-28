@@ -33,23 +33,6 @@ namespace OVR { namespace Linux {
 
 
 //-------------------------------------------------------------------------------------
-// DisplayDesc
-
-// Display information enumerable through OS .
-// TBD: Should we just move this to public header, so it's a const member of Display?
-struct DisplayDesc
-{
-    HmdTypeEnum DeviceTypeGuess;
-    String      DisplayID; // This is the device identifier string from MONITORINFO (for app usage)
-    String      ModelName; // This is a "DK2" type string
-    String      EdidSerialNumber;
-    Sizei       LogicalResolutionInPixels;
-    Sizei       NativeResolutionInPixels;
-    Vector2i    DesktopDisplayOffset;
-};
-
-
-//-------------------------------------------------------------------------------------
 // DisplayEDID
 
 // Describes EDID information as reported from our display driver.
@@ -82,7 +65,7 @@ public:
 
     static const int DescArraySize = 16;
 
-    Linux::DisplayDesc  cachedDescriptorArray[DescArraySize];
+    DisplayDesc         cachedDescriptorArray[DescArraySize];
     bool                extended;
     bool                application;
     int                 extendedDisplayCount;
@@ -102,12 +85,12 @@ public:
                 dd.DisplayID,
                 dd.ModelName,
                 dd.EdidSerialNumber,
-                dd.LogicalResolutionInPixels,
-                dd.NativeResolutionInPixels,
+                dd.ResolutionInPixels,
+                dd.ResolutionInPixels,
                 dd.DesktopDisplayOffset,
                 0,
-                0,
-				false)
+                dd.Rotation,
+                false)
     {
     }
 

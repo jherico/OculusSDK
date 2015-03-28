@@ -28,18 +28,17 @@ limitations under the License.
 #ifndef OVR_Socket_h
 #define OVR_Socket_h
 
-#include "../Kernel/OVR_Types.h"
-#include "../Kernel/OVR_Timer.h"
-#include "../Kernel/OVR_Allocator.h"
-#include "../Kernel/OVR_RefCount.h"
-#include "../Kernel/OVR_String.h"
+#include "Kernel/OVR_Types.h"
+#include "Kernel/OVR_Timer.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_RefCount.h"
+#include "Kernel/OVR_String.h"
 
 // OS-specific socket headers
 #if defined(OVR_OS_WIN32)
 #include <WinSock2.h>
 #include <WS2tcpip.h>
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "Kernel/OVR_Win32_IncludeWindows.h"
 #else
 # include <unistd.h>
 # include <sys/types.h>
@@ -72,7 +71,6 @@ static const int SOCKET_ERROR = -1;
 enum TransportType
 {
 	TransportType_None,          // No transport (useful placeholder for invalid states)
-	TransportType_Loopback,      // Loopback transport: Class talks to itself
 	TransportType_TCP,           // TCP/IPv4/v6
 	TransportType_UDP,           // UDP/IPv4/v6
 	TransportType_PacketizedTCP  // Packetized TCP: Message framing is automatic

@@ -26,7 +26,7 @@ limitations under the License.
 
 #include "OVR_RPC1.h"
 #include "OVR_BitStream.h"
-#include "../Kernel/OVR_Threads.h" // Thread::MSleep
+#include "Kernel/OVR_Threads.h" // Thread::MSleep
 #include "OVR_MessageIDTypes.h"
 
 namespace OVR { namespace Net { namespace Plugins {
@@ -54,13 +54,12 @@ RPC1::RPC1()
 
 RPC1::~RPC1()
 {
-	slotHash.Clear();
 	delete blockingReturnValue;
 }
 
-void RPC1::RegisterSlot(OVR::String sharedIdentifier,  OVR::Observer<RPCSlot>* rpcSlotObserver )
+void RPC1::RegisterSlot(OVR::String sharedIdentifier,  OVR::CallbackListener<RPCSlot>* rpcSlotObserver)
 {
-	slotHash.AddObserverToSubject(sharedIdentifier, rpcSlotObserver);
+    slotHash.AddListener(sharedIdentifier, rpcSlotObserver);
 }
 
 bool RPC1::RegisterBlockingFunction(OVR::String uniqueID, RPCDelegate blockingFunction)
@@ -235,18 +234,15 @@ void RPC1::OnReceive(ReceivePayload *pPayload, ListenerReceiveResult *lrrOut)
 			OVR::String sharedIdentifier;
 			bsIn.Read(sharedIdentifier);
 
-			Observer<RPCSlot> *o = slotHash.GetSubject(sharedIdentifier);
+			CallbackEmitter<RPCSlot>* o = slotHash.GetKey(sharedIdentifier);
 
 			if (o)
 			{
 				bsIn.AlignReadToByteBoundary();
 
-				if (o)
-				{
-					OVR::Net::BitStream serializedParameters(bsIn.GetData() + bsIn.GetReadOffset()/8, bsIn.GetNumberOfUnreadBits()/8, false);
+				OVR::Net::BitStream serializedParameters(bsIn.GetData() + bsIn.GetReadOffset()/8, bsIn.GetNumberOfUnreadBits()/8, false);
 
-					o->Call(&serializedParameters, pPayload);
-				}
+				o->Call(&serializedParameters, pPayload);
 			}
 		}
 	}

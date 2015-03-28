@@ -187,7 +187,9 @@ bool Player::HandleMoveKey(OVR::KeyCode key, bool down)
     case OVR::Key_S:     MoveBack    = down ? (MoveBack    | 1) : (MoveBack    & ~1); return true;
     case OVR::Key_A:     MoveLeft    = down ? (MoveLeft    | 1) : (MoveLeft    & ~1); return true;
     case OVR::Key_D:     MoveRight   = down ? (MoveRight   | 1) : (MoveRight   & ~1); return true;
+    case OVR::Key_MouseWheelAwayFromUser:
     case OVR::Key_Up:    MoveForward = down ? (MoveForward | 2) : (MoveForward & ~2); return true;
+    case OVR::Key_MouseWheelTowardUser:
     case OVR::Key_Down:  MoveBack    = down ? (MoveBack    | 2) : (MoveBack    & ~2); return true;
     case OVR::Key_Left:  MoveLeft    = down ? (MoveLeft    | 2) : (MoveLeft    & ~2); return true;
     case OVR::Key_Right: MoveRight   = down ? (MoveRight   | 2) : (MoveRight   & ~2); return true;

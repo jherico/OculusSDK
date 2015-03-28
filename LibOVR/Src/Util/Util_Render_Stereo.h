@@ -27,8 +27,9 @@ limitations under the License.
 #ifndef OVR_Util_Render_Stereo_h
 #define OVR_Util_Render_Stereo_h
 
-#include "../OVR_Stereo.h"
-#include "../Tracking/Tracking_SensorStateReader.h"
+#include "OVR_Stereo.h"
+#include "Extras/OVR_Math.h"
+#include "Vision/SensorFusion/Vision_SensorStateReader.h"
 
 namespace OVR { namespace Util { namespace Render {
 
@@ -218,7 +219,7 @@ public:
 
     // Allows the app to specify near and far clip planes and the right/left-handedness of the projection matrix.
     void        SetZClipPlanesAndHandedness ( float zNear = 0.01f, float zFar = 10000.0f,
-                                              bool rightHandedProjection = true );
+                                              bool rightHandedProjection = true, bool isOpenGL = false );
 
     // Allows the app to specify how much extra eye rotation to allow when determining the visible FOV.
     void        SetExtraEyeRotation ( float extraEyeRotationInRadians = 0.0f );
@@ -291,6 +292,7 @@ private:
     float              ExtraEyeRotationInRadians;
     bool               IsRendertargetSharedByBothEyes;
     bool               RightHandedProjection;
+    bool               UsingOpenGL; // for projection clip depth calculation
 
     bool               DirtyFlag;   // Set when any if the modifiable state changed. Does NOT get set by SetRender*()
 
@@ -415,6 +417,8 @@ Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matri
 Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset );
 
 
+#if defined(OVR_ENABLE_TIMEWARP_MACHINE)
+// This is deprecated by DistortionTiming code. -cat
 
 // TimewarpMachine helps keep track of rendered frame timing and
 // handles predictions for time-warp rendering.
@@ -438,7 +442,7 @@ public:
     // and the predicted pose of the HMD at that time.
     // You usually only need to call one of these functions.
     double      GetViewRenderPredictionTime();
-    bool        GetViewRenderPredictionPose(Tracking::SensorStateReader* reader, Posef& transform);
+    bool        GetViewRenderPredictionPose(Vision::TrackingStateReader* reader, Posef& transform);
 
 
     // Timewarp prediction functions. You usually only need to call one of these three sets of functions.
@@ -447,13 +451,13 @@ public:
     double      GetVisiblePixelTimeStart();
     double      GetVisiblePixelTimeEnd();
     // Predicted poses of the HMD at those first and last pixels.
-	bool        GetPredictedVisiblePixelPoseStart(Tracking::SensorStateReader* reader, Posef& transform);
-	bool        GetPredictedVisiblePixelPoseEnd(Tracking::SensorStateReader* reader, Posef& transform);
+	bool        GetPredictedVisiblePixelPoseStart(Vision::TrackingStateReader* reader, Posef& transform);
+	bool        GetPredictedVisiblePixelPoseEnd(Vision::TrackingStateReader* reader, Posef& transform);
     // The delta matrices to feed to the timewarp distortion code,
     // given the pose that was used for rendering.
     // (usually the one returned by GetViewRenderPredictionPose() earlier)
-	bool        GetTimewarpDeltaStart(Tracking::SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
-	bool        GetTimewarpDeltaEnd(Tracking::SensorStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
+	bool        GetTimewarpDeltaStart(Vision::TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
+	bool        GetTimewarpDeltaEnd(Vision::TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
 
     // Just-In-Time distortion aims to delay the second sensor reading & distortion
     // until the very last moment to improve prediction. However, it is a little scary,
@@ -492,6 +496,8 @@ private:
     double              NextFramePresentFlushTime;
 
 };
+
+#endif // OVR_ENABLE_TIMEWARP_MACHINE
 
 
 

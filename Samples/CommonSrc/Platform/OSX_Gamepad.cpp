@@ -30,6 +30,7 @@ static const UInt32 Logitech_F710_VendorID = 0x046D;
 static const UInt32 Sony_DualShock3_VendorID = 0x054C;
 //static const UInt32 Sony_DualShock3_ProductID = 0x0268;
 
+static const UInt32 Microsoft_XBox360_VendorID = 0x045E;
 
 namespace OVR { namespace OvrPlatform { namespace OSX {
 
@@ -215,9 +216,105 @@ void GamepadManager::onDeviceValueChanged(IOHIDValueRef value)
     uint32_t usagePage = IOHIDElementGetUsagePage(element);
     uint32_t usage = IOHIDElementGetUsage(element);
 
+    // The following controller mapping is based on the XBox 360 controller.
+    if (vendorID == Microsoft_XBox360_VendorID)
+    {
+        // XBox 360 mapping.
+        if (usagePage == kHIDPage_Button)
+        {
+            bool buttonState = IOHIDValueGetIntegerValue(value);
+            
+            switch(usage)
+            {
+                case kHIDUsage_Button_1:
+                    manipulateBitField(State.Buttons, Gamepad_A, buttonState);
+                    break;
+                case kHIDUsage_Button_2:
+                    manipulateBitField(State.Buttons, Gamepad_X, buttonState);
+                    break;
+                case kHIDUsage_Button_3:
+                    manipulateBitField(State.Buttons, Gamepad_Y, buttonState);
+                    break;
+                case kHIDUsage_Button_4:
+                    manipulateBitField(State.Buttons, Gamepad_B, buttonState);
+                    break;
+                case 0x05:
+                    manipulateBitField(State.Buttons, Gamepad_L1, buttonState);
+                    break;
+                case 0x06:
+                    manipulateBitField(State.Buttons, Gamepad_R1, buttonState);
+                    break;
+                case 0x07:
+                    manipulateBitField(State.Buttons, Gamepad_LStick, buttonState);
+                    break;
+                case 0x08:
+                    manipulateBitField(State.Buttons, Gamepad_RStick, buttonState);
+                    break;
+                case 0x09:
+                    manipulateBitField(State.Buttons, Gamepad_Start, buttonState);
+                    break;
+                case 0x0A:
+                    manipulateBitField(State.Buttons, Gamepad_Back, buttonState);
+                    break;
+                case 0x0C:
+                    manipulateBitField(State.Buttons, Gamepad_Up, buttonState);
+                    break;
+                case 0x0D:
+                    manipulateBitField(State.Buttons, Gamepad_Down, buttonState);
+                    break;
+                case 0x0E:
+                    manipulateBitField(State.Buttons, Gamepad_Left, buttonState);
+                    break;
+                case 0x0F:
+                    manipulateBitField(State.Buttons, Gamepad_Right, buttonState);
+                    break;
+                default:
+                    return;
+            }
+        }
+        else if (usagePage == kHIDPage_GenericDesktop)
+        {
+            float v;
+            switch(usage)
+            {
+                case kHIDUsage_GD_X:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.LX, v))
+                        return;
+                    break;
+                case kHIDUsage_GD_Y:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.LY, -v))
+                        return;
+                    break;
+                case kHIDUsage_GD_Rx:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.RX, v))
+                        return;
+                    break;
+                case kHIDUsage_GD_Ry:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.RY, -v))
+                        return;
+                    break;
+                case kHIDUsage_GD_Z:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.LT, -v))
+                        return;
+                    break;
+                case kHIDUsage_GD_Rz:
+                    v = mapAnalogAxis(value, element);
+                    if (!setStateIfDifferent(State.RT, -v))
+                        return;
+                    break;
+                default:
+                    return;
+            }
+        }
+    }
     // The following controller mapping is based on the Logitech F710, however we use it for
     // all Logitech devices on the assumption that they're likely to share the same mapping.
-    if (vendorID == Logitech_F710_VendorID)
+    else if (vendorID == Logitech_F710_VendorID)
     {
         // Logitech F710 mapping.
         if (usagePage == kHIDPage_Button)

@@ -18,7 +18,7 @@ otherwise accompanies this software in either electronic or hard copy form.
 #ifndef OVR_dxgi_ovr_filter_h
 #define OVR_dxgi_ovr_filter_h
 
-#include <Windows.h>
+#include <Kernel/OVR_Win32_IncludeWindows.h>
 #include <InitGuid.h>
 
 #define USERMODE_TEST_ROTATION 1
@@ -425,5 +425,20 @@ typedef struct _RIFT_STATUS_ARRAY
 // Output Buffer: PCHAR			- Preallocated buffer of a variable size to store the EDID from the display
 #define IOCTL_RIFTMGR_GETEDID CTL_CODE(FILE_DEVICE_VIDEO, \
 	FUNCTION_INDEX + 11, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+#define IOCTL_RIFTMGR_WAITFORVSYNC CTL_CODE(FILE_DEVICE_VIDEO, \
+    FUNCTION_INDEX + 12, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+// Return information about the currently scanned out frame to the rift
+// Input Buffer: ULONG			- ChildUid of a Rift as previously discovered
+// Output Buffer: UINT64[2]	    - Preallocated buffer of 2 UINT64s to hold CurrentFrameIndex & QPC time of current scan out start
+#define IOCTL_RIFTMGR_GETCURRENTFRAMEINFO CTL_CODE(FILE_DEVICE_VIDEO, \
+    FUNCTION_INDEX + 13, METHOD_NEITHER, FILE_ANY_ACCESS)
+
+// Return the kernel index of the adapter that the rift is connected to
+// Input Buffer: ULONG			- ChildUid of a Rift as previously discovered
+// Output Buffer: ULONG	        - The kernel adapter index
+#define IOCTL_RIFTMGR_GETRIFTADAPTERID CTL_CODE(FILE_DEVICE_VIDEO, \
+    FUNCTION_INDEX + 14, METHOD_NEITHER, FILE_ANY_ACCESS)
 
 #endif

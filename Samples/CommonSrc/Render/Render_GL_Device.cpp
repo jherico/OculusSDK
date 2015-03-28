@@ -24,22 +24,18 @@ limitations under the License.
 #include "../Render/Render_GL_Device.h"
 #include "Kernel/OVR_Log.h"
 #include "OVR_CAPI_GL.h"
-#include <CAPI/GL/CAPI_GL_Util.h>
-
+#include <assert.h>
 
 namespace OVR { namespace Render { namespace GL {
 
-
+OVR::GLEContext gleContext;
 
 void InitGLExtensions()
 {
-    // Get the GLEContext instance from libOVR. We use that shared version instead of declaring our own.
-    OVR::GLEContext* pGLEContext = OVR::GetGLEContext();
-    OVR_ASSERT(pGLEContext);
-    if(!pGLEContext->IsInitialized())
+    if(!gleContext.IsInitialized())
     {
-        OVR::GLEContext::SetCurrentContext(pGLEContext);
-        pGLEContext->Init();
+        OVR::GLEContext::SetCurrentContext(&gleContext);
+        gleContext.Init();
     }
 }
 

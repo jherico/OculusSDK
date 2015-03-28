@@ -25,11 +25,8 @@ limitations under the License.
 #define OVR_Win32_Platform_h
 
 #include "Platform.h"
-
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include "Kernel/OVR_Win32_IncludeWindows.h"
+#include "Kernel/OVR_Array.h"
 
 namespace OVR { namespace Render {
     class RenderDevice;
@@ -74,7 +71,8 @@ class PlatformCore : public OvrPlatform::PlatformCore
     int         ExitCode;
     int         Width, Height;
 
-    MouseMode   MMode;    
+    MouseMode   MMode;
+    UINT_PTR    MouseWheelTimer;
     POINT       WindowCenter; // In desktop coordinates
     HCURSOR     Cursor;
     int         Modifiers;
@@ -87,7 +85,7 @@ class PlatformCore : public OvrPlatform::PlatformCore
 
     LRESULT     WindowProc(UINT msg, WPARAM wp, LPARAM lp);
 
-    Array<Ptr<NotificationOverlay> > NotificationOverlays;
+    OVR::Array<OVR::Ptr<NotificationOverlay> > NotificationOverlays;
 
 public:
     PlatformCore(Application* app, HINSTANCE hinst);
@@ -129,28 +127,5 @@ KeyCode MapVKToKeyCode(unsigned vk);
 
 }}}
 
-
-// OVR_PLATFORM_APP_ARGS specifies the Application class to use for startup,
-// providing it with startup arguments.
-#define OVR_PLATFORM_APP_ARGS(AppClass, args)                                            \
-    OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
-    { OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));                \
-      return new AppClass args; }                                                        \
-    void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
-    { OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
-      delete app; delete platform; OVR::System::Destroy(); };
-
-// OVR_PLATFORM_APP_ARGS specifies the Application startup class with no args.
-#define OVR_PLATFORM_APP(AppClass) OVR_PLATFORM_APP_ARGS(AppClass, ())
-
-#define OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass, LogClass, args)                         \
-	OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
-	{ static LogClass log; OVR::System::Init(&log);                                      \
-	   return new AppClass args; }                                                       \
-	void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
-	{ OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
-	    delete app; delete platform; OVR::System::Destroy(); };
-
-#define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())
 
 #endif // OVR_Win32_Platform_h

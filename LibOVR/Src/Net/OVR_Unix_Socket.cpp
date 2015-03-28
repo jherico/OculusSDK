@@ -25,10 +25,10 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OVR_Unix_Socket.h"
-#include "../Kernel/OVR_Std.h"
-#include "../Kernel/OVR_Allocator.h"
-#include "../Kernel/OVR_Threads.h" // Thread::MSleep
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Std.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_Threads.h" // Thread::MSleep
+#include "Kernel/OVR_Log.h"
 
 #include <errno.h>
 
@@ -409,10 +409,14 @@ TCPSocket::TCPSocket(SocketHandle boundHandle, bool isListenSocket)
 	TheSocket = boundHandle;
 	IsListenSocket = isListenSocket;
 	IsConnecting = false;
-	SetSocketOptions(TheSocket);
 
-	// The actual socket is always non-blocking
-	_Ioctlsocket(TheSocket, 1);
+    if (TheSocket != INVALID_SOCKET)
+    {
+        SetSocketOptions(TheSocket);
+
+        // The actual socket is always non-blocking
+        _Ioctlsocket(TheSocket, 1);
+    }
 }
 
 TCPSocket::~TCPSocket()

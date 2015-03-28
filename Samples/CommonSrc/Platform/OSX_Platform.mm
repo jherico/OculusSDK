@@ -28,6 +28,11 @@ using namespace OVR::OvrPlatform;
 
 @implementation OVRApp
 
+@synthesize
+    App = _App,
+    Platform = _Platform,
+    win = _win;
+
 - (void)dealloc
 {
     [super dealloc];
@@ -162,6 +167,12 @@ static int MapModifiers(unsigned long xmod)
 }
 
 @implementation OVRView
+
+@synthesize
+    Platform = _Platform,
+    App = _App,
+    Modifiers = _Modifiers;
+
 
 -(BOOL) acceptsFirstResponder
 {

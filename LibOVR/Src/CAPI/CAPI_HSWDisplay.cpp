@@ -26,10 +26,9 @@ limitations under the License.
 
 #include "CAPI_HSWDisplay.h"
 #include "CAPI_HMDState.h"
-#include "../Kernel/OVR_Log.h"
-#include "../Kernel/OVR_String.h"
+#include "Kernel/OVR_Log.h"
+#include "Kernel/OVR_String.h"
 #include "Textures/healthAndSafety.tga.h" // TGA file as a C array declaration.
-#include <stdlib.h>
 
 //-------------------------------------------------------------------------------------
 // ***** HSWDISPLAY_DEBUGGING
@@ -46,8 +45,7 @@ limitations under the License.
 
 #if HSWDISPLAY_DEBUGGING
     OVR_DISABLE_ALL_MSVC_WARNINGS()
-    #include <winsock2.h>
-    #include <Windows.h>
+    #include "Kernel/OVR_Win32_IncludeWindows.h"
     OVR_RESTORE_ALL_MSVC_WARNINGS()
 #endif
 
@@ -63,28 +61,6 @@ OVR_DISABLE_MSVC_WARNING(4996) // "This function or variable may be unsafe..."
 #if !defined(HSWDISPLAY_DEFAULT_ENABLED)
     #define HSWDISPLAY_DEFAULT_ENABLED 1
 #endif
-
-
-
-//-------------------------------------------------------------------------------------
-// ***** Experimental C API functions
-//
-
-extern "C"
-{
-    OVR_EXPORT void ovrhmd_EnableHSWDisplaySDKRender(ovrHmd hmd, ovrBool enabled)
-    {
-        OVR::CAPI::HMDState* pHMDState = (OVR::CAPI::HMDState*)hmd->Handle;
-
-	    if (pHMDState)
-	    {
-            OVR::CAPI::HSWDisplay* pHSWDisplay = pHMDState->pHSWDisplay;
-
-            if(pHSWDisplay)
-                pHSWDisplay->EnableRender((enabled == 0) ? false : true);
-        }
-    }
-}
 
 
 
@@ -129,6 +105,15 @@ HSWDisplay::HSWDisplay(ovrRenderAPIType renderAPIType, ovrHmd hmd, const HMDRend
     LastProfileName(),
     LastHSWTime(0)
 {
+    HMDState* pHMDState = (HMDState*)HMD->Handle;
+
+    if(pHMDState)
+    {
+        if(pHMDState->pHmdDesc->HmdCaps & ovrHmdCap_DebugDevice)
+            Enabled = false;
+        else if(pHMDState->pProfile)
+            Enable(pHMDState->pProfile->GetBoolValue("HSW", true));
+    }
 }
 
 
@@ -385,18 +370,19 @@ void HSWDisplay::SetCurrentProfileLastHSWTime(time_t t)
 
 
 // Generates an appropriate stereo ortho projection matrix.
-void HSWDisplay::GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f OrthoProjection[2])
+void HSWDisplay::GetOrthoProjection(const HMDRenderState& renderState, Matrix4f orthoProjection[2])
 {
     Matrix4f perspectiveProjection[2];
-    perspectiveProjection[0] = ovrMatrix4f_Projection(RenderState.EyeRenderDesc[0].Fov, 0.01f, 10000.f, true);
-    perspectiveProjection[1] = ovrMatrix4f_Projection(RenderState.EyeRenderDesc[1].Fov, 0.01f, 10000.f, true);
+    unsigned int projectionModifier = ovrProjection_RightHanded | ((RenderAPIType == ovrRenderAPI_OpenGL) ? ovrProjection_ClipRangeOpenGL : 0);
+    perspectiveProjection[0] = ovrMatrix4f_Projection(renderState.EyeRenderDesc[0].Fov, 0.01f, 10000.f, projectionModifier);
+    perspectiveProjection[1] = ovrMatrix4f_Projection(renderState.EyeRenderDesc[1].Fov, 0.01f, 10000.f, projectionModifier);
 
     const float    orthoDistance = HSWDISPLAY_DISTANCE; // This is meters from the camera (viewer) that we place the ortho plane.
-    const Vector2f orthoScale0   = Vector2f(1.f) / Vector2f(RenderState.EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
-    const Vector2f orthoScale1   = Vector2f(1.f) / Vector2f(RenderState.EyeRenderDesc[1].PixelsPerTanAngleAtCenter);
+    const Vector2f orthoScale0   = Vector2f(1.f) / Vector2f(renderState.EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
+    const Vector2f orthoScale1   = Vector2f(1.f) / Vector2f(renderState.EyeRenderDesc[1].PixelsPerTanAngleAtCenter);
     
-    OrthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, RenderState.EyeRenderDesc[0].HmdToEyeViewOffset.x);
-    OrthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, RenderState.EyeRenderDesc[1].HmdToEyeViewOffset.x);
+    orthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, renderState.EyeRenderDesc[0].HmdToEyeViewOffset.x);
+    orthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, renderState.EyeRenderDesc[1].HmdToEyeViewOffset.x);
 }
 
 
@@ -418,17 +404,8 @@ const uint8_t* HSWDisplay::GetDefaultTexture(size_t& TextureSize)
 //
 
 #if defined (OVR_OS_WIN32)
-    #define OVR_D3D_VERSION 9
     #include "D3D9/CAPI_D3D9_HSWDisplay.h"
-    #undef  OVR_D3D_VERSION
-
-    #define OVR_D3D_VERSION 10
-    #include "D3D1X/CAPI_D3D10_HSWDisplay.h"
-    #undef  OVR_D3D_VERSION
-
-    #define OVR_D3D_VERSION 11
     #include "D3D1X/CAPI_D3D11_HSWDisplay.h"
-    #undef  OVR_D3D_VERSION
 #endif
 
 #include "GL/CAPI_GL_HSWDisplay.h"
@@ -451,10 +428,6 @@ OVR::CAPI::HSWDisplay* OVR::CAPI::HSWDisplay::Factory(ovrRenderAPIType apiType, 
     #if defined(OVR_OS_WIN32)
         case ovrRenderAPI_D3D9:
             pHSWDisplay = new OVR::CAPI::D3D9::HSWDisplay(apiType, hmd, renderState);
-            break;
-
-        case ovrRenderAPI_D3D10:
-            pHSWDisplay = new OVR::CAPI::D3D10::HSWDisplay(apiType, hmd, renderState);
             break;
 
         case ovrRenderAPI_D3D11:

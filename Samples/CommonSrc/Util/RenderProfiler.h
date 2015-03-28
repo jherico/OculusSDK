@@ -21,8 +21,8 @@ limitations under the License.
 
 *************************************************************************************/
 
-#ifndef INC_RenderProfiler_h
-#define INC_RenderProfiler_h
+#ifndef OVR_RenderProfiler_h
+#define OVR_RenderProfiler_h
 
 #include "OVR_Kernel.h"
 
@@ -68,4 +68,4 @@ private:
     int         SampleCurrentFrame;
 };
 
-#endif // INC_RenderProfiler_h
+#endif // OVR_RenderProfiler_h

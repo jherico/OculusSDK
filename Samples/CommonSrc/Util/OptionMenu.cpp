@@ -135,8 +135,8 @@ OptionVar::OptionVar(const char* name, void* pvar, VarType type,
     pNotify     = 0;
     FormatString= 0;
 
-    MaxFloat    = MATH_FLOAT_MAXVALUE;
-    MinFloat    = -MATH_FLOAT_MAXVALUE;
+    MaxFloat    = FLT_MAX;
+    MinFloat    = -FLT_MAX;
     StepFloat   = 1.0f;
     FormatScale = 1.0f;
 
@@ -165,8 +165,8 @@ OptionVar::OptionVar(const char* name, int32_t* pvar,
     pNotify     = 0;
     FormatString= formatString;
 
-    MaxFloat    = MATH_FLOAT_MAXVALUE;
-    MinFloat    = -MATH_FLOAT_MAXVALUE;
+    MaxFloat    = FLT_MAX;
+    MinFloat    = -FLT_MAX;
     StepFloat   = 1.0f;
     FormatScale = 1.0f;
 
@@ -362,6 +362,8 @@ OptionSelectionMenu::OptionSelectionMenu(OptionSelectionMenu* parentMenu)
     PopupMessageTimeout = 0.0;
     PopupMessageBorder  = false;
 
+    RenderShortcutChangeMessages = true;
+
     // Setup handlers for menu navigation actions.
     NavShortcuts[Nav_Up].pNotify = new FunctionNotifyContext<OptionSelectionMenu, bool>(this, &OptionSelectionMenu::HandleUp);
     NavShortcuts[Nav_Down].pNotify = new FunctionNotifyContext<OptionSelectionMenu, bool>(this, &OptionSelectionMenu::HandleDown);
@@ -540,9 +542,12 @@ void OptionSelectionMenu::Render(RenderDevice* prender, String title)
 {
     // If we are invisible, render shortcut notifications.
     // Both child and parent have visible == true even if only child is shown.
-    if (DisplayState == Display_None)
+    if ( DisplayState == Display_None )
     {
-        renderShortcutChangeMessage(prender);
+        if ( RenderShortcutChangeMessages )
+        {
+            renderShortcutChangeMessage(prender);
+        }
         return;
     }
 
@@ -718,6 +723,12 @@ void OptionSelectionMenu::SetPopupTimeout(double timeoutSeconds, bool border)
 {
     PopupMessageTimeout = ovr_GetTimeInSeconds() + timeoutSeconds;
     PopupMessageBorder = border;
+}
+
+
+void OptionSelectionMenu::SetShortcutChangeMessageEnable ( bool enabled )
+{
+    RenderShortcutChangeMessages = enabled;
 }
 
 

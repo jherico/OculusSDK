@@ -25,12 +25,13 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OVR_Win32_Socket.h"
-#include "../Kernel/OVR_Std.h"
-#include "../Kernel/OVR_Allocator.h"
-#include "../Kernel/OVR_Threads.h" // Thread::MSleep
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Std.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_Threads.h" // Thread::MSleep
+#include "Kernel/OVR_Log.h"
 
 #include <Winsock2.h>
+#pragma comment(lib, "ws2_32.lib")
 
 namespace OVR { namespace Net {
 
@@ -415,16 +416,21 @@ TCPSocket::TCPSocket()
 	IsListenSocket = false;
 	WSAStartupSingleton::AddRef();
 }
+
 TCPSocket::TCPSocket(SocketHandle boundHandle, bool isListenSocket)
 {
 	TheSocket = boundHandle;
 	IsListenSocket = isListenSocket;
 	IsConnecting = false;
 	WSAStartupSingleton::AddRef();
-	SetSocketOptions(TheSocket);
 
-	// The actual socket is always non-blocking
-	_Ioctlsocket(TheSocket, 1);
+    if (TheSocket != INVALID_SOCKET)
+    {
+        SetSocketOptions(TheSocket);
+
+        // The actual socket is always non-blocking
+        _Ioctlsocket(TheSocket, 1);
+    }
 }
 
 TCPSocket::~TCPSocket()
@@ -483,7 +489,7 @@ int TCPSocket::Connect(SockAddr* address)
             return 0;
 		}
 
-		printf( "TCPSocket::Connect failed:Error code - %d\n", dwIOError );
+		LogError("[TCPSocket] ERROR: Connect failed. Error code - %d", (int)dwIOError);
 	}
 
 	return retval;
@@ -506,6 +512,10 @@ int TCPSocket::Send(const void* pData, int bytes)
 
 TCPSocketPollState::TCPSocketPollState()
 {
+    memset(&readFD, 0, sizeof(readFD));
+    memset(&exceptionFD, 0, sizeof(exceptionFD));
+    memset(&writeFD, 0, sizeof(writeFD));
+
     FD_ZERO(&readFD);
     FD_ZERO(&exceptionFD);
     FD_ZERO(&writeFD);

@@ -27,11 +27,11 @@ limitations under the License.
 
 #include "CAPI_GL_HSWDisplay.h"
 #include "CAPI_GL_DistortionShaders.h"
-#include "../../OVR_CAPI_GL.h"
-#include "../../Kernel/OVR_File.h"
-#include "../../Kernel/OVR_Math.h"
-#include "../../Kernel/OVR_Allocator.h"
-#include "../../Kernel/OVR_Color.h"
+#include "OVR_CAPI_GL.h"
+#include "Kernel/OVR_File.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_Color.h"
+#include "Extras/OVR_Math.h"
 
 
 OVR_DISABLE_MSVC_WARNING(4996) // "This function or variable may be unsafe..."
@@ -71,6 +71,12 @@ uint8_t* LoadTextureTgaData(OVR::File* f, uint8_t alpha, int& width, int& height
 
     // imgType 2 is uncompressed true-color image.
     // imgType 10 is run-length encoded true-color image.
+
+    // WARNING - this loader is potentially incorrect. The default TGA origin is bottom-left.
+    // You can change the origin, but that is non-standard, and this loader ignores that bit in the header.
+    // So just be aware that this texture will have the UV origin at the bottom lef of the image, even in DirectX
+    // (I fixed the other TGA loader, but I'm not "fixing" this one because the thing works, so leave it alone!)
+
     if(((imgtype == ImgTypeBGRAUncompressed) || (imgtype == ImgTypeBGRARLECompressed)) && ((bpp == 24) || (bpp == 32)))
     {
         int imgsize = width * height * 4;
@@ -313,24 +319,24 @@ void HSWDisplay::UnloadGraphics()
         currentGLContext.InitFromCurrent();
         GLContext.Bind();
 
-    // RenderParams: No need to clear.
-    if(FrameBuffer != 0)
-    {
-        glDeleteFramebuffers(1, &FrameBuffer);
-        FrameBuffer = 0;
-    }
-    pTexture.Clear();
-    pShaderSet.Clear();
-    pVertexShader.Clear();
-    pFragmentShader.Clear();
-    pVB.Clear();
-    if(VAO)
-    {
+        // RenderParams: No need to clear.
+        if(FrameBuffer != 0)
+        {
+            glDeleteFramebuffers(1, &FrameBuffer);
+            FrameBuffer = 0;
+        }
+        pTexture.Clear();
+        pShaderSet.Clear();
+        pVertexShader.Clear();
+        pFragmentShader.Clear();
+        pVB.Clear();
+        if(VAO)
+        {
             glDeleteVertexArrays(1, &VAO);
+        }
         currentGLContext.Bind();
         GLContext.Destroy();
     }
-}
 }
 
 
@@ -389,6 +395,7 @@ void HSWDisplay::LoadGraphics()
             const float right  =  1.0f; // API abstraction we may move this draw to an overlay layer or to a more formal 
             const float bottom =  0.9f; // model/mesh scheme with a perspective projection.
 
+            // See warning in LoadTextureTgaData() about this TGA being loaded "upside down", i.e. UV origin is at bottom-left.
             pVertices[0] = HASWVertex(left,  top,    0.f, Color(255, 255, 255, 255), 0.f, flip ? 1.f : 0.f);
             pVertices[1] = HASWVertex(left,  bottom, 0.f, Color(255, 255, 255, 255), 0.f, flip ? 0.f : 1.f);
             pVertices[2] = HASWVertex(right, top,    0.f, Color(255, 255, 255, 255), 1.f, flip ? 1.f : 0.f); 

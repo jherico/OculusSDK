@@ -30,6 +30,9 @@ limitations under the License.
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_String.h"
 
+#include "OVR_Version.h"
+
+
 namespace OVR {
 
 
@@ -117,10 +120,6 @@ public:
 };
 
 
-//#define SERIAL_FORMAT_UNIT_TEST
-#ifdef SERIAL_FORMAT_UNIT_TEST
-void TestSerialFormatStuff();
-#endif
 
 
 } // OVR

@@ -7,16 +7,16 @@ Authors     :   James Hughes
 
 Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.2
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -25,7 +25,7 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_Linux_Display.h"
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 
 #include "../../../3rdParty/EDID/edid.h"
 
@@ -34,10 +34,11 @@ limitations under the License.
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xatom.h>
 
+
 //-------------------------------------------------------------------------------------
 // ***** Display enumeration Helpers
 
-namespace OVR { 
+namespace OVR {
 
 static const uint8_t edid_v1_header[] = { 0x00, 0xff, 0xff, 0xff,
                                           0xff, 0xff, 0xff, 0x00 };
@@ -185,7 +186,7 @@ static int parseEdid(uint8_t* edid, Linux::DisplayEDID& edidResult)
 //  data    OUT This pointer is modified to point to the output from
 //              XRRGetOutputProperty. You *must* call XFree on this pointer.
 //  dataLen OUT The length of the data returned in 'data'.
-static int getXRRProperty(struct _XDisplay* display, RROutput output, Atom atom,
+static int getXRRProperty(struct _XDisplay* X11Display, RROutput output, Atom atom,
                           uint8_t** data, int* dataLen)
 {
   unsigned long nitems;
@@ -193,7 +194,7 @@ static int getXRRProperty(struct _XDisplay* display, RROutput output, Atom atom,
   int           actualFormat;
   Atom          actualType;
 
-  int ret = XRRGetOutputProperty(display, output, atom, 0, 100,
+  int ret = XRRGetOutputProperty(X11Display, output, atom, 0, 100,
                                  False, False, AnyPropertyType,
                                  &actualType, &actualFormat, &nitems,
                                  &bytesAfter, data);
@@ -222,28 +223,30 @@ static XRRModeInfo* findModeByXID(XRRScreenResources* screen, RRMode xid)
   return NULL;
 }
 
-static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int inputArraySize, bool /*edidInfo*/)
+static struct _XDisplay* X11Display = NULL;
+static int BaseRREvent = 0;
+static int BaseRRError = 0;
+
+static int discoverExtendedRifts(OVR::DisplayDesc* descriptorArray, int inputArraySize, bool /*edidInfo*/)
 {
     int result = 0;
 
-    struct _XDisplay* display = XOpenDisplay(NULL);
-
-    if (display == NULL)
+    if (X11Display == NULL)
     {
         OVR::LogError("[Linux Display] Unable to open X Display!");
         return 0;
     }
 
-    Atom EDIDAtom = XInternAtom(display, RR_PROPERTY_RANDR_EDID, False);
-    int numScreens = XScreenCount(display);
+    Atom EDIDAtom = XInternAtom(X11Display, RR_PROPERTY_RANDR_EDID, False);
+    int numScreens = XScreenCount(X11Display);
     for (int i = 0; i < numScreens; ++i)
     {
-        Window sr                       = XRootWindow(display, i);
-        XRRScreenResources* screen      = XRRGetScreenResources(display, sr);
+        Window sr                       = XRootWindow(X11Display, i);
+        XRRScreenResources* screen      = XRRGetScreenResources(X11Display, sr);
 
         for (int ii = 0; ii < screen->ncrtc; ++ii)
         {
-            XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(display, screen, screen->crtcs[ii]);
+            XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(X11Display, screen, screen->crtcs[ii]);
 
             if (0 == crtcInfo->noutput)
             {
@@ -256,7 +259,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
             for (int k = 0; k < crtcInfo->noutput; ++k)
             {
                 XRROutputInfo* outputInfo =
-                    XRRGetOutputInfo(display, screen, crtcInfo->outputs[k]);
+                    XRRGetOutputInfo(X11Display, screen, crtcInfo->outputs[k]);
 
                 for (int kk = 0; kk < outputInfo->nmode; ++kk)
                 {
@@ -280,7 +283,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                 continue;
             }
 
-            XRROutputInfo* outputInfo = XRRGetOutputInfo(display, screen, output);
+            XRROutputInfo* outputInfo = XRRGetOutputInfo(X11Display, screen, output);
             if (RR_Connected != outputInfo->connection)
             {
                 XRRFreeOutputInfo(outputInfo);
@@ -291,7 +294,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
             // Read EDID associated with crtc.
             uint8_t* data    = NULL;
             int      dataLen = 0;
-            if (getXRRProperty(display, output, EDIDAtom, &data, &dataLen) != 0)
+            if (getXRRProperty(X11Display, output, EDIDAtom, &data, &dataLen) != 0)
             {
                 // Identify rifts based on EDID.
                 Linux::DisplayEDID edid;
@@ -302,7 +305,7 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                 // TODO: Remove either this 3rdParty call to read EDID data
                 //       or remove our own parsing of the EDID. Probably opt
                 //       to remove our parsing.
-                MonitorInfo* mi = read_edid_data(display, output);
+                MonitorInfo* mi = read_edid_data(X11Display, output);
                 if (mi == NULL)
                 {
                     XRRFreeOutputInfo(outputInfo);
@@ -325,13 +328,6 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                     int width = modeInfo->width;
                     int height = modeInfo->height;
 
-                    if (   crtcInfo->rotation == RR_Rotate_90
-                        || crtcInfo->rotation == RR_Rotate_270 )
-                    {
-                        width  = modeInfo->height;
-                        height = modeInfo->width;
-                    }
-
                     int x = crtcInfo->x;
                     int y = crtcInfo->y;
 
@@ -341,12 +337,32 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                                 mi->manufacturer_code, mi->product_code,
                                 screen->crtcs[ii]);
 
-                    OVR::Linux::DisplayDesc& desc = descriptorArray[result++];
-                    desc.DisplayID                 = device_id;
-                    desc.ModelName                 = edid.MonitorName;
-                    desc.EdidSerialNumber          = edid.SerialNumber;
-                    desc.LogicalResolutionInPixels = Sizei(width, height);
+                    OVR::DisplayDesc& desc         = descriptorArray[result++];
+                    desc.ResolutionInPixels        = Sizei(width, height);
                     desc.DesktopDisplayOffset      = Vector2i(x, y);
+                    strncpy(desc.DisplayID, device_id, sizeof(desc.DisplayID)-1);
+                    desc.DisplayID[sizeof(desc.DisplayID)-1] = 0;
+                    strncpy(desc.ModelName, edid.MonitorName, sizeof(desc.ModelName)-1);
+                    desc.ModelName[sizeof(desc.ModelName)-1] = 0;
+                    strncpy(desc.EdidSerialNumber, edid.SerialNumber, sizeof(desc.EdidSerialNumber)-1);
+                    desc.EdidSerialNumber[sizeof(desc.EdidSerialNumber)-1] = 0;
+
+                    bool tallScreen = (height > width);
+                    switch (crtcInfo->rotation)
+                    {
+                        default:
+                            desc.Rotation = tallScreen ? 270 : 0;
+                            break;
+                        case RR_Rotate_90:
+                            desc.Rotation = tallScreen ? 0 : 90;
+                            break;
+                        case RR_Rotate_180:
+                            desc.Rotation = tallScreen ? 90 : 180;
+                            break;
+                        case RR_Rotate_270:
+                            desc.Rotation = tallScreen ? 180 : 270;
+                            break;
+                    }
 
                     switch (mi->product_code)
                     {
@@ -363,18 +379,20 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
                     if (   desc.DeviceTypeGuess == HmdType_DK2
                         || desc.DeviceTypeGuess == HmdType_DKHDProto)
                     {
-                        desc.LogicalResolutionInPixels = Sizei(1920, 1080);
-                        desc.NativeResolutionInPixels  = Sizei(1080, 1920);
+                        desc.ResolutionInPixels = Sizei(1920, 1080);
                     }
                     else
                     {
-                        desc.LogicalResolutionInPixels = Sizei(width, height);
-                        desc.NativeResolutionInPixels  = Sizei(width, height);
+                        desc.ResolutionInPixels = Sizei(width, height);
                     }
                 }
 
                 delete mi;
                 mi = NULL;
+            }
+            else
+            {
+                XFree(data);
             }
 
             XRRFreeOutputInfo(outputInfo);
@@ -384,19 +402,42 @@ static int discoverExtendedRifts(OVR::Linux::DisplayDesc* descriptorArray, int i
         XRRFreeScreenResources(screen);
     }
 
-    XCloseDisplay(display);
-
     return result;
 }
 
 
 //-------------------------------------------------------------------------------------
-// ***** Display 
+// ***** Display
 
 bool Display::Initialize()
 {
-    // Nothing to initialize. OS X only supports compatibility mode.
+    if (X11Display == NULL)
+    {
+        X11Display = XOpenDisplay(NULL);
+    }
+
+    if (X11Display == NULL)
+    {
+        OVR::LogError("[Linux Display] Unable to open X display!");
+        return false;
+    }
+
+    if (!XRRQueryExtension(X11Display, &BaseRREvent, &BaseRRError))
+    {
+        OVR::LogError("[Linux Display] Unable to query XRandR extension!");
+        return false;
+    }
+
     return true;
+}
+
+void Display::Shutdown()
+{
+    if (X11Display != NULL)
+    {
+        XCloseDisplay(X11Display);
+        X11Display = NULL;
+    }
 }
 
 bool Display::GetDriverMode(bool& driverInstalled, bool& compatMode, bool& hideDK1Mode)
@@ -417,9 +458,9 @@ DisplaySearchHandle* Display::GetDisplaySearchHandle()
 	return new Linux::LinuxDisplaySearchHandle();
 }
 
-bool Display::InCompatibilityMode( bool displaySearch )
+bool Display::InCompatibilityMode( bool X11DisplaySearch )
 {
-	OVR_UNUSED( displaySearch );
+	OVR_UNUSED( X11DisplaySearch );
     return true;
 }
 
@@ -427,13 +468,40 @@ int Display::GetDisplayCount(DisplaySearchHandle* handle, bool extended, bool ap
 {
     OVR_UNUSED4(handle, extended, applicationOnly, edidInfo);
 
-	static int extendedCount = -1;
+    static int extendedCount = -1;
+    static int numScreens = -1;
 
-	Linux::LinuxDisplaySearchHandle* localHandle = (Linux::LinuxDisplaySearchHandle*)handle;
+    Linux::LinuxDisplaySearchHandle* localHandle = (Linux::LinuxDisplaySearchHandle*)handle;
     if (localHandle == NULL)
     {
         OVR::LogError("[Linux Display] No search handle passed into GetDisplayCount. Return 0 rifts.");
         return 0;
+    }
+
+    if (X11Display == NULL)
+    {
+        OVR::LogError("[Linux Display] Unable to open X Display!");
+        return 0;
+    }
+
+    int screen_count = XScreenCount(X11Display);
+    if (screen_count != numScreens)
+    {
+        numScreens = screen_count;
+        extended = true;
+        for (int screen = 0; screen < numScreens; ++screen)
+        {
+            // Be sure we're subscribed to config changes on all screens.
+            XRRSelectInput(X11Display, XRootWindow(X11Display, screen),
+                           RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask |
+                           RROutputChangeNotifyMask | RROutputPropertyNotifyMask);
+        }
+    }
+
+    XEvent event_return = XEvent();
+    if (XCheckTypedEvent(X11Display, BaseRREvent + RRScreenChangeNotify, &event_return))
+    {
+        extended = true;
     }
 
     if (extendedCount == -1 || extended)
@@ -445,7 +513,6 @@ int Display::GetDisplayCount(DisplaySearchHandle* handle, bool extended, bool ap
 	localHandle->extendedDisplayCount = extendedCount;
 	int totalCount = extendedCount;
 
-    /// FIXME: Implement application mode for OS X.
     localHandle->application = false;
     localHandle->applicationDisplayCount = 0;
 
@@ -484,7 +551,7 @@ Ptr<Display> Display::GetDisplay( int index, DisplaySearchHandle* handle )
 
     if (localHandle->application)
     {
-        OVR::LogError("[Linux Display] Mac does not support application displays.");
+        OVR::LogError("[Linux Display] Mac does not support application X11Displays.");
     }
 
     return result;

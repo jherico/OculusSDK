@@ -27,20 +27,17 @@ limitations under the License.
 #include "../Render/Render_Device.h"
 
 #if defined(OVR_OS_WIN32)
-    #include <WinSock2.h>
-    #include <WS2tcpip.h>
-    #define WIN32_LEAN_AND_MEAN
-    #include <Windows.h>
-    #include <CAPI/GL/CAPI_GLE.h>
+    #include "Kernel/OVR_Win32_IncludeWindows.h"
+    #include <GL/CAPI_GLE.h>
     //#include <GL/gl.h>
     //#include <GL/glext.h>
     //#include <GL/wglext.h>
 #elif defined(OVR_OS_MAC)
-    #include <CAPI/GL/CAPI_GLE.h>
+    #include <GL/CAPI_GLE.h>
     //#include <OpenGL/gl3.h>
     //#include <OpenGL/gl3ext.h>
 #else
-    #include <CAPI/GL/CAPI_GLE.h>
+    #include <GL/CAPI_GLE.h>
     //#include <GL/gl.h>
     //#include <GL/glext.h>
     #include <GL/glx.h>
@@ -252,7 +249,7 @@ public:
     virtual int GetSamples() const { return Samples; }
 
     virtual void SetSampleMode(int);
-    virtual ovrTexture Get_ovrTexture();
+    virtual ovrTexture Get_ovrTexture() OVR_OVERRIDE;
 
     virtual void Set(int slot, ShaderStage stage = Shader_Fragment) const;
 };

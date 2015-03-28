@@ -24,6 +24,7 @@ limitations under the License.
 
 *************************************************************************************/
 
+#include <Kernel/OVR_Win32_IncludeWindows.h>
 #include "OVR_Win32_Display.h"
 #include "OVR_Win32_ShimFunctions.h"
 #include "OVR_Win32_Dxgi_Display.h"
@@ -38,10 +39,6 @@ extern void clearUMDriverOverrides();
 #include <tchar.h>
 #include <string.h>
 #include <stdlib.h>
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
 #include <winioctl.h>
 #include <SetupAPI.h>
 #include <Mmsystem.h>
@@ -176,6 +173,18 @@ BOOL WINAPI OVRMirroringEnabled( PVOID context )
 	return con->UseMirroring;
 }
 
+
+// This is a temporarily exported function for the purpose of aiding in the DLL transition for the Unity plugin.
+// It is unsupported and will be removed in a future release.
+extern "C"
+{
+    OVR_PUBLIC_FUNCTION(void*) ovr_GetDX11SwapChain()
+    {
+        return OVR::Win32::DisplayShim::GetInstance().GetDX11SwapChain();
+    }
+}
+
+
 namespace OVR { namespace Win32 {
 
 DisplayShim::DisplayShim() :
@@ -210,7 +219,7 @@ bool DisplayShim::Shutdown()
 	return true;
 }
 
-bool DisplayShim::Update(Win32ShimInfo* shimInfo)
+bool DisplayShim::Update(ExtraMonitorInfo* shimInfo)
 {
 	ChildUid = shimInfo->DeviceNumber;
 	ExpectedWidth = shimInfo->NativeWidth;

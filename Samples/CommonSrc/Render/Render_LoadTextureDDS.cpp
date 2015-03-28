@@ -118,7 +118,9 @@ Texture* LoadTextureDDS(RenderDevice* ren, File* f)
     {
         out->SetSampleMode(Sample_Clamp);
     }
-    OVR_FREE(bytes);
+
+    delete[] bytes;
+
     return out;
 }
 

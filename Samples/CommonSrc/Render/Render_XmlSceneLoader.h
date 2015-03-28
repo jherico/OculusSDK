@@ -21,8 +21,8 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef INC_Render_XMLSceneLoader_h
-#define INC_Render_XMLSceneLoader_h
+#ifndef OVR_Render_XMLSceneLoader_h
+#define OVR_Render_XMLSceneLoader_h
 
 #include "Render_Device.h"
 #include <Kernel/OVR_SysFile.h>
@@ -67,4 +67,4 @@ private:
 #define new OVR_DEFINE_NEW
 #endif
 
-#endif // INC_Render_XMLSceneLoader_h
+#endif // OVR_Render_XMLSceneLoader_h

@@ -74,8 +74,8 @@ void *WavPlayer::LoadPCM(const char *filename, unsigned long *len)
     {
         return NULL;
     }
-    *len = s.st_size;
-    pcm = (void *) malloc(s.st_size);
+    *len = (unsigned long)s.st_size;
+    pcm = (void *) malloc((size_t)s.st_size);
     if(!pcm)
     {
         return NULL;
@@ -86,7 +86,7 @@ void *WavPlayer::LoadPCM(const char *filename, unsigned long *len)
         free(pcm);
         return NULL;
     }
-    fread(pcm, s.st_size, 1, file);
+    fread(pcm, (size_t)s.st_size, 1, file);
     fclose(file);
     return pcm;
 }
@@ -161,7 +161,7 @@ void WavPlayer::aqBufferCallback(void *in, AudioQueueRef inQ, AudioQueueBufferRe
     aqc = (AQCallbackStruct *) in;
     coreAudioBuffer = (unsigned char*) outQB->mAudioData;
 
-    printf("Sync: %u / %u\n", aqc->PlayPtr, aqc->SampleLen);
+    printf("Sync: %u / %u\n", (unsigned int)aqc->PlayPtr, (unsigned int)aqc->SampleLen);
 
     if(aqc->FrameCount > 0)
     {

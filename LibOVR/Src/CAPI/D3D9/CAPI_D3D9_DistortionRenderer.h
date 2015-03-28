@@ -1,6 +1,6 @@
 /************************************************************************************
 
-Filename    :   CAPI_D3D1X_DistortionRenderer.h
+Filename    :   CAPI_D3D11_DistortionRenderer.h
 Content     :   Experimental distortion renderer
 Created     :   March 7, 2014
 Authors     :   Tom Heath
@@ -24,12 +24,8 @@ limitations under the License.
 
 ************************************************************************************/
 
-#include "../../Kernel/OVR_Types.h"
-
-#if defined (OVR_OS_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <d3d9.h>
-#endif
+#include "Kernel/OVR_Types.h"
+#include "Util/Util_Direct3D.h"
 
 #if defined(OVR_DEFINE_NEW)
 #define new OVR_DEFINE_NEW
@@ -46,20 +42,17 @@ namespace OVR { namespace CAPI { namespace D3D9 {
 class DistortionRenderer : public CAPI::DistortionRenderer
 {
 public:    
-    DistortionRenderer(ovrHmd hmd, FrameTimeManager& timeManager, const HMDRenderState& renderState);
+    DistortionRenderer();
     ~DistortionRenderer();
 
     // Creation function for the device.    
-    static CAPI::DistortionRenderer* Create(ovrHmd hmd,
-		                                    FrameTimeManager& timeManager,
-                                            const HMDRenderState& renderState);
-	
+    static CAPI::DistortionRenderer* Create();
+
     // ***** Public DistortionRenderer interface
-    virtual bool Initialize(const ovrRenderAPIConfig* apiConfig) OVR_OVERRIDE;
+    virtual void SubmitEye(int eyeId, const ovrTexture* eyeTexture) OVR_OVERRIDE;
+    virtual void SubmitEyeWithDepth(int eyeId, const ovrTexture* eyeColorTexture, const ovrTexture* eyeDepthTexture) OVR_OVERRIDE;
 
-    virtual void SubmitEye(int eyeId, const ovrTexture* eyeTexture);
-
-    virtual void EndFrame(bool swapBuffers);
+    virtual void EndFrame(uint32_t frameIndex, bool swapBuffers);
 
     // TBD: Make public?
     void         WaitUntilGpuIdle();
@@ -69,8 +62,9 @@ public:
 	double       FlushGpuAndWaitTillTime(double absTime);
 
 protected:
-	
-	class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
+    virtual bool initializeRenderer(const ovrRenderAPIConfig* apiConfig) OVR_OVERRIDE;
+
+    class GraphicsState : public CAPI::DistortionRenderer::GraphicsState
 	{
 	public:
 		GraphicsState(IDirect3DDevice9* d, unsigned distortionCaps);
@@ -98,17 +92,17 @@ protected:
 private:
 
 	//Functions
-	void         CreateDistortionShaders(void);
-	void         CreateDistortionModels(void);
-	void         CreateVertexDeclaration(void);
+	void         CreateDistortionShaders();
+	bool         CreateDistortionModels();
+	void         CreateVertexDeclaration();
 	void         RenderBothDistortionMeshes();
 	void         RecordAndSetState(int which, int type, DWORD newValue);
-	void         RevertAllStates(void);
+	void         RevertAllStates();
 
     void         renderEndFrame();
 
     // Latency tester
-    void InitLatencyTester(const HMDRenderState& renderState);
+    void initLatencyTester();
     void renderLatencyQuad(unsigned char* latencyTesterDrawColor);
     void renderLatencyPixel(unsigned char* latencyTesterPixelColor);
 
@@ -139,4 +133,5 @@ private:
 	} eachEye[2];
 };
 
-}}} // OVR::CAPI::D3D9
+
+}}} // namespace OVR::CAPI::D3D9

@@ -23,7 +23,7 @@ limitations under the License.
 #ifndef OVR_Render_Device_h
 #define OVR_Render_Device_h
 
-#include "Kernel/OVR_Math.h"
+#include "Extras/OVR_Math.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_RefCount.h"
 #include "Kernel/OVR_String.h"
@@ -31,7 +31,6 @@ limitations under the License.
 #include "Kernel/OVR_Color.h"
 #include "OVR_CAPI.h"
 
-#include "OVR_Stereo.h"
 
 namespace OVR { namespace Render {
 
@@ -104,7 +103,7 @@ enum BuiltinShaders
     FShader_PostProcessHeightmapTimewarp            ,
     FShader_Count                                   ,
 
-    CShader_PostProcess2x2                          = 0,
+    CShader_PostProcess2x2Pentile                   = 0,
     CShader_Count                                   ,
 };
 
@@ -369,7 +368,7 @@ public:
     virtual void SetSampleMode(int sm) = 0;
     virtual void Set(int slot, ShaderStage stage = Shader_Fragment) const = 0;
 	
-	virtual ovrTexture Get_ovrTexture() = 0;
+    virtual ovrTexture      Get_ovrTexture() = 0;
 
 	virtual void* GetInternalImplementation() { return NULL; };
 };
@@ -726,7 +725,7 @@ enum PostProcessType
     PostProcess_MeshDistortionTimewarp,
     PostProcess_MeshDistortionPositionalTimewarp,
     PostProcess_MeshDistortionHeightmapTimewarp,
-    PostProcess_Compute2x2,
+    PostProcess_Compute2x2Pentile,
     PostProcess_NoDistortion,
 };
 
@@ -867,26 +866,11 @@ public:
 
     // StereoParams apply Viewport, Projection and Distortion simultaneously,
     // doing full configuration for one eye.
-    void        ApplyStereoParams(const StereoEyeParams& params)
-    {
-        SetViewport(params.RenderedViewport);
-        SetProjection(params.RenderedProjection);
-    }
-
     void        ApplyStereoParams(const Recti& vp, const Matrix4f& projection)
     {
         SetViewport(vp);
         SetProjection(projection);
     }
-    // Apply "orthographic" stereo parameters used for rendering 2D HUD overlays.
-    void        ApplyStereoParams2D(StereoEyeParams const &params, Matrix4f const &ortho)
-    {
-        SetViewport(params.RenderedViewport);
-        SetProjection(ortho);
-    }
-
-    
-
 
     virtual void SetViewport(const Recti& vp) = 0;
     void         SetViewport(int x, int y, int w, int h) { SetViewport(Recti(x,y,w,h)); }
@@ -926,19 +910,6 @@ public:
     virtual void BeginRendering() {}
     // Begin drawing the primary scene, starting up whatever post-processing may be needed.
     virtual void BeginScene(PostProcessType pp = PostProcess_None);
-    // Call when any of the stereo options change, so precalculation can happen.
-    virtual void PrecalculatePostProcess(PostProcessType pptype,
-                                         const StereoEyeParams &stereoParamsLeft, const StereoEyeParams &stereoParamsRight,
-                                         const HmdRenderInfo &hmdRenderInfo );
-    // Perform postprocessing
-    virtual void ApplyPostProcess(Matrix4f const &matNowFromWorldStart,   Matrix4f const &matNowFromWorldEnd,
-                                  Matrix4f const &matRenderFromWorldLeft, Matrix4f const &matRenderFromWorldRight,
-                                  StereoEyeParams const &stereoParamsLeft, StereoEyeParams const &stereoParamsRight,
-                                  RenderTarget* pHmdSpaceLayerRenderTargetLeftOrBothEyes,
-                                  RenderTarget* pHmdSpaceLayerRenderTargetRight,
-                                  RenderTarget* pStaticLayerRenderTargetLeftOrBothEyes,
-                                  RenderTarget* pStaticLayerRenderTargetRight,
-                                  RenderTarget* pOutputTarget);
 
     // Finish scene.
     virtual void FinishScene();
@@ -1024,7 +995,7 @@ public:
         PostProcessShader_MeshDistortionAndChromAbTimewarp,
         PostProcessShader_MeshDistortionAndChromAbPositionalTimewarp,
         PostProcessShader_MeshDistortionAndChromAbHeightmapTimewarp,
-        PostProcessShader_Compute2x2,
+        PostProcessShader_Compute2x2Pentile,
         PostProcessShader_Count
     };
 
@@ -1095,7 +1066,7 @@ int GetTextureSize(int format, int w, int h);
 // Image size must be a power of 2.
 void FilterRgba2x2(const uint8_t* src, int w, int h, uint8_t* dest);
 
-Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha = 255);
+Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha = 255, bool generatePremultAlpha = false);
 Texture* LoadTextureDDS(RenderDevice* ren, File* f);
 
 

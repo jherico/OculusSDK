@@ -27,14 +27,8 @@ limitations under the License.
 #ifndef OVR_CAPI_D3D9_HSWDisplay_h
 #define OVR_CAPI_D3D9_HSWDisplay_h
 
-#if !defined(OVR_D3D_VERSION) || (OVR_D3D_VERSION != 9)
-    #error This header expects OVR_D3D_VERSION to be defined, to 9.
-#endif
-
 #include "../CAPI_HSWDisplay.h"
-#include "../D3D1X/CAPI_D3D1X_Util.h"
-#include <d3d9.h>
-
+#include "Util/Util_Direct3D.h"
 
 namespace OVR { namespace CAPI { namespace D3D9 {
 

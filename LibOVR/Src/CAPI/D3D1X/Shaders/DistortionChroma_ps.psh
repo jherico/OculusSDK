@@ -23,9 +23,12 @@ limitations under the License.
 
 Texture2D Texture : register(t0);
 Texture2D LastTexture : register(t1);
+Texture2D OverdriveLut : register(t2);
 SamplerState Linear : register(s0);
+// unused - SamplerState Linear2 : register(s1);
+SamplerState OverdriveSampler : register(s2);
 
-float2 OverdriveScales;
+float3 OverdriveScales;
 float AaDerivativeMult;
 
 // Fast approximate gamma to linear conversion when averaging colors
@@ -124,12 +127,24 @@ void   main(in float4 oPosition  : SV_Position,
 	{
 		float3 oldColor = LastTexture.Load(int3(oPosition.xy, 0)).rgb;
 		
-		float3 adjustedScales;
-		adjustedScales.x = newColor.x > oldColor.x ? OverdriveScales.x : OverdriveScales.y;
-		adjustedScales.y = newColor.y > oldColor.y ? OverdriveScales.x : OverdriveScales.y;
-		adjustedScales.z = newColor.z > oldColor.z ? OverdriveScales.x : OverdriveScales.y;
-		
-		float3 overdriveColor = saturate(newColor + (newColor - oldColor) * adjustedScales);
+        float3 overdriveColor;
+
+        // x < 1.5 means "use analytical model instead of LUT"
+        if(OverdriveScales.x < 1.5)
+        {
+		    float3 adjustedScales;
+		    adjustedScales.x = newColor.x > oldColor.x ? OverdriveScales.y : OverdriveScales.z;
+    		adjustedScales.y = newColor.y > oldColor.y ? OverdriveScales.y : OverdriveScales.z;
+		    adjustedScales.z = newColor.z > oldColor.z ? OverdriveScales.y : OverdriveScales.z;
+		    overdriveColor = saturate(newColor + (newColor - oldColor) * adjustedScales);
+        }
+		else
+        {
+            overdriveColor.r = OverdriveLut.Sample(OverdriveSampler, float2(newColor.r, oldColor.r)).r;
+		    overdriveColor.g = OverdriveLut.Sample(OverdriveSampler, float2(newColor.g, oldColor.g)).g;
+		    overdriveColor.b = OverdriveLut.Sample(OverdriveSampler, float2(newColor.b, oldColor.b)).b;
+        }
+
 		outColor1 = float4(overdriveColor, 1.0);
 	}
 }

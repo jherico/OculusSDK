@@ -25,7 +25,7 @@ limitations under the License.
 *************************************************************************************/
 
 #include "OVR_Win32_FocusReader.h"
-#include "../Kernel/OVR_Log.h"
+#include "Kernel/OVR_Log.h"
 #include "../Service/Service_NetClient.h"
 
 OVR_DEFINE_SINGLETON(OVR::Win32::RenderFocusReader);

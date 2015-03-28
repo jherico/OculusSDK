@@ -26,7 +26,7 @@ limitations under the License.
 
 namespace OVR { namespace Render {
 
-Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
+Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha, bool generatePremultAlpha)
 {
     f->SeekToBegin();
     
@@ -42,7 +42,8 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
     int width = f->ReadUInt16();
     int height = f->ReadUInt16();
     int bpp = f->ReadUByte();
-    f->ReadUByte();
+    int descbyte = f->ReadUByte();         // <--- image descriptor byte
+    OVR_ASSERT_AND_UNUSED(descbyte == 0, descbyte); //image is flipped
     int imgsize = width * height * 4;
     unsigned char* imgdata = (unsigned char*) OVR_ALLOC(imgsize);
     unsigned char buf[16];
@@ -50,13 +51,16 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
     f->Read(imgdata, palCount * (palSize + 7) >> 3);
     int bpl = width * 4;
 
+    // Note that TGAs are stored bottom-up.
+    // (in theory you can store them top-down and flip a bit inside the "image descriptor" byte, but that breaks a lot of things)
+
     switch (imgtype)
     {
     case 2:
         switch (bpp)
         {
         case 24:
-            for (int y = 0; y < height; y++)
+            for (int y = height-1; y >= 0; y--)
                 for (int x = 0; x < width; x++)
                 {
                     f->Read(buf, 3);
@@ -67,7 +71,7 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
                 }
             break;
         case 32:
-            for (int y = 0; y < height; y++)
+            for (int y = height-1; y >= 0; y--)
                 for (int x = 0; x < width; x++)
                 {
                     f->Read(buf, 4);
@@ -75,9 +79,20 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
                     imgdata[y*bpl+x*4+1] = buf[1];
                     imgdata[y*bpl+x*4+2] = buf[0];
                     if (buf[3] == 255)
+                    {
                         imgdata[y*bpl+x*4+3] = alpha;
+                    }
                     else
-                    imgdata[y*bpl+x*4+3] = buf[3];
+                    {
+                        imgdata[y*bpl+x*4+3] = buf[3];
+                    }
+                    if ( generatePremultAlpha )
+                    {
+                        // Image is in lerping alpha, but we want premult alpha.
+                        imgdata[y*bpl+x*4+0] = (unsigned char)((float)buf[2] * (float)buf[3] / 255.0f);
+                        imgdata[y*bpl+x*4+1] = (unsigned char)((float)buf[1] * (float)buf[3] / 255.0f);
+                        imgdata[y*bpl+x*4+2] = (unsigned char)((float)buf[0] * (float)buf[3] / 255.0f);
+                    }
                 }
             break;
 
@@ -92,13 +107,13 @@ Texture* LoadTextureTga(RenderDevice* ren, File* f, unsigned char alpha)
         return NULL;
     }
 
-	Texture* out = ren->CreateTexture(Texture_RGBA|Texture_GenMipmaps, width, height, imgdata);
+    Texture* out = ren->CreateTexture(Texture_RGBA|Texture_GenMipmaps, width, height, imgdata);
 
-	// check for clamp based on texture name
-	if(strstr(f->GetFilePath(), "_c."))
-	{
-		out->SetSampleMode(Sample_Clamp);
-	}
+    // check for clamp based on texture name
+    if(strstr(f->GetFilePath(), "_c."))
+    {
+        out->SetSampleMode(Sample_Clamp);
+    }
 
     OVR_FREE(imgdata);
     return out;

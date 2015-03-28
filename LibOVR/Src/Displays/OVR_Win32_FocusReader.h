@@ -27,10 +27,10 @@ limitations under the License.
 #ifndef OVR_Win32_FocusReader_h
 #define OVR_Win32_FocusReader_h
 
-#include "../Kernel/OVR_System.h"
-#include "../Kernel/OVR_Lockless.h"
-#include "../Kernel/OVR_Array.h"
-#include "../Kernel/OVR_SharedMemory.h"
+#include "Kernel/OVR_System.h"
+#include "Kernel/OVR_Lockless.h"
+#include "Kernel/OVR_Array.h"
+#include "Kernel/OVR_SharedMemory.h"
 
 namespace OVR { namespace Win32 {
 

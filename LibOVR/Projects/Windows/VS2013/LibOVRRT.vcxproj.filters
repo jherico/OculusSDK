@@ -1,0 +1,346 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.cpp">
+      <Filter>CAPI\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_HSWDisplay.cpp">
+      <Filter>CAPI\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Util\Util_Interface.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Util\Util_LatencyTest2Reader.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Util\Util_Render_Stereo.cpp">
+      <Filter>Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HMDState.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Service\Service_NetClient.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Service\Service_NetSessionCommon.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_Util.cpp">
+      <Filter>CAPI\D3D9</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.cpp">
+      <Filter>CAPI\GL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.cpp">
+      <Filter>CAPI\GL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.cpp">
+      <Filter>CAPI\GL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\OVR_CAPI.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Profile.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_SerialFormat.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_Stereo.cpp" />
+    <ClCompile Include="..\..\..\Src\Net\OVR_Win32_Socket.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_NetworkPlugin.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_PacketizedTCPSocket.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_BitStream.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_Socket.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_Session.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Net\OVR_RPC1.cpp">
+      <Filter>Net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_Util.cpp">
+      <Filter>CAPI\D3D11</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Display.cpp">
+      <Filter>Displays</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_Display.cpp">
+      <Filter>Displays</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_FocusReader.cpp">
+      <Filter>Displays</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_RenderShim.cpp">
+      <Filter>Displays</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Displays\OVR_Win32_ShimFunctions.cpp">
+      <Filter>Displays</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_FrameTimeManager3.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_DistortionTiming.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\CAPI\CAPI_FrameLatencyTracker.cpp">
+      <Filter>CAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\Vision\SensorFusion\Vision_SensorStateReader.cpp">
+      <Filter>Vision\SensorFusion</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Src\OVR_StereoProjection.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_CAPI_Util.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Src\OVR_Profile.h" />
+    <ClInclude Include="..\..\..\Src\OVR_SerialFormat.h" />
+    <ClInclude Include="..\..\..\Src\OVR_Stereo.h" />
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_DistortionRenderer.h">
+      <Filter>CAPI\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_HSWDisplay.h">
+      <Filter>CAPI\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_Interface.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2Reader.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_LatencyTest2State.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Util\Util_Render_Stereo.h">
+      <Filter>Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_DistortionRenderer.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDRenderState.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HMDState.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_HSWDisplay.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_BitStream.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_NetworkPlugin.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_NetworkTypes.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_PacketizedTCPSocket.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_RPC1.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_Session.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_Socket.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Net\OVR_Win32_Socket.h">
+      <Filter>Net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Service\Service_NetClient.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Service\Service_NetSessionCommon.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_DistortionRenderer.h">
+      <Filter>CAPI\D3D9</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D9\CAPI_D3D9_HSWDisplay.h">
+      <Filter>CAPI\D3D9</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionRenderer.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_DistortionShaders.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_HSWDisplay.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\GL\CAPI_GL_Util.h">
+      <Filter>CAPI\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\Extras\OVR_Math.h">
+      <Filter>Include\Extras</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_GL.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Keys.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_D3D.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\OVR_Version.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\D3D1X\CAPI_D3D11_Util.h">
+      <Filter>CAPI\D3D11</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Display.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_Display.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_Dxgi_Display.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_FocusReader.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_ShimFunctions.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Displays\OVR_Win32_ShimVersion.h">
+      <Filter>Displays</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Tracing\ETW_Tracing.h">
+      <Filter>Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Tracing\Tracing.h">
+      <Filter>Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_0_5_0.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_FrameTimeManager3.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_DistortionTiming.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\CAPI\CAPI_FrameLatencyTracker.h">
+      <Filter>CAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\Vision\SensorFusion\Vision_SensorStateReader.h">
+      <Filter>Vision\SensorFusion</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Src\OVR_StereoProjection.h" />
+    <ClInclude Include="..\..\..\Include\OVR_CAPI_Util.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\Distortion_ps.psh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_ps.psh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionChroma_vs.vsh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionCS2x2.csh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\DistortionTimewarpChroma_vs.vsh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_ps.psh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleQuad_vs.vsh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_ps.psh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\Src\CAPI\D3D1X\Shaders\SimpleTexturedQuad_vs.vsh">
+      <Filter>CAPI\D3D11\Shaders</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CAPI">
+      <UniqueIdentifier>{9af78ed7-067d-4eee-8bb4-b4eea5c124cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Net">
+      <UniqueIdentifier>{1f52ea3c-9a0f-4915-9bd1-9f1c6c61d641}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Service">
+      <UniqueIdentifier>{2646ae0b-bdbb-461a-bcbd-e21f0c3c9174}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Util">
+      <UniqueIdentifier>{3a4b709b-2a67-4813-bbd8-67c26a2668b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CAPI\D3D9">
+      <UniqueIdentifier>{87e2fa1e-af58-46e4-b14e-c6303c87bd60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CAPI\D3D11">
+      <UniqueIdentifier>{3673fd50-1237-4030-94e3-49769e92f1a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CAPI\GL">
+      <UniqueIdentifier>{77508bdc-b6b7-4de5-9aaa-33f3383096f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CAPI\D3D11\Shaders">
+      <UniqueIdentifier>{6a8b4b6e-1055-46a7-910b-3483dd52957c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include">
+      <UniqueIdentifier>{63dbcc31-d1ff-437f-85b3-561d90871316}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{075f16d4-d2b8-4c52-a275-04af68d0ae99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Extras">
+      <UniqueIdentifier>{fb431e21-7e66-4875-9a63-479895da9622}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Displays">
+      <UniqueIdentifier>{047f6ada-3b5c-4318-978a-895e1220d0b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tracing">
+      <UniqueIdentifier>{aab9811a-dd13-4e2c-a39e-671c7f1a61c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Vision">
+      <UniqueIdentifier>{4e4e6b98-f190-4ef8-bc07-74c56bef6a02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Vision\SensorFusion">
+      <UniqueIdentifier>{f2322208-cafd-4b3f-b7c1-f53cf93d7f99}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\Src\Resources\Windows\LibOVR.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\Src\Tracing\ETW_Tracing.man">
+      <Filter>Tracing</Filter>
+    </None>
+    <None Include="..\..\..\Src\Tracing\README.md">
+      <Filter>Tracing</Filter>
+    </None>
+  </ItemGroup>
+</Project>

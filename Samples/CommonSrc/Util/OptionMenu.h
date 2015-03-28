@@ -21,8 +21,8 @@ limitations under the License.
 
 *************************************************************************************/
 
-#ifndef INC_OptionMenu_h
-#define INC_OptionMenu_h
+#ifndef OVR_OptionMenu_h
+#define OVR_OptionMenu_h
 
 #include "OVR_Kernel.h"
 
@@ -30,14 +30,9 @@ limitations under the License.
 #include "../Render/Render_Device.h"
 #include "../Platform/Gamepad.h"
 
-#include "Util/Util_Render_Stereo.h"
-using namespace OVR::Util::Render;
-
 #include <Kernel/OVR_SysFile.h>
 #include <Kernel/OVR_Log.h>
 #include <Kernel/OVR_Timer.h>
-
-#include "Sensors/OVR_DeviceConstants.h"
 
 
 using namespace OVR;
@@ -361,6 +356,20 @@ public:
         return *p;
     }
     
+        // Adds an Int variable. Returns added item to allow customization.
+    OptionVar& AddInt(   const char* name, int32_t* pvar, 
+                         int32_t min, int32_t max, int32_t stepSize = 1,
+                         const char* formatString = "%d",
+                         OptionVar::FormatFunction formatFunction = 0, // Default formatting.
+                         OptionVar::UpdateFunction updateFunction = 0 )
+    {
+        OptionVar* p = new OptionVar(name, pvar, min, max, stepSize,
+                                     formatString,
+                                     formatFunction, updateFunction);
+        AddItem(p);
+        return *p;
+    }
+
     OptionVar& AddTrigger( const char* name, OptionVar::UpdateFunction updateFunction = 0 )
     {
         OptionVar* p = new OptionVar(name, NULL, OptionVar::Type_Trigger,
@@ -381,6 +390,10 @@ public:
     // Overrides current timeout, in seconds (not the future default value);
     // intended to be called right after SetPopupMessage.
     void            SetPopupTimeout(double timeoutSeconds, bool border = false);
+
+    // If the menu is not visible, it still shows a message when an option changes.
+    // You can disable that with this.
+    void            SetShortcutChangeMessageEnable ( bool enabled );
 
     virtual bool    IsMenu() const { return true; }
 
@@ -409,6 +422,8 @@ public:
     String                    PopupMessage;
     double                    PopupMessageTimeout;
     bool                      PopupMessageBorder;
+
+    bool                      RenderShortcutChangeMessages;
 
     // Possible menu navigation actions.
     enum NavigationActions
@@ -457,4 +472,4 @@ void    DrawTextBox(RenderDevice* prender, float x, float y,
 void    CleanupDrawTextFont();
 
 
-#endif // INC_OptionMenu_h
+#endif // OVR_OptionMenu_h

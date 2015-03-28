@@ -24,30 +24,30 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef INC_OVR_CAPI_GL_Util_h
-#define INC_OVR_CAPI_GL_Util_h
+#ifndef OVR_CAPI_GL_Util_h
+#define OVR_CAPI_GL_Util_h
 
-#include "../../OVR_CAPI.h"  
-#include "../../Kernel/OVR_Array.h"
-#include "../../Kernel/OVR_Math.h"
-#include "../../Kernel/OVR_RefCount.h"
-#include "../../Kernel/OVR_String.h"
-#include "../../Kernel/OVR_Types.h"
-#include "../../Kernel/OVR_Log.h"
-
+#include "OVR_CAPI.h"  
+#include "Kernel/OVR_Array.h"
+#include "Kernel/OVR_RefCount.h"
+#include "Kernel/OVR_String.h"
+#include "Kernel/OVR_Types.h"
+#include "Kernel/OVR_Log.h"
 #if defined(OVR_OS_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#endif
+    #include "Kernel/OVR_Win32_IncludeWindows.h"
+#endif // OVR_OS_WIN32
+#include "Extras/OVR_Math.h"
 
 #if !defined(OVR_DISABLE_GLE)   // By default we use the GLE module in order to link to OpenGL functions. However, if an external user 
-#include "CAPI_GLE.h"           // wants to use an alternative mechanism to connect to OpenGL functions, they can #define OVR_DISABLE_GLE.
+#include "GL/CAPI_GLE.h"           // wants to use an alternative mechanism to connect to OpenGL functions, they can #define OVR_DISABLE_GLE.
 #endif
 
 
 #if defined(OVR_OS_MAC)
+    #include <memory>
     #include <CoreGraphics/CGDirectDisplay.h>
     #include <OpenGL/CGLTypes.h>
+    class MacContextImpl;
 #endif
 
 
@@ -485,12 +485,13 @@ class Context
     GLXContext          systemContext;
     XVisualInfo         x11Visual;
 #elif defined(OVR_OS_MAC)
-    CGLContextObj       systemContext;
+    std::unique_ptr<MacContextImpl>    systemContext;
 #endif
-        
+
 public:
 
     Context();
+    ~Context();
     void InitFromCurrent();
     void CreateShared( Context & ctx );
 #if defined(OVR_OS_MAC)
@@ -550,4 +551,4 @@ struct AutoContext
 }}} // namespace OVR::CAPI::GL
 
 
-#endif // INC_OVR_CAPI_GL_Util_h
+#endif // OVR_CAPI_GL_Util_h

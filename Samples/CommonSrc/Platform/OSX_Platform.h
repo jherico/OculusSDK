@@ -21,6 +21,9 @@ limitations under the License.
 
 ************************************************************************************/
 
+#ifndef OVR_OSX_Platform_h
+#define OVR_OSX_Platform_h
+
 #include "../Platform/Platform.h"
 #include "../Render/Render_GL_Device.h"
 
@@ -88,26 +91,6 @@ public:
 }}}}
 
 
-// OVR_PLATFORM_APP_ARGS specifies the Application class to use for startup,
-// providing it with startup arguments.
-#define OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass, LogClass, args)                     \
-OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
-{ static LogClass log; OVR::System::Init(&log);                \
-return new AppClass args; }                                                        \
-void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
-{ OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
-delete app; delete platform; OVR::System::Destroy(); };
 
-#define OVR_PLATFORM_APP_ARGS(AppClass, args)                                            \
-	OVR::OvrPlatform::Application* OVR::OvrPlatform::Application::CreateApplication()          \
-{ OVR::System::Init(OVR::Log::ConfigureDefaultLog(OVR::LogMask_All));                \
-	return new AppClass args; }                                                        \
-	void OVR::OvrPlatform::Application::DestroyApplication(OVR::OvrPlatform::Application* app) \
-{ OVR::OvrPlatform::PlatformCore* platform = app->pPlatform;                            \
-	delete app; delete platform; OVR::System::Destroy(); };
-
-// OVR_PLATFORM_APP_ARGS specifies the Application startup class with no args.
-#define OVR_PLATFORM_APP(AppClass) OVR_PLATFORM_APP_ARGS(AppClass, ())
-
-#define OVR_PLATFORM_APP_WITH_LOG(AppClass,LogClass) OVR_PLATFORM_APP_ARGS_WITH_LOG(AppClass,LogClass, ())
+#endif // OVR_OSX_Platform_h
 

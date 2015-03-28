@@ -27,11 +27,11 @@ limitations under the License.
 #ifndef OVR_Service_NetClient_h
 #define OVR_Service_NetClient_h
 
-#include "../Net/OVR_NetworkTypes.h"
+#include "Net/OVR_NetworkTypes.h"
 #include "Service_NetSessionCommon.h"
-#include "../Kernel/OVR_System.h"
-#include "../OVR_CAPI.h"
-#include "../Util/Util_Render_Stereo.h"
+#include "Kernel/OVR_System.h"
+#include "OVR_CAPI.h"
+#include "Util/Util_Render_Stereo.h"
 
 namespace OVR { namespace Service {
 
@@ -48,27 +48,21 @@ class NetClient : public NetSessionCommon,
     OVR_DECLARE_SINGLETON(NetClient);
     virtual void OnThreadDestroy();
 
-    // Status
-    bool          LatencyTesterAvailable;
-    int           HMDCount;
-    bool          EdgeTriggeredHMDCount;
-
-    virtual void OnReceive(Net::ReceivePayload* pPayload, Net::ListenerReceiveResult* lrrOut);
-    virtual void OnDisconnected(Net::Connection* conn);
-    virtual void OnConnected(Net::Connection* conn);
-
-    virtual int  Run();
-
 public:
     bool         Connect(bool blocking);
     bool         IsConnected(bool attemptReconnect, bool blockOnReconnect);
     void         Disconnect();
 
     void         GetLocalProtocolVersion(int& major, int& minor, int& patch);
-    // This function may fail if it is not connected
+    void         GetLocalSDKVersion(SDKVersion& requestedSDKVersion);
+
+    // These functions may fail if it is not connected
     bool         GetRemoteProtocolVersion(int& major, int& minor, int& patch);
+    bool         GetRemoteSDKVersion(SDKVersion& remoteSDKVersion);
 
     void         SetLastError(String str);
+
+    void         ApplyParameters(ovrInitParams const* params);
 
 public:
     // Persistent key-value storage
@@ -112,7 +106,7 @@ public:
 	// *** Tracking Setup
 
 	bool         Hmd_ConfigureTracking(VirtualHmdId hmd, unsigned supportedCaps, unsigned requiredCaps);	
-	void         Hmd_ResetTracking(VirtualHmdId hmd);
+	void         Hmd_ResetTracking(VirtualHmdId hmd, bool visionReset);
 
 	// TBD: Camera frames
     bool         LatencyUtil_ProcessInputs(double startTestSeconds, unsigned char rgbColorOut[3]);
@@ -121,25 +115,43 @@ public:
     bool         ShutdownServer();
 
 protected:
+    // Status
+    bool         LatencyTesterAvailable;
+    int          HMDCount;
+    bool         EdgeTriggeredHMDCount;
+
     String       Hmd_GetLastError_Str;
     String       LatencyUtil_GetResultsString_Str;
     String       ProfileGetValue1_Str, ProfileGetValue3_Str;
 
+    // Parameters passed to ovr_Initialize()
+    bool         ServerOptional;      // Server connection is optional?
+    bool         ExtraDebugging;      // Extra debugging enabled?
+    int          ConnectionTimeoutMS; // Connection timeout in milliseconds
+
+    void         SetDefaultParameters();
+
 protected:
+    virtual void OnReceive(Net::ReceivePayload* pPayload, Net::ListenerReceiveResult* lrrOut);
+    virtual void OnDisconnected(Net::Connection* conn);
+    virtual void OnConnected(Net::Connection* conn);
+
+    virtual int  Run();
+
     //// Push Notifications:
 
     void registerRPC();
 
-    ObserverScope<Net::Plugins::RPCSlot> InitialServerStateScope;
+    CallbackListener<Net::Plugins::RPCSlot> InitialServerStateScope;
     void InitialServerState_1(BitStream* userData, ReceivePayload* pPayload);
 
-    ObserverScope<Net::Plugins::RPCSlot> LatencyTesterAvailableScope;
+    CallbackListener<Net::Plugins::RPCSlot> LatencyTesterAvailableScope;
     void LatencyTesterAvailable_1(BitStream* userData, ReceivePayload* pPayload);
 
-    ObserverScope<Net::Plugins::RPCSlot> DefaultLogOutputScope;
+    CallbackListener<Net::Plugins::RPCSlot> DefaultLogOutputScope;
     void DefaultLogOutput_1(BitStream* userData, ReceivePayload* pPayload);
 
-    ObserverScope<Net::Plugins::RPCSlot> HMDCountUpdateScope;
+    CallbackListener<Net::Plugins::RPCSlot> HMDCountUpdateScope;
     void HMDCountUpdate_1(BitStream* userData, ReceivePayload* pPayload);
 };
 

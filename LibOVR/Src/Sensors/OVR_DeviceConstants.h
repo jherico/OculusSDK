@@ -27,7 +27,9 @@ limitations under the License.
 #ifndef OVR_DeviceConstants_h
 #define OVR_DeviceConstants_h
 
-#include "../Kernel/OVR_Math.h"
+#include "Kernel/OVR_Types.h"
+#include "Extras/OVR_Math.h"
+
 
 // CAPI forward declarations.
 struct ovrSensorData_;
@@ -70,6 +72,7 @@ enum DistortionEqnType
 
 //-------------------------------------------------------------------------------------
 // HMD types.
+// We use ordinal comparison on the enums often, so the list should be in chronological/capabilities order
 //
 enum HmdTypeEnum
 {
@@ -82,6 +85,8 @@ enum HmdTypeEnum
     HmdType_DKHDProto566Mi,     // DKHD, 5.66-inch panel, never sold.
     HmdType_CrystalCoveProto,   // Crystal Cove, 5.66-inch panel, shown at shows but never sold.
     HmdType_DK2,
+    HmdType_BlackStar,          // Prototype for E3 2014
+    HmdType_CB,                 // EVT Prototypes for Oculus Connect
 
     // Reminder - this header file is public - codenames only!
 
@@ -100,11 +105,6 @@ enum HmdShutterTypeEnum
     HmdShutter_RollingTopToBottom,
     HmdShutter_RollingLeftToRight,
     HmdShutter_RollingRightToLeft,
-    // TODO:
-    // color-sequential e.g. LCOS?
-    // alternate eyes?
-    // alternate columns?
-    // outside-in?
 
     HmdShutter_LAST
 };
@@ -134,6 +134,8 @@ enum EyeCupType
     EyeCup_Delilah2A,
     EyeCup_JamesA,
     EyeCup_SunMandalaA,
+    EyeCup_BlackStar,
+    EyeCup_EVTProto,
 
     EyeCup_LAST
 };
@@ -147,7 +149,6 @@ enum EyeCupType
 class SensorDataType
 {
 public:
-
     SensorDataType() : Temperature(0.0f), AbsoluteTimeSeconds(0.0) { }
 
     // C-interop support
@@ -175,6 +176,9 @@ public:
 };
 
 static_assert((sizeof(SensorDataType) == 3*sizeof(Vector3f) + sizeof(float) + sizeof(double)), "sizeof(SensorDataType) failure");
+
+
+
 
 #pragma pack(pop)
 

@@ -24,18 +24,17 @@ limitations under the License.
 
 ************************************************************************************/
 
-#define OVR_D3D_VERSION 9
 #include "CAPI_D3D9_HSWDisplay.h"
-#include "../../OVR_CAPI_D3D.h"
-#undef  OVR_D3D_VERSION
+#include "OVR_CAPI_D3D.h"
+#include "Util/Util_Direct3D.h"
+#include "Kernel/OVR_File.h"
+#include "Kernel/OVR_SysFile.h"
+#include "Kernel/OVR_Allocator.h"
+#include "Kernel/OVR_Color.h"
+#include "Extras/OVR_Math.h"
 
-#include <d3d9.h>
-#include "../../Kernel/OVR_File.h"
-#include "../../Kernel/OVR_SysFile.h"
-#include "../../Kernel/OVR_Math.h"
-#include "../../Kernel/OVR_Allocator.h"
-#include "../../Kernel/OVR_Color.h"
 
+OVR_DISABLE_MSVC_WARNING(4996) // Disable deprecation warning
 
 namespace OVR { namespace CAPI { 
 
@@ -259,6 +258,7 @@ void HSWDisplay::LoadGraphics()
                 const float right  = +1.0f;
                 const float bottom = +0.9f;
 
+                // See warning in LoadTextureTgaData() about this TGA being loaded "upside down", i.e. UV origin is at bottom-left.
                 pVertices[0] = HASWVertex(left,  top,    0.f, Color(255, 255, 255, 255), 0.f, flip ? 1.f : 0.f); // To do: Make this branchless 
                 pVertices[1] = HASWVertex(left,  bottom, 0.f, Color(255, 255, 255, 255), 0.f, flip ? 0.f : 1.f);
                 pVertices[2] = HASWVertex(right, top,    0.f, Color(255, 255, 255, 255), 1.f, flip ? 1.f : 0.f); 
@@ -422,9 +422,4 @@ void HSWDisplay::RenderInternal(ovrEyeType eye, const ovrTexture* eyeTexture)
 
 }}} // namespace OVR::CAPI::D3D9
 
-
-
-
-
-
-
+OVR_RESTORE_MSVC_WARNING()

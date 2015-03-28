@@ -63,7 +63,7 @@ FrameTimeRecordSet::FrameTimeRecordSet()
 void FrameTimeRecordSet::AddValue(int readValue, double timeSeconds)
 {
     Records[NextWriteIndex].ReadbackIndex = readValue;
-    Records[NextWriteIndex].TimeSeconds = timeSeconds;
+    Records[NextWriteIndex].TimeSeconds   = timeSeconds;
     NextWriteIndex++;
     if (NextWriteIndex == RecordCount)
         NextWriteIndex = 0;
@@ -110,7 +110,7 @@ void RecordStateReader::GetRecordSet(FrameTimeRecordSet& recordset)
         return;
     }
         
-    recordset = Updater->SharedLatencyTestState.GetState();
+    recordset = Updater->LatencyTest.GetState();
     return;
 }
 
