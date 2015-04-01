@@ -1,6 +1,10 @@
 project (ovr)
 
+if (WIN32 OR APPLE) 
 option(OVR_USE_SHIM "Create a small shim which dynamically loads the real Oculus library" 1)
+else()
+option(OVR_USE_SHIM "Create a small shim which dynamically loads the real Oculus library" 0)
+endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
 
@@ -18,48 +22,48 @@ if (OVR_USE_SHIM)
 
 else()
 
-	if (APPLE)
-		message(FATAL_ERROR "Cannot use cmake to build the full shared library on OSX")
-	endif()
+    if (APPLE)
+        message(FATAL_ERROR "Cannot use cmake to build the full shared library on OSX")
+    endif()
 
     include_directories(Include Src ../LibOVRKernel/Src)
     include_directories(../3rdParty/glext)
     
-	file(GLOB_RECURSE SOURCE_FILES 
-	    ../LibOVRKernel/Src/*.cpp 
-	    ../LibOVRKernel/Src/*.h 
-	    Src/*.cpp 
-	    Src/*.h 
-	    Include/*.h
-	)
-	
-	file(GLOB_RECURSE WIN32_FILES 
-	    Src/*_Win32_*.cpp 
-	    Src/*_Win32_*.h 
-	    Src/*D3D*.cpp
-	    Src/*D3D*.h
-	    ../LibOVRKernel/Src/Kernel/OVR_ThreadsWinAPI.cpp 
-	    ../LibOVRKernel/Src/*D3D*.cpp
-	    ../LibOVRKernel/Src/Util/*Direct3D.cpp
-	)
-	
-	file(GLOB_RECURSE OSX_FILES 
-	    Src/OVR_OSX_*.cpp 
-	    Src/OVR_OSX_*.h 
-	    ../LibOVRKernel/Src/*.mm 
-	    ../LibOVRKernel/Src/*OSX.c
-	)
-	
-	file(GLOB_RECURSE LINUX_FILES 
-	    Src/OVR_Linux_*.cpp 
-	    Src/OVR_Linux_*.h
-	)
-	
-	file(GLOB_RECURSE UNIX_FILES 
-	    Src/OVR_Unix_*.cpp 
-	    Src/OVR_Unix_*.h 
-	    Src/Kernel/OVR_ThreadsPthread.cpp
-	)
+    file(GLOB_RECURSE SOURCE_FILES 
+        ../LibOVRKernel/Src/*.cpp 
+        ../LibOVRKernel/Src/*.h 
+        Src/*.cpp 
+        Src/*.h 
+        Include/*.h
+    )
+    
+    file(GLOB_RECURSE WIN32_FILES 
+        Src/*_Win32_*.cpp 
+        Src/*_Win32_*.h 
+        Src/*D3D*.cpp
+        Src/*D3D*.h
+        ../LibOVRKernel/Src/Kernel/OVR_ThreadsWinAPI.cpp 
+        ../LibOVRKernel/Src/*D3D*.cpp
+        ../LibOVRKernel/Src/Util/*Direct3D.cpp
+    )
+    
+    file(GLOB_RECURSE OSX_FILES 
+        Src/OVR_OSX_*.cpp 
+        Src/OVR_OSX_*.h 
+        ../LibOVRKernel/Src/*.mm 
+        ../LibOVRKernel/Src/*OSX.c
+    )
+    
+    file(GLOB_RECURSE LINUX_FILES 
+        Src/OVR_Linux_*.cpp 
+        Src/OVR_Linux_*.h
+    )
+    
+    file(GLOB_RECURSE UNIX_FILES 
+        Src/OVR_Unix_*.cpp 
+        Src/OVR_Unix_*.h 
+        Src/Kernel/OVR_ThreadsPthread.cpp
+    )
     
     foreach(f ${OSX_FILES}) 
         list(REMOVE_ITEM SOURCE_FILES ${f})
@@ -112,7 +116,7 @@ else()
         list(APPEND SOURCE_FILES ${UNIX_FILES})
     
         # Extra libs
-    	list(APPEND SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID/edid.cpp)    
+        list(APPEND SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/EDID/edid.cpp)    
     
         # Used by the SDK to read the EDID of the monitors
         list(APPEND EXTRA_LIBS rt)
