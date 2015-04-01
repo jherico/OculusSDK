@@ -145,3 +145,7 @@ else()
     
 endif()
 
+install(TARGETS ovr DESTINATION lib)
+file(GLOB_RECURSE HEADERS Include/*.h) 
+install(FILES ${HEADERS} DESTINATION include)
+    
