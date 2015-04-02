@@ -140,7 +140,7 @@ else()
     endif()
 
     add_definitions(-DOVR_DLL_BUILD)
-    add_library(ovr SHARED ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+    add_library(ovr STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
     target_link_libraries(ovr ${EXTRA_LIBS})
     
 endif()
