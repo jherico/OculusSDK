@@ -1,5 +1,11 @@
 project (ovr)
 
+option(OVR_FORCE_SHARED "Force creation of shared library (for use in Python and Java bindings)" 0)
+
+if (OVR_FORCE_SHARED)
+add_definitions(-DOVR_DLL_BUILD)
+endif()
+
 if (WIN32 OR APPLE) 
 option(OVR_USE_SHIM "Create a small shim which dynamically loads the real Oculus library" 1)
 else()
@@ -8,6 +14,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DOVR_BUILD_DEBUG")
 
+
 if (OVR_USE_SHIM)
 
     include_directories(Include Src ../LibOVRKernel/Src)
@@ -15,10 +22,14 @@ if (OVR_USE_SHIM)
         Src/OVR_CAPIShim.c
         Src/OVR_CAPI_Util.cpp  
         Src/OVR_StereoProjection.cpp  
-        Src/Util/Util_Render_Stereo.cpp  
         Include/*.h
     )
-    add_library(ovr STATIC ${SOURCE_FILES})
+   
+    if (OVR_FORCE_SHARED)
+        add_library(ovr SHARED ${SOURCE_FILES})
+    else()
+        add_library(ovr STATIC ${SOURCE_FILES})    
+    endif()
 
 else()
 
@@ -140,7 +151,13 @@ else()
     endif()
 
     add_definitions(-DOVR_DLL_BUILD)
-    add_library(ovr STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+
+    if (OVR_FORCE_SHARED)
+        add_library(ovr SHARED ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+    else()
+        add_library(ovr STATIC ${SOURCE_FILES} ${PLATFORM_SOURCE_FILES})
+    endif()
+
     target_link_libraries(ovr ${EXTRA_LIBS})
     
 endif()
