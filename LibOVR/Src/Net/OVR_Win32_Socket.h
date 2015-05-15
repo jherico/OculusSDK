@@ -46,32 +46,32 @@ namespace OVR { namespace Net {
 class SockAddr
 {
 public:
-	SockAddr();
-	SockAddr(SockAddr* sa);
-	SockAddr(sockaddr_storage* sa);
-	SockAddr(sockaddr_in6* sa);
-	SockAddr(const char* hostAddress, uint16_t port, int sockType);
+    SockAddr();
+    SockAddr(SockAddr* sa);
+    SockAddr(sockaddr_storage* sa);
+    SockAddr(sockaddr_in6* sa);
+    SockAddr(const char* hostAddress, uint16_t port, int sockType);
 
 public:
-	void   Set(const sockaddr_storage* sa);
-	void   Set(const sockaddr_in6* sa);
-	void   Set(const char* hostAddress, uint16_t port, int sockType); // SOCK_DGRAM or SOCK_STREAM
+    void   Set(const sockaddr_storage* sa);
+    void   Set(const sockaddr_in6* sa);
+    void   Set(const char* hostAddress, uint16_t port, int sockType); // SOCK_DGRAM or SOCK_STREAM
 
-	uint16_t GetPort();
+    uint16_t GetPort();
 
-	String ToString(bool writePort, char portDelineator) const;
+    String ToString(bool writePort, char portDelineator) const;
     bool IsLocalhost() const;
 
-	void   Serialize(BitStream* bs);
-	bool   Deserialize(BitStream);
+    void   Serialize(BitStream* bs);
+    bool   Deserialize(BitStream);
 
-	bool   operator==( const SockAddr& right ) const;
-	bool   operator!=( const SockAddr& right ) const;
-	bool   operator >( const SockAddr& right ) const;
-	bool   operator <( const SockAddr& right ) const;
+    bool   operator==( const SockAddr& right ) const;
+    bool   operator!=( const SockAddr& right ) const;
+    bool   operator >( const SockAddr& right ) const;
+    bool   operator <( const SockAddr& right ) const;
 
 public:
-	sockaddr_in6 Addr6;
+    sockaddr_in6 Addr6;
 };
 
 
@@ -82,20 +82,20 @@ public:
 class UDPSocket : public UDPSocketBase
 {
 public:
-	UDPSocket();
-	virtual ~UDPSocket();
+    UDPSocket();
+    virtual ~UDPSocket();
 
 public:
-	virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters);
-	virtual int          Send(const void* pData, int bytes, SockAddr* address);
-	virtual void         Poll(SocketEvent_UDP* eventHandler);
+    virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters);
+    virtual int          Send(const void* pData, int bytes, SockAddr* address);
+    virtual void         Poll(SocketEvent_UDP* eventHandler);
 
 protected:
-	static const int RecvBufSize = 1048576;
-	uint8_t* RecvBuf;
+    static const int RecvBufSize = 1048576;
+    uint8_t* RecvBuf;
 
-	virtual void         OnRecv(SocketEvent_UDP* eventHandler, uint8_t* pData,
-								int bytesRead, SockAddr* address);
+    virtual void         OnRecv(SocketEvent_UDP* eventHandler, uint8_t* pData,
+                                int bytesRead, SockAddr* address);
 };
 
 
@@ -108,22 +108,23 @@ class TCPSocket : public TCPSocketBase
     friend class TCPSocketPollState;
 
 public:
-	TCPSocket();
-	TCPSocket(SocketHandle boundHandle, bool isListenSocket);
-	virtual ~TCPSocket();
+    TCPSocket();
+    TCPSocket(SocketHandle boundHandle, bool isListenSocket);
+    virtual ~TCPSocket();
 
 public:
-	virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters);
-	virtual int          Listen();
-	virtual int          Connect(SockAddr* address);
-	virtual int          Send(const void* pData, int bytes);
+    virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters);
+    virtual int          Listen();
+    virtual int          Connect(SockAddr* address);
+    virtual int          Send(const void* pData, int bytes);
+    int                  Send(const void** buffers, int* buffersLengths, int bufferCount);
 
 protected:
-	virtual void         OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData,
-								int bytesRead);
+    virtual void         OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData,
+                                int bytesRead);
 
 public:
-	bool IsConnecting; // Is in the process of connecting?
+    bool IsConnecting; // Is in the process of connecting?
 };
 
 

@@ -144,21 +144,21 @@ public:
     static void ConstructArray(void* p, size_t count)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata);
     }
 
     static void ConstructArray(void* p, size_t count, const T& source)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata, source);
     }
 
     static void ConstructArray(void* p, size_t count, const T* psource)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata, *psource++);
     }
 
@@ -170,8 +170,7 @@ public:
 
     static void DestructArray(T* p, size_t count)
     {
-        p = p + count - 1;
-        for (size_t i=0; i<count; ++i, --p)
+        for(size_t i = 0; i < count; ++i, ++p)
             p->~T();
     }
 
@@ -218,21 +217,21 @@ public:
     static void ConstructArray(void* p, size_t count)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata);
     }
 
     static void ConstructArray(void* p, size_t count, const T& source)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata, source);
     }
 
     static void ConstructArray(void* p, size_t count, const T* psource)
     {
         uint8_t* pdata = (uint8_t*)p;
-        for (size_t i=0; i< count; ++i, pdata += sizeof(T))
+        for (size_t i = 0; i < count; ++i, pdata += sizeof(T))
             Construct(pdata, *psource++);
     }
 
@@ -243,9 +242,8 @@ public:
     }
 
     static void DestructArray(T* p, size_t count)
-    {   
-        p += count - 1;
-        for (size_t i=0; i<count; ++i, --p)
+    {
+        for(size_t i = 0; i < count; ++i, ++p)
             p->~T();
     }
 

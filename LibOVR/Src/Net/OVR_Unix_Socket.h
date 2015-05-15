@@ -119,6 +119,7 @@ public:
 	virtual int          Listen();
 	virtual int          Connect(SockAddr* address);
 	virtual int          Send(const void* pData, int bytes);
+    int                  Send(const void** buffers, int* buffersLengths, int bufferCount);
 
 protected:
 	virtual void         OnRecv(SocketEvent_TCP* eventHandler, UByte* pData,

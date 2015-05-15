@@ -55,6 +55,11 @@ public:
     // add listeners to the emitter.
     int GetListenerCount() const;
 
+    bool HasListeners() const
+    {
+        return Emitter->HasListeners();
+    }
+
     void Call()
     {
         Emitter->Call();

@@ -302,7 +302,7 @@ limitations under the License.
     #if defined(OVR_CC_MSVC)
         #define OVR_DISABLE_ALL_MSVC_WARNINGS() \
             __pragma(warning(push, 0)) \
-            __pragma(warning(disable: 4263 4264 4266))
+            __pragma(warning(disable: 4263 4264 4265 4266))
     #else
         #define OVR_DISABLE_ALL_MSVC_WARNINGS()
     #endif

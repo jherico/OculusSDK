@@ -33,6 +33,31 @@ limitations under the License.
 
 namespace OVR { namespace Service { namespace Win32 {
 
+using namespace Net;
+
+
+//-----------------------------------------------------------------------------
+// FastIPCKey
+//
+// Key to pass to the client to be able to connect to server IPC.
+
+struct FastIPCKey
+{
+    String SharedMemoryName;
+
+    bool IsValid() const
+    {
+        return SharedMemoryName.GetLengthI() > 0;
+    }
+
+    void Invalidate()
+    {
+        SharedMemoryName.Clear();
+    }
+
+    bool Serialize(bool write, BitStream& bs);
+};
+
 
 //-----------------------------------------------------------------------------
 // FastIPCClient
@@ -45,37 +70,44 @@ namespace OVR { namespace Service { namespace Win32 {
 
 class FastIPCClient
 {
-    String            SharedMemoryName;
+public:
+    FastIPCClient();
+    ~FastIPCClient();
+
+    // Call this to initialize the shared memory section
+    OVRError Initialize(const FastIPCKey& key);
+
+    // Tear down the IPC connection
+    void Shutdown();
+
+    // Check if initialized
+    bool IsValid() const
+    {
+        return IsInitialized;
+    }
+
+    // Make a blocking call to the server
+    // Pass -1 for the timeout to wait forever
+    OVRError Call(BitStream& parameters, BitStream& returnData, int timeoutMs = -1);
+
+public:
+    static const int      RegionSize = 8192;
+    static const uint32_t Magic      = 0xfe67bead;
+
+    // Semantic versioning
+    static const uint32_t MajorVersion = 3;
+    static const uint32_t MinorVersion = 0;
+
+protected:
+    bool              IsInitialized;
+    FastIPCKey        IPCKey;
     Ptr<SharedMemory> Scratch;
     ScopedEventHANDLE DataEvent, ReturnEvent;
     uint32_t          IPCMessageIndex;
 
 protected:
-    bool ReadInitialData(const char* buffer);
-
-public:
-    static const int      RegionSize = 4096;
-    static const uint32_t Magic      = 0xfe67bead;
-
-    // Semantic versioning
-    static const uint32_t MajorVersion = 1;
-    static const uint32_t MinorVersion = 0;
-
-public:
-    FastIPCClient();
-    ~FastIPCClient();
-
-    String GetSharedMemoryName() const
-    {
-        return SharedMemoryName;
-    }
-
-    // Call this to initialize the shared memory section
-    bool Initialize(const char* sharedMemoryName);
-
-    // Make a blocking call to the server
-    // Pass -1 for the timeout to wait forever
-    bool Call(Net::BitStream* bread, Net::BitStream* toast, int timeoutMs = -1);
+    // Read the initial data from the buffer.
+    OVRError readInitialData(const char* buffer);
 };
 
 

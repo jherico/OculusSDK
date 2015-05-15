@@ -43,13 +43,10 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     d.ProductName       = OurHMDInfo.ProductName;    
     d.Manufacturer      = OurHMDInfo.Manufacturer;
 
-    d.Resolution.w      = OurHMDInfo.ResolutionInPixels.w;
-    d.Resolution.h      = OurHMDInfo.ResolutionInPixels.h;
-    d.WindowsPos.x      = OurHMDInfo.DesktopX;
-    d.WindowsPos.y      = OurHMDInfo.DesktopY;
-    d.DisplayDeviceName = OurHMDInfo.DisplayDeviceName;
-    d.DisplayId         = OurHMDInfo.DisplayId;
-    d.VendorId          = (short)OurHMDInfo.VendorId;
+    d.Resolution.w = OurHMDInfo.ResolutionInPixels.w;
+    d.Resolution.h = OurHMDInfo.ResolutionInPixels.h;
+
+    d.VendorId = (short)OurHMDInfo.VendorId;
     d.ProductId         = (short)OurHMDInfo.ProductId;
     d.FirmwareMajor     = (short)OurHMDInfo.FirmwareMajor;
     d.FirmwareMinor     = (short)OurHMDInfo.FirmwareMinor;
@@ -60,22 +57,11 @@ ovrHmdDesc HMDRenderState::GetDesc() const
 
     OVR_strcpy(d.SerialNumber, sizeof(d.SerialNumber), OurHMDInfo.PrintedSerial.ToCStr());
 
-    d.HmdCaps           = ovrHmdCap_Present | ovrHmdCap_NoVSync;
+    d.HmdCaps           = ovrHmdCap_NoVSync;
     d.TrackingCaps      = ovrTrackingCap_MagYawCorrection | ovrTrackingCap_Orientation;
-    d.DistortionCaps    = ovrDistortionCap_TimeWarp | //ovrDistortionCap_DepthProjectedTimeWarp |
-                          ovrDistortionCap_Vignette | ovrDistortionCap_SRGB | ovrDistortionCap_FlipInput |
-                          ovrDistortionCap_TimewarpJitDelay | ovrDistortionCap_ProfileNoSpinWaits |
-                          ovrDistortionCap_HqDistortion | ovrDistortionCap_LinuxDevFullscreen;
 
 #if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
-    // TODO: this gets enabled for everything, but is only applicable for DX11+
-    d.DistortionCaps   |= ovrDistortionCap_ComputeShader;
 #endif
-
-    if( OurHMDInfo.InCompatibilityMode )
-    {
-        d.HmdCaps |= ovrHmdCap_ExtendDesktop;
-    }
 
     if (OurHMDInfo.HmdType == HmdType_DK1)
     {
@@ -85,8 +71,7 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     {
         d.Type = ovrHmd_DK2;
         d.HmdCaps |= ovrHmdCap_LowPersistence | ovrHmdCap_DynamicPrediction;
-        d.TrackingCaps |= ovrTrackingCap_Position;
-        d.DistortionCaps |= ovrDistortionCap_Overdrive;
+        d.TrackingCaps |= ovrTrackingCap_Position;        
     }
 
     const DistortionRenderDesc& leftDistortion  = Distortion[0];
@@ -97,8 +82,17 @@ ovrHmdDesc HMDRenderState::GetDesc() const
     d.DefaultEyeFov[1] = CalculateFovFromHmdInfo(StereoEye_Right, rightDistortion, RenderInfo, OVR_DEFAULT_EXTRA_EYE_ROTATION);
 
     // FOV extended across the entire screen
-    d.MaxEyeFov[0] = GetPhysicalScreenFov(StereoEye_Left, leftDistortion);
-    d.MaxEyeFov[1] = GetPhysicalScreenFov(StereoEye_Right, rightDistortion);
+    if (OurHMDInfo.HmdType == HmdType_DK1)
+    {   // Clamp to the screen edges on DK1 which will be aperture limited anyway.  If we extend 
+        // out to corners we start getting into extreme FOV and resolution that our distortion mesh cannot cope with it.
+        d.MaxEyeFov[0] = GetPhysicalScreenFov(StereoEye_Left, leftDistortion);
+        d.MaxEyeFov[1] = GetPhysicalScreenFov(StereoEye_Right, rightDistortion);
+    }
+    else
+    {   // On other devices, clamp to the corners to completely fill the screen
+        d.MaxEyeFov[0] = GetPhysicalScreenDiagonalFov(StereoEye_Left, leftDistortion);
+        d.MaxEyeFov[1] = GetPhysicalScreenDiagonalFov(StereoEye_Right, rightDistortion);
+    }
     
     if (OurHMDInfo.Shutter.Type == HmdShutter_RollingRightToLeft)
     {

@@ -104,6 +104,11 @@ public:
     // Get the sensor status (same as GetSensorStateAtTime(...).Status)
     uint32_t     GetStatus() const;
 
+    void SetCenteredFromWorld(const Posed& pose)
+    {
+        CenteredFromWorld = pose;
+    }
+
     Posed GetCenteredFromWorld() const
     {
         return CenteredFromWorld;

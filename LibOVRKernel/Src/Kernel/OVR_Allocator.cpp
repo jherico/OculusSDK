@@ -42,6 +42,11 @@ limitations under the License.
  #include <sys/mman.h>
 #endif
 
+// This will cause an assertion to trip whenever an allocation occurs outside of our
+// custom allocator.  This helps track down allocations that are not being done
+// correctly via OVR_ALLOC().
+// #define OVR_HUNT_UNTRACKED_ALLOCS
+
 namespace OVR {
 
 
@@ -332,6 +337,39 @@ Pointer AlignPointerDown(Pointer p, size_t alignment)
 const size_t kFreedBlockArrayMaxSizeDefault = 16384;
 
 
+#if defined(OVR_HUNT_UNTRACKED_ALLOCS)
+
+static const char* WhiteList[] = {
+    "OVR_Allocator.cpp",
+    "OVR_Log.cpp",
+    "crtw32", // Ignore CRT internal allocations
+    nullptr
+};
+
+static int YourAllocHook(int, void *,
+    size_t, int, long,
+    const unsigned char *szFileName, int)
+{
+    if (!szFileName)
+    {
+        return TRUE;
+    }
+
+    for (int i = 0; WhiteList[i] != nullptr; ++i)
+    {
+        if (strstr((const char*)szFileName, WhiteList[i]) != 0)
+        {
+            return TRUE;
+        }
+    }
+
+    OVR_ASSERT(false);
+    return FALSE;
+}
+
+#endif // OVR_HUNT_UNTRACKED_ALLOCS
+
+
 DebugPageAllocator::DebugPageAllocator()
   : FreedBlockArray(nullptr)
   , FreedBlockArrayMaxSize(0)
@@ -347,6 +385,10 @@ DebugPageAllocator::DebugPageAllocator()
   //PageSize(0)
   , Lock()
 {
+    #if defined(OVR_HUNT_UNTRACKED_ALLOCS)
+        _CrtSetAllocHook(YourAllocHook);
+    #endif // OVR_HUNT_UNTRACKED_ALLOCS
+
     #if defined(_WIN32)
         SYSTEM_INFO systemInfo;
         GetSystemInfo(&systemInfo);
@@ -355,7 +397,7 @@ DebugPageAllocator::DebugPageAllocator()
         PageSize = 4096;
     #endif
 
-    SetDelayedFreeCount(kFreedBlockArrayMaxSizeDefault);
+    SetMaxDelayedFreeCount(kFreedBlockArrayMaxSizeDefault);
 }
 
 
@@ -383,7 +425,7 @@ void DebugPageAllocator::Shutdown()
         }
     }
 
-    SetDelayedFreeCount(0);
+    SetMaxDelayedFreeCount(0);
     FreedBlockArraySize = 0;
     FreedBlockArrayOldest = 0;
 }
@@ -391,40 +433,41 @@ void DebugPageAllocator::Shutdown()
 
 void DebugPageAllocator::EnableOverrunDetection(bool enableOverrunDetection, bool enableOverrunGuardBytes)
 {
-    OVR_ASSERT(AllocationCount == 0);
+    // Assert that no allocations have been made, which is a requirement for changing these properties. 
+    // Otherwise future deallocations of these allocations can fail to work properly because these 
+    // settings have changed behind their back.
+    OVR_ASSERT_M(AllocationCount == 0, "DebugPageAllocator::EnableOverrunDetection called when DebugPageAllocator is not in a newly initialized state.");
 
     OverrunPageEnabled       = enableOverrunDetection;
     OverrunGuardBytesEnabled = (enableOverrunDetection && enableOverrunGuardBytes); // Set OverrunGuardBytesEnabled to false if enableOverrunDetection is false.
 }
 
 
-void DebugPageAllocator::SetDelayedFreeCount(size_t delayedFreeCount)
+void DebugPageAllocator::SetMaxDelayedFreeCount(size_t maxDelayedFreeCount)
 {
-    OVR_ASSERT(AllocationCount == 0);
-
     if(FreedBlockArray)
     {
         SafeMMapFree(FreedBlockArray, FreedBlockArrayMaxSize * sizeof(Block));
         FreedBlockArrayMaxSize = 0;
     }
 
-    if(delayedFreeCount)
+    if(maxDelayedFreeCount)
     {
-        FreedBlockArray = (Block*)SafeMMapAlloc(delayedFreeCount * sizeof(Block));
+        FreedBlockArray = (Block*)SafeMMapAlloc(maxDelayedFreeCount * sizeof(Block));
         OVR_ASSERT(FreedBlockArray);
 
         if(FreedBlockArray)
         {
-            FreedBlockArrayMaxSize = delayedFreeCount;
+            FreedBlockArrayMaxSize = maxDelayedFreeCount;
             #if defined(OVR_BUILD_DEBUG)
-                memset(FreedBlockArray, 0, delayedFreeCount * sizeof(Block));
+                memset(FreedBlockArray, 0, maxDelayedFreeCount * sizeof(Block));
             #endif
         }
     }
 }
 
 
-size_t DebugPageAllocator::GetDelayedFreeCount() const
+size_t DebugPageAllocator::GetMaxDelayedFreeCount() const
 {
     return FreedBlockArrayMaxSize;
 }
@@ -771,23 +814,41 @@ void* DebugPageAllocator::AllocCommittedPageMemory(size_t blockSize)
             // because the OS will generate a one-time-only gaurd page exception. We probabl don't want this, as it's
             // more useful for maintaining your own stack than for catching unintended overruns.
             p = VirtualAlloc(nullptr, blockSize, MEM_RESERVE, PAGE_READWRITE);
-            OVR_ASSERT(p);
 
             if(p)
             {
                 // Commit all but the last page. Leave the last page as merely reserved so that reads from or writes
                 // to it result in an immediate exception.
                 p = VirtualAlloc(p, blockSize - PageSize, MEM_COMMIT, PAGE_READWRITE);
-                OVR_ASSERT(p);
             }
         }
         else
         {
             // We need to make it so that all pages are MEM_COMMIT + PAGE_READWRITE.
-
             p = VirtualAlloc(nullptr, blockSize, MEM_COMMIT, PAGE_READWRITE);
         }
-    
+
+        #if defined(OVR_BUILD_DEBUG)
+            if(!p)
+            {
+                // To consider: Make a generic OVRKernel function for formatting system errors. We could move 
+                // the OVRError GetSysErrorCodeString from LibOVR/OVRError.h to LibOVRKernel/OVR_DebugHelp.h
+                DWORD dwLastError = GetLastError();
+                CHAR  osError[256];
+                DWORD osErrorBufferCapacity = OVR_ARRAY_COUNT(osError);
+                CHAR  reportedError[384];
+                DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, (DWORD)dwLastError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), osError, osErrorBufferCapacity, nullptr);
+        
+                if (length) // If FormatMessageA failed...
+                    OVR_snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageAllocator: VirtualAlloc failed with error: %s", osError);
+                else
+                    OVR_snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageAllocator: VirtualAlloc failed with error: %d.", dwLastError);
+
+                //LogError("%s", reportedError); Disabled because this call turns around and allocates memory, yet we may be in a broken or exhausted memory situation.
+                OVR_FAIL_M(reportedError);
+            }
+        #endif
+
         return p;
     #else
         OVR_UNUSED2(blockSize, OverrunPageEnabled);

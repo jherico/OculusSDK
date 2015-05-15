@@ -44,8 +44,90 @@ limitations under the License.
 #pragma intrinsic(_ReadBarrier, _WriteBarrier, _ReadWriteBarrier)
 #endif
 
-namespace OVR {
+#ifdef OVR_OS_LINUX
+#include <atomic>
 
+namespace OVR {
+template<class T>
+class AtomicTranslator : public std::atomic<T>
+{
+public:
+    AtomicTranslator() :
+        std::atomic<T>(T())
+    {
+    }
+
+    AtomicTranslator(const T &from) :
+        std::atomic<T>(from)
+    {
+    }
+
+    AtomicTranslator(const AtomicTranslator<T> &from) :
+        std::atomic<T>(from.Load_Acquire())
+    {
+    }
+
+    T operator = (const T &from)
+    {
+        Store_Release(from);
+        return from;
+    }
+
+    operator T() const
+    {
+        return Load_Acquire();
+    }
+
+    T Exchange_Sync(T& other)
+    {
+        return std::atomic<T>::exchange(other);
+    }
+
+    T Exchange_Sync(const T& other)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::exchange(tmp_val);
+    }
+
+    T ExchangeAdd_Sync(const T &val)
+    {
+        return std::atomic<T>::fetch_add(val);
+    }
+
+    T ExchangeAdd_NoSync(const T &val)
+    {
+        return std::atomic<T>::fetch_add(val, std::memory_order_relaxed);
+    }
+
+    bool CompareAndSet_Sync(const T &other, const T &val)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::compare_exchange_strong(tmp_val, val);
+    }
+
+    bool CompareAndSet_NoSync(const T &other, const T &val)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::compare_exchange_weak(tmp_val, val);
+    }
+
+    T Load_Acquire() const
+    {
+        return std::atomic<T>::load(std::memory_order_acquire);
+    }
+
+    void Store_Release(const T &val)
+    {
+        std::atomic<T>::store(val, std::memory_order_release);
+    }
+};
+template<class T> using AtomicOps = AtomicTranslator<T>;
+template<class T> using AtomicInt = AtomicTranslator<T>;
+template<class T> using AtomicPtr = AtomicTranslator<T*>;
+
+#else // OVR_OS_LINUX
+
+namespace OVR {
 
 // ****** Declared classes
 
@@ -809,6 +891,7 @@ public:
     }
 };
 
+#endif // OVR_OS_LINUX
 
 //-----------------------------------------------------------------------------------
 // ***** Lock
@@ -817,16 +900,7 @@ public:
 // Unlike Mutex, it cannot be waited on.
 
 class Lock
-{
-    // NOTE: Locks are not allocatable and they themselves should not allocate 
-    // memory by standard means. This is the case because StandardAllocator
-    // relies on this class.
-    // Make 'delete' private. Don't do this for 'new' since it can be redefined.  
-    void    operator delete(void*) {}
-
-
-    // *** Lock implementation for various platforms.
-    
+{    
 #if !defined(OVR_ENABLE_THREADS)
 
 public:
@@ -902,7 +976,7 @@ private:
     Lock* toLock() { return (Lock*)Buffer; }
 
     // UseCount and max alignment.
-    volatile int    UseCount;
+    AtomicInt<int>  UseCount;
     uint64_t        Buffer[(sizeof(Lock)+sizeof(uint64_t)-1)/sizeof(uint64_t)];
 };
 

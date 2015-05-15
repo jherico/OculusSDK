@@ -331,10 +331,15 @@ bool ThreadCommandQueueImpl::PushCommand(const ThreadCommand& command)
 
 // Pops the next command from the thread queue, if any is available.
 bool ThreadCommandQueueImpl::PopCommand(ThreadCommand::PopBuffer* popBuffer)
-{    
-	PullThreadId = OVR::GetCurrentThreadId();
+{
+    // We do not write to this variable unless we are changing it.
+    // This ensures it is read-only after the first call to PopCommand().
+    if (PullThreadId != OVR::GetCurrentThreadId())
+    {
+        PullThreadId = OVR::GetCurrentThreadId();
+    }
 
-	Lock::Locker lock(&QueueLock);
+    Lock::Locker lock(&QueueLock);
 
     uint8_t* buffer = CommandBuffer.ReadBegin();
     if (!buffer)

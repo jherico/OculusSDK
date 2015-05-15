@@ -32,7 +32,7 @@ using namespace OVR::Vision;
 
 
 #if defined (OVR_CC_MSVC)
-static_assert(sizeof(DistortionMeshVertexData) == sizeof(ovrDistortionVertex), "DistortionMeshVertexData size mismatch");
+static_assert(sizeof(DistortionMeshVertexData) == sizeof(DistortionMeshVertex), "DistortionMeshVertexData size mismatch");
 #endif
 
 //-----------------------------------------------------------------------------------
@@ -232,26 +232,32 @@ static StereoEyeParams CalculateStereoEyeParamsInternal ( StereoEye eyeType, Hmd
 Vector3f CalculateEyeVirtualCameraOffset(HmdRenderInfo const &hmd,
                                          StereoEye eyeType, bool bmonoRenderingMode)
 {
+    // By definition the offset to the center eye is zero.
     Vector3f virtualCameraOffset(0);
 
     if (!bmonoRenderingMode)
     {
         float eyeCenterRelief = hmd.GetEyeCenter().ReliefInMeters;
 
+        // Remember:
+        // Positive X is to the right.
+        // Positive Y is upwards.
+        // Positive Z is backwards.
         if (eyeType == StereoEye_Left)
         {
-            virtualCameraOffset.x = hmd.EyeLeft.NoseToPupilInMeters;
-            virtualCameraOffset.z = eyeCenterRelief - hmd.EyeLeft.ReliefInMeters;
+            virtualCameraOffset.x = -hmd.EyeLeft.NoseToPupilInMeters;
+            virtualCameraOffset.z = hmd.EyeLeft.ReliefInMeters - eyeCenterRelief;
         }
         else if (eyeType == StereoEye_Right)
         {
-            virtualCameraOffset.x = -hmd.EyeRight.NoseToPupilInMeters;
-            virtualCameraOffset.z = eyeCenterRelief - hmd.EyeRight.ReliefInMeters;
+            virtualCameraOffset.x = hmd.EyeRight.NoseToPupilInMeters;
+            virtualCameraOffset.z = hmd.EyeRight.ReliefInMeters - eyeCenterRelief;
         }
     }
 
     return virtualCameraOffset;
 }
+
 
 
 //-----------------------------------------------------------------------------------
@@ -808,7 +814,8 @@ static const int DMA_NumTrisPerEye  = (DMA_GridSize)*(DMA_GridSize)*2;
 DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
                                                     bool rightEye,
                                                     const HmdRenderInfo &hmdRenderInfo,
-                                                    const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC )
+                                                    const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC,
+                                                    unsigned distortionCaps)
 {
     DistortionMeshVertexData result;
 
@@ -816,9 +823,18 @@ DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
     TransformScreenNDCToTanFovSpaceChroma ( &tanEyeAnglesR, &tanEyeAnglesG, &tanEyeAnglesB,
                                             distortion, screenNDC );
 
-	result.TanEyeAnglesR = tanEyeAnglesR;
-	result.TanEyeAnglesG = tanEyeAnglesG;
-	result.TanEyeAnglesB = tanEyeAnglesB;
+    if ((distortionCaps & ovrDistortionCap_DisableChromatic) > 0)
+    {
+        result.TanEyeAnglesR = tanEyeAnglesG;
+        result.TanEyeAnglesG = tanEyeAnglesG;
+        result.TanEyeAnglesB = tanEyeAnglesG;
+    }
+    else
+    {
+        result.TanEyeAnglesR = tanEyeAnglesR;
+        result.TanEyeAnglesG = tanEyeAnglesG;
+        result.TanEyeAnglesB = tanEyeAnglesB;
+    }
 
     HmdShutterTypeEnum shutterType = hmdRenderInfo.Shutter.Type;
     switch ( shutterType )
@@ -924,7 +940,8 @@ void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, uint16_t *pTri
 
 void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                             int *pNumVertices, int *pNumTriangles,
-                            const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo )
+                            const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo,
+                            unsigned distortionCaps)
 {
     bool    rightEye      = ( stereoParams.Eye == StereoEye_Right );
     int     vertexCount   = 0;
@@ -932,7 +949,7 @@ void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **pp
 
     // Generate mesh into allocated data and return result.
     DistortionMeshCreate(ppVertices, ppTriangleListIndices, &vertexCount, &triangleCount,
-                         rightEye, hmdRenderInfo, stereoParams.Distortion, stereoParams.EyeToSourceNDC);
+                         rightEye, hmdRenderInfo, stereoParams.Distortion, stereoParams.EyeToSourceNDC, distortionCaps);
 
     *pNumVertices  = vertexCount;
     *pNumTriangles = triangleCount;
@@ -944,7 +961,8 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppT
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
                            const HmdRenderInfo &hmdRenderInfo,
-                           const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC )
+                           const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC,
+                           unsigned distortionCaps)
 {
     *pNumVertices  = DMA_NumVertsPerEye;
     *pNumTriangles = DMA_NumTrisPerEye;
@@ -997,7 +1015,7 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppT
             screenNDC.y = Alg::Max ( -1.0f, Alg::Min ( screenNDC.y, 1.0f ) );
 
             // From those screen positions, generate the vertex.
-            *pcurVert = DistortionMeshMakeVertex ( screenNDC, rightEye, hmdRenderInfo, distortion, eyeToSourceNDC );
+            *pcurVert = DistortionMeshMakeVertex ( screenNDC, rightEye, hmdRenderInfo, distortion, eyeToSourceNDC, distortionCaps );
             pcurVert++;
         }
     }
@@ -1336,6 +1354,8 @@ PredictionValues PredictionGetDeviceValues ( const HmdRenderInfo &hmdRenderInfo,
 
 Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset )
 {
+    OVR_FAIL_M ( "This function appears to be never used?" );
+
     Matrix4f worldFromPredictedView = (hmdToEyeViewOffset * predictedViewFromWorld).InvertedHomogeneousTransform();
     Matrix4f matRenderFromNowStart = (hmdToEyeViewOffset * renderedViewFromWorld) * worldFromPredictedView;
 
@@ -1370,221 +1390,13 @@ Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matri
 
 Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset )
 {
+    OVR_FAIL_M ( "This function appears to be never used?" );
+
     Matrix4f worldFromPredictedView = (hmdToEyeViewOffset * predictedViewFromWorld).InvertedHomogeneousTransform();
     Matrix4f matRenderXform = (hmdToEyeViewOffset * renderedViewFromWorld) * worldFromPredictedView;
 
     return matRenderXform.Inverted();
 }
-
-
-#if defined(OVR_ENABLE_TIMEWARP_MACHINE)
-// This is deprecated by DistortionTiming code. -cat
-
-TimewarpMachine::TimewarpMachine()
-  : VsyncEnabled(false),
-    RenderInfo(),
-    CurrentPredictionValues(),
-    DistortionTimeCount(0),
-    DistortionTimeCurrentStart(0.0),
-  //DistortionTimes[],
-    DistortionTimeAverage(0.f),
-  //EyeRenderPoses[],
-    LastFramePresentFlushTime(0.0),
-    PresentFlushToPresentFlushSeconds(0.f),
-    NextFramePresentFlushTime(0.0)
-{
-    #if defined(OVR_BUILD_DEBUG)
-        memset(DistortionTimes, 0, sizeof(DistortionTimes));
-    #endif
-
-    for ( int i = 0; i < 2; i++ )
-    {
-        EyeRenderPoses[i] = Posef();
-    }
-}
-
-void TimewarpMachine::Reset(HmdRenderInfo& renderInfo, bool vsyncEnabled, double timeNow)
-{
-    RenderInfo = renderInfo;
-    VsyncEnabled = vsyncEnabled;
-    CurrentPredictionValues = PredictionGetDeviceValues ( renderInfo, true, VsyncEnabled );
-    PresentFlushToPresentFlushSeconds = 0.0f;
-    DistortionTimeCount = 0;
-    DistortionTimeAverage = 0.0f;
-    LastFramePresentFlushTime = timeNow;
-    AfterPresentAndFlush(timeNow);
-}
-
-void TimewarpMachine::AfterPresentAndFlush(double timeNow)
-{
-    AfterPresentWithoutFlush();
-    AfterPresentFinishes ( timeNow );
-}
-
-void TimewarpMachine::AfterPresentWithoutFlush()
-{
-    // We've only issued the Present - it hasn't actually finished (i.e. appeared)
-    // But we need to estimate when the next Present will appear, so extrapolate from previous data.
-    NextFramePresentFlushTime = LastFramePresentFlushTime + 2.0 * (double)PresentFlushToPresentFlushSeconds;
-}
-
-void TimewarpMachine::AfterPresentFinishes(double timeNow)
-{
-    // The present has now actually happened.
-    PresentFlushToPresentFlushSeconds = (float)(timeNow - LastFramePresentFlushTime);
-    LastFramePresentFlushTime = timeNow;
-    NextFramePresentFlushTime = timeNow + (double)PresentFlushToPresentFlushSeconds;
-}
-
-
-
-double TimewarpMachine::GetViewRenderPredictionTime()
-{
-    // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
-    return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToRenderedScene;
-}
-
-bool TimewarpMachine::GetViewRenderPredictionPose(TrackingStateReader* reader, Posef& pose)
-{
-	return reader->GetPoseAtTime(GetViewRenderPredictionTime(), pose);
-}
-
-double TimewarpMachine::GetVisiblePixelTimeStart()
-{
-    // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
-    return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToTimewarpStart;
-}
-double TimewarpMachine::GetVisiblePixelTimeEnd()
-{
-    // Note that PredictionGetDeviceValues() did all the vsync-dependent thinking for us.
-    return NextFramePresentFlushTime + CurrentPredictionValues.PresentFlushToTimewarpEnd;
-}
-bool TimewarpMachine::GetPredictedVisiblePixelPoseStart(TrackingStateReader* reader, Posef& pose)
-{
-	return reader->GetPoseAtTime(GetVisiblePixelTimeStart(), pose);
-}
-bool TimewarpMachine::GetPredictedVisiblePixelPoseEnd(TrackingStateReader* reader, Posef& pose)
-{
-	return reader->GetPoseAtTime(GetVisiblePixelTimeEnd(), pose);
-}
-bool TimewarpMachine::GetTimewarpDeltaStart(TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
-{
-	Posef visiblePose;
-	if (!GetPredictedVisiblePixelPoseStart(reader, visiblePose))
-	{
-		return false;
-	}
-
-    Matrix4f visibleMatrix(visiblePose);
-    Matrix4f renderedMatrix(renderedPose);
-    Matrix4f identity;  // doesn't matter for orientation-only timewarp
-    transform = TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
-
-	return true;
-}
-bool TimewarpMachine::GetTimewarpDeltaEnd(TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform)
-{
-	Posef visiblePose;
-	if (!GetPredictedVisiblePixelPoseEnd(reader, visiblePose))
-	{
-		return false;
-	}
-
-    Matrix4f visibleMatrix(visiblePose);
-    Matrix4f renderedMatrix(renderedPose);
-    Matrix4f identity;  // doesn't matter for orientation-only timewarp
-    transform = TimewarpComputePoseDelta ( renderedMatrix, visibleMatrix, identity );
-
-	return true;
-}
-
-
-// What time should the app wait until before starting distortion?
-double  TimewarpMachine::JustInTime_GetDistortionWaitUntilTime()
-{
-    if ( !VsyncEnabled || ( DistortionTimeCount < NumDistortionTimes ) )
-    {
-        // Don't wait.
-        return LastFramePresentFlushTime;
-    }
-
-    // Note - 1-2ms fudge factor (because Windows timer granularity etc) is NOT added here,
-    // because otherwise you end up adding multiple fudge factors!
-    // So it's left for the calling app to add just one fudge factor.
-
-    float howLongBeforePresent = DistortionTimeAverage;
-    // Subtlety here. Technically, the correct time is NextFramePresentFlushTime - howLongBeforePresent.
-    // However, if the app drops a frame, this then perpetuates it,
-    // i.e. if the display is running at 60fps, but the last frame was slow,
-    // (e.g. because of swapping or whatever), then NextFramePresentFlushTime is
-    // 33ms in the future, not 16ms. Since this function supplies the
-    // time to wait until, the app will indeed wait until 32ms, so the framerate
-    // drops to 30fps and never comes back up!
-    // So we return the *ideal* framerate, not the *actual* framerate.
-    return LastFramePresentFlushTime + (float)( CurrentPredictionValues.PresentFlushToPresentFlush - howLongBeforePresent );
-}
-
-double TimewarpMachine::JustInTime_AverageDistortionTime()
-{
-    if ( JustInTime_NeedDistortionTimeMeasurement() )
-    {
-        return 0.0;
-    }
-    return DistortionTimeAverage;
-}
-
-bool    TimewarpMachine::JustInTime_NeedDistortionTimeMeasurement() const
-{
-    if (!VsyncEnabled)
-    {
-        return false;
-    }
-    return ( DistortionTimeCount < NumDistortionTimes );
-}
-
-void    TimewarpMachine::JustInTime_BeforeDistortionTimeMeasurement(double timeNow)
-{
-    DistortionTimeCurrentStart = timeNow;
-}
-
-void    TimewarpMachine::JustInTime_AfterDistortionTimeMeasurement(double timeNow)
-{
-    float timeDelta = (float)( timeNow - DistortionTimeCurrentStart );
-    if ( DistortionTimeCount < NumDistortionTimes )
-    {
-        DistortionTimes[DistortionTimeCount] = timeDelta;
-        DistortionTimeCount++;
-        if ( DistortionTimeCount == NumDistortionTimes )
-        {
-            // Median.
-            float distortionTimeMedian = 0.0f;
-            for ( int i = 0; i < NumDistortionTimes/2; i++ )
-            {
-                // Find the maximum time of those remaining.
-                float maxTime = DistortionTimes[0];
-                int maxIndex = 0;
-                for ( int j = 1; j < NumDistortionTimes; j++ )
-                {
-                    if ( maxTime < DistortionTimes[j] )
-                    {
-                        maxTime = DistortionTimes[j];
-                        maxIndex = j;
-                    }
-                }
-                // Zero that max time, so we'll find the next-highest time.
-                DistortionTimes[maxIndex] = 0.0f;
-                distortionTimeMedian = maxTime;
-            }
-            DistortionTimeAverage = distortionTimeMedian;
-        }
-    }
-    else
-    {
-        OVR_ASSERT ( !"Really didn't need more measurements, thanks" );
-    }
-}
-
-#endif // OVR_ENABLE_TIMEWARP_MACHINE
 
 
 }}}  // OVR::Util::Render

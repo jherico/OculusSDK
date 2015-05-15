@@ -28,15 +28,16 @@ limitations under the License.
 #ifndef OVR_Session_h
 #define OVR_Session_h
 
-#include <atomic>
-
-#include <OVR_Version.h>
+#include "OVR_Version.h"
 #include "OVR_Socket.h"
+#include "OVR_Error.h"
 #include "OVR_PacketizedTCPSocket.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Threads.h"
 #include "Kernel/OVR_RefCount.h"
+
 #include <stdint.h>
+#include <atomic>
 
 
 namespace OVR { namespace Net {
@@ -53,11 +54,15 @@ class Session;
 // 1.2.0 - [SDK 0.4.4]
 // 1.2.1 - [SDK 0.5.0] Added DyLib model and SDKVersion
 // 1.3.0 - [SDK 0.5.0] Multiple shared memory regions for different objects
+// 1.4.0 - [SDK 0.6.0] Added OVRError returns to RPC blocking calls
+// 1.5.0 - [SDK 0.6.0] Added OVRError returns to IPC blocking calls
 //-----------------------------------------------------------------------------
 
-static const uint16_t RPCVersion_Major = 1; // MAJOR version when you make incompatible API changes,
-static const uint16_t RPCVersion_Minor = 3; // MINOR version when you add functionality in a backwards-compatible manner, and
-static const uint16_t RPCVersion_Patch = 0; // PATCH version when you make backwards-compatible bug fixes.
+static const uint16_t RPCVersion_Major = 1; // MAJOR version when we make incompatible API changes.
+static const uint16_t RPCVersion_Minor = 5; // MINOR version when we add backwards-compatible functionality.
+static const uint16_t RPCVersion_Patch = 0; // PATCH version when we make backwards-compatible bug fixes.
+static const uint16_t RPCVersion_Major_CompositorFirstIntroduced = 1;
+static const uint16_t RPCVersion_Minor_CompositorFirstIntroduced = 4;
 
 #define OVR_FEATURE_VERSION 0
 
@@ -80,7 +85,7 @@ struct SDKVersion
     void Reset()
     {
         ProductVersion        = MajorVersion = MinorVersion = UINT16_MAX;
-        RequestedMinorVersion = PatchVersion = BuildNumber = UINT16_MAX;
+        RequestedMinorVersion = PatchVersion = BuildNumber  = UINT16_MAX;
         FeatureVersion        = UINT16_MAX;
     }
 
@@ -122,8 +127,8 @@ struct RPC_C2S_Hello
     // Client runtime code version info
     SDKVersion CodeVersion;
 
-    bool Serialize(bool writeToBitstream, Net::BitStream* bs);
-    static void ClientGenerate(Net::BitStream* bs);
+    bool Serialize(bool writeToBitstream, BitStream& bs);
+    static void ClientGenerate(BitStream& bs);
     bool ServerValidate();
 };
 
@@ -148,8 +153,8 @@ struct RPC_S2C_Authorization
     // There's no concept of the server requesting an SDK version like the client does.
     SDKVersion CodeVersion;
 
-    bool Serialize(bool writeToBitstream, Net::BitStream* bs);
-    static void ServerGenerate(Net::BitStream* bs, String errorString = "");
+    bool Serialize(bool writeToBitstream, BitStream& bs);
+    static void ServerGenerate(BitStream& bs, String errorString = String());
     bool ClientValidate();
 };
 
@@ -198,12 +203,12 @@ public:
         RemoteCodeVersion()
     {
     }
-    virtual ~Connection() // Allow delete from base
+    virtual ~Connection()
     {
     }
 
 public:
-    virtual void SetState(EConnectionState s) {State = s;}
+    virtual void SetState(EConnectionState s) { State = s; }
 
     TransportType    Transport;
     EConnectionState State;
@@ -340,13 +345,14 @@ struct ReceivePayload
     int         Bytes;       // Number of bytes of data received
 };
 
+
 //-----------------------------------------------------------------------------
 // Broadcast parameters
 class BroadcastParameters
 {
 public:
     BroadcastParameters() :
-        pData(NULL),
+        pData(nullptr),
         Bytes(0)
     {
     }
@@ -362,13 +368,14 @@ public:
     int             Bytes;       // Number of bytes of data received
 };
 
+
 //-----------------------------------------------------------------------------
 // Send parameters
 class SendParameters
 {
 public:
     SendParameters() :
-        pData(NULL),
+        pData(nullptr),
         Bytes(0)
     {
     }
@@ -401,8 +408,13 @@ public:
 
 struct ConnectParametersBerkleySocket : public ConnectParameters
 {
+    // Remote host address
     SockAddr           RemoteAddress;
+
+    // The bound socket used for this connection
     Ptr<BerkleySocket> BoundSocketToConnectWith;
+
+    // Should the connection attempt block until success or failure?
     bool               Blocking;
 
     ConnectParametersBerkleySocket(BerkleySocket* s, SockAddr* addr, bool blocking,
@@ -420,13 +432,14 @@ struct ConnectParametersBerkleySocket : public ConnectParameters
 // Listener receive result
 enum ListenerReceiveResult
 {
-    /// The SessionListener used this message and it shouldn't be given to the user.
+    // The SessionListener used this message and it shouldn't be given to the user.
     LRR_RETURN = 0,
 
-    /// The SessionListener is going to hold on to this message.  Do not deallocate it but do not pass it to other plugins either.
+    // The SessionListener is going to hold on to this message.
+    // Do not deallocate it but do not pass it to other plugins either.
     LRR_BREAK,
 
-    /// This message will be processed by other SessionListeners, and at last by the user.
+    // This message will be processed by other SessionListeners, and at last by the user.
     LRR_CONTINUE,
 };
 
@@ -438,10 +451,10 @@ enum ListenerReceiveResult
 class SessionListener
 {
 public:
-    virtual ~SessionListener(){}
+    virtual ~SessionListener() {}
 
     // Data events
-    virtual void OnReceive(ReceivePayload* pPayload, ListenerReceiveResult* lrrOut) { OVR_UNUSED2(pPayload, lrrOut);  }
+    virtual void OnReceive(ReceivePayload const& pPayload, ListenerReceiveResult& lrrOut) { OVR_UNUSED2(pPayload, lrrOut);  }
 
     // Connection was closed
     virtual void OnDisconnected(Connection* conn) = 0;
@@ -471,25 +484,19 @@ public:
 //-----------------------------------------------------------------------------
 // Session
 
-//  Interface for network events such as listening on a socket, sending data, connecting, and disconnecting. Works independently of the transport medium and also implements loopback
+// Interface for network events such as listening on a socket, sending data, connecting, and disconnecting.
+// Works independently of the transport medium and also implements loopback.
 class Session : public SocketEvent_TCP, public NewOverrideBase
 {
 public:
-    Session() :
-        HaveFullConnections(false)
-    {
-    }
-    virtual ~Session()
-    {
-        // Ensure memory backing the sockets array is released
-        AllBlockingTcpSockets.ClearAndRelease();
-    }
+    Session();
+    virtual ~Session();
 
-    virtual SessionResult Listen(ListenerDescription* pListenerDescription);
-    virtual SessionResult Connect(ConnectParameters* cp);
-    virtual int           Send(SendParameters* payload);
-    virtual void          Broadcast(BroadcastParameters* payload);
-    // DO NOT CALL Poll() FROM MULTIPLE THREADS due to AllBlockingTcpSockets being a member
+    virtual SessionResult Listen(ListenerDescription const* pListenerDescription);
+    virtual SessionResult Connect(ConnectParameters const* cp);
+    virtual int           Send(SendParameters const& payload);
+    virtual void          Broadcast(BroadcastParameters const& payload);
+    // DO NOT CALL Poll() FROM MULTIPLE THREADS due to AllBlockingTCPSockets being a member
     virtual void          Poll(bool listeners = true);
     virtual void          AddSessionListener(SessionListener* se);
     virtual void          RemoveSessionListener(SessionListener* se);
@@ -501,56 +508,85 @@ public:
     virtual SessionResult ConnectPTCP(BerkleyBindParameters* bbp, SockAddr* RemoteAddress, bool blocking);
 
     // Closes all the sockets; useful for interrupting the socket polling during shutdown
-    void            Shutdown();
+    void Shutdown();
 
     // Returns true if there is at least one successful connection
     // WARNING: This function may not be in sync across threads, but it IS atomic
-    bool            ConnectionSuccessful() const
+    bool ConnectionSuccessful() const
     {
         return HaveFullConnections.load(std::memory_order_relaxed);
     }
 
     // Get count of successful connections (past handshake point)
     // WARNING: This function is not thread-safe
-    int             GetConnectionCount() const
+    int GetConnectionCount() const
     {
         return FullConnections.GetSizeI();
     }
-    Ptr<Connection> GetConnectionAtIndex(int index);
+
+    Ptr<Connection> GetFirstConnection();
+
+    const OVRError& GetError() const
+    {
+        return Error;
+    }
+
+    // Identifies if a session result is a successful one.
+    static bool GetSessionResultSuccess(SessionResult result)
+    {
+        return result == Net::SessionResult_OK ||
+               result == Net::SessionResult_AlreadyConnected ||
+               result == Net::SessionResult_ConnectInProgress;
+    }
 
 protected:
     virtual Ptr<Connection> AllocConnection(TransportType transportType);
 
     Lock SocketListenersLock, ConnectionsLock, SessionListenersLock;
-    Array< Ptr<TCPSocket> >   SocketListeners;     // List of active sockets
-    Array< Ptr<Connection> >  AllConnections;      // List of active connections stuck at the versioning handshake
-    Array< Ptr<Connection> >  FullConnections;     // List of active connections past the versioning handshake
-    Array< SessionListener* > SessionListeners;    // List of session listeners
-    Array< Ptr< Net::TCPSocket > > AllBlockingTcpSockets; // Preallocated blocking sockets array
+    Array< Ptr<TCPSocket> >   SocketListeners;       // List of active sockets
+    Array< Ptr<Connection> >  AllConnections;        // List of active connections stuck at the versioning handshake
+    Array< Ptr<Connection> >  FullConnections;       // List of active connections past the versioning handshake
+    Array< SessionListener* > SessionListeners;      // List of session listeners
+    Array< Ptr<TCPSocket> >   AllBlockingTCPSockets; // Preallocated blocking sockets array
+    std::atomic<bool>         HaveFullConnections;   // Do we have any full connections?
+    Session*                  SingleTargetSession;   // Target for SingleProcess mode
 
-    std::atomic<bool> HaveFullConnections;
+    // Find a connection by socket.  Call with ConnectionsLock held
+    Ptr<PacketizedTCPConnection> findConnectionBySocket(Array< Ptr<Connection> >& connectionArray,
+                                                        Socket* s, int* connectionIndex = nullptr);
 
-    // Tools
-    Ptr<PacketizedTCPConnection> findConnectionBySocket(Array< Ptr<Connection> >& connectionArray, Socket* s, int *connectionIndex = NULL); // Call with ConnectionsLock held
-    Ptr<PacketizedTCPConnection> findConnectionBySockAddr(SockAddr* address); // Call with ConnectionsLock held
-    int                   invokeSessionListeners(ReceivePayload*);
-    void                  invokeSessionEvent(void(SessionListener::*f)(Connection*), Connection* pConnection);
+    // Checks if a connection is in an array.  Call with ConnectionsLock held
+    // Returns < 0 if not found.
+    int findConnectionIndex(Array< Ptr<Connection> >& connectionArray, Connection* search);
+    bool connectionInArray(Array< Ptr<Connection> >& connectionArray, Connection* search)
+    {
+        return findConnectionIndex(connectionArray, search) >= 0;
+    }
 
-    // TCP
-    virtual void          TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead);
-    virtual void          TCP_OnClosed(TCPSocket* pSocket);
-    virtual void          TCP_OnAccept(TCPSocket* pListener, SockAddr* pSockAddr, SocketHandle newSock);
-    virtual void          TCP_OnConnected(TCPSocket* pSocket);
+    // Promote a Connection to the FullConnections list.  Thread-safe.
+    void promoteConnectionToFull(Connection* conn);
+
+    // Remove a connection from the full list if it is there.  Thread-safe.
+    void removeFullConnection(Connection* conn);
+
+    // Invoke session listeners
+    int  invokeSessionListeners(ReceivePayload const&);
+    void invokeSessionEvent(void(SessionListener::*f)(Connection*), Connection* pConnection);
+
+    // TCP event handlers
+    virtual void TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead);
+    virtual void TCP_OnClosed(TCPSocket* pSocket);
+    virtual void TCP_OnAccept(TCPSocket* pListener, SockAddr* pSockAddr, SocketHandle newSock);
+    virtual void TCP_OnConnected(TCPSocket* pSocket);
 
 public:
+    // Single process mode
     static void SetSingleProcess(bool enable);
     static bool IsSingleProcess();
-
-protected:
-    Session* SingleTargetSession; // Target for SingleProcess mode
+    OVRError Error;               // Error state.
 };
 
 
-}} // OVR::Net
+}} // namespace OVR::Net
 
-#endif
+#endif // OVR_Session_h

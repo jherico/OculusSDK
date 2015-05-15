@@ -31,6 +31,9 @@ limitations under the License.
 
 #include "Util/Util_Render_Stereo.h" // DistortionMeshCreate
 
+OVR_DISABLE_MSVC_WARNING(4351) // new behavior: elements of array will be default initialized
+
+
 
 //To allow custom distortion to be introduced to CatMulSpline.
 float (*CustomDistortion)(float) = nullptr;
@@ -623,6 +626,8 @@ ProfileRenderInfo::ProfileRenderInfo() :
     Eye2Nose[1] = OVR_DEFAULT_IPD * 0.5f;
     Eye2Plate[0] = 0.;
     Eye2Plate[1] = 0.;
+    HSWDisabled = 0;
+
 }
 
 ProfileRenderInfo GenerateProfileRenderInfoFromProfile( HMDInfo const& hmdInfo,
@@ -644,7 +649,9 @@ ProfileRenderInfo GenerateProfileRenderInfoFromProfile( HMDInfo const& hmdInfo,
         profileRenderInfo.EyeCupType = eyecup;
     }
 
-    Ptr<Profile> def = *ProfileManager::GetInstance()->GetDefaultProfile(hmdInfo.HmdType);
+     profileRenderInfo.HSWDisabled = !profile->GetBoolValue("HSW", true);
+
+     Ptr<Profile> def = *ProfileManager::GetInstance()->GetDefaultProfile(hmdInfo.HmdType);
 
     // Set the eye position
     // Use the user profile value unless they have elected to use the defaults
@@ -664,18 +671,19 @@ ProfileRenderInfo GenerateProfileRenderInfoFromProfile( HMDInfo const& hmdInfo,
     char user[32] = {};
     profile->GetValue(OVR_KEY_USER, user, 32);   // for debugging purposes
 
-    // TBD: Maybe we should separate custom camera positioning from custom distortion rendering ??
-    float ipd = OVR_DEFAULT_IPD;
+    // Eye2Nose
+    profileRenderInfo.Eye2Nose[0] = (OVR_DEFAULT_IPD * 0.5f);
+    profileRenderInfo.Eye2Nose[1] = (OVR_DEFAULT_IPD * 0.5f);
+
     if (profile->GetFloatValues(OVR_KEY_EYE_TO_NOSE_DISTANCE, profileRenderInfo.Eye2Nose, 2) != 2)
     {
         // Legacy profiles may not include half-ipd, so use the regular IPD value instead
-        ipd = profile->GetFloatValue(OVR_KEY_IPD, OVR_DEFAULT_IPD);
+        const float ipd = profile->GetFloatValue(OVR_KEY_IPD, OVR_DEFAULT_IPD);
+        profileRenderInfo.Eye2Nose[0] = (ipd * 0.5f);
+        profileRenderInfo.Eye2Nose[1] = (ipd * 0.5f);
     }
 
-    const float ipd_div2 = ipd * 0.5f;
-    profileRenderInfo.Eye2Nose[0] = ipd_div2;
-    profileRenderInfo.Eye2Nose[1] = ipd_div2;
-
+    // Eye2Plate
     if ((profile->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, profileRenderInfo.Eye2Plate, 2) != 2) &&
         (def->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, profileRenderInfo.Eye2Plate, 2) != 2))
     {
@@ -797,6 +805,7 @@ HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
     renderInfo.LensSeparationInMeters               = hmdInfo.LensSeparationInMeters;
     renderInfo.PelOffsetR                           = hmdInfo.PelOffsetR;
     renderInfo.PelOffsetB                           = hmdInfo.PelOffsetB;
+    renderInfo.Rotation                             = hmdInfo.ShimInfo.Rotation;
 
     OVR_ASSERT ( sizeof(renderInfo.Shutter) == sizeof(hmdInfo.Shutter) );   // Try to keep the files in sync!
     renderInfo.Shutter.Type                         = hmdInfo.Shutter.Type;
@@ -809,20 +818,6 @@ HmdRenderInfo GenerateHmdRenderInfoFromHmdInfo ( HMDInfo const &hmdInfo,
     renderInfo.LensDiameterInMeters                 = 0.035f;
     renderInfo.LensSurfaceToMidplateInMeters        = 0.025f;
     renderInfo.EyeCups                              = EyeCup_DK1A;
-
-#if defined(OVR_OS_LINUX)
-    // If the Rift is a monitor,
-    if (hmdInfo.InCompatibilityMode)
-    {
-        renderInfo.Rotation = hmdInfo.ShimInfo.Rotation;
-    }
-    else // Direct mode handles rotation internally
-    {
-#endif
-        renderInfo.Rotation = 0;
-#if defined(OVR_OS_LINUX)
-    }
-#endif
 
 #if 0       // Device settings are out of date - don't use them.
     if (Contents & Contents_Distortion)
@@ -1526,7 +1521,28 @@ FovPort CalculateFovFromHmdInfo ( StereoEye eyeType,
     return fovPort;
 }
 
+static FovPort FindRange(Vector2f from, Vector2f to, int numSteps, DistortionRenderDesc const &distortionL)
+{
+    FovPort result;
+    result.UpTan = 0.0f;
+    result.DownTan = 0.0f;
+    result.LeftTan = 0.0f;
+    result.RightTan = 0.0f;
 
+    float stepScale = 1.0f / (numSteps - 1);
+    for (int step = 0; step < numSteps; step++)
+    {
+        float    lerpFactor = stepScale * (float)step;
+        Vector2f sample = from + (to - from) * lerpFactor;
+        Vector2f tanEyeAngle = TransformScreenNDCToTanFovSpace(distortionL, sample);
+
+        result.LeftTan = Alg::Max(result.LeftTan, -tanEyeAngle.x);
+        result.RightTan = Alg::Max(result.RightTan, tanEyeAngle.x);
+        result.UpTan = Alg::Max(result.UpTan, -tanEyeAngle.y);
+        result.DownTan = Alg::Max(result.DownTan, tanEyeAngle.y);
+    }
+    return result;
+}
 
 FovPort GetPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &distortion )
 {
@@ -1545,42 +1561,47 @@ FovPort GetPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &di
     // "closer" than the visible bounds, so we'll clip too aggressively.
 
     // Solution - step gradually towards the boundary, noting the maximum distance.
-    struct FunctionHider
-    {
-        static FovPort FindRange ( Vector2f from, Vector2f to, int numSteps,
-                                          DistortionRenderDesc const &distortionL )
-        {
-            FovPort result;
-            result.UpTan    = 0.0f;
-            result.DownTan  = 0.0f;
-            result.LeftTan  = 0.0f;
-            result.RightTan = 0.0f;
+    
 
-            float stepScale = 1.0f / ( numSteps - 1 );
-            for ( int step = 0; step < numSteps; step++ )
-            {
-                float    lerpFactor  = stepScale * (float)step;
-                Vector2f sample      = from + (to - from) * lerpFactor;
-                Vector2f tanEyeAngle = TransformScreenNDCToTanFovSpace ( distortionL, sample );
-
-                result.LeftTan  = Alg::Max ( result.LeftTan,  -tanEyeAngle.x );
-                result.RightTan = Alg::Max ( result.RightTan,  tanEyeAngle.x );
-                result.UpTan    = Alg::Max ( result.UpTan,    -tanEyeAngle.y );
-                result.DownTan  = Alg::Max ( result.DownTan,   tanEyeAngle.y );
-            }
-            return result;
-        }
-    };
-
-    FovPort leftFovPort  = FunctionHider::FindRange( dmiddle, Vector2f( -1.0f, dmiddle.y ), 10, distortion );
-    FovPort rightFovPort = FunctionHider::FindRange( dmiddle, Vector2f( 1.0f, dmiddle.y ),  10, distortion );
-    FovPort upFovPort    = FunctionHider::FindRange( dmiddle, Vector2f( dmiddle.x, -1.0f ), 10, distortion );
-    FovPort downFovPort  = FunctionHider::FindRange( dmiddle, Vector2f( dmiddle.x, 1.0f ),  10, distortion );
+    FovPort leftFovPort  = FindRange( dmiddle, Vector2f( -1.0f, dmiddle.y ), 10, distortion );
+    FovPort rightFovPort = FindRange( dmiddle, Vector2f( 1.0f, dmiddle.y ),  10, distortion );
+    FovPort upFovPort    = FindRange( dmiddle, Vector2f( dmiddle.x, -1.0f ), 10, distortion );
+    FovPort downFovPort  = FindRange( dmiddle, Vector2f( dmiddle.x, 1.0f ),  10, distortion );
     
     resultFovPort.LeftTan  = leftFovPort.LeftTan;
     resultFovPort.RightTan = rightFovPort.RightTan;
     resultFovPort.UpTan    = upFovPort.UpTan;
     resultFovPort.DownTan  = downFovPort.DownTan;
+
+    return resultFovPort;
+}
+
+FovPort GetPhysicalScreenDiagonalFov(StereoEye eyeType, DistortionRenderDesc const &distortion)
+{
+    OVR_UNUSED1(eyeType);
+    
+    FovPort resultFovPort;
+
+    // Figure out the boundaries of the screen. We take the middle pixel of the screen,
+    // move to each of the four screen edges, and transform those back into TanAngle space.
+    Vector2f dmiddle = distortion.LensCenter;
+
+    // The gotcha is that for some distortion functions, the map will "wrap around"
+    // for screen pixels that are not actually visible to the user (especially on DK1,
+    // which has a lot of invisible pixels), and map to pixels that are close to the middle.
+    // This means the edges of the screen will actually be
+    // "closer" than the visible bounds, so we'll clip too aggressively.
+
+    // Solution - step gradually towards the boundary, noting the maximum distance.
+    FovPort nw = FindRange(dmiddle, Vector2f(-1.0f, -1.0f), 10, distortion);
+    FovPort ne = FindRange(dmiddle, Vector2f(1.0f, -1.0), 10, distortion);
+    FovPort sw = FindRange(dmiddle, Vector2f(-1.0f, 1.0f), 10, distortion);
+    FovPort se = FindRange(dmiddle, Vector2f(1.0f, 1.0f), 10, distortion);
+
+    resultFovPort.LeftTan = Alg::Max(nw.LeftTan, sw.LeftTan);
+    resultFovPort.RightTan = Alg::Max(ne.RightTan, se.RightTan);
+    resultFovPort.UpTan = Alg::Max(nw.UpTan, ne.UpTan);
+    resultFovPort.DownTan = Alg::Max(sw.DownTan, se.DownTan);
 
     return resultFovPort;
 }
@@ -1852,112 +1873,124 @@ void CalculatePositionalTimewarpMatrix(Posef const & renderFromEyeInverted, Pose
 
 
 //-----------------------------------------------------------------------------
-// CalculateTimewarpFromSensors
+// CalculateTimewarpFromPoses
 //
-// Read current pose from sensors and construct timewarp matrices for start/end
-// predicted poses.
+// Given start/end predicted poses, construct timewarp matrices.
 //
-// hmdPose: RenderPose eye quaternion, *not* inverted.
-// reader: the tracking state
+// eyeRenderPose: RenderPose eye quaternion, *not* inverted.
 // poseInFaceSpace: true if the pose supplied is stuck-to-your-face rather than fixed-in-space
 // calcPosition: true if the position part of the result is actually used (false = orientation only)
 // hmdToEyeViewOffset: offset from the HMD "middle eye" to actual eye.
-// startEndTimes: start and end times of the screen - typically fed direct from Timing->GetTimewarpTiming()->EyeStartEndTimes[eyeNum]
+// hmdStartEndPoses: the predicted poses of the HMD at start/end times.
+//
+// Results:
+// startEndMatrices: Timewarp matrices for the start and end times respectively.
+void CalculateTimewarpFromPoses(Posef const & eyeRenderPose,
+                                bool poseInFaceSpace,
+                                bool calcPosition, 
+                                Vector3f const &hmdToEyeViewOffset,
+                                Posef const hmdStartEndPoses[2],
+                                Matrix4f startEndMatrices[2])
+{
+    Posef startHmdPose = hmdStartEndPoses[0];
+    Posef endHmdPose   = hmdStartEndPoses[1];
+
+    if ( poseInFaceSpace )
+    {
+        startHmdPose.Translation = Vector3f::Zero();
+        startHmdPose.Rotation = Quatf::Identity();
+        endHmdPose = startHmdPose;
+    }
+
+    Posef eyeRenderPoseLocal = eyeRenderPose;
+    Vector3f eyeOffset = Vector3f::Zero();
+    if(calcPosition)
+    {
+        if(hmdToEyeViewOffset.x >= MATH_FLOAT_MAXVALUE)
+        {
+            // This can happen due to timing issues - the app has connected to the compositor,
+            // but not yet submitted a frame, so not supplied any eye vectors yet.
+            // (in future we should get eye vectors directly from the profile, not from the app)
+            eyeRenderPoseLocal.Translation = Vector3f::Zero();   // disable position to avoid positional issues
+        }
+        else
+        {
+            // Currently HmdToEyeViewOffset is in head space, move it to torso space
+            eyeOffset = startHmdPose.Rotation.Rotate(hmdToEyeViewOffset);
+        }
+    }
+    else
+    {
+        // Orientation only.
+        eyeRenderPoseLocal.Translation = Vector3f::Zero();
+    }
+
+
+    if(calcPosition)
+    {
+        Posef eyeRenderInv = eyeRenderPoseLocal.Inverted();
+        CalculatePositionalTimewarpMatrix ( eyeRenderInv, startHmdPose,
+                                            eyeOffset, startEndMatrices[0] );
+        CalculatePositionalTimewarpMatrix ( eyeRenderInv,   endHmdPose,
+                                            eyeOffset, startEndMatrices[1] );
+    }
+    else
+    {
+        // Orientation-only.
+        Quatf quatFromEye = eyeRenderPoseLocal.Rotation.Inverted();
+        CalculateOrientationTimewarpMatrix(quatFromEye, startHmdPose.Rotation, startEndMatrices[0]);
+        CalculateOrientationTimewarpMatrix(quatFromEye,   endHmdPose.Rotation, startEndMatrices[1]);
+    }
+}
+
+
+//-----------------------------------------------------------------------------
+// CalculateOrientationTimewarpFromSensors
+//
+// LEGACY - DO NOT USE. Only for the OGL path right now.
+
+// Explicit use of something like:
+// DistortionRenderer::readSensorsAndCalculateHmdPoses + CalculateTimewarpFromPoses
+// is preferred.
+//
+// Similar to CalculateTimewarpFromPoses, but reads the sensors for you,
+// and only handles orientation, not position.
+//
+// eyeQuat: RenderPose eye quaternion, *not* inverted.
+// reader: the tracking state
+// startEndTimes: start and end times of the screen - typically fed direct from Timing->GetTimewarpTiming()->EyeStartEndTimes
 //
 // Results:
 // startEndMatrices: Timewarp matrices for the start and end times respectively.
 // timewarpIMUTime: On success it contains the raw IMU sample time for the pose.
-// Returns false on failure to read state.
-bool CalculateTimewarpFromSensors(Posef const & hmdPose,
-                                  Vision::TrackingStateReader* reader,
-                                  bool poseInFaceSpace,
-                                  bool calcPosition, 
-                                  ovrVector3f const &hmdToEyeViewOffset,
-                                  const double startEndTimes[2],
-                                  Matrix4f startEndMatrices[2],
-                                  double& timewarpIMUTime)
+void CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
+                                             Vision::TrackingStateReader* reader,
+                                             const double startEndTimes[2],
+                                             Matrix4f startEndMatrices[2],
+                                             double& timewarpIMUTime)
 {
     Vision::TrackingState startState, endState;
     if (!reader->GetTrackingStateAtTime(startEndTimes[0], startState) ||
         !reader->GetTrackingStateAtTime(startEndTimes[1], endState))
     {
         // No data is available so do not do timewarp.
-        startEndMatrices[0] = Matrix4f::Identity();
-        startEndMatrices[1] = Matrix4f::Identity();
-        timewarpIMUTime = 0.;
-        return false;
-    }
-
-    ovrPosef startHmdPose;
-    ovrPosef endHmdPose;
-    if ( poseInFaceSpace )
-    {
-        startHmdPose.Position = Vector3f::Zero();
-        startHmdPose.Orientation = Quatf::Identity();
-        endHmdPose = startHmdPose;
-    }
-    else
-    {
-        startHmdPose = startState.HeadPose.ThePose;
-        endHmdPose   = endState.HeadPose.ThePose;
-    }
-
-    Posef renderPose = hmdPose;
-    Vector3f eyeOffset = Vector3f(0.0f, 0.0f, 0.0f);
-    if(calcPosition)
-    {
-        if(hmdToEyeViewOffset.x >= MATH_FLOAT_MAXVALUE)
-        {
-            OVR_ASSERT(false);
-            LogError("{ERR-103} [FrameTime] Invalid hmdToEyeViewOffset provided by client.");
-
-            renderPose.Translation = Vector3f::Zero();   // disable position to avoid positional issues
-        }
-        else
-        {
-            // Currently HmdToEyeViewOffset is only a 3D vector
-            // (Negate HmdToEyeViewOffset because offset is a view matrix offset and not a camera offset)
-            eyeOffset = ((Posef)startHmdPose).Apply(-((Vector3f)hmdToEyeViewOffset));
-        }
-    }
-    else
-    {
-        // Orientation only.
-        renderPose.Translation = Vector3f::Zero();
-    }
-
-
-    if(calcPosition)
-    {
-        Posef hmdPoseInv = hmdPose.Inverted();
-        CalculatePositionalTimewarpMatrix ( hmdPoseInv, startHmdPose,
-                                            eyeOffset, startEndMatrices[0] );
-        CalculatePositionalTimewarpMatrix ( hmdPoseInv,   endHmdPose,
-                                            eyeOffset, startEndMatrices[1] );
-    }
-    else
-    {
-        // Orientation-only.
-        Quatf quatFromEye = hmdPose.Rotation.Inverted();
-        CalculateOrientationTimewarpMatrix(quatFromEye, startHmdPose.Orientation, startEndMatrices[0]);
-        CalculateOrientationTimewarpMatrix(quatFromEye,   endHmdPose.Orientation, startEndMatrices[1]);
+        startState.HeadPose.ThePose = Posef();
+        startState.RawSensorData.AbsoluteTimeSeconds = 0.0;
+        endState = startState;
+        // ...and then continue to calculate everything using this data, or graphics oddness happens.
     }
 
     // Store off the IMU sample time.
     timewarpIMUTime = startState.RawSensorData.AbsoluteTimeSeconds;
 
-    return true;
-}
+    Posef hmdStartEndPoses[2];
+    hmdStartEndPoses[0] = startState.HeadPose.ThePose;
+    hmdStartEndPoses[1] =   endState.HeadPose.ThePose;
 
-// Only handles orientation, not translation.
-bool CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
-                                             Vision::TrackingStateReader* reader,
-                                             const double startEndTimes[2],
-                                             Matrix4f startEndMatrices[2],
-                                             double& timewarpIMUTime)
-{
-    Posef hmdPose = Posef ( eyeQuat, Vector3f::Zero() );
-    return CalculateTimewarpFromSensors ( hmdPose, reader, false, false, Vector3f::Zero(), startEndTimes, startEndMatrices, timewarpIMUTime );
+    Posef eyeRenderPose = Posef ( eyeQuat, Vector3f::Zero() );
+    ovrVector3f hmdToEyeViewOffset = Vector3f::Zero();
+
+    CalculateTimewarpFromPoses ( eyeRenderPose, false, false, hmdToEyeViewOffset, hmdStartEndPoses, startEndMatrices );
 }
 
 
@@ -1965,10 +1998,10 @@ bool CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
 // CalculateEyeTimewarpTimes
 //
 // Given the scanout start time, duration of scanout, and shutter type, this
-// function returns the timewarp left/right eye start and end prediction times.
+// function returns the timewarp start and end prediction times.
 void CalculateEyeTimewarpTimes(double scanoutStartTime, double scanoutDuration,
                                HmdShutterTypeEnum shutterType,
-                               double leftEyeStartEndTime[2], double rightEyeStartEndTime[2])
+                               double eyeStartEndTime[2])
 {
     // Calculate absolute points in time when eye rendering or corresponding time-warp
     // screen edges will become visible.
@@ -1978,20 +2011,15 @@ void CalculateEyeTimewarpTimes(double scanoutStartTime, double scanoutDuration,
     case HmdShutter_RollingTopToBottom:
     case HmdShutter_RollingLeftToRight:
     case HmdShutter_RollingRightToLeft:
-        // This is *Correct* with Tom's distortion mesh organization.
-        leftEyeStartEndTime[0] = scanoutStartTime;
-        leftEyeStartEndTime[1] = scanoutStartTime + scanoutDuration;
-        rightEyeStartEndTime[0] = scanoutStartTime;
-        rightEyeStartEndTime[1] = scanoutStartTime + scanoutDuration;
+        eyeStartEndTime[0] = scanoutStartTime;
+        eyeStartEndTime[1] = scanoutStartTime + scanoutDuration;
         break;
     case HmdShutter_Global:
         // TBD
         {
             double midpoint = scanoutStartTime + scanoutDuration * 0.5;
-            leftEyeStartEndTime[0] = midpoint;
-            leftEyeStartEndTime[1] = midpoint;
-            rightEyeStartEndTime[0] = midpoint;
-            rightEyeStartEndTime[1] = midpoint;
+            eyeStartEndTime[0] = midpoint;
+            eyeStartEndTime[1] = midpoint;
         }
         break;
     default:
@@ -2042,22 +2070,19 @@ bool CalculateDistortionMeshFromFOV(HmdRenderInfo const & renderInfo,
                                     DistortionRenderDesc const & distortionDesc,
                                     StereoEye stereoEye, FovPort fov,
                                     unsigned distortionCaps,
-                                    ovrDistortionMesh *meshData)
+                                    DistortionMesh *meshData)
 {
     if (!meshData)
     {
         return false;
     }
-
-    // Not used now, but Chromatic flag or others could possibly be checked for in the future.
-    OVR_UNUSED1(distortionCaps); 
-
+    
     // *** Calculate a part of "StereoParams" needed for mesh generation
 
     // Note that mesh distortion generation is invariant of RenderTarget UVs, allowing
     // render target size and location to be changed after the fact dynamically. 
     // eyeToSourceUV is computed here for convenience, so that users don't need
-    // to call ovrHmd_GetRenderScaleAndOffset unless changing RT dynamically.
+    // to call GetRenderScaleAndOffset unless changing RT dynamically.
 
     // Find the mapping from TanAngle space to target NDC space.
     ScaleAndOffset2D eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
@@ -2070,7 +2095,7 @@ bool CalculateDistortionMeshFromFOV(HmdRenderInfo const & renderInfo,
         (uint16_t**)&meshData->pIndexData,
         &vertexCount, &triangleCount,
         (stereoEye == StereoEye_Right),
-        renderInfo, distortionDesc, eyeToSourceNDC);
+        renderInfo, distortionDesc, eyeToSourceNDC, distortionCaps);
 
     if (meshData->pVertexData)
     {
@@ -2082,6 +2107,53 @@ bool CalculateDistortionMeshFromFOV(HmdRenderInfo const & renderInfo,
 
     return false;
 }
+
+// Frees distortion mesh allocated by ovrHmd_GenerateDistortionMesh. meshData elements
+// are set to null and 0s after the call.
+void DestroyDistortionMeshObject(DistortionMesh* meshData)
+{
+    if (!meshData)
+    {
+        OVR_ASSERT(false);
+        return;
+    }
+
+    if (meshData->pVertexData)
+        OVR::Util::Render::DistortionMeshDestroy((OVR::Util::Render::DistortionMeshVertexData*)meshData->pVertexData,
+                                                 meshData->pIndexData);
+    meshData->pVertexData = 0;
+    meshData->pIndexData = 0;
+    meshData->VertexCount = 0;
+    meshData->IndexCount = 0;
+}
+
+
+// Computes updated 'uvScaleOffsetOut' to be used with a distortion if render target size or
+// viewport changes after the fact. This can be used to adjust render size every frame, if desired.
+void GetRenderScaleAndOffset(ovrFovPort fov,
+                             ovrSizei textureSize, ovrRecti renderViewport,
+                             ovrVector2f uvScaleOffsetOut[2] )
+{        
+    if (!uvScaleOffsetOut)
+    {
+        OVR_ASSERT(false);
+        return;
+    }
+
+    // Find the mapping from TanAngle space to target NDC space.
+    ScaleAndOffset2D  eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
+    // Find the mapping from TanAngle space to textureUV space.
+    ScaleAndOffset2D  eyeToSourceUV  = CreateUVScaleAndOffsetfromNDCScaleandOffset(
+                                         eyeToSourceNDC,
+                                         renderViewport, textureSize );
+
+    if (uvScaleOffsetOut)
+    {
+        uvScaleOffsetOut[0] = eyeToSourceUV.Scale;
+        uvScaleOffsetOut[1] = eyeToSourceUV.Offset;
+    }
+}
+
 
 
 } //namespace OVR

@@ -111,7 +111,7 @@ public:
 
 	// Function invocation
 
-	OVR_FORCE_INLINE ret_type operator()() const
+	inline ret_type operator()() const
 	{
 		return (*_stub)(_object);
 	}
@@ -227,7 +227,7 @@ public:
 
 	// Function invocation
 
-	OVR_FORCE_INLINE ret_type operator()(arg1_type a1) const
+	inline ret_type operator()(arg1_type a1) const
 	{
 		return (*_stub)(_object, a1);
 	}
@@ -343,7 +343,7 @@ public:
 
 	// Function invocation
 
-	OVR_FORCE_INLINE ret_type operator()(arg1_type a1, arg2_type a2) const
+	inline ret_type operator()(arg1_type a1, arg2_type a2) const
 	{
 		return (*_stub)(_object, a1, a2);
 	}
@@ -459,7 +459,7 @@ public:
 
 	// Function invocation
 
-	OVR_FORCE_INLINE ret_type operator()(arg1_type a1, arg2_type a2, arg3_type a3) const
+	inline ret_type operator()(arg1_type a1, arg2_type a2, arg3_type a3) const
 	{
 		return (*_stub)(_object, a1, a2, a3);
 	}

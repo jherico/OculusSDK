@@ -2033,6 +2033,7 @@ bool SymbolLookup::LookupSymbols(uint64_t* addressArray, SymbolInfo* pSymbolInfo
             if(pSymbolInfoArray[i].pModuleInfo && pSymbolInfoArray[i].pModuleInfo->filePath[0] && (stat(pSymbolInfoArray[i].pModuleInfo->filePath, &statStruct) == 0))
             {
                 char command[PATH_MAX * 2];   // Problem: We can't unilaterally use pSymbolInfoArray[0] for all addresses. We need to match addresses to the corresponding modules.
+                // FIXME: atos is moving. Should start with 'xcrun atos'.
                 OVR_snprintf(command, OVR_ARRAY_COUNT(command), "atos -o %s -l 0x%llx 0x%llx",
                             pSymbolInfoArray[i].pModuleInfo->filePath, (int64_t)pSymbolInfoArray[i].pModuleInfo->baseAddress, (int64_t)pSymbolInfoArray[i].address);
 
@@ -2194,9 +2195,10 @@ ExceptionHandler::~ExceptionHandler()
 
 size_t ExceptionHandler::GetCrashDumpDirectory(char* directoryPath, size_t directoryPathCapacity)
 {
+    
     #if defined(OVR_OS_MS)
         wchar_t pathW[OVR_MAX_PATH + 1]; // +1 because we append a path separator.
-        HRESULT hr = SHGetFolderPathW(nullptr, CSIDL_APPDATA | CSIDL_FLAG_CREATE, nullptr, SHGFP_TYPE_CURRENT, pathW);
+        HRESULT hr = SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, nullptr, SHGFP_TYPE_CURRENT, pathW);
 
         if (SUCCEEDED(hr))
         {
@@ -3189,11 +3191,6 @@ void ExceptionHandler::WriteReport()
                             0, (unsigned)pHMDState->pHmdDesc->Type, pHMDState->pHmdDesc->ProductName, pHMDState->pHmdDesc->Manufacturer, pHMDState->pHmdDesc->VendorId,
                             pHMDState->pHmdDesc->ProductId, pHMDState->pHmdDesc->SerialNumber, pHMDState->pHmdDesc->FirmwareMajor, pHMDState->pHmdDesc->FirmwareMinor,
                             pHMDState->pHmdDesc->Resolution.w, pHMDState->pHmdDesc->Resolution.h, pHMDState->pHmdDesc->DisplayDeviceName, pHMDState->pHmdDesc->DisplayId);
-
-            // HSW display state
-            ovrHSWDisplayState hswDS;
-            ovrHmd_GetHSWDisplayState(pHMDState->pHmdDesc, &hswDS);
-            WriteReportLineF("HSW displayed for hmd: %s\n", hswDS.Displayed ? "yes" : "no");
         }
 
         char threadIdStr[24];

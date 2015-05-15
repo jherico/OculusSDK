@@ -28,6 +28,7 @@ limitations under the License.
 #include "OVR_Std.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include "OVR_System.h"
 #include "OVR_DebugHelp.h"
@@ -227,7 +228,7 @@ void Log::LogMessageVarg(LogMessageType messageType, const char* fmt, va_list ar
 
     char  buffer[MaxLogBufferMessageSize];
     char* pBuffer = buffer;
-    char* pAllocated = NULL;
+    char* pAllocated = nullptr;
 
     #if !defined(OVR_CC_MSVC) // Non-Microsoft compilers require you to save a copy of the va_list.
         va_list argListSaved;
@@ -240,9 +241,10 @@ void Log::LogMessageVarg(LogMessageType messageType, const char* fmt, va_list ar
     {
         // We assume C++ exceptions are disabled.
         // FormatLog will handle the case that pAllocated is NULL.
-        pAllocated = new char [result + 1];
+        pAllocated = (char*)malloc(result + 1);
         // We cannot use OVR_ALLOC() for this allocation because the logging subsystem exists
         // outside of the rest of LibOVR so that it can be used to log events from anywhere.
+        // We cannot use new/delete either because we wrap that.
         pBuffer = pAllocated;
 
         #if !defined(OVR_CC_MSVC)
@@ -254,7 +256,7 @@ void Log::LogMessageVarg(LogMessageType messageType, const char* fmt, va_list ar
     }
 
     DefaultLogOutput(pBuffer, messageType, result);
-    delete[] pAllocated;
+    free(pAllocated);
 }
 
 void OVR::Log::LogMessage(LogMessageType messageType, const char* pfmt, ...)
@@ -300,7 +302,7 @@ int Log::FormatLog(char* buffer, size_t bufferSize, LogMessageType messageType,
             buffer2[0] = '\n'; // We are guaranteed to have capacity for this.
             buffer2[1] = '\0';
         }
-        else
+        else if((messageLength == 0) || (buffer2[messageLength - 1] != '\n')) // If there isn't already a trailing '\n' ...
         {
             // If the printed string used all of the capacity or required more than the capacity,
             // Chop the output by one character so we can append the \n safely.
@@ -333,9 +335,11 @@ void Log::DefaultLogOutput(const char* formattedText, LogMessageType messageType
     // To do: use bufferSize to deal with the case that Android has a limited output length.
     __android_log_write(ANDROID_LOG_INFO, "OVR", formattedText);
 
+#elif defined(OVR_OS_MAC)
+    syslog(LOG_INFO, "%s", formattedText);
+    fputs(formattedText, stdout);
 #else
     fputs(formattedText, stdout);
-
 #endif
 
     if (messageType == Log_Error)
@@ -428,6 +432,17 @@ OVR_LOG_FUNCTION_IMPL(Assert)
 
 
 
+void OVR_Fail_F(const char* format, ...)
+{
+    char message[512];
+    va_list argList;
+    va_start(argList, format);
+    OVR_vsnprintf(message, sizeof(message), format, argList);
+    va_end(argList);
+    OVR_FAIL_M(message);
+}
+
+
 // Assertion handler support
 // To consider: Move this to an OVR_Types.cpp or OVR_Assert.cpp source file.
 
@@ -490,6 +505,7 @@ intptr_t DefaultAssertionHandler(intptr_t /*userParameter*/, const char* title, 
             }
             else
             {
+                // See above.
                 OVR::Util::DisplayMessageBox(title, message);
             }
         #else
@@ -500,5 +516,20 @@ intptr_t DefaultAssertionHandler(intptr_t /*userParameter*/, const char* title, 
     return 0;
 }
 
+bool IsAutomationRunning()
+{
+    #if defined(OVR_OS_WIN32)
+        // We use the OS GetEnvironmentVariable function as opposed to getenv, as that
+        // is process-wide as opposed to being tied to the current C runtime library.
+        return GetEnvironmentVariableW(L"OvrAutomationRunning", NULL, 0) > 0;
+    #else
+        return getenv("OvrAutomationRunning") != nullptr;
+    #endif
+}
 
 } // OVR
+
+
+
+
+

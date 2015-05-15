@@ -274,7 +274,7 @@ typedef struct _RIFT_MODE
 {
 	ULONG	childUid;				// ChildUid as reported by RIFT_STATUS
 	ULONG	mode;					// Bitmap of mode values, defined by OVR_RIFT_HOME_*
-	HANDLE	userModeHandle;			// Handle of render target created in user mode
+    VOID* POINTER_64 userModeHandle; // Handle of render target created in user mode
 									// that's usable as a primary 
 } RIFT_MODE, *PRIFT_MODE;
 
@@ -284,6 +284,7 @@ typedef struct _RIFT_STATUS
 	ULONG mode;					// Active rift mode, see OVR_RIFT_MODE_*
 	ULONG serialNumber;			// Serial number as reported in the Rift's EDID
 	ULONG textureHandle;		// Handle of shared render resource -- NULL if not shared 
+    ULONG adapterId;            // Ordinal of adapter the Rift is plugged into
 } RIFT_STATUS, *PRIFT_STATUS;
 
 typedef struct _RIFT_STATUS_ARRAY

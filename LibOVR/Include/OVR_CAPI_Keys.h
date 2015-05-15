@@ -24,21 +24,26 @@ limitations under the License.
 
 ************************************************************************************/
 
+#ifndef OVR_CAPI_Keys_h
+#define OVR_CAPI_Keys_h
+
+#include "OVR_Version.h"
 
 
-#define OVR_KEY_USER                        "User"              // string
-#define OVR_KEY_NAME                        "Name"              // string
-#define OVR_KEY_GENDER                      "Gender"            // string
-#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"      // float
-#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"         // float
-#define OVR_KEY_IPD                         "IPD"               // float
-#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"   // float[2]
-#define OVR_KEY_EYE_RELIEF_DIAL             "EyeReliefDial"     // int
-#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"     // float[2]
-#define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist" // float[2]
-#define OVR_KEY_EYE_CUP                     "EyeCup"            // char[16]
-#define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"   // bool
-#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld" // double[7]
+#define OVR_KEY_USER                        "User"                // string
+#define OVR_KEY_NAME                        "Name"                // string
+#define OVR_KEY_GENDER                      "Gender"              // string "Male", "Female", or "Unknown"
+#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"        // float meters
+#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"           // float meters
+#define OVR_KEY_IPD                         "IPD"                 // float meters
+#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"     // float[2] meters
+#define OVR_KEY_EYE_RELIEF_DIAL             "EyeReliefDial"       // int in range of 0-10
+#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"       // float[2] meters
+#define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist"   // float[2] meters
+#define OVR_KEY_EYE_CUP                     "EyeCup"              // char[16] "A", "B", or "C"
+#define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"     // bool
+#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld"   // double[7] ovrPosef quat rotation x, y, z, w, translation x, y, z
+
 
 // Default measurements empirically determined at Oculus to make us happy
 // The neck model numbers were derived as an average of the male and female averages from ANSUR-88
@@ -54,3 +59,4 @@ limitations under the License.
 #define OVR_DEFAULT_EYE_RELIEF_DIAL         3
 #define OVR_DEFAULT_CAMERA_POSITION			{0,0,0,1,0,0,0}
 
+#endif // OVR_CAPI_Keys_h

@@ -115,6 +115,11 @@ namespace OVR { namespace CAPI {
 //        would need to put in a couple seconds delay to allow the fade to complete.
 //    Ideally we'd handle the case of a user switching HMDs and not needing to see the warning again.
 
+// Returns the default HSW display texture data.
+const uint8_t* HSWDisplay_GetDefaultTexture(size_t& TextureSize);
+
+#if 0  // Now done by compositor. This code is left here because we probably want to move some of the functionality back into the compositor.
+
 class HSWDisplay : public RefCountBase<HSWDisplay>
 {
 public:
@@ -169,6 +174,7 @@ public:
     // Resets the current profile's HAS settings (e.g. to act as if the user has never seen the HSW display before).
     void ResetProfileData();
 
+#if 0
     // Returns the ovrRenderAPIType. This is essentially the same as RTTI, as it's indicating what subclass
     // is being used for this.
     ovrRenderAPIType GetRenderAPIType() const // e.g. ovrRenderAPI_D3D11
@@ -181,6 +187,11 @@ public:
 
     // Creates and constructs an instance of an HSWDisplay subclass based on the API type.
     static HSWDisplay* Factory(ovrRenderAPIType apiType, ovrHmd hmd, const HMDRenderState& renderState);
+#endif
+
+
+
+
 
 private:
     OVR_NON_COPYABLE(HSWDisplay)
@@ -195,12 +206,6 @@ protected:
     // Profile functionality
     time_t GetCurrentProfileLastHSWTime() const;
     void   SetCurrentProfileLastHSWTime(time_t t);
-
-    // Generates an appropriate stereo ortho projection matrix.
-    void GetOrthoProjection(const HMDRenderState& RenderState, Matrix4f OrthoProjection[2]);
-
-    // Returns the default HSW display texture data.
-    static const uint8_t* GetDefaultTexture(size_t& TextureSize);
 
 protected:
     bool                   Enabled;                 // If true then the HSW display system is enabled. True by default.
@@ -224,7 +229,7 @@ protected:
 
 }; // class HSWDisplay
 
-
+#endif
 
 }} // namespace OVR::CAPI
 

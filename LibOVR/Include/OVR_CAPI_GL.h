@@ -1,22 +1,20 @@
-/************************************************************************************
+/********************************************************************************//**
 
-Filename    :   OVR_CAPI_GL.h
-Content     :   GL specific structures used by the CAPI interface.
-Created     :   November 7, 2013
-Authors     :   Lee Cooper
+\file OVR_CAPI_GL.h
+\brief GL specific structures used by the CAPI interface.
+\date November 7, 2013
+\author Lee Cooper
 
-Copyright   :   Copyright 2013 Oculus VR, LLC. All Rights reserved.
-
+\copyright Copyright 2013 Oculus VR, LLC. All Rights reserved.
+\n
 Use of this software is subject to the terms of the Oculus Inc license
 agreement provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 ************************************************************************************/
+
 #ifndef OVR_CAPI_GL_h
 #define OVR_CAPI_GL_h
-
-/// @file OVR_CAPI_GL.h
-/// OpenGL rendering support.
 
 #include "OVR_CAPI.h"
 
@@ -35,31 +33,6 @@ otherwise accompanies this software in either electronic or hard copy form.
     #pragma warning(disable: 4324) // structure was padded due to __declspec(align())
 #endif
 
-
-/// Used to configure slave GL rendering (i.e. for devices created externally).
-typedef struct ovrGLConfigData_s
-{
-    ovrRenderAPIConfigHeader Header;    ///< General device settings.
-
-#if defined(OVR_OS_WIN32)
-    HWND Window;                ///< The optional window handle. If unset, rendering will use the current window.
-    HDC  DC;                    ///< The optional device context. If unset, rendering will use a new context.
-#elif defined (OVR_OS_LINUX)
-    struct _XDisplay* Disp;     ///< Optional display. If unset, will issue glXGetCurrentDisplay when context is current.
-#endif
-} ovrGLConfigData;
-
-#if defined(__cplusplus)
-    static_assert(sizeof(ovrRenderAPIConfig) >= sizeof(ovrGLConfigData), "Insufficient size.");
-#endif
-
-/// Contains OpenGL-specific rendering information.
-union ovrGLConfig
-{
-    ovrRenderAPIConfig Config;  ///< General device settings.
-    ovrGLConfigData    OGL;     ///< OpenGL-specific settings.
-};
-
 /// Used to pass GL eye texture data to ovrHmd_EndFrame.
 typedef struct ovrGLTextureData_s
 {
@@ -69,6 +42,7 @@ typedef struct ovrGLTextureData_s
 
 #if defined(__cplusplus)
     static_assert(sizeof(ovrTexture) >= sizeof(ovrGLTextureData), "Insufficient size.");
+    static_assert(sizeof(ovrGLTextureData) == sizeof(ovrTextureHeader) + 4, "size mismatch");
 #endif
 
 /// Contains OpenGL-specific texture information.
@@ -82,6 +56,45 @@ typedef union ovrGLTexture_s
 #if defined(_MSC_VER)
     #pragma warning(pop)
 #endif
+
+
+
+/// Creates a Texture Set suitable for use with OpenGL.
+///
+/// \param[in]  hmd Specifies an ovrHmd previously returned by ovrHmd_Create.
+/// \param[in]  format Specifies the texture format.
+/// \param[in]  width Specifies the requested texture width.
+/// \param[in]  height Specifies the requested texture height.
+/// \param[out] outTextureSet Specifies the created ovrSwapTextureSet, which will be valid only upon a successful return value.
+///             This texture set must be eventually destroyed via ovrHmd_DestroySwapTextureSet before destroying the HMD with ovrHmd_Destroy.
+///
+/// \return Returns an ovrResult indicating success or failure. In the case of failure, use 
+///         ovr_GetLastErrorInfo to get more information.
+///
+/// \see ovrHmd_DestroySwapTextureSet
+///
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateSwapTextureSetGL(ovrHmd hmd, GLuint format,
+                                                             int width, int height,
+                                                             ovrSwapTextureSet** outTextureSet);
+
+
+/// Creates a Mirror Texture which is auto-refreshed to mirror Rift contents produced by this application.
+///
+/// \param[in]  hmd Specifies an ovrHmd previously returned by ovrHmd_Create.
+/// \param[in]  format Specifies the texture format.
+/// \param[in]  width Specifies the requested texture width.
+/// \param[in]  height Specifies the requested texture height.
+/// \param[out] outMirrorTexture Specifies the created ovrTexture, which will be valid only upon a successful return value.
+///             This texture must be eventually destroyed via ovrHmd_DestroyMirrorTexture before destroying the HMD with ovrHmd_Destroy.
+///
+/// \return Returns an ovrResult indicating success or failure. In the case of failure, use 
+///         ovr_GetLastErrorInfo to get more information.
+///
+/// \see ovrHmd_DestroyMirrorTexture
+///
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateMirrorTextureGL(ovrHmd hmd, GLuint format,
+                                                            int width, int height,
+                                                            ovrTexture** outMirrorTexture);
 
 
 #endif    // OVR_CAPI_GL_h

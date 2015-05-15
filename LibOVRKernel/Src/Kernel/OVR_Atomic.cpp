@@ -90,17 +90,17 @@ Lock* SharedLock::GetLockAddRef()
         if (oldUseCount == 0)
         {
             // Initialize marker
-            if (AtomicOps<int>::CompareAndSet_Sync(&UseCount, 0, LockInitMarker))
+            if (UseCount.CompareAndSet_Sync(0, LockInitMarker))
             {
                 Construct<Lock>(Buffer);
                 do { }
-                while (!AtomicOps<int>::CompareAndSet_Sync(&UseCount, LockInitMarker, 1));
+                while (UseCount.CompareAndSet_Sync(LockInitMarker, 1));
                 return toLock();
             }
             continue;
         }
 
-    } while (!AtomicOps<int>::CompareAndSet_NoSync(&UseCount, oldUseCount, oldUseCount + 1));
+    } while (!UseCount.CompareAndSet_NoSync(oldUseCount, oldUseCount + 1));
 
     return toLock();
 }
@@ -119,19 +119,19 @@ void SharedLock::ReleaseLock(Lock* plock)
         if (oldUseCount == 1)
         {
             // Initialize marker
-            if (AtomicOps<int>::CompareAndSet_Sync(&UseCount, 1, LockInitMarker))
+            if (UseCount.CompareAndSet_Sync(1, LockInitMarker))
             {
                 Destruct<Lock>(toLock());
 
                 do { }
-                while (!AtomicOps<int>::CompareAndSet_Sync(&UseCount, LockInitMarker, 0));
+                while (!UseCount.CompareAndSet_Sync(LockInitMarker, 0));
 
                 return;
             }
             continue;
         }
 
-    } while (!AtomicOps<int>::CompareAndSet_NoSync(&UseCount, oldUseCount, oldUseCount - 1));
+    } while (!UseCount.CompareAndSet_NoSync(oldUseCount, oldUseCount - 1));
 }
 
 } // OVR

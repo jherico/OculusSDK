@@ -88,19 +88,45 @@ limitations under the License.
     #define TraceDistortionEnd(id, frameIndex) EventWriteDistortionEnd((id), (frameIndex))
 
     // Tracking Camera events
-    #define _TraceCameraFrameData(fn,img) \
+    #define _TraceCameraFrameData(fn,camIdx,img) \
         fn( \
-            0, \
+            (camIdx), \
             (img).FrameNumber, \
+            (img).HmdFrameNumber, \
             (img).ArrivalTime, \
-            (img).CaptureTime, \
-            0 \
-          )
-    #define TraceCameraFrameReceived(img) _TraceCameraFrameData(EventWriteCameraFrameReceived,(img))
-    #define TraceCameraBeginProcessing(img) _TraceCameraFrameData(EventWriteCameraBeginProcessing,(img))
+            (img).CaptureTime \
+        )
+    #define TraceCameraFrameReceived(img) _TraceCameraFrameData(EventWriteCameraFrameReceived, 0, (img))
+    #define TraceCameraBeginProcessing(camIdx, img) _TraceCameraFrameData(EventWriteCameraBeginProcessing, camIdx, (img))
+    #define TraceCameraEndProcessing(camIdx, img) _TraceCameraFrameData(EventWriteCameraEndProcessing, camIdx, (img))
     #define TraceCameraFrameRequest(requestNumber, frameCount, lastFrameNumber) EventWriteCameraFrameRequest(requestNumber, frameCount, lastFrameNumber)
-    #define TraceCameraEndProcessing(img) _TraceCameraFrameData(EventWriteCameraEndProcessing,(img))
-    #define TraceCameraSkippedFrames(requestNumber, frameCount, lastFrameNumber) EventWriteCameraSkippedFrames(requestNumber, frameCount, lastFrameNumber)
+    #define TraceCameraSkippedFrames(camIdx, skippedFrameCount) EventWriteCameraSkippedFrames(camIdx, skippedFrameCount)
+    #define TraceCameraBeginGlobalImageAquisition(attachedCameras) EventWriteCameraBeginGlobalImageAquisition(attachedCameras, 0, 0)
+    #define TraceCameraEndGlobalImageAquisition(attachedCameras, capturedFrames, captureTime) EventWriteCameraEndGlobalImageAquisition(attachedCameras, capturedFrames, captureTime)
+    #define TraceCameraBeginLEDMatching(camIdx, matchPass, objIdx, matchCount) EventWriteBeginCameraLEDMatching(camIdx, matchPass, objIdx, matchCount)
+    #define TraceCameraEndLEDMatching(camIdx, matchPass, objIdx, matchCount) EventWriteEndCameraLEDMatching(camIdx, matchPass, objIdx, matchCount)
+    #define TraceCameraPoseChange(camIdx, newWorld, oldWorld) \
+        EventWriteCameraPoseChange( \
+            camIdx, \
+            &(newWorld).Rotation.x, \
+            &(newWorld).Translation.x, \
+            &(oldWorld).Rotation.x, \
+            &(oldWorld).Translation.x \
+        )
+    #define TraceCameraClockSync(camIdx, objIdx, hmdFrameNumber, captureTime) EventWriteCameraClockSync(camIdx, objIdx, hmdFrameNumber, captureTime)
+    #define TraceCameraPoseReconstruction(camIdx, objIdx, sample) \
+        EventWriteCameraPoseReconstruction( \
+            camIdx, \
+            objIdx, \
+            (sample).HasPosition, \
+            (sample).HasOrientation, \
+            (sample).HasVelocities, \
+            (sample).ObjectSpaceError, \
+            (sample).MatchCount \
+        )
+    #define TraceCameraPoseSensorFusion(camIdx, objIdx) EventWriteCameraPoseSensorFusion(camIdx, objIdx)
+    #define TraceCameraGetFrame(camIdx, lastFrameNumber) EventWriteCameraGetFrame(camIdx, lastFrameNumber)
+    #define TraceCameraBeginBlobSegmentation(camIdx, lastFrameNumber) EventWriteCameraBeginBlobSegmentation(camIdx, lastFrameNumber)
 
     // Trace the interesting parts of an ovrHmdDesc structure
     #define TraceHmdDesc(desc) \
@@ -113,9 +139,9 @@ limitations under the License.
             (desc).FirmwareMinor, \
             (desc).HmdCaps, \
             (desc).TrackingCaps, \
-            (desc).DistortionCaps, \
-            (desc).Resolution.w, \
-            (desc).Resolution.h \
+            0, \
+            0, \
+            0 \
         )
 
     // Trace part of a JSON string (events have a 64k limit)
@@ -146,11 +172,11 @@ limitations under the License.
             (ts).LastCameraFrameCounter \
         )
 
-    #define TraceCameraBlobs(blobs) \
+    #define TraceCameraBlobs(camIdx, frame) \
         if (EventEnabledCameraBlobs()) \
         { \
             const int max_blobs = 80; \
-            int count = (blobs).GetSizeI(); \
+            int count = (frame).Blobs.GetSizeI(); \
             double x[max_blobs]; \
             double y[max_blobs]; \
             int size[max_blobs]; \
@@ -158,13 +184,31 @@ limitations under the License.
                 count = max_blobs; \
             for (int i = 0; i < count; ++i) \
             { \
-                x[i] = (blobs)[i].Position.x; \
-                y[i] = (blobs)[i].Position.y; \
-                size[i] = (blobs)[i].BlobSize; \
+                x[i] = (frame).Blobs[i].Position.x; \
+                y[i] = (frame).Blobs[i].Position.y; \
+                size[i] = (frame).Blobs[i].BlobSize; \
             } \
-            EventWriteCameraBlobs(count, x, y, size); \
+            EventWriteCameraBlobs( \
+                camIdx, \
+                (frame).Frame->FrameNumber, \
+                (frame).Frame->ArrivalTime, \
+                (frame).Frame->Width, \
+                (frame).Frame->Height, \
+                count, \
+                x, \
+                y, \
+                size \
+            ); \
         } \
         else ((void)0)
+
+    // Trace PoseLatching CPU pinned memory write
+    #define TracePoseLatchCPUWrite(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime) \
+        EventWritePoseLatchCPUWrite(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)
+
+    // Trace PoseLatching GPU latch
+    #define TracePoseLatchGPULatchReadback(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime) \
+        EventWritePoseLatchGPULatchReadback(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)
 
 #else // OVR_ENABLE_ETW_TRACING
 

@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\OculusWorldDemo.cpp" />
+    <ClCompile Include="..\..\..\OculusWorldDemo_Scene.cpp" />
+    <ClCompile Include="..\..\..\Player.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_D3D11_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_GL_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_GL_Win32_Device.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_LoadTextureDDS.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_LoadTextureTGA.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.cpp">
+      <Filter>CommonSrc\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Win32_Platform.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Platform\Platform.cpp">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\OptionMenu.cpp">
+      <Filter>CommonSrc\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\RenderProfiler.cpp">
+      <Filter>CommonSrc\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\..\3rdParty\TinyXml\tinyxml2.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\OculusWorldDemo.h" />
+    <ClInclude Include="..\..\..\Player.h" />
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_D3D11_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_Font.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_GL_Win32_Device.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.h">
+      <Filter>CommonSrc\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Platform.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Win32_Gamepad.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Platform.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Platform_Default.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\OptionMenu.h">
+      <Filter>CommonSrc\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\RenderProfiler.h">
+      <Filter>CommonSrc\Util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\CommonSrc\Platform\Gamepad.h">
+      <Filter>CommonSrc\Platform</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\OculusWorldDemo.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CommonSrc">
+      <UniqueIdentifier>{d77fd864-e7a7-473b-9968-c87779430bfa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonSrc\Util">
+      <UniqueIdentifier>{6fb044e0-797f-47d8-b7aa-9ae1ef859f7c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonSrc\Platform">
+      <UniqueIdentifier>{eb131d9f-90a6-4132-9510-cdcff506b851}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="CommonSrc\Render">
+      <UniqueIdentifier>{370b168a-42ef-457b-899a-4eda6fc5a328}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

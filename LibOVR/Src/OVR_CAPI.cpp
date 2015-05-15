@@ -34,6 +34,7 @@ limitations under the License.
 #include "Extras/OVR_Math.h"
 #include "OVR_Stereo.h"
 #include "OVR_Profile.h"
+#include "OVR_Error.h"
 
 #include "CAPI/CAPI_HMDState.h"
 
@@ -41,13 +42,22 @@ limitations under the License.
 #include "Service/Service_NetClient.h"
 #ifdef OVR_PRIVATE_FILE
 #include "Service/Service_NetServer.h"
+#include "OVR_PadCheck.h"
 #endif
 
-#include "Displays/OVR_Display.h"
-
 #if defined(OVR_OS_WIN32)
-#include "Displays/OVR_Win32_ShimFunctions.h"
 #include <VersionHelpers.h>
+#include "CAPI/D3D1X/CAPI_D3D11_CliCompositorClient.h"
+
+#elif defined(OVR_OS_LINUX)
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <poll.h>
+#endif
+
+// New overrides to route std::vector and all other allocations through our allocator.
+#if defined(OVR_BUILD_DEBUG) && !defined(OVR_STATIC_BUILD)
+#include <Kernel/OVR_NewOverride.inl>
 #endif
 
 // Forward decl to keep the callback static
@@ -81,7 +91,7 @@ static ovrTrackingState GetNullTrackingState()
 static ovrFrameTiming GetNullFrameTiming()
 {
     ovrFrameTiming nullTiming = ovrFrameTiming();
-    nullTiming.DeltaSeconds = 0.013f; // Provide nominal value
+    nullTiming.FrameIntervalSeconds = 0.013f; // Provide nominal value
     return nullTiming;
 }
 
@@ -116,6 +126,8 @@ SensorDataType::operator ovrSensorData () const
     result.TimeInSeconds = (float)AbsoluteTimeSeconds;
     return result;
 }
+
+
 
 
 
@@ -176,9 +188,7 @@ static OVR::Service::NetClient* CAPI_pNetClient = nullptr;
 
 ovrBool ovr_InitializeRenderingShim()
 {
-    OVR::Display::Initialize();
-
-    return OVR::Display::GetDirectDisplayInitialized();
+    return ovrTrue;
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShimVersion(int requestedMinorVersion)
@@ -189,7 +199,7 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShimVersion(int requestedMin
     if (requestedMinorVersion > OVR_MINOR_VERSION)
         return ovrFalse;
 
-    return ovr_InitializeRenderingShim();
+    return ovrTrue;
 }
 
 // Write out to the log where the current running module is located on disk.
@@ -229,15 +239,84 @@ static const ovrInitParams DefaultParams = {
     ovrInit_RequestVersion, // Flags
     OVR_MINOR_VERSION,      // RequestedMinorVersion
     0,                      // LogCallback
-    0                       // ConnectionTimeoutSeconds
+    0,                      // ConnectionTimeoutSeconds
+    OVR_ON64("")            // pad0
 };
 
-// Precondition: params is not null
-OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* params)
+
+#if !defined(OVR_OS_LINUX)
+static ovrBool ConnectToService()
 {
-    // TBD: Should we check if the version requested changed and fail here?
+    ovrResult errorCode = CAPI_pNetClient->Connect(true);
+    return (errorCode == ovrSuccess);
+}
+
+#else // OVR_OS_LINUX
+static ovrBool ConnectToService()
+{
+    ovrResult errorCode = CAPI_pNetClient->Connect(true);
+    if (errorCode != ovrSuccess)
+    {
+        // If that fails, maybe the daemon is just not running.
+        // So, try to start the daemon ourselves.
+        const char *fifo_name = "/var/tmp/ovrd_start";
+        const char *cmd_fmt = "ovrd --daemonize --fifo=%s";
+        char command[strlen(fifo_name) + strlen(cmd_fmt)];
+
+        if (mkfifo(fifo_name, 0600) < 0)
+        {
+            // Another ovrd is running, abort with original error
+            return ovrFalse;
+        }
+
+        sprintf(command, cmd_fmt, fifo_name);
+        int ret = system(command);
+        if (ret == -1)
+        {
+            // Failure in system() itself
+            return ovrFalse;
+        }
+
+        int fifo_fd = open(fifo_name, O_RDONLY | O_NONBLOCK);
+        if (fifo_fd < 0)
+        {
+            // Another ovrd is running, abort with original error
+            return ovrFalse;
+        }
+
+        // Wait for the service to signal it's ready
+        pollfd wait_on = pollfd();
+        wait_on.fd = fifo_fd;
+        wait_on.events = POLLIN;
+        poll(&wait_on, 1, 10000);
+
+        close(fifo_fd);
+        unlink(fifo_name);
+
+        // Now try connecting to the service again
+        errorCode = CAPI_pNetClient->Connect(true);
+        return (errorCode == ovrSuccess);
+    }
+    return ovrTrue;
+}
+#endif // OVR_OS_LINUX
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_Initialize(ovrInitParams const* params)
+{
     if (CAPI_ovrInitializeCalled) // If already initialized...
-        return ovrTrue;
+    {
+        if(params && (OVR::Net::RuntimeSDKVersion.RequestedMinorVersion != params->RequestedMinorVersion)) // If the caller is requesting a different version...
+        {
+            OVR_MAKE_ERROR_F(ovrError_Reinitialization, "Cannot reinitialize LibOVRRT with a different version. Newly requested major.minor version: %d.%d; Current version: %d.%d", 
+                             OVR_MAJOR_VERSION, (int)params->RequestedMinorVersion, OVR_MAJOR_VERSION, OVR::Net::RuntimeSDKVersion.RequestedMinorVersion);
+            return ovrError_Reinitialization;
+        }
+
+        return ovrSuccess;
+    }
+
+    OVRError  error;
+    ovrResult errorCode;
 
     TraceInit();
     TraceCall(0);
@@ -257,6 +336,27 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* params)
     }
 #endif
 
+    // We must set up the system for the plugin to work
+    if (!OVR::System::IsInitialized())
+    {
+        // TBD: Base this on registry setting?
+        Allocator::SetLeakTracking(DebugMode);
+
+        OVR::Log* logger = OVR::Log::ConfigureDefaultLog(OVR::LogMask_All);
+        OVR_ASSERT(logger != nullptr);
+
+        // Set the CAPI logger callback
+        logger->SetCAPICallback(params->LogCallback);
+
+#if defined(OVR_BUILD_DEBUG)
+        DebugPageAllocator* debugAlloc = DebugPageAllocator::InitSystemSingleton();
+        debugAlloc->EnableOverrunDetection(true, true);
+        OVR::System::Init(logger, debugAlloc);
+#else
+        OVR::System::Init(logger);
+#endif
+    }
+
     // We ignore the requested patch version and build version, as they are not currently relevant to
     // the library compatibility. Our test for minor version compatibility is currently simple: we support
     // only older or equal minor versions, and don't change our behavior if the requested minor version
@@ -265,15 +365,16 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* params)
     if ((params->Flags & ovrInit_RequestVersion) != 0 &&
         (params->RequestedMinorVersion > OVR_MINOR_VERSION))
     {
+        error = OVR_MAKE_ERROR_F(ovrError_LibVersion, "Insufficient LibOVRRT version. Requested major.minor version: %d.%d; LibOVRRT version: %d.%d", 
+                                    OVR_MAJOR_VERSION, (int)params->RequestedMinorVersion, OVR_MAJOR_VERSION, OVR_MINOR_VERSION);
         goto Abort;
     }
 
 #if defined(OVR_OS_WIN32)
-    // Older than Windows 7 SP1?
+    // Older than Windows 7 SP1? Question: Why is SP1 required? Can we document that here?
     if (!IsWindows7SP1OrGreater())
     {
-        MessageBoxA(nullptr, "This software depends on features available starting with \nWindows 7 Service Pack 1, and it cannot start.", "LibOVR: Cannot start", 0);
-        OVR_ASSERT(false);
+        error = OVR_MAKE_ERROR(ovrError_IncompatibleOS, "Windows 7 Service Pack 1 or a later operating system version is required.");
         goto Abort;
     }
 #endif // OVR_OS_WIN32
@@ -281,58 +382,50 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* params)
     OVR::Net::RuntimeSDKVersion.SetCurrent();  // Fill in the constant parts of this struct.
     OVR::Net::RuntimeSDKVersion.RequestedMinorVersion = (uint16_t)params->RequestedMinorVersion;
 
-    // Initialize display subsystem regardless of Allocator initialization.
-    OVR::Display::Initialize();
-
-    // We must set up the system for the plugin to work
-    if (!OVR::System::IsInitialized())
-    {
-        // TBD: Base this on registry setting?
-        Allocator::SetLeakTracking(DebugMode);
-
-        OVR::Log* logger = OVR::Log::ConfigureDefaultLog(OVR::LogMask_All);
-
-        // Set the CAPI logger callback
-        logger->SetCAPICallback(params->LogCallback);
-
-        OVR::System::Init(logger);
-    }
-
-    if (!OVR::Display::GetDirectDisplayInitialized() && !OVR::Display::InCompatibilityMode(true))
-    {
-        OVR_ASSERT(false);
-        goto Abort;
-    }
-
     CAPI_pNetClient = NetClient::GetInstance();
 
     // Store off the initialization parameters from ovr_Initialize()
     CAPI_pNetClient->ApplyParameters(params);
 
-    // Mark as initialized regardless of whether or not we can connect to the server.
-    CAPI_ovrInitializeCalled = 1;
-
     // Log the location of the module after most of the bring-up, as the game
     // could do almost anything in response to a log message callback.
     LogLocationOfThisModule();
 
-    // If unable to connect to server and we are not in a debug mode,
-    if (!CAPI_pNetClient->Connect(true) && !DebugMode)
+    // If unable to connect to server and we are not in a debug mode or the server is optional then fail.
+    if (!ConnectToService() && !DebugMode && ((params->Flags & ovrInit_ServerOptional) == 0))
     {
         // Then it's a failure when the server is unreachable.
         // This means that a DebugHMD cannot be created unless the ovrInit_Debug flag is set.
+        // No need to call OVR_MAKE_ERROR because Connect would already have done that before returning the error code.
         goto Abort;
     }
 
+    CAPI_ovrInitializeCalled = ovrTrue;
+
+
     // everything is okay
     TraceReturn(0);
-    return ovrTrue;
+    return ovrSuccess;
 
 Abort:
+    OVR_ASSERT(error.GetCode() != ovrSuccess);
+    errorCode = error.GetCode();
+
+    // We undo anything we may have done above.
+    OVR::Log* logger = OVR::Log::GetDefaultLog();
+    if(logger)
+        logger->SetCAPICallback(nullptr);
+
     // clean up and return failure
+    if (OVR::System::IsInitialized())
+    {
+        error.Reset();  // Normally we don't need to explicitly call OVRError::Reset, but we are about to shut down the heap.
+        OVR::System::Destroy();
+    }
+
     TraceReturn(0);
     TraceFini();
-    return ovrFalse;
+    return errorCode;
 }
 
 
@@ -340,10 +433,9 @@ OVR_PUBLIC_FUNCTION(void) ovr_Shutdown()
 {  
     if (CAPI_ovrInitializeCalled)
     {
-        OVR::Display::Shutdown();
         TraceCall(0);
         TraceFini();
-        CAPI_ovrInitializeCalled = 0;
+        CAPI_ovrInitializeCalled = ovrFalse;
     }
 
     if (OVR::System::IsInitialized())
@@ -356,6 +448,20 @@ OVR_PUBLIC_FUNCTION(void) ovr_Shutdown()
 }
 
 
+OVR_PUBLIC_FUNCTION(void) ovr_GetLastErrorInfo(ovrErrorInfo* errorInfo)
+{
+    if (errorInfo)
+    {
+        const OVRError& error = LastErrorTLS::GetInstance()->LastError();
+
+        errorInfo->Result = error.GetCode();
+
+        static_assert(OVR_ARRAY_COUNT(errorInfo->ErrorString) == 512, "If this value changes between public releases then we need to dynamically handle older versions.");
+        OVR_strlcpy(errorInfo->ErrorString, error.GetDescription().ToCStr(), OVR_ARRAY_COUNT(errorInfo->ErrorString));
+    }
+}
+
+
 // There is a thread safety issue with ovrHmd_Detect in that multiple calls from different
 // threads can corrupt the global array state. This would lead to two problems:
 //  a) Create(index) enumerator may miss or overshoot items. Probably not a big deal
@@ -365,10 +471,10 @@ OVR_PUBLIC_FUNCTION(void) ovr_Shutdown()
 //         probably check this.
 //
 
-OVR_PUBLIC_FUNCTION(int) ovrHmd_Detect()
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_Detect()
 {
     if (!CAPI_ovrInitializeCalled)
-        return -2;
+        return ovrError_ServiceConnection;
 
     return CAPI_pNetClient->Hmd_Detect();
 }
@@ -378,10 +484,18 @@ OVR_PUBLIC_FUNCTION(int) ovrHmd_Detect()
 // a relatively light-weight handle that would reference the device going forward and would 
 // survive future ovrHmd_Detect calls. That is once ovrHMD is returned, index is no longer
 // necessary and can be changed by a ovrHmd_Detect call.
-OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_Create(int index)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_Create(int index, ovrHmd* pHmd)
 {
+    OVRError ovrError;
+
+    OVR_ASSERT(pHmd);
+    *pHmd = nullptr;
+
     if (!CAPI_ovrInitializeCalled)
-        return 0;
+    {
+        ovrError = OVR_MAKE_ERROR(ovrError_NotInitialized, "ovrHmd_Create: CAPI is not initialized.");
+        return ovrError.GetCode();
+    }
 
     double t0 = Timer::GetSeconds();
     HMDNetworkInfo netInfo;
@@ -389,15 +503,12 @@ OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_Create(int index)
     // There may be some delay before the HMD is fully detected.
     // Since we are also trying to create the HMD immediately it may lose this race and
     // get "NO HMD DETECTED."  Wait a bit longer to avoid this.
-    while (!CAPI_pNetClient->Hmd_Create(index, &netInfo) ||
-           netInfo.NetId == InvalidVirtualHmdId)
+    while (!CAPI_pNetClient->Hmd_Create(index, &netInfo, &ovrError))
     {
         double waitTime = 2.0; // Default wait time
 
         if (NetClient::GetInstance()->IsConnected(false, false))
         {
-            NetClient::GetInstance()->SetLastError("No HMD Detected");
-
             // If in single process mode,
             if (Net::Session::IsSingleProcess())
             {
@@ -413,17 +524,20 @@ OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_Create(int index)
         }
         else
         {
-            NetClient::GetInstance()->SetLastError("Not connected to service");
-
             // Wait the default amount of time for the service to start up.
         }
 
-        // If two seconds elapse and still no HMD detected,
+        // If still no HMD detected,
         if (Timer::GetSeconds() - t0 > waitTime)
         {
-            return 0;
+            LogError("ovrHmd_Create failed to complete within the timeout period.");
+            // This should not set error because this asserts, and ovrHmd_Create(0) should not assert in debug mode in this common case.
+            //OVR_SET_ERROR(ovrError); // We are not making a new error, but simply using the one returned by Hmd_Create. We may want to consider appending a ovrError_Timeout error to this underlying OVRError.
+            return ovrError.GetCode();
         }
     }
+
+    OVR_ASSERT(netInfo.NetId != InvalidVirtualHmdId);
 
     // Create HMD State object
     HMDState* hmds = HMDState::CreateHMDState(CAPI_pNetClient, netInfo);
@@ -431,56 +545,64 @@ OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_Create(int index)
     {
         CAPI_pNetClient->Hmd_Release(netInfo.NetId);
 
-        NetClient::GetInstance()->SetLastError("Unable to create HMD state");
-        return 0;
+        ovrError = OVR_MAKE_ERROR(ovrError_InvalidHmd, "ovrHmd_Create: CreateHMDState failed."); // We may need a better error code for this.
+        return ovrError.GetCode();
     }
 
     // Reset frame timing so that FrameTimeManager values are properly initialized in AppRendered mode.
+    // TBD: No longer needed? -cat
     ovrHmd_ResetFrameTiming(hmds->pHmdDesc, 0);
 
     TraceHmdDesc(*hmds->pHmdDesc);
+    *pHmd = hmds->pHmdDesc;
 
-    return hmds->pHmdDesc;
+    return ovrSuccess;
 }
 
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_AttachToWindow(ovrHmd hmddesc, void* window,
-                                                   const ovrRecti* destMirrorRect,
-                                                   const ovrRecti* sourceRenderTargetRect)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateDebug(ovrHmdType type, ovrHmd* pHmd)
 {
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return ovrFalse;
+    OVRError ovrError;
+    OVR_ASSERT(pHmd);
 
-    OVR_UNUSED3(destMirrorRect, sourceRenderTargetRect, hmds);
+    if (!pHmd)
+    {
+        ovrError = OVR_MAKE_ERROR(ovrError_InvalidParameter, "ovrHmd_CreateDebug: Null ovrHmd parameter.");
+        return ovrError.GetCode();
+    }
+
+    *pHmd = nullptr;
 
     if (!CAPI_ovrInitializeCalled)
-        return ovrFalse;
+    {
+        ovrError = OVR_MAKE_ERROR(ovrError_NotInitialized, "ovrHmd_CreateDebug: CAPI is not initialized.");
+        return ovrError.GetCode();
+    }
 
-#ifndef OVR_OS_MAC
-    CAPI_pNetClient->Hmd_AttachToWindow(hmds->GetNetId(), window);
-    hmds->pWindow = window;
-#endif
-#ifdef OVR_OS_WIN32
-    Win32::DisplayShim::GetInstance().hWindow = (HWND)window;
-#endif
-#ifdef OVR_OS_MAC
-    OVR_UNUSED(window);
-#endif
+    HmdTypeEnum t = HmdType_None;
+    switch (type)
+    {
+    case ovrHmd_DK1:    t = HmdType_DK1;    break;
+    case ovrHmd_DK2:    t = HmdType_DK2;    break;
+    default: OVR_ASSERT(false); return ovrError_InvalidParameter;
+    }
 
-    return ovrTrue;
-}
+    if (!CAPI_pNetClient->Hmd_CreateDebug(t, &ovrError))
+    {
+        LogError("ovrHmd_CreateDebug failed.");
+        OVR_SET_ERROR(ovrError); // We are not making a new error, but simply using the one returned by Hmd_CreateDebug. We may want to consider appending a ovrError_Timeout error to this underlying OVRError.
+        return ovrError.GetCode();
+    }
 
-OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_CreateDebug(ovrHmdType type)
-{
-    if (!CAPI_ovrInitializeCalled)
-        return 0;
-
-    HMDState* hmds = HMDState::CreateDebugHMDState(type);
+    HMDState* hmds = HMDState::CreateDebugHMDState(CAPI_pNetClient, type);
     if (!hmds)
-        return nullptr;
+    {
+        ovrError = OVR_MAKE_ERROR(ovrError_InvalidHmd, "ovrHmd_CreateDebug: CreateDebugHMDState failed."); // We may need a better error code for this.
+        return ovrError.GetCode();
+    }
 
-    return hmds->pHmdDesc;
+    *pHmd = hmds->pHmdDesc;
+
+    return ovrSuccess;
 }
 
 OVR_PUBLIC_FUNCTION(void) ovrHmd_Destroy(ovrHmd hmddesc)
@@ -494,42 +616,15 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_Destroy(ovrHmd hmddesc)
         ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_Destroy");
     }    
 
-#ifdef OVR_OS_WIN32
-    if (hmds->pWindow)
-    {
-        // ? ok to call
-        //CAPI_pNetClient->Hmd_AttachToWindow(hmds->GetNetId(), 0);
-        hmds->pWindow = 0;
-        Win32::DisplayShim::GetInstance().hWindow = (HWND)0;
-    }    
-#endif
-
     delete (HMDState*)hmddesc->Handle;
 }
 
 
-OVR_PUBLIC_FUNCTION(const char*) ovrHmd_GetLastError(ovrHmd hmddesc)
-{
-    if (!CAPI_ovrInitializeCalled)
-        return "System initialize not called";
-
-    VirtualHmdId netId = InvalidVirtualHmdId;
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (hmds)
-        netId = hmds->GetNetId();
-
-    return CAPI_pNetClient->Hmd_GetLastError(netId);
-}
-
-#define OVR_VERSION_LIBOVR_PFX "libOVR:"
-
-// Returns version string representing libOVR version. Static, so
-// string remains valid for app lifespan
+// Returns version string representing libOVR version. 
+// Valid for the lifetime of LibOVRRT within the process.
 OVR_PUBLIC_FUNCTION(const char*) ovr_GetVersionString()
 {
-	static const char* version = OVR_VERSION_LIBOVR_PFX OVR_VERSION_STRING;
-    return version + sizeof(OVR_VERSION_LIBOVR_PFX) - 1;
+    return OVR_VERSION_STRING;
 }
 
 
@@ -568,21 +663,19 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_SetEnabledCaps(ovrHmd hmddesc, unsigned int cap
 //    such as Vision tracking, which you don't want to create unless necessary.
 //  - A game may want to switch some sensor settings based on user input, 
 //    or at lease enable/disable features such as Vision for debugging.
-//  - The same or syntactically similar sensor interface is likely to be used if we 
-//    introduce controllers.
 //
 //  - Sensor interface functions are all Thread-safe, unlike the frame/render API
 //    functions that have different rules (all frame access functions
 //    must be on render thread)
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ConfigureTracking(ovrHmd hmddesc, unsigned int supportedCaps,
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_ConfigureTracking(ovrHmd hmddesc, unsigned int supportedCaps,
                                                       unsigned int requiredCaps)
 {
     HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
     if (!hmds)
-        return ovrFalse;
+        return ovrError_InvalidHmd;
 
-    return hmds->ConfigureTracking(supportedCaps, requiredCaps) ? ovrTrue : ovrFalse;
+    return hmds->ConfigureTracking(supportedCaps, requiredCaps);
 }
 
 
@@ -624,117 +717,230 @@ OVR_PUBLIC_FUNCTION(ovrSizei) ovrHmd_GetFovTextureSize(ovrHmd hmddesc, ovrEyeTyp
 
 
 //-------------------------------------------------------------------------------------
+// *** SwapTextureSets
 
+#if defined (OVR_OS_MS)
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ConfigureRendering(ovrHmd hmddesc,
-                                                       const ovrRenderAPIConfig* apiConfig,
-                                                       unsigned int distortionCaps,
-                                                       const ovrFovPort eyeFovIn[2],
-                                                       ovrEyeRenderDesc eyeRenderDescOut[2])
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateSwapTextureSetD3D11(ovrHmd hmd,
+                                                                ID3D11Device* device,
+                                                                const D3D11_TEXTURE2D_DESC* desc,
+                                                                ovrSwapTextureSet** outTextureSet)
 {
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
     if (!hmds)
-        return ovrFalse;
-
-    return hmds->ConfigureRendering(eyeRenderDescOut, eyeFovIn,
-                                    apiConfig, distortionCaps);
-}
-
-OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_BeginFrame(ovrHmd hmddesc, unsigned int frameIndex)
-{
-    // NOTE: frameIndex == 0 is handled inside ovrHmd_BeginFrameTiming()
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return GetNullFrameTiming();
-
-    TraceCall(frameIndex);
-
-    // Check: Proper configure and threading state for the call.
-    hmds->checkRenderingConfigured("ovrHmd_BeginFrame");
-    OVR_DEBUG_LOG_COND(hmds->BeginFrameCalled, ("ovrHmd_BeginFrame called multiple times."));
-    ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_BeginFrame");
-
-    hmds->BeginFrameCalled   = true;
-    hmds->BeginFrameThreadId = OVR::GetCurrentThreadId();
-
-    ovrFrameTiming timing = ovrHmd_BeginFrameTiming(hmddesc, frameIndex);
-
-    TraceReturn(frameIndex);
-
-    return timing;
-}
-
-
-// Renders textures to frame buffer
-OVR_PUBLIC_FUNCTION(void) ovrHmd_EndFrame(ovrHmd hmddesc,
-                                          const ovrPosef renderPose[2],
-                                          const ovrTexture eyeTexture[2])
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    const ovrTexture*        eyeDepthTexture = nullptr;
-    ovrPositionTimewarpDesc* posTimewarpDesc = nullptr;
-
-    TraceCall(hmds->BeginFrameIndex);
-
-    hmds->SubmitEyeTextures(renderPose, eyeTexture, eyeDepthTexture);
-
-    // Debug state checks: Must be in BeginFrame, on the same thread.
-    hmds->checkBeginFrameScope("ovrHmd_EndFrame");
-    ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_EndFrame");  
-    
-    hmds->pRenderer->SetLatencyTestColor(hmds->LatencyTestActive ? hmds->LatencyTestDrawColor : nullptr);
-
-    ovrHmd_GetLatencyTest2DrawColor(hmddesc, nullptr); // We don't actually need to draw color, so send nullptr
-    
-    if (hmds->pRenderer)
     {
-        hmds->pRenderer->SaveGraphicsState();
-
-        // See if we need to show the HSWDisplay.
-        if (hmds->pHSWDisplay) // Until we know that these are valid, assume any of them can't be.
-        {
-            ovrHSWDisplayState hswDisplayState;
-            hmds->pHSWDisplay->TickState(&hswDisplayState, true);  // This may internally call HASWarning::Display.
-
-            if (hswDisplayState.Displayed)
-            {
-                hmds->pHSWDisplay->Render(ovrEye_Left, &eyeTexture[ovrEye_Left]);
-                hmds->pHSWDisplay->Render(ovrEye_Right, &eyeTexture[ovrEye_Right]);
-            }
-        }
-
-        if (posTimewarpDesc)
-            hmds->pRenderer->SetPositionTimewarpDesc(*posTimewarpDesc);
-
-        hmds->pRenderer->EndFrame(hmds->BeginFrameIndex, true);
-        hmds->pRenderer->RestoreGraphicsState();
+        OVR_MAKE_ERROR(ovrError_InvalidHmd, L"Invalid HMD object provided");
+        return ovrError_InvalidHmd;
     }
 
-    // Call after present
-    ovrHmd_EndFrameTiming(hmddesc);
+    if (outTextureSet == nullptr)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidParameter, L"Null textureSet pointer provided.");
+        return ovrError_InvalidParameter;
+    }
 
-    TraceReturn(hmds->BeginFrameIndex);
+    *outTextureSet = nullptr;
 
-    // Out of BeginFrame
-    hmds->BeginFrameThreadId = 0;
-    hmds->BeginFrameCalled   = false;
-    hmds->BeginFrameIndex++; // Set frame index to the next value in case 0 is passed.
+    if (!hmds->pCompClient)
+    {
+        OVR_MAKE_ERROR(ovrError_ServiceConnection, L"Incomplete service connection.");
+        return ovrError_ServiceConnection;
+    }
+
+    /// On Windows, we always use CliD3D11CompositorClient
+    CliD3D11CompositorClient* d3d11Client = static_cast<CliD3D11CompositorClient*>(hmds->pCompClient.GetPtr());
+    if (!d3d11Client)
+    {
+        return ovrError_NotInitialized;
+    }
+    return d3d11Client->CreateTextureSetD3D(device, desc, outTextureSet).GetCode();
 }
 
-// Not exposed as part of public API
-OVR_PUBLIC_FUNCTION(void) ovrHmd_RegisterPostDistortionCallback(ovrHmd hmddesc, PostDistortionCallback callback)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateMirrorTextureD3D11(ovrHmd hmd,
+                                                               ID3D11Device* device,
+                                                               const D3D11_TEXTURE2D_DESC* desc,
+                                                               ovrTexture** outMirrorTexture)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
+    if (!hmds)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidHmd, L"Invalid HMD object provided");
+        return ovrError_InvalidHmd;
+    }
+
+    if (outMirrorTexture == nullptr)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidParameter, L"Null mirror texture pointer provided.");
+        return ovrError_InvalidParameter;
+    }
+
+    *outMirrorTexture = nullptr;
+
+    if (!hmds->pCompClient)
+    {
+        OVR_MAKE_ERROR(ovrError_ServiceConnection, L"Incomplete service connection.");
+        return ovrError_ServiceConnection;
+    }
+
+    /// On Windows, we always use CliD3D11CompositorClient
+    CliD3D11CompositorClient* d3d11Client = static_cast<CliD3D11CompositorClient*>(hmds->pCompClient.GetPtr());
+    if (!d3d11Client)
+    {
+        return ovrError_NotInitialized;
+    }
+    return d3d11Client->CreateMirrorTextureD3D(device, desc, outMirrorTexture).GetCode();
+}
+
+#endif // OVR_OS_MS
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateSwapTextureSetGL(ovrHmd hmd, GLuint format,
+                                                             int width, int height,
+                                                             ovrSwapTextureSet** outTextureSet)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
+    if (!hmds)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidHmd, L"Invalid HMD object provided");
+        return ovrError_InvalidHmd;
+    }
+
+    if (outTextureSet == nullptr)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidParameter, L"Null textureSet pointer provided.");
+        return ovrError_InvalidParameter;
+    }
+
+    *outTextureSet = nullptr;
+
+    if (!hmds->pCompClient)
+    {
+        OVR_MAKE_ERROR(ovrError_ServiceConnection, L"Incomplete service connection.");
+        return ovrError_ServiceConnection;
+    }
+
+#if defined (OVR_OS_MS)
+    /// On Windows, we always use CliD3D11CompositorClient
+    CliD3D11CompositorClient* d3d11Client = static_cast<CliD3D11CompositorClient*>(hmds->pCompClient.GetPtr());
+    if (!d3d11Client)
+    {
+        return ovrError_NotInitialized;
+    }
+    return d3d11Client->CreateTextureSetGL(format, width, height, outTextureSet).GetCode();
+
+#else
+
+    return ovrError_IncompatibleOS;
+
+#endif
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateMirrorTextureGL(ovrHmd hmd, GLuint format,
+                                                            int width, int height,
+                                                            ovrTexture** outMirrorTexture)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
+    if (!hmds)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidHmd, L"Invalid HMD object provided");
+        return ovrError_InvalidHmd;
+    }
+
+    if (outMirrorTexture == nullptr)
+    {
+        OVR_MAKE_ERROR(ovrError_InvalidParameter, L"Null textureSet pointer provided.");
+        return ovrError_InvalidParameter;
+    }
+
+    *outMirrorTexture = nullptr;
+
+    if (!hmds->pCompClient)
+    {
+        OVR_MAKE_ERROR(ovrError_ServiceConnection, L"Incomplete service connection.");
+        return ovrError_ServiceConnection;
+    }
+
+#if defined (OVR_OS_MS)
+    /// On Windows, we always use CliD3D11CompositorClient
+    CliD3D11CompositorClient* d3d11Client = static_cast<CliD3D11CompositorClient*>(hmds->pCompClient.GetPtr());
+    if (!d3d11Client)
+    {
+        return ovrError_NotInitialized;
+    }
+    return d3d11Client->CreateMirrorTextureGL(format, width, height, outMirrorTexture).GetCode();
+
+#else
+
+    return ovrError_IncompatibleOS;
+
+#endif
+}
+
+OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroySwapTextureSet(ovrHmd hmd, ovrSwapTextureSet* textureSet)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
+    if (!hmds)
+    {
+        return;
+    }
+
+    if (hmds->pCompClient)
+    {
+        hmds->pCompClient->DestroyTextureSet(textureSet);
+    }
+}
+
+OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroyMirrorTexture(ovrHmd hmd, ovrTexture* mirrorTexture)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmd);
+    if (!hmds)
+    {
+        return;
+    }
+
+    if (hmds->pCompClient)
+    {
+        hmds->pCompClient->DestroyMirrorTexture(mirrorTexture);
+    }
+}
+
+//-------------------------------------------------------------------------------------
+// *** Layers
+
+/* We may re-enable this in the future:
+OVR_PUBLIC_FUNCTION(int) ovrHmd_GetMaxNumLayers(ovrHmd hmddesc)
 {
     HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds || !hmds->pRenderer)
-        return;
+    if (!hmds)
+        return -1;
 
-    hmds->pRenderer->RegisterPostDistortionCallback(callback);
+    return hmds->GetMaxNumLayers();
 }
+*/
 
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_SubmitFrame(ovrHmd hmddesc, unsigned int frameIndex, const ovrViewScaleDesc* viewScaleDesc,
+                                                  ovrLayerHeader const * const * layers, unsigned int layerCount)
+{
+    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
+    if (!hmds)
+        return ovrError_InvalidHmd;
+
+    ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_EndFrame");
+
+    if (frameIndex == 0)
+        frameIndex = hmds->AppFrameIndex;
+
+    ovrViewScaleDesc viewScaleDescDefault;
+    if (!viewScaleDesc)
+    {
+        // If the caller supplies a NULL viewScaleDesc then use defaults.
+        viewScaleDescDefault.HmdToEyeViewOffset[0] = hmds->RenderState.EyeRenderDesc[0].HmdToEyeViewOffset;
+        viewScaleDescDefault.HmdToEyeViewOffset[1] = hmds->RenderState.EyeRenderDesc[1].HmdToEyeViewOffset;
+        viewScaleDescDefault.HmdSpaceToWorldScaleInMeters = 1.f;
+        viewScaleDesc = &viewScaleDescDefault;
+    }
+
+    return hmds->SubmitFrame(frameIndex, viewScaleDesc, layers, layerCount);
+}
 
 
 //-------------------------------------------------------------------------------------
@@ -746,64 +952,25 @@ OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_GetFrameTiming(ovrHmd hmddesc, unsign
     if (!hmds)
         return GetNullFrameTiming();
 
-    // If no frame index is provided,
-    if (frameIndex == 0)
-    {
-        // Use the next one in the series.
-        frameIndex = hmds->BeginFrameIndex;
-    }
-
-    return hmds->GetFrameTiming(frameIndex);
-}
-
-OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_BeginFrameTiming(ovrHmd hmddesc, unsigned int frameIndex)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return GetNullFrameTiming();
-
-    // Check: Proper state for the call.    
-    OVR_DEBUG_LOG_COND(hmds->BeginFrameTimingCalled,
-                      ("ovrHmd_BeginFrameTiming called multiple times."));    
-    hmds->BeginFrameTimingCalled = true;
-
-    // If a frame index is specified,
+    // MA: Moved assignment of AppFrameIndex here from BeginFrameTiming to allow removal
+    //     of that function. However, supporting index value of 0 is not good for threading
+    //     as it introduces a race condition (assignment vs. use later in SubmitFrame)
+    //     TBD: Remove FrameIndex 0 special case and add debug checks?
+    
     if (frameIndex != 0)
     {
+        // If a frame index is specified,
         // Use the next one after the last BeginFrame() index.
-        hmds->BeginFrameIndex = (uint32_t)frameIndex;
+        hmds->AppFrameIndex = (uint32_t)frameIndex;
     }
     else
     {
-        frameIndex = hmds->BeginFrameIndex;
-    }
-
-    // Update latency tester once per frame
-    hmds->LatencyTestActive = hmds->ProcessLatencyTest(hmds->LatencyTestDrawColor);
-
-    if (!hmds->BeginFrameCalled)
-    {
-        hmds->TimewarpTimer.CalculateTimewarpTiming(frameIndex);
+        frameIndex = hmds->AppFrameIndex;
     }
 
     return hmds->GetFrameTiming(frameIndex);
 }
 
-OVR_PUBLIC_FUNCTION(void) ovrHmd_EndFrameTiming(ovrHmd hmddesc)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    // Debug state checks: Must be in BeginFrameTiming, on the same thread.
-    hmds->checkBeginFrameTimingScope("ovrHmd_EndTiming");
-   // MA TBD: Correct check or not?
-   // ThreadChecker::Scope checkScope(&hmds->RenderAPIThreadChecker, "ovrHmd_EndFrame");
-
-    hmds->BeginFrameTimingCalled = false;
-
-    hmds->endFrameRenderTiming();
-}
 
 OVR_PUBLIC_FUNCTION(void) ovrHmd_ResetFrameTiming(ovrHmd hmddesc, unsigned int frameIndex)
 {
@@ -811,124 +978,8 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_ResetFrameTiming(ovrHmd hmddesc, unsigned int f
     if (!hmds)
         return;
 
-    OVR_UNUSED(frameIndex);
-
     // Clear timing-related state.
-    hmds->BeginFrameIndex = frameIndex;
-    hmds->TimewarpTimer.Reset();
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyePoses(ovrHmd hmddesc, unsigned int frameIndex, const ovrVector3f hmdToEyeViewOffset[2],
-                                             ovrPosef outEyePoses[2], ovrTrackingState* outHmdTrackingState)
-{
-    if (!hmdToEyeViewOffset || !outEyePoses)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-    {
-        outEyePoses[0] = ovrPosef(); outEyePoses[0].Orientation.w = 1;
-        outEyePoses[1] = ovrPosef(); outEyePoses[1].Orientation.w = 1;
-        if (outHmdTrackingState)
-            *outHmdTrackingState = GetNullTrackingState();
-        return;
-    }
-
-    // If no frame index is provided,
-    if (frameIndex == 0)
-    {
-        // Use the next one in the series.
-        frameIndex = hmds->BeginFrameIndex;
-    }
-
-    ovrTrackingState hmdTrackingState = hmds->GetMidpointPredictionTracking(frameIndex);
-    TraceTrackingState(hmdTrackingState);
-    ovrPosef hmdPose = hmdTrackingState.HeadPose.ThePose;
-
-    // caller passed in a valid pointer, so copy to output
-    if (outHmdTrackingState)
-       *outHmdTrackingState = hmdTrackingState;
-
-    // Currently HmdToEyeViewOffset is only a 3D vector
-    // (Negate HmdToEyeViewOffset because offset is a view matrix offset and not a camera offset)
-    outEyePoses[0] = Posef(hmdPose.Orientation, ((Posef)hmdPose).Apply(-((Vector3f)hmdToEyeViewOffset[0])));
-    outEyePoses[1] = Posef(hmdPose.Orientation, ((Posef)hmdPose).Apply(-((Vector3f)hmdToEyeViewOffset[1])));
-}
-
-OVR_PUBLIC_FUNCTION(ovrPosef) ovrHmd_GetHmdPosePerEye(ovrHmd hmddesc, ovrEyeType eye)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-    {
-        ovrPosef nullPose = ovrPosef();
-        nullPose.Orientation.w = 1.0f; // Return a proper quaternion.
-        return nullPose;
-    }
-
-    hmds->checkBeginFrameTimingScope("ovrHmd_GetEyePose");
-
-    return hmds->GetEyePredictionPose(eye);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_AddDistortionTimeMeasurement(ovrHmd hmddesc, double distortionTimeSeconds)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    hmds->checkBeginFrameTimingScope("ovrHmd_GetTimewarpEyeMatrices");   
-
-    hmds->TimewarpTimer.AddDistortionTimeMeasurement(distortionTimeSeconds);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyeTimewarpMatricesDebug(ovrHmd hmddesc, ovrEyeType eye, ovrPosef renderPose,
-                                                             ovrQuatf playerTorsoMotion, ovrMatrix4f twmOut[2],
-                                                             double debugTimingOffsetInSeconds)
-{
-    if (!twmOut)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    // Debug checks: BeginFrame was called, on the same thread.
-    hmds->checkBeginFrameTimingScope("ovrHmd_GetTimewarpEyeMatrices");   
-
-    // TODO: Position input disabled for now
-    bool calcPosition = false;
-    ovrVector3f* hmdToEyeViewOffset = nullptr;
-
-    // playerTorsoMotion can be fed in by the app to indicate player rotation,
-    // i.e. renderPose is in torso space, and playerTorsoMotion says that torso space changed.
-    Quatf playerTorsoMotionInv = Quatf(playerTorsoMotion).Inverted();
-    Posef renderPoseTorso = (Posef)renderPose * Posef(playerTorsoMotionInv, Vector3f::Zero());
-    hmds->GetTimewarpMatricesEx(eye, renderPoseTorso, calcPosition, hmdToEyeViewOffset, twmOut,
-                                debugTimingOffsetInSeconds);
-}
-
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmddesc, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2])
-{
-    if (!twmOut)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    // Shortcut to doing orientation-only timewarp.
-
-    hmds->GetTimewarpMatrices(eye, renderPose, twmOut);
+    hmds->AppFrameIndex = frameIndex;    
 }
 
 
@@ -943,219 +994,6 @@ OVR_PUBLIC_FUNCTION(ovrEyeRenderDesc) ovrHmd_GetRenderDesc(ovrHmd hmddesc,
 }
 
 
-#define OVR_OFFSET_OF(s, field) ((size_t)&((s*)0)->field)
-
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_CreateDistortionMeshDebug(ovrHmd hmddesc,
-                                                              ovrEyeType eyeType, ovrFovPort fov,
-                                                              unsigned int distortionCaps,
-                                                              ovrDistortionMesh *meshData,
-												              float debugEyeReliefOverrideInMetres)
-{
-    if (!meshData)
-    {
-        OVR_ASSERT(false);
-        return ovrFalse;
-    }
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return ovrFalse;
-
-    return hmds->CreateDistortionMesh(eyeType, fov,
-                                      distortionCaps,
-                                      meshData,
-                                      debugEyeReliefOverrideInMetres)
-           ? ovrTrue : ovrFalse;
-}
-
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_CreateDistortionMesh(ovrHmd hmddesc,
-                                                         ovrEyeType eyeType, ovrFovPort fov,
-                                                         unsigned int distortionCaps,
-                                                         ovrDistortionMesh *meshData)
-{
-    if (!meshData)
-    {
-        OVR_ASSERT(false);
-        return ovrFalse;
-    }
-
-    return ovrHmd_CreateDistortionMeshDebug(hmddesc, eyeType, fov, distortionCaps, meshData, 0);
-}
-
-
-
-// Frees distortion mesh allocated by ovrHmd_GenerateDistortionMesh. meshData elements
-// are set to null and 0s after the call.
-OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroyDistortionMesh(ovrDistortionMesh* meshData)
-{
-    if (!meshData)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    if (meshData->pVertexData)
-        DistortionMeshDestroy((DistortionMeshVertexData*)meshData->pVertexData,
-                              meshData->pIndexData);
-    meshData->pVertexData = 0;
-    meshData->pIndexData  = 0;
-    meshData->VertexCount = 0;
-    meshData->IndexCount  = 0;
-}
-
-
-
-// Computes updated 'uvScaleOffsetOut' to be used with a distortion if render target size or
-// viewport changes after the fact. This can be used to adjust render size every frame, if desired.
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetRenderScaleAndOffset(ovrFovPort fov,
-                                                         ovrSizei textureSize, ovrRecti renderViewport,
-                                                         ovrVector2f uvScaleOffsetOut[2] )
-{        
-    if (!uvScaleOffsetOut)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    // Find the mapping from TanAngle space to target NDC space.
-    ScaleAndOffset2D  eyeToSourceNDC = CreateNDCScaleAndOffsetFromFov(fov);
-    // Find the mapping from TanAngle space to textureUV space.
-    ScaleAndOffset2D  eyeToSourceUV  = CreateUVScaleAndOffsetfromNDCScaleandOffset(
-                                         eyeToSourceNDC,
-                                         renderViewport, textureSize );
-
-    if (uvScaleOffsetOut)
-    {
-        uvScaleOffsetOut[0] = eyeToSourceUV.Scale;
-        uvScaleOffsetOut[1] = eyeToSourceUV.Offset;
-    }
-}
-
-
-//-------------------------------------------------------------------------------------
-// ***** Latency Test interface
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_GetLatencyTestDrawColor(ovrHmd hmddesc, unsigned char rgbColorOut[3])
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return ovrFalse;
-
-    if (rgbColorOut)
-    {
-        rgbColorOut[0] = hmds->LatencyTestDrawColor[0];
-        rgbColorOut[1] = hmds->LatencyTestDrawColor[1];
-        rgbColorOut[2] = hmds->LatencyTestDrawColor[2];
-    }
-
-    return hmds->LatencyTestActive;
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ProcessLatencyTest(ovrHmd hmddesc, unsigned char rgbColorOut[3])
-{
-    OVR_UNUSED(hmddesc);
-
-    if (!rgbColorOut)
-    {
-        OVR_ASSERT(false);
-        return ovrFalse;
-    }
-
-    return NetClient::GetInstance()->LatencyUtil_ProcessInputs(Timer::GetSeconds(), rgbColorOut);
-}
-
-OVR_PUBLIC_FUNCTION(const char*) ovrHmd_GetLatencyTestResult(ovrHmd hmddesc)
-{
-    OVR_UNUSED(hmddesc);
-
-    return NetClient::GetInstance()->LatencyUtil_GetResultsString();
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_GetLatencyTest2DrawColor(ovrHmd hmddesc, unsigned char rgbColorOut[3])
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return ovrFalse;
-
-    // TBD: Move directly into renderer
-    bool dk2LatencyTest = (hmds->EnabledHmdCaps & ovrHmdCap_DynamicPrediction) != 0;
-    if (dk2LatencyTest)
-    {
-        hmds->LatencyTest2DrawColor[0] = hmds->ScreenLatencyTracker.GetNextDrawColor();
-        hmds->LatencyTest2DrawColor[1] = hmds->ScreenLatencyTracker.IsLatencyTimingAvailable() ? 255 : 0;
-        hmds->LatencyTest2DrawColor[2] = hmds->ScreenLatencyTracker.IsLatencyTimingAvailable() ? 0 : 255;
-
-        if (rgbColorOut)
-        {
-            rgbColorOut[0] = hmds->LatencyTest2DrawColor[0];
-            rgbColorOut[1] = hmds->LatencyTest2DrawColor[1];
-            rgbColorOut[2] = hmds->LatencyTest2DrawColor[2];
-        }
-
-        if (hmds->pRenderer)
-            hmds->pRenderer->SetLatencyTest2Color(hmds->LatencyTest2DrawColor);
-    }
-    else
-    {
-        if (hmds->pRenderer)
-            hmds->pRenderer->SetLatencyTest2Color(nullptr);
-    }
-
-    return dk2LatencyTest ? ovrTrue : ovrFalse;
-}
-
-
-OVR_PUBLIC_FUNCTION(double) ovrHmd_GetMeasuredLatencyTest2(ovrHmd hmddesc)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return 0.;
-
-    double latencyPostPresent = 0.;
-    hmds->ScreenLatencyTracker.GetVsyncToScanout(latencyPostPresent);
-    return latencyPostPresent;
-}
-
-
-//-------------------------------------------------------------------------------------
-// ***** Health and Safety Warning Display interface
-//
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetHSWDisplayState(ovrHmd hmddesc, ovrHSWDisplayState *hswDisplayState)
-{
-    if (!hswDisplayState)
-    {
-        OVR_ASSERT(false);
-        return;
-    }
-
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return;
-
-    OVR::CAPI::HSWDisplay* pHSWDisplay = hmds->pHSWDisplay;
-
-    if (pHSWDisplay)
-        pHSWDisplay->TickState(hswDisplayState); // This may internally call HSWDisplay::Display.
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_DismissHSWDisplay(ovrHmd hmddesc)
-{
-    HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
-    if (!hmds)
-        return ovrFalse;
-
-    OVR::CAPI::HSWDisplay* pHSWDisplay = hmds->pHSWDisplay;
-
-    if (pHSWDisplay && pHSWDisplay->Dismiss())
-        return ovrTrue;
-
-    return ovrFalse;
-}
-
-
 // -----------------------------------------------------------------------------------
 // ***** Property Access
 
@@ -1166,6 +1004,7 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_GetBool(ovrHmd hmddesc,
     OVR_ASSERT(propertyName != nullptr);
     if (!propertyName)
         return ovrFalse;
+
 
     HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
     bool success = false;
@@ -1299,7 +1138,7 @@ OVR_PUBLIC_FUNCTION(unsigned int) ovrHmd_GetFloatArray(ovrHmd hmddesc,
 // Modify float[] property; false if property doesn't exist or is readonly.
 OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_SetFloatArray(ovrHmd hmddesc,
                                                   const char* propertyName,
-                                                  float values[],
+                                                  const float values[],
                                                   unsigned int arraySize)
 {
     OVR_ASSERT(propertyName != nullptr && values != nullptr);
@@ -1309,7 +1148,7 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_SetFloatArray(ovrHmd hmddesc,
     HMDState* hmds = GetHMDStateFromOvrHmd(hmddesc);
     if (!hmds) return ovrFalse;
 
-    return hmds->setFloatArray(propertyName, values, arraySize) ? ovrTrue : ovrFalse;
+    return hmds->setFloatArray(propertyName, const_cast<float*>(values), arraySize) ? ovrTrue : ovrFalse;
 }
 
 OVR_PUBLIC_FUNCTION(const char*) ovrHmd_GetString(ovrHmd hmddesc,
@@ -1402,16 +1241,3 @@ OVR_PUBLIC_FUNCTION(int) ovr_TraceMessage(int level, const char* message)
     return len;
 }
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_StartPerfLog(ovrHmd hmddesc, const char* fileName, const char* userData1)
-{
-    // DEPRECATED
-    OVR_UNUSED3(hmddesc, fileName, userData1);
-    return ovrFalse;
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_StopPerfLog(ovrHmd hmddesc)
-{
-    // DEPRECATED
-    OVR_UNUSED(hmddesc);
-    return ovrFalse;
-}

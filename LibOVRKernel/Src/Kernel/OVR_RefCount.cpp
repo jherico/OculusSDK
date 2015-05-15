@@ -72,11 +72,11 @@ void RefCountNTSImplCore::reportInvalidDelete(void *pmem)
 
 void    RefCountImpl::AddRef()
 {
-    AtomicOps<int>::ExchangeAdd_NoSync(&RefCount, 1);
+    RefCount.ExchangeAdd_NoSync(1);
 }
 void    RefCountImpl::Release()
 {
-    if ((AtomicOps<int>::ExchangeAdd_NoSync(&RefCount, -1) - 1) == 0)
+    if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
         delete this;
 }
 
@@ -84,11 +84,11 @@ void    RefCountImpl::Release()
 
 void    RefCountVImpl::AddRef()
 {
-    AtomicOps<int>::ExchangeAdd_NoSync(&RefCount, 1);
+    RefCount.ExchangeAdd_NoSync(1);
 }
 void    RefCountVImpl::Release()
 {
-    if ((AtomicOps<int>::ExchangeAdd_NoSync(&RefCount, -1) - 1) == 0)
+    if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
         delete this;
 }
 

@@ -31,9 +31,6 @@ limitations under the License.
 #include "Kernel/OVR_Win32_IncludeWindows.h"
 #include "Kernel/OVR_String.h"
 
-// DirectX 9 Ex
-#include <d3d9.h>
-
 // Direct3D 11
 #include <D3D11Shader.h>
 #include <d3dcompiler.h>
@@ -56,9 +53,6 @@ limitations under the License.
 
 namespace OVR { namespace D3DUtil {
 
-
-// Check if D3D9Ex support exists in the environment
-bool CheckD3D9Ex();
 
 String GetWindowsErrorString(HRESULT hr);
 
@@ -95,6 +89,36 @@ bool VerifyHRESULT(const char* file, int line, HRESULT hr);
 
 // If the result is a failure, it will write the exact compile error to the error log
 void LogD3DCompileError(HRESULT hr, ID3DBlob* errorBlob);
+
+
+#if defined(OVR_BUILD_DEBUG)
+
+    // Enable this to track down double-tagging object warnings from D3D.
+    #define OVR_D3D_TRACK_DOUBLE_TAGGING
+
+    #if defined(OVR_D3D_TRACK_DOUBLE_TAGGING)
+        #define OVR_D3D_CHECK_REUSE(child) \
+                char tagReuseBuffer[1024]; \
+                UINT reuseSize = (UINT)sizeof(tagReuseBuffer); \
+                OVR_ASSERT(FAILED(child->GetPrivateData(WKPDID_D3DDebugObjectName, &reuseSize, tagReuseBuffer)));
+    #else
+        #define OVR_D3D_CHECK_REUSE(child) (void(0))
+    #endif
+
+    #define OVR_D3D_TAG_OBJECT(child) \
+        if (child) { \
+            OVR_D3D_CHECK_REUSE(child); \
+            const char* tagName = OVR_STRINGIZE(child) " " __FILE__ "(" OVR_STRINGIZE(__LINE__) ")"; \
+            UINT tagDataSize = (UINT)strlen(tagName); \
+            HRESULT tagHR = child->SetPrivateData(WKPDID_D3DDebugObjectName, tagDataSize, tagName); \
+            OVR_D3D_CHECK(tagHR); \
+        }
+
+#else // !Debug:
+
+    #define OVR_D3D_TAG_OBJECT(child) (void(0))
+
+#endif // !Debug
 
 
 }} // namespace OVR::D3DUtil

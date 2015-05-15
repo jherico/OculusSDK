@@ -135,6 +135,9 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 		                case IDOK:
                             EndDialog(hDlg, 0);
 			                return TRUE;
+                        case IDABORT:
+                            _exit(0); // We don't call abort() because the visual studio runtime
+                                      // will capture the signal and throw up another dialog
 		            }
                     break;
                 case WM_CLOSE:
@@ -157,14 +160,14 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 
     // Sizes are in Windows dialog units, which are relative to a character size. Depends on the font and environment settings. Often the pixel size will be ~3x the dialog unit x size. Often the pixel size will be ~3x the dialog unit y size.
     const int    kGutterSize   =  6; // Empty border space around controls within the dialog
-    const int    kButtonWidth  = 24;
+    const int    kButtonWidth  = 30;
     const int    kButtonHeight = 10;
     const int    kDialogWidth  = ((textLength > 1000) ? 600 : ((textLength > 400) ? 300 : 200));    // To do: Clip this against screen bounds.
     const int    kDialogHeight = ((textLineCount > 100) ? 400 : ((textLineCount > 25) ? 300 : ((textLineCount > 10) ? 200 : 100)));
 
     // Define a dialog box.
     pDlg->style = WS_POPUP | WS_BORDER | WS_SYSMENU | DS_MODALFRAME | WS_CAPTION;
-    pDlg->cdit  = 2;    // Control count
+    pDlg->cdit  = 3;    // Control count
     pDlg->x     = 10;   // X position To do: Center the dialog.
     pDlg->y     = 10;
     pDlg->cx    = (short)kDialogWidth;
@@ -197,6 +200,26 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
     pWchar[0] = 'O'; pWchar[1] = 'K'; pWchar[2] = '\0'; // Not currently localized.
     pWord     += 3; // OK\0
     *pWord++   = 0; // no creation data
+
+    // Define a QUIT button
+    pWord = Dialog::WordUp(pWord);
+
+    pDlgItem = (DLGITEMTEMPLATE*)pWord;
+    pDlgItem->x = pDlg->cx - ((kGutterSize + kButtonWidth) * 2);
+    pDlgItem->y = pDlg->cy - (kGutterSize + kButtonHeight);
+    pDlgItem->cx = kButtonWidth;
+    pDlgItem->cy = kButtonHeight;
+    pDlgItem->id = IDABORT;
+    pDlgItem->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON;
+
+    pWord = (WORD*)(pDlgItem + 1);
+    *pWord++ = 0xFFFF;
+    *pWord++ = 0x0080; // button class
+
+    pWchar = (WCHAR*)pWord;
+    pWchar[0] = 'Q'; pWchar[1] = 'U'; pWchar[2] = 'I'; pWchar[3] = 'T'; pWchar[4] = '\0'; // Not currently localized.
+    pWord += 5; // QUIT\0
+    *pWord++ = 0; // no creation data
 
     // Define an EDIT contol.
     pWord = Dialog::WordUp(pWord);

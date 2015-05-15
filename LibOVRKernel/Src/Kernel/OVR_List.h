@@ -52,12 +52,46 @@ private:
 
     template<class X, class B> friend class List;
 
+#ifdef OVR_BUILD_DEBUG
+    bool marker; // Is this a marker node (rather than an actual data node)?
+#endif
+
 public:
+#ifdef OVR_BUILD_DEBUG
+    T* GetPrev() const
+    {
+        if (pPrev && !pPrev->marker)
+        {
+            return (T*)(pPrev);
+        }
+        else
+        {
+            OVR_FAIL_M("Unstable call to ListNode<>::GetPrev() without first checking List<>IsFirst()");
+            return nullptr;
+        }
+    }
+    T* GetNext() const
+    {
+        if (pNext && !pNext->marker)
+        {
+            return (T*)(pNext);
+        }
+        else
+        {
+            OVR_FAIL_M("Unstable call to ListNode<>::GetNext() without first checking List<>IsLast()");
+            return nullptr;
+        }
+    }
+#else
     T* GetPrev() const { return (T*)(pPrev); }
     T* GetNext() const { return (T*)(pNext); }
+#endif
 
     ListNode()
     {
+#ifdef OVR_BUILD_DEBUG
+        marker = false; // Most nodes are data nodes, so that is the default.
+#endif
         pPrev = nullptr;
         pNext = nullptr;
     }
@@ -156,6 +190,9 @@ public:
     List()
     {
         Root.pNext = Root.pPrev = &Root;
+#ifdef OVR_BUILD_DEBUG
+        Root.marker = true; // This is a marker node.
+#endif
     }
 
     void Clear()

@@ -28,7 +28,6 @@ limitations under the License.
 #define OVR_Stereo_h
 
 #include "Sensors/OVR_DeviceConstants.h"
-#include "Displays/OVR_Display.h"
 #include "Vision/SensorFusion/Vision_SensorStateReader.h"
 #include "OVR_Profile.h"
 #include "OVR_CAPI.h" // ovrDistortionMesh
@@ -42,6 +41,52 @@ typedef struct ovrRecti_ ovrRecti;
 namespace OVR {
 
 class SensorDevice; // Opaque forward declaration
+
+
+//-----------------------------------------------------------------------------------
+// *****  Distortion Capability Flags
+
+// These distortion flags used to be reported for Hmd and configured through ovrHmd_ConfigureRendering.
+// With ConfigureRendering gone, there is no longer place for these in public API.
+// We are now using the ovrDistortionCap_Default instead.
+// 
+// Moving here and keeping 'ovr' prefix for now to avoid extra change until their fate is fully decided. 
+// Some may be re-exposed as debug flags.
+//
+// We do have some agreement on keeping a few of these internally:  Vignette, Overdrive and DisableChromatic
+// are planned to be exposed through ConfigUtil user options.
+//
+
+typedef enum ovrDistortionCaps_
+{
+    // 0x01 unused - Previously ovrDistortionCap_Chromatic. Use ovrDistortionCap_DisableChromatic to explicitly disable
+    ovrDistortionCap_TimeWarp           = 0x02,     ///< Supports timewarp.
+    // 0x04 unused
+
+    /// \brief Supports vignetting around the edges of the view.
+    /// \details Vignette adds a fade to the edges of the display for each eye, instead of a harsh cutoff
+    ovrDistortionCap_Vignette           =    0x08,    
+    ovrDistortionCap_SRGB               =    0x40,     ///< Assume input images are in sRGB gamma-corrected color space. This is not supported on D3D. May change in a future revision.
+    /// \brief Overdrive brightness transitions to reduce artifacts on DK2+ displays
+    /// \details <I>This option has a slight GPU cost, but by default should probably be enabled 99% of the time.</I>
+    ovrDistortionCap_Overdrive          =    0x80,
+
+    ovrDistortionCap_ComputeShader      =   0x400,     ///< \internal Using compute shader for timewarp and distortion. (DX11+ only)
+    //ovrDistortionCap_NoTimewarpJit    =   0x800      RETIRED - do not reuse this bit without major versioning changes.
+    /// \brief Enables a spin-wait that tries to push time-warp to be as close to V-sync as possible. WARNING - this may backfire and cause framerate loss - use with caution.
+    /// \details Default to off, recommended do not use due to inaccuracies in the used timing and waiting methods employed in Windows.
+    ovrDistortionCap_TimewarpJitDelay   =  0x1000,
+    ovrDistortionCap_DisableChromatic   =  0x2000,     ///< Disables de-chromatic aberration in distortion pass w/o perf improvements (useful for debugging visuals outside of the HMD)
+
+    ovrDistortionCap_ProfileNoSpinWaits = 0x10000,     ///< \deprecated Use when profiling with timewarp to remove false positives
+    ovrDistortionCap_EnumSize           = 0x7fffffff,   ///< @internal Force type int32_t.
+
+    // Default values passed now that DistortionCaps are no longer public.
+    // Always use Timewarp and Overdrive
+    ovrDistortionCap_Default            = ovrDistortionCap_TimeWarp | ovrDistortionCap_Overdrive | ovrDistortionCap_Vignette
+
+} ovrDistortionCaps;
+
 
 
 //-----------------------------------------------------------------------------------
@@ -346,8 +391,6 @@ public:
 		return DisplayId == o.DisplayId &&
 			DisplayDeviceName.CompareNoCase(o.DisplayDeviceName) == 0;
 	}
-
-	static bool CreateFromSensorAndDisplay(SensorDevice* sensor, Display* display, HMDInfo* hmdi);
 };
 
 
@@ -470,9 +513,130 @@ struct ProfileRenderInfo
     // Eye relief dial
     int EyeReliefDial;
 
+    //Profile option to disable the HSW
+    bool  HSWDisabled;
+
 
     ProfileRenderInfo();
 };
+
+
+
+//-----------------------------------------------------------------------------------
+// A description of a layer.
+//
+// This does not include the texture pointers/IDs/etc since everything that uses
+// this description uses a slightly different format for them. They are here in comment form only.
+// If you change this, update IPCCompositorSubmitLayersParams::Serialize()
+struct LayerDesc
+{
+    // To consider: just use ovrLayerType directly instead of LayerType, as they match 1:1.
+    enum LayerType
+    {
+        LayerType_Disabled       = ovrLayerType_Disabled,         ///< Layer is disabled.
+        LayerType_Fov            = ovrLayerType_EyeFov,           ///< Standard rendered 3D view - usually stereo.
+        LayerType_FovWithDepth   = ovrLayerType_EyeFovDepth,      ///< Rendered 3D view with depth buffer - usually stereo.
+        LayerType_QuadInWorld    = ovrLayerType_QuadInWorld,      ///< Arbitrarily-positioned quad - usually mono. Pos+orn specified in "zero pose" space.
+        LayerType_QuadHeadLocked = ovrLayerType_QuadHeadLocked,   ///< Quad in face space. Pos+orn specified in current HMD space - moves/TW with HMD.
+        LayerType_Direct         = ovrLayerType_Direct,           ///< Drawn directly to the HMD, no distortion, CA, timewarp.
+        // TODO: cubemap layer?
+
+        LayerType_COUNT // Always last.
+    };
+
+    enum QualityType
+    {
+        QualityType_Normal,         // Single sample.
+        QualityType_EWA,            // 7-tap EWA
+
+        QualityType_COUNT,
+    };
+
+    LayerDesc()
+        : Type(LayerType_Fov)
+        , Quality(QualityType_Normal)
+        , bAnisoFiltering(false)
+        , bTextureOriginAtBottomLeft(false)
+    {}
+
+    LayerType           Type;
+    QualityType         Quality;
+    bool                bAnisoFiltering;                // otherwise trilinear
+
+    bool                bTextureOriginAtBottomLeft;     // Generally false for D3D, true for OpenGL.
+    ovrSizei            EyeTextureSize[2];
+    ovrRecti            EyeRenderViewport[2];
+    ovrFovPort          EyeRenderFovPort[2];
+    ovrPosef            EyeRenderPose[2];               // quadCenterPose in the case of LayerType_HangingQuad
+    ovrVector2f         QuadSize[2];                    // for LayerType_HangingQuad
+    ovrTimewarpProjectionDesc ProjectionDesc;           // for LayerType_FovWithDepth
+
+    // TODO: motion vectors.
+
+    // Used ONLY on client side to specify which texture set should be used.
+    ovrSwapTextureSet const *  pEyeTextureSets[2];      // NOTE - both texture sets may be the same.
+    ovrSwapTextureSet const *  pEyeDepthTextureSets[2]; // NOTE - both texture sets may be the same.
+
+    void SetToDisabled()
+    {
+        Type                        = LayerDesc::LayerType_Disabled;
+        bTextureOriginAtBottomLeft  = false;
+        bAnisoFiltering             = false;
+        Quality                     = LayerDesc::QualityType_Normal;
+        ProjectionDesc.Projection22 = 0.0f;
+        ProjectionDesc.Projection23 = 0.0f;
+        ProjectionDesc.Projection32 = 0.0f;
+        for (int eyeId = 0; eyeId < 2; eyeId++)
+        {
+            EyeTextureSize[eyeId]       = ovrSizei();
+            EyeRenderViewport[eyeId]    = ovrRecti();
+            QuadSize[eyeId]             = ovrVector2f();
+            EyeRenderPose[eyeId]        = Posef();
+            EyeRenderFovPort[eyeId]     = FovPort();
+            pEyeTextureSets[eyeId]      = nullptr;
+            pEyeDepthTextureSets[eyeId] = nullptr;
+        }
+    }
+
+};
+
+struct DistortionRendererLayerDesc
+{
+    int LayerNum;
+    OVR::LayerDesc Desc;
+
+    // Used ONLY by server side after resolving the texture set to an actual texture
+    ovrTexture *  pEyeTextures[2];        // NOTE - both textures may be the same.
+    ovrTexture *  pEyeDepthTextures[2];   // NOTE - both textures may be the same.
+
+    DistortionRendererLayerDesc() :
+        LayerNum(0),
+        Desc()
+    {
+        SetToDisabled();
+    }
+
+    void SetToDisabled()
+    {
+        Desc.SetToDisabled();
+        for (int eyeId = 0; eyeId < 2; eyeId++)
+        {
+            pEyeTextures[eyeId]      = nullptr;
+            pEyeDepthTextures[eyeId] = nullptr;
+        }
+    }
+};
+
+
+enum {
+    // Arbitrary number - all this does is control the size of some arrays - rendering will multi-pass as needed.
+    MaxNumLayersTotal = 33,
+    // HSW always lives in the last one.
+    HswLayerNum = MaxNumLayersTotal - 1,
+    // ...and we don't tell people that layer exists.
+    MaxNumLayersPublic = MaxNumLayersTotal - 1
+};
+
 
 
 //-----------------------------------------------------------------------------------
@@ -518,6 +682,8 @@ FovPort             CalculateFovFromHmdInfo ( StereoEye eyeType,
 
 FovPort             GetPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &distortion );
 
+FovPort             GetPhysicalScreenDiagonalFov(StereoEye eyeType, DistortionRenderDesc const &distortion);
+
 FovPort             ClampToPhysicalScreenFov ( StereoEye eyeType, DistortionRenderDesc const &distortion,
                                                FovPort inputFovPort );
 
@@ -539,7 +705,7 @@ ScaleAndOffset2D    CreateUVScaleAndOffsetfromNDCScaleandOffset ( ScaleAndOffset
 struct StereoEyeParams
 {
     StereoEye               Eye;
-    Matrix4f                HmdToEyeViewOffset;         // Translation to be applied to view matrix.
+    Matrix4f                HmdToEyeViewOffset;     // Translation from the HMD "middle eye" to actual eye.
 
     // Distortion and the VP on the physical display - the thing to run the distortion shader on.
     DistortionRenderDesc    Distortion;
@@ -623,46 +789,61 @@ void CalculateOrientationTimewarpMatrix(Quatf const & eye, Quatf const & pred, M
 void CalculatePositionalTimewarpMatrix(Posef const & renderFromEyeInverted, Posef const & hmdPose,
                                        Vector3f const & extraEyeOffset, Matrix4f& M);
 
+
 //-----------------------------------------------------------------------------
-// CalculateTimewarpFromSensors
+// CalculateTimewarpFromPoses
 //
-// Read current pose from sensors and construct timewarp matrices for start/end
-// predicted poses.
+// Given start/end predicted poses, construct timewarp matrices.
 //
-// hmdPose: RenderPose eye quaternion, *not* inverted.
-// reader: the tracking state
-// poseInFaceSpace: true if the pose supplied is stuck-to-your-face rather than fixed-in-place
+// eyeRenderPose: RenderPose eye quaternion, *not* inverted.
+// poseInFaceSpace: true if the pose supplied is stuck-to-your-face rather than fixed-in-space
 // calcPosition: true if the position part of the result is actually used (false = orientation only)
 // hmdToEyeViewOffset: offset from the HMD "middle eye" to actual eye.
-// startEndTimes: start and end times of the screen - typically fed direct from Timing->GetTimewarpTiming()->EyeStartEndTimes[eyeNum]
+// hmdStartEndPoses: the predicted poses of the HMD at start/end times.
+//
+// Results:
+// startEndMatrices: Timewarp matrices for the start and end times respectively.
+void CalculateTimewarpFromPoses(Posef const & eyeRenderPose,
+                                bool poseInFaceSpace,
+                                bool calcPosition, 
+                                Vector3f const &hmdToEyeViewOffset,
+                                Posef const hmdStartEndPoses[2],
+                                Matrix4f startEndMatrices[2]);
+
+//-----------------------------------------------------------------------------
+// CalculateOrientationTimewarpFromSensors
+//
+// LEGACY - DO NOT USE. Only for the OGL path right now.
+
+// Explicit use of something like:
+// DistortionRenderer::readSensorsAndCalculateHmdPoses + CalculateTimewarpFromPoses
+// is preferred.
+//
+// Similar to CalculateTimewarpFromPoses, but reads the sensors for you,
+// and only handles orientation, not position.
+//
+// eyeQuat: RenderPose eye quaternion, *not* inverted.
+// reader: the tracking state
+// startEndTimes: start and end times of the screen - typically fed direct from Timing->GetTimewarpTiming()->EyeStartEndTimes
 //
 // Results:
 // startEndMatrices: Timewarp matrices for the start and end times respectively.
 // timewarpIMUTime: On success it contains the raw IMU sample time for the pose.
-// Returns false on failure to read state.
-bool CalculateTimewarpFromSensors(Posef const & hmdPose,
-                                  Vision::TrackingStateReader* reader,
-                                  bool poseInFaceSpace,
-                                  bool calcPosition, 
-                                  ovrVector3f const &hmdToEyeViewOffset,
-                                  const double startEndTimes[2],
-                                  Matrix4f startEndMatrices[2],
-                                  double& timewarpIMUTime);
-
-// Orientation-only version.
-bool CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
+void CalculateOrientationTimewarpFromSensors(Quatf const & eyeQuat,
                                              Vision::TrackingStateReader* reader,
-                                             const double startEndTimes[2], Matrix4f startEndMatrices[2],
+                                             const double startEndTimes[2],
+                                             Matrix4f startEndMatrices[2],
                                              double& timewarpIMUTime);
+
 
 //-----------------------------------------------------------------------------
 // CalculateEyeTimewarpTimes
 //
 // Given the scanout start time, duration of scanout, and shutter type, this
-// function returns the timewarp left/right eye start and end prediction times.
+// function returns the timewarp start and end prediction times.
 void CalculateEyeTimewarpTimes(double scanoutStartTime, double scanoutDuration,
                                HmdShutterTypeEnum shutterType,
-                               double leftEyeStartEndTime[2], double rightEyeStartEndTime[2]);
+                               double eyeStartEndTime[2]);
 
 //-----------------------------------------------------------------------------
 // CalculateEyeRenderTimes
@@ -672,6 +853,35 @@ void CalculateEyeTimewarpTimes(double scanoutStartTime, double scanoutDuration,
 void CalculateEyeRenderTimes(double scanoutStartTime, double scanoutDuration,
                              HmdShutterTypeEnum shutterType,
                              double& leftEyeRenderTime, double& rightEyeRenderTime);
+
+
+//-----------------------------------------------------------------------------------
+// ***** Distortion mesh structures
+
+/// Describes a vertex used by the distortion mesh. This is intended to be converted into
+/// the engine-specific format. Some fields may be unused based on the ovrDistortionCaps
+/// flags selected. TexG and TexB, for example, are not used if chromatic correction is
+/// not requested.
+typedef struct OVR_ALIGNAS(8) DistortionMeshVertex_
+{
+    ovrVector2f ScreenPosNDC;   ///< [-1,+1],[-1,+1] over the entire framebuffer.
+    float       TimeWarpFactor; ///< Lerp factor between time-warp matrices. Can be encoded in Pos.z.
+    float       VignetteFactor; ///< Vignette fade factor. Can be encoded in Pos.w.
+    ovrVector2f TanEyeAnglesR;  ///< The tangents of the horizontal and vertical eye angles for the red channel.
+    ovrVector2f TanEyeAnglesG;  ///< The tangents of the horizontal and vertical eye angles for the green channel.
+    ovrVector2f TanEyeAnglesB;  ///< The tangents of the horizontal and vertical eye angles for the blue channel.
+} DistortionMeshVertex;
+
+/// Describes a full set of distortion mesh data, filled in by CalculateDistortionMeshFromFOV.
+/// Contents of this data structure, if not null, should be freed by DestroyDistortionMeshObject.
+typedef struct OVR_ALIGNAS(8) DistortionMesh_
+{
+    DistortionMeshVertex* pVertexData; ///< The distortion vertices representing each point in the mesh.
+    unsigned short*       pIndexData;  ///< Indices for connecting the mesh vertices into polygons.
+    unsigned int          VertexCount; ///< The number of vertices in the mesh.
+    unsigned int          IndexCount;  ///< The number of indices in the mesh.
+} DistortionMesh;
+
 
 
 //-----------------------------------------------------------------------------
@@ -685,7 +895,17 @@ bool CalculateDistortionMeshFromFOV(HmdRenderInfo const & renderInfo,
                                     DistortionRenderDesc const & distortionDesc,
                                     StereoEye stereoEye, FovPort fov,
                                     unsigned distortionCaps,
-                                    ovrDistortionMesh *meshData);
+                                    DistortionMesh *meshData);
+
+void DestroyDistortionMeshObject(DistortionMesh* meshData);
+
+
+
+/// Computes updated 'uvScaleOffsetOut' to be used with a distortion if render target size or
+/// viewport changes after the fact. This can be used to adjust render size every frame if desired.
+void GetRenderScaleAndOffset(ovrFovPort fov,
+                             ovrSizei textureSize, ovrRecti renderViewport,
+                             ovrVector2f uvScaleOffsetOut[2]);
 
 
 } //namespace OVR

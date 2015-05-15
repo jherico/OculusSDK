@@ -48,8 +48,8 @@ namespace OVR { namespace Net {
 class PacketizedTCPSocketBase : public TCPSocket
 {
 public:
-	PacketizedTCPSocketBase() {}
-	PacketizedTCPSocketBase(SocketHandle _sock, bool isListenSocket) : TCPSocket(_sock, isListenSocket) {}
+    PacketizedTCPSocketBase() {}
+    PacketizedTCPSocketBase(SocketHandle _sock, bool isListenSocket) : TCPSocket(_sock, isListenSocket) {}
 };
 
 
@@ -61,27 +61,25 @@ public:
 class PacketizedTCPSocket : public PacketizedTCPSocketBase
 {
 public:
-	PacketizedTCPSocket();
-	PacketizedTCPSocket(SocketHandle _sock, bool isListenSocket);
-	virtual ~PacketizedTCPSocket();
+    PacketizedTCPSocket();
+    PacketizedTCPSocket(SocketHandle _sock, bool isListenSocket);
+    virtual ~PacketizedTCPSocket();
 
 public:
-	virtual int Send(const void* pData, int bytes);
-	virtual int SendAndConcatenate(const void** pDataArray, int *dataLengthArray, int arrayCount);
+    virtual int Send(const void* pData, int bytes);
 
 protected:
-	virtual void OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, int bytesRead);
+    virtual void OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, int bytesRead);
 
-	int BytesFromStream(uint8_t* pData, int bytesRead);
+    int BytesFromStream(uint8_t* pData, int bytesRead);
 
-    Lock   sendLock;
     Lock   recvBuffLock;
 
-	uint8_t* pRecvBuff;     // Queued receive buffered data
-	int    pRecvBuffSize; // Size of receive queue in bytes
+    uint8_t* pRecvBuff;     // Queued receive buffered data
+    int    pRecvBuffSize; // Size of receive queue in bytes
 };
 
 
-}} // OVR::Net
+}} // namespace OVR::Net
 
 #endif

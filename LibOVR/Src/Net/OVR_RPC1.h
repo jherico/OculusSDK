@@ -39,68 +39,70 @@ limitations under the License.
 namespace OVR { namespace Net { namespace Plugins {
 
 
-typedef Delegate3<void, BitStream*, BitStream*, ReceivePayload*> RPCDelegate;
-typedef Delegate2<void, BitStream*, ReceivePayload*> RPCSlot;
-// typedef void ( *Slot ) ( OVR::Net::BitStream *userData, OVR::Net::ReceivePayload *pPayload );
+typedef Delegate3<OVRError, BitStream&, BitStream&, ReceivePayload const&> RPCDelegate;
+typedef Delegate2<void, BitStream&, ReceivePayload const&> RPCSlot;
 
 /// NetworkPlugin that maps strings to function pointers. Can invoke the functions using blocking calls with return values, or signal/slots. Networked parameters serialized with BitStream
 class RPC1 : public NetworkPlugin, public NewOverrideBase
 {
 public:
-	RPC1();
-	virtual ~RPC1();
+    RPC1();
+    virtual ~RPC1();
 
-	/// Register a slot, which is a function pointer to one or more implementations that supports this function signature
-	/// When a signal occurs, all slots with the same identifier are called.
-	/// \param[in] sharedIdentifier A string to identify the slot. Recommended to be the same as the name of the function.
-	/// \param[in] functionPtr Pointer to the function.
-	/// \param[in] callPriority Slots are called by order of the highest callPriority first. For slots with the same priority, they are called in the order they are registered
-	void RegisterSlot(OVR::String sharedIdentifier,  CallbackListener<RPCSlot>* rpcSlotListener);
+    /// Register a slot, which is a function pointer to one or more implementations that supports this function signature
+    /// When a signal occurs, all slots with the same identifier are called.
+    /// \param[in] sharedIdentifier A string to identify the slot. Recommended to be the same as the name of the function.
+    /// \param[in] functionPtr Pointer to the function.
+    /// \param[in] callPriority Slots are called by order of the highest callPriority first. For slots with the same priority, they are called in the order they are registered
+    void RegisterSlot(String sharedIdentifier,  CallbackListener<RPCSlot>* rpcSlotListener);
 
-	/// \brief Same as \a RegisterFunction, but is called with CallBlocking() instead of Call() and returns a value to the caller
-	bool RegisterBlockingFunction(OVR::String uniqueID, RPCDelegate blockingFunction);
+    /// \brief Same as \a RegisterFunction, but is called with CallBlocking() instead of Call() and returns a value to the caller
+    /// \return true if successfully called, false if there is already a blockingFunction registered for the uniqueID.
+    /// \note This function doesn't generate an OVRError upon failure; it merely returns false and expects the caller to act accordingly. 
+    bool RegisterBlockingFunction(String uniqueID, RPCDelegate blockingFunction);
 
-	/// \brief Same as UnregisterFunction, except for a blocking function
-	void UnregisterBlockingFunction(OVR::String uniqueID);
+    /// \brief Same as UnregisterFunction, except for a blocking function
+    void UnregisterBlockingFunction(String uniqueID);
 
-	// \brief Same as call, but don't return until the remote system replies.
-	/// Broadcasting parameter does not exist, this can only call one remote system
-	/// \note This function does not return until the remote system responds, disconnects, or was never connected to begin with
-	/// \param[in] Identifier originally passed to RegisterBlockingFunction() on the remote system(s)
-	/// \param[in] bitStream bitStream encoded data to send to the function callback
-	/// \param[in] pConnection connection to send on
-	/// \param[out] returnData Written to by the function registered with RegisterBlockingFunction.
-	/// \return true if successfully called. False on disconnect, function not registered, or not connected to begin with
-	bool CallBlocking( OVR::String uniqueID, OVR::Net::BitStream * bitStream, Ptr<Connection> pConnection, OVR::Net::BitStream *returnData = NULL );
+    /// \brief Same as call, but don't return until the remote system replies.
+    /// Broadcasting parameter does not exist, this can only call one remote system
+    /// \note This function does not return until the remote system responds, disconnects, or was never connected to begin with
+    /// \note This function doesn't generate an OVRError upon failure; it merely returns false and expects the caller to act accordingly. All errors are assumed to be connection errors.
+    /// \param[in] Identifier originally passed to RegisterBlockingFunction() on the remote system(s)
+    /// \param[in] bitStream bitStream encoded data to send to the function callback
+    /// \param[in] pConnection connection to send on
+    /// \param[out] returnData Written to by the function registered with RegisterBlockingFunction.
+    /// \return true if successfully called. False on disconnect, function not registered, or not connected to begin with
+    OVRError CallBlocking(String uniqueID, BitStream& bitStream, Connection* pConnection, BitStream* returnData = nullptr);
 
-	/// Calls zero or more functions identified by sharedIdentifier registered with RegisterSlot()
-	/// \param[in] sharedIdentifier parameter of the same name passed to RegisterSlot() on the remote system
-	/// \param[in] bitStream bitStream encoded data to send to the function callback
-	/// \param[in] pConnection connection to send on
-	bool Signal(OVR::String sharedIdentifier, OVR::Net::BitStream * bitStream, Ptr<Connection> pConnection);
-    void BroadcastSignal(OVR::String sharedIdentifier, OVR::Net::BitStream * bitStream);
-
+    /// Calls zero or more functions identified by sharedIdentifier registered with RegisterSlot()
+    /// \note This function doesn't generate an OVRError upon failure; it merely returns false and expects the caller to act accordingly. All errors are assumed to be connection errors.
+    /// \param[in] sharedIdentifier parameter of the same name passed to RegisterSlot() on the remote system
+    /// \param[in] bitStream bitStream encoded data to send to the function callback
+    /// \param[in] pConnection connection to send on
+    bool Signal(String sharedIdentifier, BitStream& bitStream, Connection* pConnection);
+    void BroadcastSignal(String sharedIdentifier, BitStream& bitStream);
 
 protected:
-	virtual void OnReceive(ReceivePayload *pPayload, ListenerReceiveResult *lrrOut);
+    virtual void OnReceive(ReceivePayload const& pPayload, ListenerReceiveResult& lrrOut) OVR_OVERRIDE;
+    virtual void OnDisconnected(Connection* conn) OVR_OVERRIDE;
+    virtual void OnConnected(Connection* conn) OVR_OVERRIDE;
 
-    virtual void OnDisconnected(Connection* conn);
-    virtual void OnConnected(Connection* conn);
+    Hash<String, RPCDelegate, String::HashFunctor> RegisteredBlockingFunctions;
 
-	Hash< String, RPCDelegate, String::HashFunctor > registeredBlockingFunctions;
-
-	CallbackHash< RPCSlot > slotHash;
+    CallbackHash<RPCSlot> SlotHash;
 
     // Synchronization for RPC caller
-    Lock            singleRPCLock;
-    Mutex           callBlockingMutex;
-    WaitCondition   callBlockingWait;
+    Lock            SingleRPCLock;
+    Mutex           CallBlockingMutex;
+    WaitCondition   CallBlockingWait;
 
-    Net::BitStream* blockingReturnValue;
-	Ptr<Connection> blockingOnThisConnection;
+    BitStream       BlockingReturnValue;
+    Ptr<Connection> BlockingOnThisConnection;
+    bool            BlockingCallSuccess;
 };
 
 
-}}} // OVR::Net::Plugins
+}}} // namespace OVR::Net::Plugins
 
 #endif // OVR_Net_RPC_h

@@ -46,6 +46,14 @@ using namespace OVR::Util::Render;
 // All actual lifetime and update control is done by the surrounding HMDState.
 struct HMDRenderState
 {
+    HMDRenderState() : EnabledHmdCaps(0), EnabledDistortionCaps(0), PresentQueueLimit(0)
+    {
+        memset(EyeRenderDesc, 0, sizeof(EyeRenderDesc));
+        memset(EyeRenderPoses, 0, sizeof(EyeRenderPoses));
+        memset(Distortion, 0, sizeof(Distortion));
+        memset(ClearColor, 0, sizeof(ClearColor));
+    }
+
     // Utility query functions.
     ovrHmdDesc          GetDesc() const;
     ovrSizei            GetFOVTextureSize(int eye, ovrFovPort fov, float pixelsPerDisplayPixel) const;
@@ -64,8 +72,11 @@ struct HMDRenderState
     ovrPosef                EyeRenderPoses[2];
 
     // Capabilities passed to Configure.
-    unsigned                EnabledHmdCaps;     // enum ovrHmdCaps
-    unsigned                DistortionCaps;     // enum ovrDistortionCaps
+    unsigned                EnabledHmdCaps;             // enum ovrHmdCaps
+    unsigned                EnabledDistortionCaps;      // enum ovrDistortionCaps
+
+    // Present Queue Limit. Set to 1 for no queue ahead, for each N after 1 is that many frames of queue ahead (ex: 2 for 1 frame queue ahead)
+    uint32_t                PresentQueueLimit;
 };
 
 

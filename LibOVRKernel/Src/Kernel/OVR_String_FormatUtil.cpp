@@ -29,14 +29,11 @@ limitations under the License.
 
 namespace OVR {
 
-void StringBuffer::AppendFormat(const char* format, ...)
+void StringBuffer::AppendFormatV(const char* format, va_list argList)
 {       
-    va_list argList;
     char    buffer[512];
     char*   bufferUsed = buffer;
     char*   bufferAllocated = NULL;
-
-    va_start(argList, format);
 
     #if !defined(OVR_CC_MSVC) // Non-Microsoft compilers require you to save a copy of the va_list.
         va_list argListSaved;
@@ -73,4 +70,11 @@ void StringBuffer::AppendFormat(const char* format, ...)
         OVR_FREE(bufferAllocated);
 }
 
+void StringBuffer::AppendFormat(const char* format, ...)
+{
+    va_list argList;
+    va_start(argList, format);
+    AppendFormatV(format, argList);
+    va_end(argList);
+}
 } // OVR

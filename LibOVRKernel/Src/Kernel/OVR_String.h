@@ -69,12 +69,12 @@ protected:
         // Number of bytes. Will be the same as the number of chars if the characters
         // are ascii, may not be equal to number of chars in case string data is UTF8.
         size_t  Size;       
-        volatile int32_t RefCount;
+        AtomicInt<int32_t> RefCount;
         char    Data[1];
 
         void    AddRef()
         {
-            AtomicOps<int32_t>::ExchangeAdd_NoSync(&RefCount, 1);
+            RefCount.ExchangeAdd_NoSync(1);
         }
         // Decrement ref count. This needs to be thread-safe, since
         // a different thread could have also decremented the ref count.
@@ -88,7 +88,7 @@ protected:
         // checking against 0 needs to made an atomic operation.
         void    Release()
         {
-            if ((AtomicOps<int32_t>::ExchangeAdd_NoSync(&RefCount, -1) - 1) == 0)
+            if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
                 OVR_FREE(this);
         }
 
@@ -461,6 +461,7 @@ public:
     // Append a string
     void        AppendString(const wchar_t* pstr, intptr_t len = -1);
     void        AppendString(const char* putf8str, intptr_t utf8StrSz = -1);
+    void        AppendFormatV(const char* format, va_list argList);
     void        AppendFormat(const char* format, ...);
 
     // Assigned a string with dynamic data (copied through initializer).

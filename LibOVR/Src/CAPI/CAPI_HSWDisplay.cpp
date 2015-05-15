@@ -72,6 +72,9 @@ OVR_DISABLE_MSVC_WARNING(4996) // "This function or variable may be unsafe..."
 namespace OVR { namespace CAPI {
 
 
+#if 0 // Now done by compositor. This code is left here because we probably want to move some of the functionality back into the compositor.
+
+
 static const time_t HSWDisplayTimeNever = (time_t)0; // Constant which denotes the time of "never", as in the display has never been shown yet.
 
 #define HSWDISPLAY_POLL_INTERVAL            0.400 // Seconds between polling for whether the display should be shown.
@@ -369,34 +372,13 @@ void HSWDisplay::SetCurrentProfileLastHSWTime(time_t t)
 }
 
 
-// Generates an appropriate stereo ortho projection matrix.
-void HSWDisplay::GetOrthoProjection(const HMDRenderState& renderState, Matrix4f orthoProjection[2])
-{
-    Matrix4f perspectiveProjection[2];
-    unsigned int projectionModifier = ovrProjection_RightHanded | ((RenderAPIType == ovrRenderAPI_OpenGL) ? ovrProjection_ClipRangeOpenGL : 0);
-    perspectiveProjection[0] = ovrMatrix4f_Projection(renderState.EyeRenderDesc[0].Fov, 0.01f, 10000.f, projectionModifier);
-    perspectiveProjection[1] = ovrMatrix4f_Projection(renderState.EyeRenderDesc[1].Fov, 0.01f, 10000.f, projectionModifier);
-
-    const float    orthoDistance = HSWDISPLAY_DISTANCE; // This is meters from the camera (viewer) that we place the ortho plane.
-    const Vector2f orthoScale0   = Vector2f(1.f) / Vector2f(renderState.EyeRenderDesc[0].PixelsPerTanAngleAtCenter);
-    const Vector2f orthoScale1   = Vector2f(1.f) / Vector2f(renderState.EyeRenderDesc[1].PixelsPerTanAngleAtCenter);
-    
-    orthoProjection[0] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[0], orthoScale0, orthoDistance, renderState.EyeRenderDesc[0].HmdToEyeViewOffset.x);
-    orthoProjection[1] = ovrMatrix4f_OrthoSubProjection(perspectiveProjection[1], orthoScale1, orthoDistance, renderState.EyeRenderDesc[1].HmdToEyeViewOffset.x);
-}
-
-
-const uint8_t* HSWDisplay::GetDefaultTexture(size_t& TextureSize)
-{
-    TextureSize = sizeof(healthAndSafety_tga);
-    return healthAndSafety_tga;
-}
-
+#endif
 
 
 }} // namespace OVR::CAPI
 
 
+#if 0 // Now done by compositor
 
 
 //-------------------------------------------------------------------------------------
@@ -404,11 +386,11 @@ const uint8_t* HSWDisplay::GetDefaultTexture(size_t& TextureSize)
 //
 
 #if defined (OVR_OS_WIN32)
-    #include "D3D9/CAPI_D3D9_HSWDisplay.h"
     #include "D3D1X/CAPI_D3D11_HSWDisplay.h"
 #endif
 
 #include "GL/CAPI_GL_HSWDisplay.h"
+
 
 
 OVR::CAPI::HSWDisplay* OVR::CAPI::HSWDisplay::Factory(ovrRenderAPIType apiType, ovrHmd hmd, const OVR::CAPI::HMDRenderState& renderState)
@@ -427,7 +409,9 @@ OVR::CAPI::HSWDisplay* OVR::CAPI::HSWDisplay::Factory(ovrRenderAPIType apiType, 
 
     #if defined(OVR_OS_WIN32)
         case ovrRenderAPI_D3D9:
-            pHSWDisplay = new OVR::CAPI::D3D9::HSWDisplay(apiType, hmd, renderState);
+        case ovrRenderAPI_D3D10:
+            // Deprecated
+            OVR_ASSERT(false);
             break;
 
         case ovrRenderAPI_D3D11:
@@ -449,6 +433,7 @@ OVR::CAPI::HSWDisplay* OVR::CAPI::HSWDisplay::Factory(ovrRenderAPIType apiType, 
     return pHSWDisplay;
 }
 
+#endif
 
 
 

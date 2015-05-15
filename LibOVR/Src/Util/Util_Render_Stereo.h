@@ -334,11 +334,13 @@ struct DistortionMeshVertexData
 DistortionMeshVertexData DistortionMeshMakeVertex ( Vector2f screenNDC,
                                                     bool rightEye,
                                                     const HmdRenderInfo &hmdRenderInfo, 
-                                                    const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC );
+                                                    const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC,
+                                                    unsigned distortionCaps);
 
 void DistortionMeshCreate ( DistortionMeshVertexData **ppVertices, uint16_t **ppTriangleListIndices,
                             int *pNumVertices, int *pNumTriangles,
-                            const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo );
+                            const StereoEyeParams &stereoParams, const HmdRenderInfo &hmdRenderInfo,
+                            unsigned distortionCaps);
 
 // Generate distortion mesh for a eye.
 // This version requires less data then stereoParms, supporting dynamic change in render target viewport.
@@ -346,7 +348,8 @@ void DistortionMeshCreate( DistortionMeshVertexData **ppVertices, uint16_t **ppT
                            int *pNumVertices, int *pNumTriangles,
                            bool rightEye,
                            const HmdRenderInfo &hmdRenderInfo, 
-                           const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC );
+                           const DistortionRenderDesc &distortion, const ScaleAndOffset2D &eyeToSourceNDC,
+                           unsigned distortionCaps);
 
 void DistortionMeshDestroy ( DistortionMeshVertexData *pVertices, uint16_t *pTriangleMeshIndices );
 
@@ -415,89 +418,6 @@ PredictionValues PredictionGetDeviceValues ( const HmdRenderInfo &hmdRenderInfo,
 // TODO: deal with different handedness?
 Matrix4f TimewarpComputePoseDelta ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset );
 Matrix4f TimewarpComputePoseDeltaPosition ( Matrix4f const &renderedViewFromWorld, Matrix4f const &predictedViewFromWorld, Matrix4f const&hmdToEyeViewOffset );
-
-
-#if defined(OVR_ENABLE_TIMEWARP_MACHINE)
-// This is deprecated by DistortionTiming code. -cat
-
-// TimewarpMachine helps keep track of rendered frame timing and
-// handles predictions for time-warp rendering.
-class TimewarpMachine
-{
-public:
-    TimewarpMachine();
-   
-    // Call this on and every time something about the setup changes.
-    void        Reset ( HmdRenderInfo& renderInfo, bool vsyncEnabled, double timeNow );
-
-    // The only reliable time in most engines is directly after the frame-present and GPU flush-and-wait.
-    // This call should be done right after that to give this system the timing info it needs.
-    void        AfterPresentAndFlush(double timeNow);
-    // But some engines queue up the frame-present and only later find out when it actually happened.
-    // They should call these two at those times.
-    void        AfterPresentWithoutFlush();
-    void        AfterPresentFinishes(double timeNow);
-
-    // The "average" time the rendered frame will show up,
-    // and the predicted pose of the HMD at that time.
-    // You usually only need to call one of these functions.
-    double      GetViewRenderPredictionTime();
-    bool        GetViewRenderPredictionPose(Vision::TrackingStateReader* reader, Posef& transform);
-
-
-    // Timewarp prediction functions. You usually only need to call one of these three sets of functions.
-
-    // The predicted times that the first and last pixel will be visible on-screen.
-    double      GetVisiblePixelTimeStart();
-    double      GetVisiblePixelTimeEnd();
-    // Predicted poses of the HMD at those first and last pixels.
-	bool        GetPredictedVisiblePixelPoseStart(Vision::TrackingStateReader* reader, Posef& transform);
-	bool        GetPredictedVisiblePixelPoseEnd(Vision::TrackingStateReader* reader, Posef& transform);
-    // The delta matrices to feed to the timewarp distortion code,
-    // given the pose that was used for rendering.
-    // (usually the one returned by GetViewRenderPredictionPose() earlier)
-	bool        GetTimewarpDeltaStart(Vision::TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
-	bool        GetTimewarpDeltaEnd(Vision::TrackingStateReader* reader, Posef const &renderedPose, Matrix4f& transform);
-
-    // Just-In-Time distortion aims to delay the second sensor reading & distortion
-    // until the very last moment to improve prediction. However, it is a little scary,
-    // since the delay might wait too long and miss the vsync completely!
-    // Use of the JustInTime_* functions is entirely optional, and we advise allowing
-    // users to turn it off in their video options to cope with odd machine configurations.
-
-    // What time should the app wait until before starting distortion?
-    double      JustInTime_GetDistortionWaitUntilTime();
-
-    // Used to time the distortion rendering
-    bool        JustInTime_NeedDistortionTimeMeasurement() const;
-    void        JustInTime_BeforeDistortionTimeMeasurement(double timeNow);
-    void        JustInTime_AfterDistortionTimeMeasurement(double timeNow);
-    double      JustInTime_AverageDistortionTime();     // Just for profiling - use JustInTime_GetDistortionWaitUntilTime() for functionality.
-
-private:
-    bool                VsyncEnabled;
-    HmdRenderInfo       RenderInfo;
-    PredictionValues    CurrentPredictionValues;
-
-    enum { NumDistortionTimes = 100 };
-    int                 DistortionTimeCount;
-    double              DistortionTimeCurrentStart;
-    float               DistortionTimes[NumDistortionTimes];
-    float               DistortionTimeAverage;
-
-    // Pose at which last time the eye was rendered.
-    Posef               EyeRenderPoses[2];
-
-    // Absolute time of the last present+flush
-    double              LastFramePresentFlushTime;
-    // Seconds between present+flushes
-    float               PresentFlushToPresentFlushSeconds;
-    // Predicted absolute time of the next present+flush
-    double              NextFramePresentFlushTime;
-
-};
-
-#endif // OVR_ENABLE_TIMEWARP_MACHINE
 
 
 

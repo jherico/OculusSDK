@@ -74,8 +74,8 @@ void System::Init(Log* log, Allocator *palloc)
         }
 
         Log::SetGlobalLog(log);
-        Timer::initializeTimerSystem();
         Allocator::setInstance(palloc);
+        Timer::initializeTimerSystem();
     }
     else
     {
@@ -109,7 +109,9 @@ void System::Destroy()
 
         SystemShutdownListenerList = nullptr;
 
-        // Shutdown heap and destroy SysAlloc singleton, if any.
+        Timer::shutdownTimerSystem();
+
+		// Shutdown heap and destroy SysAlloc singleton, if any.
         Allocator::GetInstance()->onSystemShutdown();
         Allocator::setInstance(nullptr);
 
@@ -118,7 +120,6 @@ void System::Destroy()
             SymbolLookup::Shutdown();
         }
 
-        Timer::shutdownTimerSystem();
         Log::SetGlobalLog(Log::GetDefaultLog());
 
         if (Allocator::IsTrackingLeaks())

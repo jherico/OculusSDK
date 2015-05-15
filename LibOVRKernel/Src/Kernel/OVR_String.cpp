@@ -38,8 +38,7 @@ namespace OVR {
 
 #define String_LengthIsSize (size_t(1) << String::Flag_LengthIsSizeShift)
 
-String::DataDesc String::NullData = {String_LengthIsSize, 1, {0} };
-
+String::DataDesc String::NullData = {String_LengthIsSize, AtomicInt<int32_t>(1), {0} };
 
 String::String()
 {

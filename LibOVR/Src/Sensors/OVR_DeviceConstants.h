@@ -144,9 +144,9 @@ enum EyeCupType
 //-----------------------------------------------------------------------------
 // BodyFrameState
 //
-#pragma pack(push, 8)
-
-class SensorDataType
+// This structure needs to be the same size and layout on 32-bit and 64-bit arch.
+// Update OVR_PadCheck.cpp when updating this object.
+struct OVR_ALIGNAS(8) SensorDataType
 {
 public:
     SensorDataType() : Temperature(0.0f), AbsoluteTimeSeconds(0.0) { }
@@ -155,6 +155,7 @@ public:
     SensorDataType(const ovrSensorData& s);
     operator ovrSensorData () const;
 
+public:
     Vector3f Acceleration;     // in m/s^2
     Vector3f RotationRate;     // in rad/s
     Vector3f MagneticField;    // in Gauss
@@ -175,12 +176,9 @@ public:
     double   AbsoluteTimeSeconds;
 };
 
-static_assert((sizeof(SensorDataType) == 3*sizeof(Vector3f) + sizeof(float) + sizeof(double)), "sizeof(SensorDataType) failure");
+static_assert(sizeof(SensorDataType) == 3*sizeof(Vector3f) + 4 + 8, "size mismatch");
 
 
-
-
-#pragma pack(pop)
 
 
 } // namespace OVR

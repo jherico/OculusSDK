@@ -27,11 +27,11 @@ limitations under the License.
 #ifndef OVR_Vision_Common_h
 #define OVR_Vision_Common_h
 
-#include "Kernel/OVR_RefCount.h"
 #include "Extras/OVR_Math.h"
 #include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Log.h"
 #include "Sensors/OVR_DeviceConstants.h"
+#include "Util/Util_Stopwatch.h"
 
 // Compatible types (these are declared in global namespace)
 typedef struct ovrPoseStatef_ ovrPoseStatef;
@@ -72,94 +72,172 @@ struct ImuSample
     Vector3d Magnetometer;
     double Temperature;
 
-    ImuSample() : Time(-1), 
-                  Temperature(-1) {}
+    ImuSample() : 
+        Time(-1),
+        Accelerometer(),
+        Gyro(),
+        Magnetometer(),
+        Temperature(-1) {}
 
-    ImuSample(const SensorDataType& data) : Time(data.AbsoluteTimeSeconds),
-                                            Accelerometer(data.Acceleration),
-                                            Gyro(data.RotationRate),
-                                            Magnetometer(data.MagneticField),
-                                            Temperature(data.Temperature) {}
+    ImuSample(const SensorDataType& data) : 
+        Time(data.AbsoluteTimeSeconds),
+        Accelerometer(data.Acceleration),
+        Gyro(data.RotationRate),
+        Magnetometer(data.MagneticField),
+        Temperature(data.Temperature) {}
 };
 
+// vision pose result in the camera frame
 struct PoseSample
 {
-    double Time;
-    Posed ThePose;
-    Vector3d LinearVelocity, AngularVelocity;
+    double Time; // capture time in seconds
+    Posed CameraFromImu;
+    Vector3d Velocity; // linear velocity in m/s in the camera frame
+    Vector3d Omega; // angular velocity, Rodrigues representation, in rad/s
 
-    // stats for LED tracking
-    int LedsCount;
     double ObjectSpaceError;
-    // stats for sphere tracking
-    int ContourCount;
-    double CircleRadius;
+    int MatchCount; // number of LEDs used for reconstruction
 
-    bool HasOrientation, HasPosition, HasVelocities;
-    // true => ThePose == WorldFromImu, false => ThePose == CameraFromImu
-    bool IsInWorldFrame;
+    bool HasPosition, HasOrientation, HasVelocities;
+    Matrix3d PositionCovariance, OrientationCovariance;
 
-    void ApplyWorldFromCamera(const Posed& worldFromCamera)
-    {
-        OVR_ASSERT(!IsInWorldFrame);
+    // Extra information that is logged but not otherwise used by tracking system
+    double Stats[8];
 
-        IsInWorldFrame = true;
-        ThePose = worldFromCamera * ThePose;
-        if (HasVelocities)
-        {
-            LinearVelocity = worldFromCamera.Rotate(LinearVelocity);
-            AngularVelocity = worldFromCamera.Rotate(AngularVelocity);
-    }
-    }
-
-    friend PoseSample operator*(const PoseSample& sample, const Posed& trans)
-    {
-        PoseSample result = sample;
-        result.ThePose = sample.ThePose * trans;
-        // if we don't have orientation, the result will be useless - this is probably not expected to happen
-        OVR_ASSERT(sample.HasOrientation); 
-        result.HasPosition = sample.HasPosition && sample.HasOrientation;
-        return result;
-    }
-
-    PoseSample(double time = -1) : Time(time),
-                   LedsCount(-1),
-                   ObjectSpaceError(-1),
-                   ContourCount(-1),
-                   CircleRadius(-1),
-                   HasOrientation(false),
-                   HasPosition(false),
-                   HasVelocities(false),
-                   IsInWorldFrame(false) {}
-};
-
-struct PoseEstimate
-{
-    Posed WorldFromImu, CameraFromWorld;
-
-    bool HasPosition, HasOrientation, HasUp;
-
-    Posed CameraFromImu() const
-    {
-        return CameraFromWorld * WorldFromImu;
-    }
-
-    friend PoseEstimate operator*(const PoseEstimate& estimate, const Posed& trans)
-{
-    PoseEstimate result = estimate;
-    result.WorldFromImu = estimate.WorldFromImu * trans;
-    // if we don't have orientation, the result will be useless - this is probably not expected to happen
-    OVR_ASSERT(estimate.HasOrientation);
-    result.HasPosition = estimate.HasPosition && estimate.HasOrientation;
-    return result;
-    }
-
-    PoseEstimate(const Posed& worldFromCamera) :
-        CameraFromWorld(worldFromCamera.Inverted()),
+OVR_DISABLE_MSVC_WARNING(4351)
+    PoseSample() :
+        Time(-1),
+        CameraFromImu(),
+        Velocity(),
+        Omega(),
+        ObjectSpaceError(DBL_MAX),
+        MatchCount(-1),
         HasPosition(false),
         HasOrientation(false),
-        HasUp(false) {}
+        HasVelocities(false),
+        PositionCovariance(),
+        OrientationCovariance(),
+        Stats()
+    {
+    }
+OVR_RESTORE_MSVC_WARNING()
 };
+
+// vision pose result in the world frame
+struct PoseSampleWorld
+{
+    double Time; // capture time in seconds
+    Posed WorldFromImu;
+    Vector3d Velocity; // linear velocity in m/s
+    Vector3d Omega; // angular velocity, Rodrigues representation, in rad/s
+
+    bool HasPosition, HasOrientation, HasVelocities;
+    Matrix3d PositionCovariance, OrientationCovariance;
+
+    PoseSampleWorld() :
+        Time(-1),
+        WorldFromImu(),
+        Velocity(),
+        Omega(),
+        HasPosition(false),
+        HasOrientation(false),
+        HasVelocities(false),
+        PositionCovariance(),
+        OrientationCovariance()
+    {
+
+    }
+
+    PoseSampleWorld(const PoseSample& sample, const Posed& worldFromCamera) :
+        Time(sample.Time),
+        HasPosition(sample.HasPosition),
+        HasOrientation(sample.HasOrientation),
+        HasVelocities(sample.HasVelocities)
+    {
+        WorldFromImu = worldFromCamera * sample.CameraFromImu;
+        Velocity = worldFromCamera.Rotate(sample.Velocity);
+        Omega = worldFromCamera.Rotate(sample.Omega);
+
+        Matrix3d R = (Matrix3d)worldFromCamera.Rotation;
+        Matrix3d Rt = R.Transposed();
+        PositionCovariance = R * sample.PositionCovariance * Rt;
+        OrientationCovariance = R * sample.OrientationCovariance * Rt;
+    }
+};
+
+// vision pose prediction in the world frame
+struct PoseEstimateWorld
+{
+    double Time;        // capture time in seconds
+    Posed WorldFromImu; // Gravity aligned
+
+    bool HasPosition;       // WorldFromImu.Translation is valid
+    bool HasOrientation;    // WorldFromImu.Rotation is valid and gravity aligned
+    bool HasUp;             // WorldFromImu.Rotation is gravity aligned, but yaw is unknown
+
+    PoseEstimateWorld() :
+        Time(-1),
+        WorldFromImu(),
+        HasPosition(false),
+        HasOrientation(false),
+        HasUp(false)
+    {
+    }
+};
+
+// vision pose prediction in the camera frame (computed from PoseEstimateWorld)
+struct PoseEstimate
+{
+    double Time;            // capture time in seconds
+    Posed CameraFromImu;    // Gravity aligned
+    Vector3d UpInImu;       // direction of gravity in the IMU frame
+
+    bool HasPosition;       // WorldFromImu.Translation is valid
+    bool HasOrientation;    // WorldFromImu.Rotation is valid and gravity aligned
+    bool HasUp;             // WorldFromImu.Rotation is gravity aligned, but yaw is unknown
+
+    PoseEstimate() :
+        Time(-1),
+        CameraFromImu(),
+        UpInImu(),
+        HasPosition(false),
+        HasOrientation(false),
+        HasUp(false)
+    {
+    }
+
+    PoseEstimate(const PoseEstimateWorld& estimateWorld, const Posed& worldFromCamera)
+    {
+        Time = estimateWorld.Time;
+        CameraFromImu = worldFromCamera.Inverted() * estimateWorld.WorldFromImu;
+        UpInImu = estimateWorld.WorldFromImu.InverseRotate(Vector3d(0, 1, 0));
+        HasPosition = estimateWorld.HasPosition;
+        HasOrientation = estimateWorld.HasOrientation;
+        HasUp = estimateWorld.HasUp;
+    }
+};
+
+// PoseDistance functions
+//
+// Returns a distance between two poses, taking into account translation and rotation difference.
+// This is an estimate of the worst-case distance between any two points of a model of size scale
+// after being transformed by the two poses.
+// These functions return the sum of the translation distance and the displacement due
+// to the difference in rotation acting at a distance of arm, which should be roughly
+// half the distance across the object.
+// FIXME: Might be nice to add to Pose<T> in OVR_Math.h
+
+template<typename T>
+T PoseDistance(const Pose<T>& p1, const Pose<T>& p2, const T arm)
+{
+    return (p1.Translation.Distance(p2.Translation) + p1.Rotation.Angle(p2.Rotation) * arm);
+}
+
+template<typename T>
+T PoseDistance(const Matrix3<T>& R1, const Vector3<T>& t1, const Matrix3<T>& R2, const Vector3<T>& t2, const T arm)
+{
+    return (t1.Distance(t2) + R1.Angle(R2) * arm);
+}
 
 } // namespace OVR::Vision
 
@@ -167,7 +245,9 @@ struct PoseEstimate
 // point in time, including first and second derivatives. It is used to specify
 // instantaneous location and movement of the headset.
 // SensorState is returned as a part of the sensor state.
-
+//
+// This structure needs to be the same size and layout on 32-bit and 64-bit arch.
+// Update OVR_PadCheck.cpp when updating this object.
 template<class T>
 class PoseState
 {
@@ -229,15 +309,15 @@ public:
     }
 
     friend PoseState operator*(const Pose<T>& trans, const PoseState& poseState)
-{
+    {
         PoseState result;
-	result.ThePose             = trans * poseState.ThePose;
-	result.LinearVelocity      = trans.Rotate(poseState.LinearVelocity);
-	result.LinearAcceleration  = trans.Rotate(poseState.LinearAcceleration);
-	result.AngularVelocity     = trans.Rotate(poseState.AngularVelocity);
-	result.AngularAcceleration = trans.Rotate(poseState.AngularAcceleration);
-	return result;
-}
+        result.ThePose = trans * poseState.ThePose;
+        result.LinearVelocity = trans.Rotate(poseState.LinearVelocity);
+        result.LinearAcceleration = trans.Rotate(poseState.LinearAcceleration);
+        result.AngularVelocity = trans.Rotate(poseState.AngularVelocity);
+        result.AngularAcceleration = trans.Rotate(poseState.AngularAcceleration);
+        return result;
+    }
 };
 
 // External API returns pose as float, but uses doubles internally for quaternion precision.

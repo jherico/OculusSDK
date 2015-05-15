@@ -256,6 +256,9 @@ public:
 private:
     static Allocator* pInstance;
 
+protected:
+    Allocator() {}
+
 public:
     // Lock used during LibOVR execution to guard the tracked allocation list.
     Lock TrackLock;
@@ -422,8 +425,8 @@ public:
     void  Init();
     void  Shutdown();
 
-    void   SetDelayedFreeCount(size_t delayedFreeCount); // Sets how many freed blocks we should save before purging the oldest of them.
-    size_t GetDelayedFreeCount() const;
+    void   SetMaxDelayedFreeCount(size_t delayedFreeCount); // Sets how many freed blocks we should save before purging the oldest of them.
+    size_t GetMaxDelayedFreeCount() const;                  // Returns the max number of delayed free allocations before the oldest ones are purged (finally freed).
     void   EnableOverrunDetection(bool enableOverrunDetection, bool enableOverrunGuardBytes);  // enableOverrunDetection is by default. enableOverrunGuardBytes is enabled by default in debug builds.
 
     void*  Alloc(size_t size);
@@ -705,4 +708,4 @@ void  SafeMMapFree (const void* memory, size_t size);
 #pragma warning(pop)
 #endif
 
-#endif // OVR_Memory
+#endif // OVR_Allocator_h

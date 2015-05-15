@@ -215,7 +215,7 @@ Remarks:
 #endif
 #endif // MCGEN_DISABLE_PROVIDER_CODE_GENERATION
 //+
-// Provider OVR-SDK-LibOVR Event Count 19
+// Provider OVR-SDK-LibOVR Event Count 36
 //+
 EXTERN_C __declspec(selectany) const GUID LibOVRProvider = {0x553787fc, 0xd3d7, 0x4f5e, {0xac, 0xb2, 0x15, 0x97, 0xc7, 0x20, 0x9b, 0x3c}};
 
@@ -268,15 +268,23 @@ EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR DistortionEnd = {0x7, 0x0,
 #define DistortionEnd_value 0x7
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR HmdDesc = {0x8, 0x0, 0x11, 0x4, 0x11, 0x3, 0x4000000000000000};
 #define HmdDesc_value 0x8
-EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraFrameReceived = {0x9, 0x0, 0x11, 0x4, 0x12, 0x4, 0x4000000000000000};
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraFrameReceived_v0 = {0x9, 0x0, 0x11, 0x4, 0x12, 0x4, 0x4000000000000000};
+#define CameraFrameReceived_v0_value 0x9
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraFrameReceived = {0x9, 0x1, 0x11, 0x4, 0x12, 0x4, 0x4000000000000000};
 #define CameraFrameReceived_value 0x9
-EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBeginProcessing = {0xa, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBeginProcessing_v0 = {0xa, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraBeginProcessing_v0_value 0xa
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBeginProcessing = {0xa, 0x1, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
 #define CameraBeginProcessing_value 0xa
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraFrameRequest = {0xb, 0x0, 0x11, 0x4, 0x13, 0x4, 0x4000000000000000};
 #define CameraFrameRequest_value 0xb
-EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraEndProcessing = {0xc, 0x0, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraEndProcessing_v0 = {0xc, 0x0, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
+#define CameraEndProcessing_v0_value 0xc
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraEndProcessing = {0xc, 0x1, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
 #define CameraEndProcessing_value 0xc
-EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraSkippedFrames = {0xd, 0x0, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraSkippedFrames_v0 = {0xd, 0x0, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
+#define CameraSkippedFrames_v0_value 0xd
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraSkippedFrames = {0xd, 0x1, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
 #define CameraSkippedFrames_value 0xd
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR JSONChunk = {0xe, 0x0, 0x11, 0x4, 0xc, 0x3, 0x4000000000000000};
 #define JSONChunk_value 0xe
@@ -288,8 +296,34 @@ EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR LogErrorMessage = {0x11, 0
 #define LogErrorMessage_value 0x11
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR HmdTrackingState = {0x12, 0x0, 0x11, 0x4, 0xc, 0x3, 0x4000000000000000};
 #define HmdTrackingState_value 0x12
-EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBlobs = {0x13, 0x0, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBlobs_v0 = {0x13, 0x0, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
+#define CameraBlobs_v0_value 0x13
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBlobs = {0x13, 0x1, 0x11, 0x4, 0xc, 0x4, 0x4000000000000000};
 #define CameraBlobs_value 0x13
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBeginGlobalImageAquisition = {0x14, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraBeginGlobalImageAquisition_value 0x14
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraEndGlobalImageAquisition = {0x15, 0x0, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
+#define CameraEndGlobalImageAquisition_value 0x15
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR BeginCameraLEDMatching = {0x16, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define BeginCameraLEDMatching_value 0x16
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR EndCameraLEDMatching = {0x17, 0x0, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
+#define EndCameraLEDMatching_value 0x17
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraPoseChange = {0x18, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraPoseChange_value 0x18
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraClockSync = {0x19, 0x0, 0x11, 0x4, 0x10, 0x4, 0x4000000000000000};
+#define CameraClockSync_value 0x19
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraPoseReconstruction = {0x1a, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraPoseReconstruction_value 0x1a
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraPoseSensorFusion = {0x1b, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraPoseSensorFusion_value 0x1b
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraGetFrame = {0x1c, 0x0, 0x11, 0x4, 0x13, 0x4, 0x4000000000000000};
+#define CameraGetFrame_value 0x1c
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR CameraBeginBlobSegmentation = {0x1d, 0x0, 0x11, 0x4, 0xd, 0x4, 0x4000000000000000};
+#define CameraBeginBlobSegmentation_value 0x1d
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR PoseLatchCPUWrite = {0x1e, 0x0, 0x11, 0x4, 0xd, 0x2, 0x4000000000000000};
+#define PoseLatchCPUWrite_value 0x1e
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR PoseLatchGPULatchReadback = {0x1f, 0x0, 0x11, 0x4, 0x10, 0x2, 0x4000000000000000};
+#define PoseLatchGPULatchReadback_value 0x1f
 
 //
 // Note on Generate Code from Manifest Windows Vista and above
@@ -531,6 +565,20 @@ Remarks:
         : ERROR_SUCCESS\
 
 //
+// Enablement check macro for CameraFrameReceived_v0
+//
+
+#define EventEnabledCameraFrameReceived_v0() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraFrameReceived_v0
+//
+#define EventWriteCameraFrameReceived_v0(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        EventEnabledCameraFrameReceived_v0() ?\
+        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraFrameReceived_v0, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        : ERROR_SUCCESS\
+
+//
 // Enablement check macro for CameraFrameReceived
 //
 
@@ -539,9 +587,23 @@ Remarks:
 //
 // Event Macro for CameraFrameReceived
 //
-#define EventWriteCameraFrameReceived(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+#define EventWriteCameraFrameReceived(Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
         EventEnabledCameraFrameReceived() ?\
-        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraFrameReceived, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        Template_qddgg(OVR_SDK_LibOVRHandle, &CameraFrameReceived, Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraBeginProcessing_v0
+//
+
+#define EventEnabledCameraBeginProcessing_v0() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraBeginProcessing_v0
+//
+#define EventWriteCameraBeginProcessing_v0(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        EventEnabledCameraBeginProcessing_v0() ?\
+        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraBeginProcessing_v0, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
         : ERROR_SUCCESS\
 
 //
@@ -553,9 +615,9 @@ Remarks:
 //
 // Event Macro for CameraBeginProcessing
 //
-#define EventWriteCameraBeginProcessing(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+#define EventWriteCameraBeginProcessing(Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
         EventEnabledCameraBeginProcessing() ?\
-        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraBeginProcessing, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        Template_qddgg(OVR_SDK_LibOVRHandle, &CameraBeginProcessing, Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
         : ERROR_SUCCESS\
 
 //
@@ -573,6 +635,20 @@ Remarks:
         : ERROR_SUCCESS\
 
 //
+// Enablement check macro for CameraEndProcessing_v0
+//
+
+#define EventEnabledCameraEndProcessing_v0() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraEndProcessing_v0
+//
+#define EventWriteCameraEndProcessing_v0(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        EventEnabledCameraEndProcessing_v0() ?\
+        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraEndProcessing_v0, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        : ERROR_SUCCESS\
+
+//
 // Enablement check macro for CameraEndProcessing
 //
 
@@ -581,9 +657,23 @@ Remarks:
 //
 // Event Macro for CameraEndProcessing
 //
-#define EventWriteCameraEndProcessing(FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+#define EventWriteCameraEndProcessing(Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
         EventEnabledCameraEndProcessing() ?\
-        Template_fqggq(OVR_SDK_LibOVRHandle, &CameraEndProcessing, FrameRate, FrameNumber, ArrivalTimeSeconds, CaptureTime, LostFrames)\
+        Template_qddgg(OVR_SDK_LibOVRHandle, &CameraEndProcessing, Camera, FrameNumber, HmdFrameNumber, ArrivalTime, CaptureTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraSkippedFrames_v0
+//
+
+#define EventEnabledCameraSkippedFrames_v0() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraSkippedFrames_v0
+//
+#define EventWriteCameraSkippedFrames_v0(RequestNumber, FrameCounter, LastFrameNumber)\
+        EventEnabledCameraSkippedFrames_v0() ?\
+        Template_xxq(OVR_SDK_LibOVRHandle, &CameraSkippedFrames_v0, RequestNumber, FrameCounter, LastFrameNumber)\
         : ERROR_SUCCESS\
 
 //
@@ -595,9 +685,9 @@ Remarks:
 //
 // Event Macro for CameraSkippedFrames
 //
-#define EventWriteCameraSkippedFrames(RequestNumber, FrameCounter, LastFrameNumber)\
+#define EventWriteCameraSkippedFrames(Camera, LastFrameNumber)\
         EventEnabledCameraSkippedFrames() ?\
-        Template_xxq(OVR_SDK_LibOVRHandle, &CameraSkippedFrames, RequestNumber, FrameCounter, LastFrameNumber)\
+        Template_qq(OVR_SDK_LibOVRHandle, &CameraSkippedFrames, Camera, LastFrameNumber)\
         : ERROR_SUCCESS\
 
 //
@@ -671,6 +761,20 @@ Remarks:
         : ERROR_SUCCESS\
 
 //
+// Enablement check macro for CameraBlobs_v0
+//
+
+#define EventEnabledCameraBlobs_v0() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraBlobs_v0
+//
+#define EventWriteCameraBlobs_v0(BlobCount, PositionX, PositionY, Size)\
+        EventEnabledCameraBlobs_v0() ?\
+        Template_qGR0GR0DR0(OVR_SDK_LibOVRHandle, &CameraBlobs_v0, BlobCount, PositionX, PositionY, Size)\
+        : ERROR_SUCCESS\
+
+//
 // Enablement check macro for CameraBlobs
 //
 
@@ -679,9 +783,177 @@ Remarks:
 //
 // Event Macro for CameraBlobs
 //
-#define EventWriteCameraBlobs(BlobCount, PositionX, PositionY, Size)\
+#define EventWriteCameraBlobs(Camera, FrameNumber, ArrivalTime, Width, Height, BlobCount, PositionX, PositionY, Size)\
         EventEnabledCameraBlobs() ?\
-        Template_qGR0GR0DR0(OVR_SDK_LibOVRHandle, &CameraBlobs, BlobCount, PositionX, PositionY, Size)\
+        Template_qdgddqGR5GR5DR5(OVR_SDK_LibOVRHandle, &CameraBlobs, Camera, FrameNumber, ArrivalTime, Width, Height, BlobCount, PositionX, PositionY, Size)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraBeginGlobalImageAquisition
+//
+
+#define EventEnabledCameraBeginGlobalImageAquisition() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraBeginGlobalImageAquisition
+//
+#define EventWriteCameraBeginGlobalImageAquisition(AttachedCameras, CapturedFrames, CaptureTime)\
+        EventEnabledCameraBeginGlobalImageAquisition() ?\
+        Template_qqg(OVR_SDK_LibOVRHandle, &CameraBeginGlobalImageAquisition, AttachedCameras, CapturedFrames, CaptureTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraEndGlobalImageAquisition
+//
+
+#define EventEnabledCameraEndGlobalImageAquisition() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraEndGlobalImageAquisition
+//
+#define EventWriteCameraEndGlobalImageAquisition(AttachedCameras, CapturedFrames, CaptureTime)\
+        EventEnabledCameraEndGlobalImageAquisition() ?\
+        Template_qqg(OVR_SDK_LibOVRHandle, &CameraEndGlobalImageAquisition, AttachedCameras, CapturedFrames, CaptureTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for BeginCameraLEDMatching
+//
+
+#define EventEnabledBeginCameraLEDMatching() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for BeginCameraLEDMatching
+//
+#define EventWriteBeginCameraLEDMatching(Camera, MatchPass, TrackedObject, MatchCount)\
+        EventEnabledBeginCameraLEDMatching() ?\
+        Template_qqqq(OVR_SDK_LibOVRHandle, &BeginCameraLEDMatching, Camera, MatchPass, TrackedObject, MatchCount)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for EndCameraLEDMatching
+//
+
+#define EventEnabledEndCameraLEDMatching() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for EndCameraLEDMatching
+//
+#define EventWriteEndCameraLEDMatching(Camera, MatchPass, TrackedObject, MatchCount)\
+        EventEnabledEndCameraLEDMatching() ?\
+        Template_qqqq(OVR_SDK_LibOVRHandle, &EndCameraLEDMatching, Camera, MatchPass, TrackedObject, MatchCount)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraPoseChange
+//
+
+#define EventEnabledCameraPoseChange() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraPoseChange
+//
+#define EventWriteCameraPoseChange(Camera, NewQuat, NewTrans, OldQuat, OldTrans)\
+        EventEnabledCameraPoseChange() ?\
+        Template_qG4G3G4G3(OVR_SDK_LibOVRHandle, &CameraPoseChange, Camera, NewQuat, NewTrans, OldQuat, OldTrans)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraClockSync
+//
+
+#define EventEnabledCameraClockSync() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraClockSync
+//
+#define EventWriteCameraClockSync(Camera, TrackedObject, HmdFrameNumber, CaptureTime)\
+        EventEnabledCameraClockSync() ?\
+        Template_qqdg(OVR_SDK_LibOVRHandle, &CameraClockSync, Camera, TrackedObject, HmdFrameNumber, CaptureTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraPoseReconstruction
+//
+
+#define EventEnabledCameraPoseReconstruction() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraPoseReconstruction
+//
+#define EventWriteCameraPoseReconstruction(Camera, TrackedObject, HasPosition, HasOrientation, HasVelocities, ObjectSpaceError, MatchCount)\
+        EventEnabledCameraPoseReconstruction() ?\
+        Template_qqtttgd(OVR_SDK_LibOVRHandle, &CameraPoseReconstruction, Camera, TrackedObject, HasPosition, HasOrientation, HasVelocities, ObjectSpaceError, MatchCount)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraPoseSensorFusion
+//
+
+#define EventEnabledCameraPoseSensorFusion() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraPoseSensorFusion
+//
+#define EventWriteCameraPoseSensorFusion(Camera, TrackedObject)\
+        EventEnabledCameraPoseSensorFusion() ?\
+        Template_qq(OVR_SDK_LibOVRHandle, &CameraPoseSensorFusion, Camera, TrackedObject)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraGetFrame
+//
+
+#define EventEnabledCameraGetFrame() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraGetFrame
+//
+#define EventWriteCameraGetFrame(Camera, LastFrameNumber)\
+        EventEnabledCameraGetFrame() ?\
+        Template_qq(OVR_SDK_LibOVRHandle, &CameraGetFrame, Camera, LastFrameNumber)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for CameraBeginBlobSegmentation
+//
+
+#define EventEnabledCameraBeginBlobSegmentation() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for CameraBeginBlobSegmentation
+//
+#define EventWriteCameraBeginBlobSegmentation(Camera, LastFrameNumber)\
+        EventEnabledCameraBeginBlobSegmentation() ?\
+        Template_qq(OVR_SDK_LibOVRHandle, &CameraBeginBlobSegmentation, Camera, LastFrameNumber)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for PoseLatchCPUWrite
+//
+
+#define EventEnabledPoseLatchCPUWrite() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for PoseLatchCPUWrite
+//
+#define EventWritePoseLatchCPUWrite(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)\
+        EventEnabledPoseLatchCPUWrite() ?\
+        Template_qqdfffg(OVR_SDK_LibOVRHandle, &PoseLatchCPUWrite, ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)\
+        : ERROR_SUCCESS\
+
+//
+// Enablement check macro for PoseLatchGPULatchReadback
+//
+
+#define EventEnabledPoseLatchGPULatchReadback() ((OVR_SDK_LibOVREnableBits[0] & 0x00000001) != 0)
+
+//
+// Event Macro for PoseLatchGPULatchReadback
+//
+#define EventWritePoseLatchGPULatchReadback(ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)\
+        EventEnabledPoseLatchGPULatchReadback() ?\
+        Template_qqdfffg(OVR_SDK_LibOVRHandle, &PoseLatchGPULatchReadback, ThreadId, Sequence, Layer, MotionSensorTime, PredictedScanlineFirst, PredictedScanlineLast, OVREventTime)\
         : ERROR_SUCCESS\
 
 #endif // MCGEN_DISABLE_PROVIDER_CODE_GENERATION
@@ -806,7 +1078,7 @@ Template_qlls24llqqqdd(
 #endif
 
 //
-//Template from manifest : CameraFrameData
+//Template from manifest : CameraFrameData_v0
 //
 #ifndef Template_fqggq_def
 #define Template_fqggq_def
@@ -837,6 +1109,41 @@ Template_fqggq(
     EventDataDescCreate(&EventData[4], &_Arg4, sizeof(const unsigned int)  );
 
     return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_fqggq, EventData);
+}
+#endif
+
+//
+//Template from manifest : CameraFrameData
+//
+#ifndef Template_qddgg_def
+#define Template_qddgg_def
+ETW_INLINE
+ULONG
+Template_qddgg(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const signed int  _Arg1,
+    _In_ const signed int  _Arg2,
+    _In_ const double  _Arg3,
+    _In_ const double  _Arg4
+    )
+{
+#define ARGUMENT_COUNT_qddgg 5
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qddgg];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const double)  );
+
+    EventDataDescCreate(&EventData[4], &_Arg4, sizeof(const double)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qddgg, EventData);
 }
 #endif
 
@@ -1000,7 +1307,7 @@ Template_gF4F3F3F3F4F3F3F3F3ffqq(
 #endif
 
 //
-//Template from manifest : CameraBlobs
+//Template from manifest : CameraBlobs_v0
 //
 #ifndef Template_qGR0GR0DR0_def
 #define Template_qGR0GR0DR0_def
@@ -1028,6 +1335,263 @@ Template_qGR0GR0DR0(
     EventDataDescCreate(&EventData[3],  _Arg3, sizeof(const signed int)*_Arg0);
 
     return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qGR0GR0DR0, EventData);
+}
+#endif
+
+//
+//Template from manifest : CameraBlobs
+//
+#ifndef Template_qdgddqGR5GR5DR5_def
+#define Template_qdgddqGR5GR5DR5_def
+ETW_INLINE
+ULONG
+Template_qdgddqGR5GR5DR5(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const signed int  _Arg1,
+    _In_ const double  _Arg2,
+    _In_ const signed int  _Arg3,
+    _In_ const signed int  _Arg4,
+    _In_ const unsigned int  _Arg5,
+    _In_reads_(_Arg5) const double *_Arg6,
+    _In_reads_(_Arg5) const double *_Arg7,
+    _In_reads_(_Arg5) const signed int *_Arg8
+    )
+{
+#define ARGUMENT_COUNT_qdgddqGR5GR5DR5 9
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qdgddqGR5GR5DR5];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const double)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[4], &_Arg4, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[5], &_Arg5, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[6],  _Arg6, sizeof(const double)*_Arg5);
+
+    EventDataDescCreate(&EventData[7],  _Arg7, sizeof(const double)*_Arg5);
+
+    EventDataDescCreate(&EventData[8],  _Arg8, sizeof(const signed int)*_Arg5);
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qdgddqGR5GR5DR5, EventData);
+}
+#endif
+
+//
+//Template from manifest : GlobalImageAquisition
+//
+#ifndef Template_qqg_def
+#define Template_qqg_def
+ETW_INLINE
+ULONG
+Template_qqg(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const unsigned int  _Arg1,
+    _In_ const double  _Arg2
+    )
+{
+#define ARGUMENT_COUNT_qqg 3
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qqg];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const double)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qqg, EventData);
+}
+#endif
+
+//
+//Template from manifest : LEDMatching
+//
+#ifndef Template_qqqq_def
+#define Template_qqqq_def
+ETW_INLINE
+ULONG
+Template_qqqq(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const unsigned int  _Arg1,
+    _In_ const unsigned int  _Arg2,
+    _In_ const unsigned int  _Arg3
+    )
+{
+#define ARGUMENT_COUNT_qqqq 4
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qqqq];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const unsigned int)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qqqq, EventData);
+}
+#endif
+
+//
+//Template from manifest : CameraPoseChange
+//
+#ifndef Template_qG4G3G4G3_def
+#define Template_qG4G3G4G3_def
+ETW_INLINE
+ULONG
+Template_qG4G3G4G3(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_reads_(4) const double *_Arg1,
+    _In_reads_(3) const double *_Arg2,
+    _In_reads_(4) const double *_Arg3,
+    _In_reads_(3) const double *_Arg4
+    )
+{
+#define ARGUMENT_COUNT_qG4G3G4G3 5
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qG4G3G4G3];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1],  _Arg1, sizeof(const double)*4);
+
+    EventDataDescCreate(&EventData[2],  _Arg2, sizeof(const double)*3);
+
+    EventDataDescCreate(&EventData[3],  _Arg3, sizeof(const double)*4);
+
+    EventDataDescCreate(&EventData[4],  _Arg4, sizeof(const double)*3);
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qG4G3G4G3, EventData);
+}
+#endif
+
+//
+//Template from manifest : CameraClockSync
+//
+#ifndef Template_qqdg_def
+#define Template_qqdg_def
+ETW_INLINE
+ULONG
+Template_qqdg(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const unsigned int  _Arg1,
+    _In_ const signed int  _Arg2,
+    _In_ const double  _Arg3
+    )
+{
+#define ARGUMENT_COUNT_qqdg 4
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qqdg];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const double)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qqdg, EventData);
+}
+#endif
+
+//
+//Template from manifest : CameraPoseReconstruction
+//
+#ifndef Template_qqtttgd_def
+#define Template_qqtttgd_def
+ETW_INLINE
+ULONG
+Template_qqtttgd(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const unsigned int  _Arg1,
+    _In_ const BOOL  _Arg2,
+    _In_ const BOOL  _Arg3,
+    _In_ const BOOL  _Arg4,
+    _In_ const double  _Arg5,
+    _In_ const signed int  _Arg6
+    )
+{
+#define ARGUMENT_COUNT_qqtttgd 7
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qqtttgd];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const BOOL)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const BOOL)  );
+
+    EventDataDescCreate(&EventData[4], &_Arg4, sizeof(const BOOL)  );
+
+    EventDataDescCreate(&EventData[5], &_Arg5, sizeof(const double)  );
+
+    EventDataDescCreate(&EventData[6], &_Arg6, sizeof(const signed int)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qqtttgd, EventData);
+}
+#endif
+
+//
+//Template from manifest : PoseLatch
+//
+#ifndef Template_qqdfffg_def
+#define Template_qqdfffg_def
+ETW_INLINE
+ULONG
+Template_qqdfffg(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor,
+    _In_ const unsigned int  _Arg0,
+    _In_ const unsigned int  _Arg1,
+    _In_ const signed int  _Arg2,
+    _In_ const float  _Arg3,
+    _In_ const float  _Arg4,
+    _In_ const float  _Arg5,
+    _In_ const double  _Arg6
+    )
+{
+#define ARGUMENT_COUNT_qqdfffg 7
+
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_qqdfffg];
+
+    EventDataDescCreate(&EventData[0], &_Arg0, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[1], &_Arg1, sizeof(const unsigned int)  );
+
+    EventDataDescCreate(&EventData[2], &_Arg2, sizeof(const signed int)  );
+
+    EventDataDescCreate(&EventData[3], &_Arg3, sizeof(const float)  );
+
+    EventDataDescCreate(&EventData[4], &_Arg4, sizeof(const float)  );
+
+    EventDataDescCreate(&EventData[5], &_Arg5, sizeof(const float)  );
+
+    EventDataDescCreate(&EventData[6], &_Arg6, sizeof(const double)  );
+
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_qqdfffg, EventData);
 }
 #endif
 
@@ -1074,3 +1638,15 @@ Template_qGR0GR0DR0(
 #define MSG_OVR_SDK_LibOVR_event_17_message  0xB0000011L
 #define MSG_OVR_SDK_LibOVR_event_18_message  0xB0000012L
 #define MSG_OVR_SDK_LibOVR_event_19_message  0xB0000013L
+#define MSG_OVR_SDK_LibOVR_event_20_message  0xB0000014L
+#define MSG_OVR_SDK_LibOVR_event_21_message  0xB0000015L
+#define MSG_OVR_SDK_LibOVR_event_22_message  0xB0000016L
+#define MSG_OVR_SDK_LibOVR_event_23_message  0xB0000017L
+#define MSG_OVR_SDK_LibOVR_event_24_message  0xB0000018L
+#define MSG_OVR_SDK_LibOVR_event_25_message  0xB0000019L
+#define MSG_OVR_SDK_LibOVR_event_26_message  0xB000001AL
+#define MSG_OVR_SDK_LibOVR_event_27_message  0xB000001BL
+#define MSG_OVR_SDK_LibOVR_event_28_message  0xB000001CL
+#define MSG_OVR_SDK_LibOVR_event_29_message  0xB000001DL
+#define MSG_OVR_SDK_LibOVR_event_30_message  0xB000001EL
+#define MSG_OVR_SDK_LibOVR_event_31_message  0xB000001FL

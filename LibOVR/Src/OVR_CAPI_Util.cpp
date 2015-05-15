@@ -43,12 +43,22 @@ ovrMatrix4f ovrMatrix4f_Projection(ovrFovPort fov, float znear, float zfar, unsi
     return OVR::CreateProjection(rightHanded , isOpenGL, fov, OVR::StereoEye_Center, znear, zfar, flipZ, farAtInfinity);
 }
 
+ovrTimewarpProjectionDesc ovrTimewarpProjectionDesc_FromProjection(ovrMatrix4f Projection)
+{
+    ovrTimewarpProjectionDesc res;
+    res.Projection22 = Projection.M[2][2];
+    res.Projection23 = Projection.M[2][3];
+    res.Projection32 = Projection.M[3][2];
+    return res;
+}
 
 ovrMatrix4f ovrMatrix4f_OrthoSubProjection(ovrMatrix4f projection, ovrVector2f orthoScale,
-                                                      float orthoDistance, float hmdToEyeViewOffsetX)
+                                           float orthoDistance, float hmdToEyeViewOffsetX)
 {
     ovrMatrix4f ortho;
-    float orthoHorizontalOffset = hmdToEyeViewOffsetX / orthoDistance;
+    // Negative sign is correct!
+    // If the eye is offset to the left, then the ortho view needs to be offset to the right relative to the camera.
+    float orthoHorizontalOffset = -hmdToEyeViewOffsetX / orthoDistance;
 
     /*
     // Current projection maps real-world vector (x,y,1) to the RT.
@@ -96,6 +106,41 @@ ovrMatrix4f ovrMatrix4f_OrthoSubProjection(ovrMatrix4f projection, ovrVector2f o
 }
 
 
+void ovr_CalcEyePoses(ovrPosef headPose,
+                      const ovrVector3f hmdToEyeViewOffset[2],
+                      ovrPosef outEyePoses[2])
+{
+    if (!hmdToEyeViewOffset || !outEyePoses)
+    {        
+        return;
+    }
+
+    using OVR::Posef;
+    using OVR::Vector3f;
+
+    // Currently HmdToEyeViewOffset is only a 3D vector
+    outEyePoses[0] = Posef(headPose.Orientation, ((Posef)headPose).Apply((Vector3f)hmdToEyeViewOffset[0]));
+    outEyePoses[1] = Posef(headPose.Orientation, ((Posef)headPose).Apply((Vector3f)hmdToEyeViewOffset[1]));
+}
+
+
+void ovrHmd_GetEyePoses(ovrHmd hmd, unsigned int frameIndex,
+                        const ovrVector3f hmdToEyeViewOffset[2],
+                        ovrPosef outEyePoses[2],
+                        ovrTrackingState* outHmdTrackingState)
+{
+    ovrFrameTiming   ftiming = ovrHmd_GetFrameTiming(hmd, frameIndex);
+    ovrTrackingState hmdState = ovrHmd_GetTrackingState(hmd, ftiming.DisplayMidpointSeconds);
+    ovr_CalcEyePoses(hmdState.HeadPose.ThePose, hmdToEyeViewOffset, outEyePoses);
+    if ( outHmdTrackingState != nullptr )
+    {
+        *outHmdTrackingState = hmdState;
+    }
+}
+
+
+
+
 double ovr_WaitTillTime(double absTime)
 {
     double       initialTime = ovr_GetTimeInSeconds();
@@ -119,6 +164,7 @@ double ovr_WaitTillTime(double absTime)
 
     return (newTime - initialTime);
 }
+
 
 
 

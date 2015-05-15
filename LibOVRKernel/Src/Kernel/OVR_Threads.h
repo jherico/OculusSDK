@@ -430,6 +430,12 @@ protected:
 // comparison purposes.
 ThreadId GetCurrentThreadId();
 
+// Returns the unique Id of the current running process.
+#if !defined(OVR_OS_MS)
+#define GetCurrentProcessId getpid
+#endif
+
+
 
 } // OVR
 

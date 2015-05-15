@@ -151,6 +151,8 @@ public:
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedEventHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_InvalidTraits > ScopedFileHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedProcessHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedThreadHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedSemaphoreHANDLE;
 
 // Scoped registry keys
 class ScopedHKEY

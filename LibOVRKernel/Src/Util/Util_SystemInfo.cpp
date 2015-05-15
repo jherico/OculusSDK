@@ -113,7 +113,9 @@ uint64_t GetGuidInt()
     {
         lastTime = Timer::GetTicksNanos();
         Thread::MSleep(1);
-        Thread::MSleep(0);
+        // Note this does not actually sleep for "only" 1 millisecond
+        // necessarily.  Since we do not call timeBeginPeriod(1) explicitly
+        // before invoking this function it may be sleeping for 10+ milliseconds.
         thisTime = Timer::GetTicksNanos();
         uint64_t diff = thisTime - lastTime;
         unsigned int diff4Bits = (unsigned int)(diff & 15);
@@ -124,6 +126,7 @@ uint64_t GetGuidInt()
 
     return g;
 }
+
 String GetGuidString()
 {
     uint64_t guid = GetGuidInt();
@@ -139,7 +142,7 @@ String GetGuidString()
 
 const char * GetProcessInfo()
 {
-	#if defined (OVR_CPU_X86_64	)
+#if defined (OVR_CPU_X86_64	)
     return "64 bit";
 #elif defined (OVR_CPU_X86)
     return "32 bit";
@@ -237,18 +240,18 @@ String GetCameraDriverVersion()
 // From http://stackoverflow.com/questions/9524309/enumdisplaydevices-function-not-working-for-me
 void GetGraphicsCardList( Array< String > &gpus)
 {
-	gpus.Clear();
+    gpus.Clear();
 
-	DISPLAY_DEVICEA dd;
+    DISPLAY_DEVICEA dd;
 
-	dd.cb = sizeof(dd);
+    dd.cb = sizeof(dd);
 
-	DWORD deviceNum = 0;
-	while( EnumDisplayDevicesA(NULL, deviceNum, &dd, 0) ){
+    DWORD deviceNum = 0;
+    while( EnumDisplayDevicesA(NULL, deviceNum, &dd, 0) ){
         if (dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
-		    gpus.PushBack(dd.DeviceString);
-		deviceNum++;
-	}
+            gpus.PushBack(dd.DeviceString);
+        deviceNum++;
+    }
 }
 
 

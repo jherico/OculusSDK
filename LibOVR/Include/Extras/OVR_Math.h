@@ -1547,7 +1547,7 @@ public:
     // Call with nullptr if a return value is not needed.
     void GetYawPitchRoll(T* yaw, T* pitch, T* roll) const
     {
-        return GetEulerAngles(yaw, pitch, roll, Rotate_CCW, Handed_R);
+        return GetEulerAngles<Axis_Y, Axis_X, Axis_Z, Rotate_CCW, Handed_R>(yaw, pitch, roll);
     }
 
     // GetEulerAngles extracts Euler angles from the quaternion, in the specified order of
@@ -1671,9 +1671,11 @@ OVR_MATH_STATIC_ASSERT((sizeof(Quatd) == 4*sizeof(double)), "sizeof(Quatd) failu
 
 //-------------------------------------------------------------------------------------
 // ***** Pose
-
+//
 // Position and orientation combined.
-
+//
+// This structure needs to be the same size and layout on 32-bit and 64-bit arch.
+// Update OVR_PadCheck.cpp when updating this object.
 template<class T>
 class Pose
 {
@@ -1695,6 +1697,9 @@ public:
     static Pose Identity() { return Pose(Quat<T>(0, 0, 0, 1), Vector3<T>(0, 0, 0)); }
 
     void SetIdentity() { Rotation = Quat<T>(0, 0, 0, 1); Translation = Vector3<T>(0, 0, 0); }
+
+    // used to make things obviously broken if someone tries to use the value
+    void SetInvalid() { Rotation = Quat<T>(NAN, NAN, NAN, NAN); Translation = Vector3<T>(NAN, NAN, NAN); }
 
     bool IsEqual(const Pose&b, T tolerance = Math<T>::Tolerance())
     {

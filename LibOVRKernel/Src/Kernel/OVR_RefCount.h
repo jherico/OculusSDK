@@ -62,7 +62,7 @@ class   RefCountNTSImpl;
 class RefCountImplCore
 {
 protected:
-   volatile int RefCount;
+   AtomicInt<int> RefCount;
 
 public:
     // RefCountImpl constructor always initializes RefCount to 1 by default.

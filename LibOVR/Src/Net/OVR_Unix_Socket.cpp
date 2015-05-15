@@ -492,6 +492,33 @@ int TCPSocket::Send(const void* pData, int bytes)
 	}
 }
 
+int TCPSocket::Send(const void** buffers, int* buffersLengths, int bufferCount)
+{
+    int TotalLen = 0;
+    for (int i = 0; i < bufferCount; i++)
+    {
+        OVR_ASSERT(buffersLengths[i] > 0);
+        TotalLen += buffersLengths[i];
+    }
+
+    unsigned char* pkt = (unsigned char*)OVR_malloca(TotalLen);
+    if (pkt)
+    {
+        int i, progress;
+        for (i = 0, progress = 0; i < bufferCount; i++)
+        {
+            if (buffersLengths[i] > 0)
+            {
+                memcpy(pkt + progress, buffers[i], buffersLengths[i]);
+                progress += buffersLengths[i];
+            }
+        }
+
+        return static_cast<int>(send(TheSocket, (const char*)pkt, TotalLen, 0));
+    }
+
+    return -1;
+}
 
 //// TCPSocketPollState
 

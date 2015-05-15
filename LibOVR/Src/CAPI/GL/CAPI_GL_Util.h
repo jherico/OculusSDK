@@ -138,7 +138,6 @@ struct RenderParams
 #endif
 
     ovrSizei    BackBufferSize;
-    int    Multisample;
 };
 
 
@@ -170,6 +169,7 @@ public:
     RenderParams* pParams;
     GLuint        TexId;
     int           Width, Height;
+    GLenum        TexTarget;
 
     Texture(RenderParams* rp, int w, int h);
     ~Texture();

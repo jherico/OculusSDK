@@ -25,13 +25,24 @@ limitations under the License.
 
 #include "OVR_CAPI.h"
 #include "OVR_Version.h"
+#include "OVR_ErrorCode.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
 
 #if defined(_WIN32)
+    #if defined(_MSC_VER)
+        #pragma warning(push, 0)
+    #endif
     #include <Windows.h>
+    #if defined(_MSC_VER)
+        #pragma warning(pop)
+    #endif
+
+    #include "../Include/OVR_CAPI_D3D.h"
 #else
     #if defined(__APPLE__)
         #include <mach-o/dyld.h>
@@ -44,6 +55,7 @@ limitations under the License.
     #include <sys/stat.h>
     #include <unistd.h>
 #endif
+#include "../Include/OVR_CAPI_GL.h"
 
 
 #if defined(_MSC_VER)
@@ -162,7 +174,6 @@ limitations under the License.
     }
 
 
-#if defined(__APPLE__) || defined(OVR_ENABLE_DEVELOPER_SEARCH)
 static size_t OVR_strlcpy(char* dest, const char* src, size_t destsize)
 {
     const char* s = src;
@@ -186,30 +197,27 @@ static size_t OVR_strlcpy(char* dest, const char* src, size_t destsize)
 
     return (size_t)((s - src) - 1);
 }
-#endif // __APPLE__ || OVR_ENABLE_DEVELOPER_SEARCH
 
 
-#if defined(__APPLE__) // Currently used on Apple only.
-    static size_t OVR_strlcat(char* dest, const char* src, size_t destsize)
+static size_t OVR_strlcat(char* dest, const char* src, size_t destsize)
+{
+    const size_t d = destsize ? strlen(dest) : 0;
+    const size_t s = strlen(src);
+    const size_t t = s + d;
+
+    if(t < destsize)
+        memcpy(dest + d, src, (s + 1) * sizeof(*src));
+    else
     {
-        const size_t d = destsize ? strlen(dest) : 0;
-        const size_t s = strlen(src);
-        const size_t t = s + d;
-
-        if(t < destsize)
-            memcpy(dest + d, src, (s + 1) * sizeof(*src));
-        else
+        if(destsize)
         {
-            if(destsize)
-            {
-                memcpy(dest + d, src, ((destsize - d) - 1) * sizeof(*src));
-                dest[destsize - 1] = 0;
-            }
+            memcpy(dest + d, src, ((destsize - d) - 1) * sizeof(*src));
+            dest[destsize - 1] = 0;
         }
-
-        return t;
     }
-#endif
+
+    return t;
+}
 
 
 #if defined(__APPLE__)
@@ -472,7 +480,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
 {
     ModuleHandleType moduleHandle;
     int printfResult;
-    FilePathCharType developerDir[OVR_MAX_PATH];
+    FilePathCharType developerDir[OVR_MAX_PATH] = { '\0' };
 
     #if defined(_MSC_VER)
         #if defined(_WIN64)
@@ -492,52 +500,64 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
 
     moduleHandle = ModuleHandleTypeNull;
     if(libraryPathCapacity)
-    libraryPath[0] = '\0';
+        libraryPath[0] = '\0';
     
-    // Support checking for a developer library location override via the OVR_SDK_ROOT environment variable.
-    developerDir[0] = '\0';
+    // Note: OVR_ENABLE_DEVELOPER_SEARCH is deprecated in favor of the simpler LIBOVR_DLL_DIR, as the edge
+    // case uses of the former created some complications that may be best solved by simply using a LIBOVR_DLL_DIR
+    // environment variable which the user can set in their debugger or system environment variables.
+    #if (defined(_MSC_VER) || defined(_WIN32)) && !defined(OVR_FILE_PATH_SEPARATOR)
+        #define OVR_FILE_PATH_SEPARATOR "\\"
+    #else
+        #define OVR_FILE_PATH_SEPARATOR "/"
+    #endif
 
-    #if defined(OVR_ENABLE_DEVELOPER_SEARCH)
     {
-        #if (defined(_MSC_VER) || defined(_WIN32)) && !defined(OVR_FILE_PATH_SEPARATOR)
-            #define OVR_FILE_PATH_SEPARATOR "\\"
-        #else
-            #define OVR_FILE_PATH_SEPARATOR "/"
-        #endif
-
-        char sdkRoot[OVR_MAX_PATH];
-        const char* pSDKRootEnv = getenv("OVR_SDK_ROOT"); // Example value: /dev/OculusSDK/0.4/Main/
+        const char* pLibOvrDllDir = getenv("LIBOVR_DLL_DIR"); // Example value: /dev/OculusSDK/Main/LibOVR/Mac/Debug/
+           
+        if(pLibOvrDllDir)
+        {
+            char developerDir8[OVR_MAX_PATH];
+            size_t length = OVR_strlcpy(developerDir8, pLibOvrDllDir, sizeof(developerDir8)); // If missing a trailing path separator then append one.
         
-        if(pSDKRootEnv)
-        {
-            size_t length = OVR_strlcpy(sdkRoot, pSDKRootEnv, sizeof(sdkRoot));
-            
-            if((length > 0) || (length < sizeof(sdkRoot)))
+            if((length > 0) && (length < sizeof(developerDir8)) && (developerDir8[length - 1] != OVR_FILE_PATH_SEPARATOR[0]))
             {
-                if(sdkRoot[length-1] == OVR_FILE_PATH_SEPARATOR[0])
-                    sdkRoot[length-1] = '\0';
+                length = OVR_strlcat(developerDir8, OVR_FILE_PATH_SEPARATOR, sizeof(developerDir8));
+            
+                if(length < sizeof(developerDir8))
+                {
+                    #if defined(_WIN32)
+                        size_t i;
+                        for(i = 0; i <= length; ++i) // ASCII conversion of 8 to 16 bit text.
+                            developerDir[i] = (FilePathCharType)(uint8_t)developerDir8[i];
+                    #else
+                        OVR_strlcpy(developerDir, developerDir8, sizeof(developerDir));
+                    #endif
+                }
             }
-            else
-                sdkRoot[0] = '\0';
         }
-        else
-        {
-            // __FILE__ maps to <sdkRoot>/LibOVR/Src/OVR_CAPIShim.c
-            char* pLibOVR;
-            size_t i;
+    }
+   
+    // Support checking for a developer library location override via the OVR_SDK_ROOT environment variable.
+    // This pathway is deprecated in favor of using LIBOVR_DLL_DIR instead.
+    #if defined(OVR_ENABLE_DEVELOPER_SEARCH)
+    if (!developerDir[0]) // If not already set by LIBOVR_DLL_PATH...
+    {
+        // __FILE__ maps to <sdkRoot>/LibOVR/Src/OVR_CAPIShim.c
+        char sdkRoot[OVR_MAX_PATH];
+        char* pLibOVR;
+        size_t i;
 
-            // We assume that __FILE__ returns a full path, which isn't the case for some compilers.
-            // Need to compile with /FC under VC++ for __FILE__ to expand to the full file path.
-            // clang expands __FILE__ to a full path by default.
-            OVR_strlcpy(sdkRoot, __FILE__, sizeof(sdkRoot));
-            for(i = 0; sdkRoot[i]; ++i)
-                sdkRoot[i] = (char)tolower(sdkRoot[i]); // Microsoft doesn't maintain case.
-            pLibOVR = strstr(sdkRoot, "libovr");
-            if(pLibOVR && (pLibOVR > sdkRoot))
-                pLibOVR[-1] = '\0';
-            else
-                sdkRoot[0] = '\0';
-        }
+        // We assume that __FILE__ returns a full path, which isn't the case for some compilers.
+        // Need to compile with /FC under VC++ for __FILE__ to expand to the full file path.
+        // clang expands __FILE__ to a full path by default.
+        OVR_strlcpy(sdkRoot, __FILE__, sizeof(sdkRoot));
+        for(i = 0; sdkRoot[i]; ++i)
+            sdkRoot[i] = (char)tolower(sdkRoot[i]); // Microsoft doesn't maintain case.
+        pLibOVR = strstr(sdkRoot, "libovr");
+        if(pLibOVR && (pLibOVR > sdkRoot))
+            pLibOVR[-1] = '\0';
+        else
+            sdkRoot[0] = '\0';
 
         if(sdkRoot[0])
         {
@@ -615,8 +635,8 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
         size_t i;
 
         #if defined(_WIN32)
-            FilePathCharType  moduleDir[OVR_MAX_PATH];
-            FilePathCharType* directoryArray[5];
+            FilePathCharType        moduleDir[OVR_MAX_PATH];
+            const FilePathCharType* directoryArray[5];
             directoryArray[0] = cwDir;
             directoryArray[1] = moduleDir;
             directoryArray[2] = appDir;
@@ -628,10 +648,10 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
         #elif defined(__APPLE__)
             // https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man1/dyld.1.html
         
-            FilePathCharType  homeDir[OVR_MAX_PATH];
-            FilePathCharType  homeFrameworkDir[OVR_MAX_PATH];
-            FilePathCharType* directoryArray[5];
-            size_t            homeDirLength = 0;
+            FilePathCharType        homeDir[OVR_MAX_PATH];
+            FilePathCharType        homeFrameworkDir[OVR_MAX_PATH];
+            const FilePathCharType* directoryArray[5];
+            size_t                  homeDirLength = 0;
 
             const char* pHome = getenv("HOME"); // Try getting the HOME environment variable.
         
@@ -682,7 +702,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
                 #define TEST_LIB_DIR appDir
             #endif
 
-            FilePathCharType* directoryArray[5];
+            const FilePathCharType* directoryArray[5];
             directoryArray[0] = cwDir;
             directoryArray[1] = TEST_LIB_DIR;           // Directory specified by LIBDIR if defined.
             directoryArray[2] = developerDir;           // Developer directory.
@@ -769,48 +789,27 @@ ModuleHandleType ovr_GetLibOVRRTHandle()
 //
 // To consider: Move OVR_DECLARE_IMPORT and the declarations below to OVR_CAPI.h
 //
-//OVR_DECLARE_IMPORT(ovrBool,        ovr_InitializeRenderingShim, ())
 OVR_DECLARE_IMPORT(ovrBool,          ovr_InitializeRenderingShimVersion, (int requestedMinorVersion))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_Initialize, (ovrInitParams const* params))
+OVR_DECLARE_IMPORT(ovrResult,        ovr_Initialize, (const ovrInitParams* params))
 OVR_DECLARE_IMPORT(ovrBool,          ovr_Shutdown, ())
 OVR_DECLARE_IMPORT(const char*,      ovr_GetVersionString, ())
-OVR_DECLARE_IMPORT(int,              ovrHmd_Detect, ())
-OVR_DECLARE_IMPORT(ovrHmd,           ovrHmd_Create, (int index))
+OVR_DECLARE_IMPORT(void,             ovr_GetLastErrorInfo, (ovrErrorInfo* errorInfo))
+OVR_DECLARE_IMPORT(ovrResult,        ovrHmd_Detect, ())
+OVR_DECLARE_IMPORT(ovrResult,        ovrHmd_Create, (int index, ovrHmd* pHmd))
 OVR_DECLARE_IMPORT(void,             ovrHmd_Destroy, (ovrHmd hmd))
-OVR_DECLARE_IMPORT(ovrHmd,           ovrHmd_CreateDebug, (ovrHmdType type))
-OVR_DECLARE_IMPORT(const char*,      ovrHmd_GetLastError, (ovrHmd hmd))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_AttachToWindow, (ovrHmd hmd, void* window, const ovrRecti* destMirrorRect, const ovrRecti* sourceRenderTargetRect))
+OVR_DECLARE_IMPORT(ovrResult,        ovrHmd_CreateDebug, (ovrHmdType type, ovrHmd* pHmd))
 OVR_DECLARE_IMPORT(unsigned int,     ovrHmd_GetEnabledCaps, (ovrHmd hmd))
 OVR_DECLARE_IMPORT(void,             ovrHmd_SetEnabledCaps, (ovrHmd hmd, unsigned int hmdCaps))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_ConfigureTracking, (ovrHmd hmd, unsigned int supportedTrackingCaps, unsigned int requiredTrackingCaps))
+OVR_DECLARE_IMPORT(ovrResult,        ovrHmd_ConfigureTracking, (ovrHmd hmd, unsigned int supportedTrackingCaps, unsigned int requiredTrackingCaps))
 OVR_DECLARE_IMPORT(void,             ovrHmd_RecenterPose, (ovrHmd hmd))
 OVR_DECLARE_IMPORT(ovrTrackingState, ovrHmd_GetTrackingState, (ovrHmd hmd, double absTime))
 OVR_DECLARE_IMPORT(ovrSizei,         ovrHmd_GetFovTextureSize, (ovrHmd hmd, ovrEyeType eye, ovrFovPort fov, float pixelsPerDisplayPixel))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_ConfigureRendering, ( ovrHmd hmd, const ovrRenderAPIConfig* apiConfig, unsigned int distortionCaps, const ovrFovPort eyeFovIn[2], ovrEyeRenderDesc eyeRenderDescOut[2] ))
-OVR_DECLARE_IMPORT(ovrFrameTiming,   ovrHmd_BeginFrame, (ovrHmd hmd, unsigned int frameIndex))
-OVR_DECLARE_IMPORT(void,             ovrHmd_EndFrame, (ovrHmd hmd, const ovrPosef renderPose[2], const ovrTexture eyeTexture[2]))
-OVR_DECLARE_IMPORT(void,             ovrHmd_GetEyePoses, (ovrHmd hmd, unsigned int frameIndex, const ovrVector3f hmdToEyeViewOffset[2], ovrPosef outEyePoses[2], ovrTrackingState* outHmdTrackingState))
-OVR_DECLARE_IMPORT(ovrPosef,         ovrHmd_GetHmdPosePerEye, (ovrHmd hmd, ovrEyeType eye))
+OVR_DECLARE_IMPORT(void,             ovrHmd_SubmitFrameLegacy, (ovrHmd hmd, unsigned int frameIndex, const ovrPosef renderPose[2], const ovrTexture eyeTexture[2]))
+OVR_DECLARE_IMPORT(ovrResult,        ovrHmd_SubmitFrame, (ovrHmd hmd, unsigned int frameIndex, const ovrViewScaleDesc* viewScaleDesc, ovrLayerHeader const * const * layerPtrList, unsigned int layerCount))
 OVR_DECLARE_IMPORT(ovrEyeRenderDesc, ovrHmd_GetRenderDesc, (ovrHmd hmd, ovrEyeType eyeType, ovrFovPort fov))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_CreateDistortionMesh, (ovrHmd hmd, ovrEyeType eyeType, ovrFovPort fov, unsigned int distortionCaps, ovrDistortionMesh *meshData))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_CreateDistortionMeshDebug, (ovrHmd hmddesc, ovrEyeType eyeType, ovrFovPort fov, unsigned int distortionCaps, ovrDistortionMesh *meshData, float debugEyeReliefOverrideInMetres))
-OVR_DECLARE_IMPORT(void,             ovrHmd_DestroyDistortionMesh, (ovrDistortionMesh* meshData ))
-OVR_DECLARE_IMPORT(void,             ovrHmd_GetRenderScaleAndOffset, (ovrFovPort fov, ovrSizei textureSize, ovrRecti renderViewport, ovrVector2f uvScaleOffsetOut[2] ))
 OVR_DECLARE_IMPORT(ovrFrameTiming,   ovrHmd_GetFrameTiming, (ovrHmd hmd, unsigned int frameIndex))
-OVR_DECLARE_IMPORT(ovrFrameTiming,   ovrHmd_BeginFrameTiming, (ovrHmd hmd, unsigned int frameIndex))
-OVR_DECLARE_IMPORT(void,             ovrHmd_EndFrameTiming, (ovrHmd hmd))
 OVR_DECLARE_IMPORT(void,             ovrHmd_ResetFrameTiming, (ovrHmd hmd, unsigned int frameIndex))
-OVR_DECLARE_IMPORT(void,             ovrHmd_GetEyeTimewarpMatrices, (ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2]))
-OVR_DECLARE_IMPORT(void,             ovrHmd_GetEyeTimewarpMatricesDebug, (ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrQuatf playerTorsoMotion, ovrMatrix4f twmOut[2], double debugTimingOffsetInSeconds))
-//OVR_DECLARE_IMPORT(ovrMatrix4f,      ovrMatrix4f_Projection, (ovrFovPort fov, float znear, float zfar, unsigned int projectionModFlags))
-//OVR_DECLARE_IMPORT(ovrMatrix4f,      ovrMatrix4f_OrthoSubProjection, (ovrMatrix4f projection, ovrVector2f orthoScale, float orthoDistance, float hmdToEyeViewOffsetX))
 OVR_DECLARE_IMPORT(double,           ovr_GetTimeInSeconds, ())
-//OVR_DECLARE_IMPORT(double,           ovr_WaitTillTime, (double absTime))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_ProcessLatencyTest, (ovrHmd hmd, unsigned char rgbColorOut[3]))
-OVR_DECLARE_IMPORT(const char*,      ovrHmd_GetLatencyTestResult, (ovrHmd hmd))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_GetLatencyTest2DrawColor, (ovrHmd hmddesc, unsigned char rgbColorOut[3]))
-OVR_DECLARE_IMPORT(void,             ovrHmd_GetHSWDisplayState, (ovrHmd hmd, ovrHSWDisplayState *hasWarningState))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_DismissHSWDisplay, (ovrHmd hmd))
 OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_GetBool, (ovrHmd hmd, const char* propertyName, ovrBool defaultVal))
 OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetBool, (ovrHmd hmd, const char* propertyName, ovrBool value))
 OVR_DECLARE_IMPORT(int,              ovrHmd_GetInt, (ovrHmd hmd, const char* propertyName, int defaultVal))
@@ -818,67 +817,55 @@ OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetInt, (ovrHmd hmd, const char* pro
 OVR_DECLARE_IMPORT(float,            ovrHmd_GetFloat, (ovrHmd hmd, const char* propertyName, float defaultVal))
 OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetFloat, (ovrHmd hmd, const char* propertyName, float value))
 OVR_DECLARE_IMPORT(unsigned int,     ovrHmd_GetFloatArray, (ovrHmd hmd, const char* propertyName, float values[], unsigned int arraySize))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetFloatArray, (ovrHmd hmd, const char* propertyName, float values[], unsigned int arraySize))
+OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetFloatArray, (ovrHmd hmd, const char* propertyName, const float values[], unsigned int arraySize))
 OVR_DECLARE_IMPORT(const char*,      ovrHmd_GetString, (ovrHmd hmd, const char* propertyName, const char* defaultVal))
 OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_SetString, (ovrHmd hmddesc, const char* propertyName, const char* value))
 OVR_DECLARE_IMPORT(int,              ovr_TraceMessage, (int level, const char* message))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_StartPerfLog, (ovrHmd hmd, const char* fileName, const char* userData1))
-OVR_DECLARE_IMPORT(ovrBool,          ovrHmd_StopPerfLog, (ovrHmd hmd))
 
-static ovrBool OVR_LoadSharedLibrary(int requestedMinorVersion, int requestedPatchVersion)
+#if defined (_WIN32)
+OVR_DECLARE_IMPORT(ovrResult, ovrHmd_CreateSwapTextureSetD3D11, (ovrHmd hmddesc, ID3D11Device* device, const D3D11_TEXTURE2D_DESC* desc, ovrSwapTextureSet** outTextureSet))
+OVR_DECLARE_IMPORT(ovrResult, ovrHmd_CreateMirrorTextureD3D11,  (ovrHmd hmddesc, ID3D11Device* device, const D3D11_TEXTURE2D_DESC* desc, ovrTexture** outMirrorTexture))
+#endif
+
+OVR_DECLARE_IMPORT(ovrResult, ovrHmd_CreateSwapTextureSetGL, (ovrHmd hmddesc, GLuint format, int width, int height, ovrSwapTextureSet** outTextureSet))
+OVR_DECLARE_IMPORT(ovrResult, ovrHmd_CreateMirrorTextureGL,  (ovrHmd hmddesc, GLuint format, int width, int height, ovrTexture** outMirrorTexture))
+
+OVR_DECLARE_IMPORT(void, ovrHmd_DestroySwapTextureSet, (ovrHmd hmddesc, ovrSwapTextureSet* textureSet))
+OVR_DECLARE_IMPORT(void, ovrHmd_DestroyMirrorTexture, (ovrHmd hmddesc, ovrTexture* textureSet))
+OVR_DECLARE_IMPORT(ovrResult, ovrHmd_SetQueueAheadFraction, (ovrHmd hmddesc, float queueAheadFraction))
+
+static ovrResult OVR_LoadSharedLibrary(int requestedMinorVersion, int requestedPatchVersion)
 {
     FilePathCharType filePath[OVR_MAX_PATH];
 
     if(hLibOVR)
-        return ovrTrue;
+        return ovrSuccess;
 
     hLibOVR = OVR_FindLibraryPath(requestedMinorVersion, requestedPatchVersion,
                              filePath, sizeof(filePath) / sizeof(filePath[0]));
     if(!hLibOVR)
-        return ovrFalse;
+        return ovrError_LibLoad;
 
-  //OVR_GETFUNCTION(ovr_InitializeRenderingShim)    // No longer exposed.
     OVR_GETFUNCTION(ovr_InitializeRenderingShimVersion)
     OVR_GETFUNCTION(ovr_Initialize)
     OVR_GETFUNCTION(ovr_Shutdown)
     OVR_GETFUNCTION(ovr_GetVersionString)
+    OVR_GETFUNCTION(ovr_GetLastErrorInfo)
     OVR_GETFUNCTION(ovrHmd_Detect)
     OVR_GETFUNCTION(ovrHmd_Create)
     OVR_GETFUNCTION(ovrHmd_Destroy)
     OVR_GETFUNCTION(ovrHmd_CreateDebug)
-    OVR_GETFUNCTION(ovrHmd_GetLastError)
-    OVR_GETFUNCTION(ovrHmd_AttachToWindow)
     OVR_GETFUNCTION(ovrHmd_GetEnabledCaps)
     OVR_GETFUNCTION(ovrHmd_SetEnabledCaps)
     OVR_GETFUNCTION(ovrHmd_ConfigureTracking)
     OVR_GETFUNCTION(ovrHmd_RecenterPose)
     OVR_GETFUNCTION(ovrHmd_GetTrackingState)
     OVR_GETFUNCTION(ovrHmd_GetFovTextureSize)
-    OVR_GETFUNCTION(ovrHmd_ConfigureRendering)
-    OVR_GETFUNCTION(ovrHmd_BeginFrame)
-    OVR_GETFUNCTION(ovrHmd_EndFrame)
-    OVR_GETFUNCTION(ovrHmd_GetEyePoses)
-    OVR_GETFUNCTION(ovrHmd_GetHmdPosePerEye)
+    OVR_GETFUNCTION(ovrHmd_SubmitFrame)    
     OVR_GETFUNCTION(ovrHmd_GetRenderDesc)
-    OVR_GETFUNCTION(ovrHmd_CreateDistortionMesh)
-    OVR_GETFUNCTION(ovrHmd_CreateDistortionMeshDebug)
-    OVR_GETFUNCTION(ovrHmd_DestroyDistortionMesh)
-    OVR_GETFUNCTION(ovrHmd_GetRenderScaleAndOffset)
     OVR_GETFUNCTION(ovrHmd_GetFrameTiming)
-    OVR_GETFUNCTION(ovrHmd_BeginFrameTiming)
-    OVR_GETFUNCTION(ovrHmd_EndFrameTiming)
     OVR_GETFUNCTION(ovrHmd_ResetFrameTiming)
-    OVR_GETFUNCTION(ovrHmd_GetEyeTimewarpMatrices)
-    OVR_GETFUNCTION(ovrHmd_GetEyeTimewarpMatricesDebug)
-  //OVR_GETFUNCTION(ovrMatrix4f_Projection)
-  //OVR_GETFUNCTION(ovrMatrix4f_OrthoSubProjection)
     OVR_GETFUNCTION(ovr_GetTimeInSeconds)
-  //OVR_GETFUNCTION(ovr_WaitTillTime)
-    OVR_GETFUNCTION(ovrHmd_ProcessLatencyTest)
-    OVR_GETFUNCTION(ovrHmd_GetLatencyTestResult)
-    OVR_GETFUNCTION(ovrHmd_GetLatencyTest2DrawColor)
-    OVR_GETFUNCTION(ovrHmd_GetHSWDisplayState)
-    OVR_GETFUNCTION(ovrHmd_DismissHSWDisplay)
     OVR_GETFUNCTION(ovrHmd_GetBool)
     OVR_GETFUNCTION(ovrHmd_SetBool)
     OVR_GETFUNCTION(ovrHmd_GetInt)
@@ -890,10 +877,17 @@ static ovrBool OVR_LoadSharedLibrary(int requestedMinorVersion, int requestedPat
     OVR_GETFUNCTION(ovrHmd_GetString)
     OVR_GETFUNCTION(ovrHmd_SetString)
     OVR_GETFUNCTION(ovr_TraceMessage)
-    OVR_GETFUNCTION(ovrHmd_StartPerfLog)
-    OVR_GETFUNCTION(ovrHmd_StopPerfLog)
+#if defined (_WIN32)
+    OVR_GETFUNCTION(ovrHmd_CreateSwapTextureSetD3D11)
+    OVR_GETFUNCTION(ovrHmd_CreateMirrorTextureD3D11)
+#endif
+    OVR_GETFUNCTION(ovrHmd_CreateSwapTextureSetGL)
+    OVR_GETFUNCTION(ovrHmd_CreateMirrorTextureGL)
+    OVR_GETFUNCTION(ovrHmd_DestroySwapTextureSet)
+    OVR_GETFUNCTION(ovrHmd_DestroyMirrorTexture)
+    OVR_GETFUNCTION(ovrHmd_SetQueueAheadFraction)
 
-    return ovrTrue;
+    return ovrSuccess;
 }
 
 static void OVR_UnloadSharedLibrary()
@@ -909,24 +903,29 @@ static void OVR_UnloadSharedLibrary()
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShim()
 {
+#if 1
+    return ovrTrue;
+#else
     return ovr_InitializeRenderingShimVersion(OVR_MINOR_VERSION);
+#endif
 }
 
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShimVersion(int requestedMinorVersion)
 {
     // By design we ignore the build version in the library search.
-    ovrBool result = OVR_LoadSharedLibrary(OVR_PRODUCT_VERSION, OVR_MAJOR_VERSION);
+    ovrBool initializeResult;
+    ovrResult result = OVR_LoadSharedLibrary(OVR_PRODUCT_VERSION, OVR_MAJOR_VERSION);
 
-    if (!result)
+    if (result != ovrSuccess)
         return ovrFalse;
 
-    result = ovr_InitializeRenderingShimVersionPtr(requestedMinorVersion);
+    initializeResult = ovr_InitializeRenderingShimVersionPtr(requestedMinorVersion);
 
-    if (result == ovrFalse)
+    if (initializeResult == ovrFalse)
         OVR_UnloadSharedLibrary();
 
-    return result;
+    return initializeResult;
 }
 
 
@@ -935,12 +934,13 @@ static const ovrInitParams DefaultParams = {
     ovrInit_RequestVersion, // Flags
     OVR_MINOR_VERSION,      // RequestedMinorVersion
     0,                      // LogCallback
-    0                       // ConnectionTimeoutSeconds
+    0,                      // ConnectionTimeoutSeconds
+    OVR_ON64("")            // pad0
 };
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* inputParams)
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_Initialize(const ovrInitParams* inputParams)
 {
-    ovrBool result;
+    ovrResult result;
     ovrInitParams params;
 
     if (!inputParams)
@@ -971,11 +971,11 @@ OVR_PUBLIC_FUNCTION(ovrBool) ovr_Initialize(ovrInitParams const* inputParams)
 
     // By design we ignore the build version in the library search.
     result = OVR_LoadSharedLibrary(OVR_PRODUCT_VERSION, OVR_MAJOR_VERSION);
-    if (!result)
-        return ovrFalse;
+    if (result != ovrSuccess)
+       return result;
 
     result = ovr_InitializePtr(&params);
-    if (result == ovrFalse)
+    if (result != ovrSuccess)
         OVR_UnloadSharedLibrary();
 
     return result;
@@ -996,18 +996,36 @@ OVR_PUBLIC_FUNCTION(const char*) ovr_GetVersionString()
     return ovr_GetVersionStringPtr();
 }
 
-OVR_PUBLIC_FUNCTION(int) ovrHmd_Detect()
+OVR_PUBLIC_FUNCTION(void) ovr_GetLastErrorInfo(ovrErrorInfo* errorInfo)
+{
+    if (!ovr_GetLastErrorInfoPtr)
+    {
+        memset(errorInfo, 0, sizeof(ovrErrorInfo));
+        errorInfo->Result = ovrError_LibLoad;
+    }
+    else
+        ovr_GetLastErrorInfoPtr(errorInfo);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_Detect()
 {
     if (!ovrHmd_DetectPtr)
-        return -1;
+        return ovrError_NotInitialized;
     return ovrHmd_DetectPtr();
 }
 
-OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_Create(int index)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_Create(int index, ovrHmd* pHmd)
 {
     if (!ovrHmd_CreatePtr)
-        return 0;
-    return ovrHmd_CreatePtr(index);
+        return ovrError_NotInitialized;
+    return ovrHmd_CreatePtr(index, pHmd);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateDebug(ovrHmdType type, ovrHmd* pHmd)
+{
+    if (!ovrHmd_CreateDebugPtr)
+        return ovrError_NotInitialized;
+    return ovrHmd_CreateDebugPtr(type, pHmd);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovrHmd_Destroy(ovrHmd hmd)
@@ -1015,28 +1033,6 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_Destroy(ovrHmd hmd)
     if (!ovrHmd_DestroyPtr)
         return;
     ovrHmd_DestroyPtr(hmd);
-}
-
-OVR_PUBLIC_FUNCTION(ovrHmd) ovrHmd_CreateDebug(ovrHmdType type)
-{
-    if (!ovrHmd_CreateDebugPtr)
-        return 0;
-    return ovrHmd_CreateDebugPtr(type);
-}
-
-OVR_PUBLIC_FUNCTION(const char*) ovrHmd_GetLastError(ovrHmd hmd)
-{
-    if (!ovrHmd_GetLastErrorPtr)
-        return "(Unable to load LibOVR)";
-    return ovrHmd_GetLastErrorPtr(hmd);
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_AttachToWindow(ovrHmd hmd, void* window,
-                                const ovrRecti* destMirrorRect, const ovrRecti* sourceRenderTargetRect)
-{
-    if (!ovrHmd_AttachToWindowPtr)
-        return ovrFalse;
-    return ovrHmd_AttachToWindowPtr(hmd, window, destMirrorRect, sourceRenderTargetRect);
 }
 
 OVR_PUBLIC_FUNCTION(unsigned int) ovrHmd_GetEnabledCaps(ovrHmd hmd)
@@ -1053,11 +1049,11 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_SetEnabledCaps(ovrHmd hmd, unsigned int hmdCaps
     ovrHmd_SetEnabledCapsPtr(hmd, hmdCaps);
 }
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ConfigureTracking(ovrHmd hmd, unsigned int supportedTrackingCaps,
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_ConfigureTracking(ovrHmd hmd, unsigned int supportedTrackingCaps,
                                                          unsigned int requiredTrackingCaps)
 {
     if (!ovrHmd_ConfigureTrackingPtr)
-        return ovrFalse;
+        return ovrError_NotInitialized;
     return ovrHmd_ConfigureTrackingPtr(hmd, supportedTrackingCaps, requiredTrackingCaps);
 }
 
@@ -1072,7 +1068,7 @@ OVR_PUBLIC_FUNCTION(ovrTrackingState) ovrHmd_GetTrackingState(ovrHmd hmd, double
 {
     if (!ovrHmd_GetTrackingStatePtr)
     {
-        static ovrTrackingState nullTrackingState;
+        ovrTrackingState nullTrackingState;
         memset(&nullTrackingState, 0, sizeof(nullTrackingState));
         return nullTrackingState;
     }
@@ -1087,7 +1083,7 @@ OVR_PUBLIC_FUNCTION(ovrSizei) ovrHmd_GetFovTextureSize(ovrHmd hmd, ovrEyeType ey
 {
     if (!ovrHmd_GetFovTextureSizePtr)
     {
-        static ovrSizei nullSize;
+        ovrSizei nullSize;
         memset(&nullSize, 0, sizeof(nullSize));
         return nullSize;
     }
@@ -1095,121 +1091,102 @@ OVR_PUBLIC_FUNCTION(ovrSizei) ovrHmd_GetFovTextureSize(ovrHmd hmd, ovrEyeType ey
     return ovrHmd_GetFovTextureSizePtr(hmd, eye, fov, pixelsPerDisplayPixel);
 }
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ConfigureRendering(ovrHmd hmd, const ovrRenderAPIConfig* apiConfig, unsigned int distortionCaps,
-                                  const ovrFovPort eyeFovIn[2], ovrEyeRenderDesc eyeRenderDescOut[2])
+#if defined (_WIN32)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateSwapTextureSetD3D11(ovrHmd hmd,
+                                                                ID3D11Device* device,
+                                                                const D3D11_TEXTURE2D_DESC* desc,
+                                                                ovrSwapTextureSet** outTextureSet)
 {
-    if (!ovrHmd_ConfigureRenderingPtr)
-        return ovrFalse;
-    return ovrHmd_ConfigureRenderingPtr(hmd, apiConfig, distortionCaps, eyeFovIn, eyeRenderDescOut);
+    if (!ovrHmd_CreateSwapTextureSetD3D11Ptr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_CreateSwapTextureSetD3D11Ptr(hmd, device, desc, outTextureSet);
 }
 
-OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_BeginFrame(ovrHmd hmd, unsigned int frameIndex)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateMirrorTextureD3D11(ovrHmd hmd,
+                                                               ID3D11Device* device,
+                                                               const D3D11_TEXTURE2D_DESC* desc,
+                                                               ovrTexture** outMirrorTexture)
 {
-    if (!ovrHmd_BeginFramePtr)
-    {
-        static ovrFrameTiming nullFrameTiming;
-        memset(&nullFrameTiming, 0, sizeof(nullFrameTiming));
-        return nullFrameTiming;
-    }
-    return ovrHmd_BeginFramePtr(hmd, frameIndex);
+    if (!ovrHmd_CreateMirrorTextureD3D11Ptr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_CreateMirrorTextureD3D11Ptr(hmd, device, desc, outMirrorTexture);
+}
+#endif
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateSwapTextureSetGL(ovrHmd hmd, GLuint format,
+                                                             int width, int height,
+                                                             ovrSwapTextureSet** outTextureSet)
+{
+    if (!ovrHmd_CreateSwapTextureSetGLPtr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_CreateSwapTextureSetGLPtr(hmd, format, width, height, outTextureSet);
 }
 
-OVR_PUBLIC_FUNCTION(void) ovrHmd_EndFrame(ovrHmd hmd, const ovrPosef renderPose[2], const ovrTexture eyeTexture[2])
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_CreateMirrorTextureGL(ovrHmd hmd, GLuint format,
+                                                            int width, int height,
+                                                            ovrTexture** outMirrorTexture)
 {
-    if (!ovrHmd_EndFramePtr)
+    if (!ovrHmd_CreateMirrorTextureGLPtr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_CreateMirrorTextureGLPtr(hmd, format, width, height, outMirrorTexture);
+}
+
+OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroySwapTextureSet(ovrHmd hmd, ovrSwapTextureSet* textureSet)
+{
+    if (!ovrHmd_DestroySwapTextureSetPtr)
         return;
-    ovrHmd_EndFramePtr(hmd, renderPose, eyeTexture);
+
+    ovrHmd_DestroySwapTextureSetPtr(hmd, textureSet);
 }
 
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyePoses(ovrHmd hmd, unsigned int frameIndex, const ovrVector3f hmdToEyeViewOffset[2],
-                                             ovrPosef outEyePoses[2], ovrTrackingState* outHmdTrackingState)
+OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroyMirrorTexture(ovrHmd hmd, ovrTexture* mirrorTexture)
 {
-    if (!ovrHmd_GetEyePosesPtr)
+    if (!ovrHmd_DestroyMirrorTexturePtr)
         return;
-    ovrHmd_GetEyePosesPtr(hmd, frameIndex, hmdToEyeViewOffset, outEyePoses, outHmdTrackingState);
+
+    ovrHmd_DestroyMirrorTexturePtr(hmd, mirrorTexture);
 }
 
-OVR_PUBLIC_FUNCTION(ovrPosef) ovrHmd_GetHmdPosePerEye(ovrHmd hmd, ovrEyeType eye)
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_SetQueueAheadFraction(ovrHmd hmd, float queueAheadFraction)
 {
-    if (!ovrHmd_GetHmdPosePerEyePtr)
-    {
-        static ovrPosef nullPose;
-        memset(&nullPose, 0, sizeof(nullPose));
-        nullPose.Orientation.w = 1.0f; // Return a proper quaternion.
-        return nullPose;
-    }
-    return ovrHmd_GetHmdPosePerEyePtr(hmd, eye);
+    if (!ovrHmd_SetQueueAheadFractionPtr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_SetQueueAheadFractionPtr(hmd, queueAheadFraction);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovrHmd_SubmitFrame(ovrHmd hmd, unsigned int frameIndex, const ovrViewScaleDesc* viewScaleDesc, ovrLayerHeader const * const * layerPtrList, unsigned int layerCount)
+{
+    if (!ovrHmd_SubmitFramePtr)
+        return ovrError_NotInitialized;
+
+    return ovrHmd_SubmitFramePtr(hmd, frameIndex, viewScaleDesc, layerPtrList, layerCount);
 }
 
 OVR_PUBLIC_FUNCTION(ovrEyeRenderDesc) ovrHmd_GetRenderDesc(ovrHmd hmd, ovrEyeType eyeType, ovrFovPort fov)
 {
     if (!ovrHmd_GetRenderDescPtr)
     {
-        static ovrEyeRenderDesc nullEyeRenderDesc;
+        ovrEyeRenderDesc nullEyeRenderDesc;
         memset(&nullEyeRenderDesc, 0, sizeof(nullEyeRenderDesc));
         return nullEyeRenderDesc;
     }
     return ovrHmd_GetRenderDescPtr(hmd, eyeType, fov);
 }
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_CreateDistortionMesh(ovrHmd hmd, ovrEyeType eyeType, ovrFovPort fov,
-                                       unsigned int distortionCaps, ovrDistortionMesh *meshData)
-{
-    if (!ovrHmd_CreateDistortionMeshPtr)
-        return ovrFalse;
-    return ovrHmd_CreateDistortionMeshPtr(hmd, eyeType, fov, distortionCaps, meshData);
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_CreateDistortionMeshDebug(ovrHmd hmd, ovrEyeType eyeType, ovrFovPort fov, unsigned int distortionCaps,
-                                           ovrDistortionMesh *meshData, float debugEyeReliefOverrideInMetres)
-{
-    if (!ovrHmd_CreateDistortionMeshDebugPtr)
-        return ovrFalse;
-    return ovrHmd_CreateDistortionMeshDebugPtr(hmd, eyeType, fov, distortionCaps, meshData, debugEyeReliefOverrideInMetres);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_DestroyDistortionMesh(ovrDistortionMesh* meshData)
-{
-    if (!ovrHmd_DestroyDistortionMeshPtr)
-        return;
-    ovrHmd_DestroyDistortionMeshPtr(meshData);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetRenderScaleAndOffset(ovrFovPort fov, ovrSizei textureSize, ovrRecti renderViewport,
-                                                    ovrVector2f uvScaleOffsetOut[2])
-{
-    if (!ovrHmd_GetRenderScaleAndOffsetPtr)
-        return;
-    ovrHmd_GetRenderScaleAndOffsetPtr(fov, textureSize, renderViewport, uvScaleOffsetOut);
-}
-
 OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_GetFrameTiming(ovrHmd hmd, unsigned int frameIndex)
 {
     if (!ovrHmd_GetFrameTimingPtr)
     {
-        static ovrFrameTiming nullFrameTiming;
+        ovrFrameTiming nullFrameTiming;
         memset(&nullFrameTiming, 0, sizeof(nullFrameTiming));
         return nullFrameTiming;
     }
     return ovrHmd_GetFrameTimingPtr(hmd, frameIndex);
-}
-
-OVR_PUBLIC_FUNCTION(ovrFrameTiming) ovrHmd_BeginFrameTiming(ovrHmd hmd, unsigned int frameIndex)
-{
-    if (!ovrHmd_BeginFrameTimingPtr)
-{
-        static ovrFrameTiming nullFrameTiming;
-        memset(&nullFrameTiming, 0, sizeof(nullFrameTiming));
-        return nullFrameTiming;
-    }
-    return ovrHmd_BeginFrameTimingPtr(hmd, frameIndex);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_EndFrameTiming(ovrHmd hmd)
-{
-    if (!ovrHmd_EndFrameTimingPtr)
-        return;
-    ovrHmd_EndFrameTimingPtr(hmd);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovrHmd_ResetFrameTiming(ovrHmd hmd, unsigned int frameIndex)
@@ -1219,97 +1196,11 @@ OVR_PUBLIC_FUNCTION(void) ovrHmd_ResetFrameTiming(ovrHmd hmd, unsigned int frame
     ovrHmd_ResetFrameTimingPtr(hmd, frameIndex);
 }
 
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyeTimewarpMatrices(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose, ovrMatrix4f twmOut[2])
-{
-    if (!ovrHmd_GetEyeTimewarpMatricesPtr)
-        return;
-    ovrHmd_GetEyeTimewarpMatricesPtr(hmd, eye, renderPose, twmOut);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetEyeTimewarpMatricesDebug(ovrHmd hmd, ovrEyeType eye, ovrPosef renderPose,
-                                                ovrQuatf playerTorsoMotion, ovrMatrix4f twmOut[2], double debugTimingOffsetInSeconds)
-{
-    if (!ovrHmd_GetEyeTimewarpMatricesDebugPtr)
-        return;
-    ovrHmd_GetEyeTimewarpMatricesDebugPtr(hmd, eye, renderPose, playerTorsoMotion, twmOut, debugTimingOffsetInSeconds);
-}
-
-/*
-OVR_PUBLIC_FUNCTION(ovrMatrix4f) ovrMatrix4f_Projection(ovrFovPort fov, float znear, float zfar, unsigned int projectionModFlags)
-{
-    if (!ovrMatrix4f_ProjectionPtr)
-    {
-        static ovrMatrix4f nullMatrix;
-        memset(&nullMatrix, 0, sizeof(nullMatrix));
-        return nullMatrix;
-    }
-    return ovrMatrix4f_ProjectionPtr(fov, znear, zfar, projectionModFlags);
-}
-*/
-
-/*
-OVR_PUBLIC_FUNCTION(ovrMatrix4f) ovrMatrix4f_OrthoSubProjection(ovrMatrix4f projection, ovrVector2f orthoScale,
-                                             float orthoDistance, float hmdToEyeViewOffsetX)
-{
-    if (!ovrMatrix4f_OrthoSubProjectionPtr)
-    {
-        static ovrMatrix4f nullMatrix;
-        memset(&nullMatrix, 0, sizeof(nullMatrix));
-        return nullMatrix;
-    }
-    return ovrMatrix4f_OrthoSubProjectionPtr(projection, orthoScale, orthoDistance, hmdToEyeViewOffsetX);
-}
-*/
-
 OVR_PUBLIC_FUNCTION(double) ovr_GetTimeInSeconds()
 {
     if (!ovr_GetTimeInSecondsPtr)
         return 0.;
     return ovr_GetTimeInSecondsPtr();
-}
-
-/*
-OVR_PUBLIC_FUNCTION(double) ovr_WaitTillTime(double absTime)
-{
-    if (!ovr_WaitTillTimePtr)
-        return 0.;
-    return ovr_WaitTillTimePtr(absTime);
-}
-*/
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_ProcessLatencyTest(ovrHmd hmd, unsigned char rgbColorOut[3])
-{
-    if (!ovrHmd_ProcessLatencyTestPtr)
-        return ovrFalse;
-    return ovrHmd_ProcessLatencyTestPtr(hmd, rgbColorOut);
-}
-
-OVR_PUBLIC_FUNCTION(const char*) ovrHmd_GetLatencyTestResult(ovrHmd hmd)
-{
-    if (!ovrHmd_GetLatencyTestResultPtr)
-        return "(Unable to load LibOVR)";
-    return ovrHmd_GetLatencyTestResultPtr(hmd);
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_GetLatencyTest2DrawColor(ovrHmd hmd, unsigned char rgbColorOut[3])
-{
-    if (!ovrHmd_GetLatencyTest2DrawColorPtr)
-        return ovrFalse;
-    return ovrHmd_GetLatencyTest2DrawColorPtr(hmd, rgbColorOut);
-}
-
-OVR_PUBLIC_FUNCTION(void) ovrHmd_GetHSWDisplayState(ovrHmd hmd, ovrHSWDisplayState *hasWarningState)
-{
-    if (!ovrHmd_GetHSWDisplayStatePtr)
-        return;
-    ovrHmd_GetHSWDisplayStatePtr(hmd, hasWarningState);
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_DismissHSWDisplay(ovrHmd hmd)
-{
-    if (!ovrHmd_DismissHSWDisplayPtr)
-        return ovrFalse;
-    return ovrHmd_DismissHSWDisplayPtr(hmd);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_GetBool(ovrHmd hmd, const char* propertyName, ovrBool defaultVal)
@@ -1363,7 +1254,7 @@ OVR_PUBLIC_FUNCTION(unsigned int) ovrHmd_GetFloatArray(ovrHmd hmd, const char* p
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_SetFloatArray(ovrHmd hmd, const char* propertyName,
-                                             float values[], unsigned int arraySize)
+                                             const float values[], unsigned int arraySize)
 {
     if (!ovrHmd_SetFloatArrayPtr)
         return ovrFalse;
@@ -1394,19 +1285,6 @@ OVR_PUBLIC_FUNCTION(int) ovr_TraceMessage(int level, const char* message)
     return ovr_TraceMessagePtr(level, message);
 }
 
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_StartPerfLog(ovrHmd hmd, const char* fileName, const char* userData1)
-{
-    if (!ovrHmd_StartPerfLogPtr)
-        return ovrFalse;
-    return ovrHmd_StartPerfLogPtr(hmd, fileName, userData1);
-}
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovrHmd_StopPerfLog(ovrHmd hmd)
-{
-    if (!ovrHmd_StopPerfLogPtr)
-        return ovrFalse;
-    return ovrHmd_StopPerfLogPtr(hmd);
-}
 
 
 

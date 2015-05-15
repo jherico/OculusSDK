@@ -5,7 +5,7 @@ Content     :   Implements timing for the distortion renderer
 Created     :   Dec 16, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2015 Oculus VR, LLC All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
@@ -27,19 +27,17 @@ limitations under the License.
 #ifndef OVR_CAPI_DistortionTiming_h
 #define OVR_CAPI_DistortionTiming_h
 
-#include "CAPI_HMDRenderState.h"
-#include "CAPI_FrameLatencyTracker.h"
-#include "CAPI_FrameTimeManager3.h"
-#include "CAPI_HMDRenderState.h"
 #include <Kernel/OVR_Lockless.h>
+#include <Kernel/OVR_SharedMemory.h>
 #include <OVR_CAPI.h> // ovrFrameTiming
+#include "OVR_Error.h"
 
 /*
     -----------------------------
     Distortion Timing Terminology
     -----------------------------
 
-    To fix on one set of terminology, a frame life-cycle is defined the following:
+    To fix on one set of terminology, a frame life-cycle is defined as the following:
 
     (1) Get prediction time for app left/right eye rendering.
     (2) App renders left/right eyes.
@@ -82,30 +80,16 @@ struct AppTiming
     // Time between frames.
     double FrameInterval;
 
+    // Display frame index.
+    uint32_t DisplayFrameIndex;
+
     void Clear()
     {
         FrameInterval       = 0.013; // A value that should not break anything.
         ScanoutStartTime    = 0.; // Predict to current time.
         VisibleMidpointTime = 0.; // Predict to current time.
+        DisplayFrameIndex   = 0;
     }
-};
-
-
-//-----------------------------------------------------------------------------
-// TimewarpTiming
-//
-// This structure provides the measurements for the current frame timewarp.
-struct TimewarpTiming
-{
-    // Time at which scanout is predicted to start.
-    double ScanoutTime;
-
-    // The time when Just-In-Time timewarp should be started.
-    // The app should busy/idle-wait until this time before doing timewarp.
-    double JIT_TimewarpTime;
-
-    // Left and right eye start and end render times, respectively.
-    double EyeStartEndTimes[2][2];
 };
 
 
@@ -115,7 +99,10 @@ struct TimewarpTiming
 // Base timing info shared via lockless data structure.
 // The AppDistortionTimer can use a copy of this data to derive an AppTiming
 // object for a given frame index.
-struct LocklessAppTimingBase
+//
+// This structure needs to be the same size and layout on 32-bit and 64-bit arch.
+// Update OVR_PadCheck.cpp when updating this object.
+struct OVR_ALIGNAS(8) LocklessAppTimingBase
 {
     // Is the data valid?
     // 0 = Not valid.
@@ -143,186 +130,10 @@ struct LocklessAppTimingBase
     double ScreenSwitchingDelay;
 };
 
-
-//-----------------------------------------------------------------------------
-// DistortionTimer
-//
-// This is a calculator for the app and timewarp/distortion timing.
-class DistortionTimer
-{
-    typedef OVR::CAPI::FTM3::FrameTimeManagerCore TimeMan;
-
-public:
-    DistortionTimer();
-    ~DistortionTimer();
-
-    // Returns false if distortion timing could not be initialized.
-    bool Initialize(HMDRenderState const* renderState,
-                    FrameLatencyTracker const* lagTester);
-    void Reset();
-
-    //-------------------------------------------------------------------------
-    // Timewarp Timing
-
-    // Calculate timing for current frame timewarp.
-    // Result can be retrieved via GetTimewarpTiming().
-    void CalculateTimewarpTiming(uint32_t frameIndex, double previousKnownVsyncTime = 0.);
-
-    // Called after CalculateTimewarpTiming() will retrieve the timewarp
-    // timing for this frame.
-    TimewarpTiming const* GetTimewarpTiming()
-    {
-        return &CurrentFrameTimewarpTiming;
-    }
-
-    // Add a distortion draw call timing measurement.
-    void AddDistortionTimeMeasurement(double distortionTimeSeconds);
-
-    // Returns true if more distortion timing measurements are needed.
-    bool NeedDistortionTimeMeasurement() const
-    {
-        // NOTE: Even when Vsync is off this measurement is still valid and useful.
-        return !DistortionRenderTimes.AtCapacity();
-    }
-
-    // Insert right after spin-wait for Present query to finish for the renderer.
-    void SetLastPresentTime()
-    {
-        // Update vsync time.  This is the post-present time, which is expected to be
-        // after the Vsync has completed and our query event put in after the Present
-        // has indicated that it is signaled.  However this is not reliable.
-        LastPresentTime = Timer::GetSeconds();
-    }
-
-    // Returns the time to use for the current frame for latency tester present time,
-    // which is not the same as the LastPresentTime.
-    double GetLatencyTesterPresentTime() const
-    {
-        return LatencyTesterPresentTime;
-    }
-
-    // Set/get the Timewarp IMU time, which is the time at which the IMU was sampled.
-    void SetTimewarpIMUTime(double t)
-    {
-        LastTimewarpIMUTime = t;
-    }
-
-    double GetTimewarpIMUTime() const
-    {
-        return LastTimewarpIMUTime;
-    }
-
-protected:
-    // Vsync/no-vsync versions split out for readability.
-    AppTiming getAppTimingWithVsync();
-    AppTiming getAppTimingNoVsync();
-
-protected:
-    // Last time that Present() was called for post-present latency measurement.
-    // Provided by SetLastPresentTime() cooperatively with the distortion renderer.
-    double LastPresentTime;
-
-    // The time to use for the latency tester for present time, which is the reference
-    // time used for calculating present-scanout delay.
-    double LatencyTesterPresentTime;
-
-    // Last known Vsync time, provided cooperatively by the distortion renderer
-    // via the GetTimewarpTiming() call or internal estimation.
-    double LastKnownVsyncTime;
-
-    // Time in seconds that the Vsync measurement may be in error.
-    // It is assumed to be pretty tight for D3D11 and Display Driver data but for
-    // end frame -based timing we need to add some buffer to avoid misprediction.
-    double LastKnownVsyncFuzzBuffer;
-
-    // The current app frame index, initially zero.
-    uint32_t AppFrameIndex;
-    // Updated in getAppTiming()
-    // Read in CalculateTimewarpTiming()
-
-protected:
-    // Calculator for the time it takes to render distortion.
-    mutable OVR::CAPI::FTM3::MedianCalculator DistortionRenderTimes;
-
-    // Current estimate for timewarp render time.
-    double EstimatedTimewarpRenderTime;
-
-protected:
-#ifdef OVR_OS_WIN32
-    ScopedFileHANDLE DeviceHandle;
-
-    // Attempt to use the display driver for getting a previous vsync
-    bool getDriverVsyncTime(double* previousKnownVsyncTime);
-#endif
-
-    // Get Vsync to next Vsync interval.
-    // NOTE: Technically the Vsync-Vsync frame interval is not the same as the scanout
-    // start to end interval because there is a back porch that implies some blanking time
-    double getFrameInterval() const;
-
-    // Get Frame End to Scanout delay.  Measured by DK2 Latency Tester if available.
-    // This works for Vsync on or off.
-    double getScanoutDelay();
-
-protected:
-    // Update the TimeManager during timewarp calculation
-    void submitDisplayFrame(double frameEndTime, double frameInterval);
-
-    // Update LastKnownVsyncTime.
-    // Pass zero if no Vsync timing information is available.
-    void updateLastKnownVsyncTime(double previousKnownVsyncTime = 0.);
-
-    double getJITTimewarpTime(double frameEndTime);
-
-protected:
-    // DK2 Latency Tester object
-    FrameLatencyTracker const* LatencyTester;
-
-    // Render state parameters from HMD
-    HMDRenderState const* RenderState;
-
-    // Constant screen switching delay calculated from the shutter info.
-    // This is the time it takes between pixels starting to scan out and
-    // for the visible light to rise to half the expected brightness value.
-    // For OLEDs on the DK2 this is about 1 millisecond.
-    double ScreenSwitchingDelay;
-
-    // Time Manager
-    TimeMan TimeManager;
-
-    // The last predicted vsync time from the previous frame.
-    double LastTimewarpFrameEndTime;
-
-    // Has the timing object already been initialized?
-    bool AlreadyInitialized;
-
-protected:
-    // Updated by CalculateTimewarpTiming(). 
-    TimewarpTiming CurrentFrameTimewarpTiming;
-
-    // Time when sensor was sampled for timewarp pose.
-    double LastTimewarpIMUTime;
-
-protected:
-    // Lockless data used by application for eye pose timing via the
-    // provided AppDistortionTimer class.
-    LocklessUpdater<LocklessAppTimingBase> LocklessAppTimingBaseUpdater;
-
-    void ClearAppTimingUpdater()
-    {
-        LocklessAppTimingBase cleared = LocklessAppTimingBase();
-        LocklessAppTimingBaseUpdater.SetState(cleared);
-    }
-
-public:
-    LocklessUpdater<LocklessAppTimingBase>* GetUpdater()
-    {
-        return &LocklessAppTimingBaseUpdater;
-    }
-};
+static_assert(sizeof(LocklessAppTimingBase) == 4 + 4 + 8*6, "size mismatch");
 
 
-// TODO: This header needs to be split up.
+typedef LocklessUpdater<LocklessAppTimingBase, LocklessPadding<LocklessAppTimingBase, 512> > TimingStateUpdater;
 
 
 //-----------------------------------------------------------------------------
@@ -336,23 +147,53 @@ public:
     AppRenderTimer();
     ~AppRenderTimer();
 
-    void SetUpdater(LocklessUpdater<LocklessAppTimingBase>* updater)
+    OVRError Open(const char* sharedMemoryName);
+
+    void SetUpdater(TimingStateUpdater const* updater)
     {
-        AppTimingBaseUpdater = updater;
+        TimingUpdater = updater;
     }
 
-    bool IsValid() const
-    {
-        return AppTimingBaseUpdater != nullptr;
-    }
-
-    // Returns true on success.
     // Pass in 0 for frameIndex to use the next scanout time,
     // or a non-zero incrementing number for each frame to support queue ahead.
-    void GetAppTimingForIndex(AppTiming& result, bool vsyncOn, uint32_t frameIndex = 0);
+    void GetAppTimingForIndex(AppTiming& result, bool vsyncOn, uint32_t frameIndex = 0) const;
+
+    // Get the time at which Vsync will happen next.
+    // This time does not include any perceptual delay and is mainly
+    // useful for scheduling GPU work.
+    double GetNextVsyncTime() const;
+
+    // Get the frame interval between two consecutive vsyncs.
+    double GetFrameInterval() const;
 
 protected:
-    LocklessUpdater<LocklessAppTimingBase>* AppTimingBaseUpdater;
+    SharedObjectReader<TimingStateUpdater> TimingReader;
+    TimingStateUpdater const* TimingUpdater;
+
+    // Refactored out common state checking at the top of GetAppTimingForIndex() and GetNextVsyncTime().
+    bool getTimingBase(LocklessAppTimingBase& base) const;
+};
+
+// Based on LastKnownVsyncTime, predict time when the previous frame Vsync occurred.
+// If it has no data it will still provide a reasonable estimate of last Vsync time.
+double CalculateFrameStartTime(double now,
+                               double lastKnownVsyncTime,
+                               double lastKnownVsyncFuzzBuffer,
+                               double frameInterval);
+
+
+//-----------------------------------------------------------------------------
+// AppTimingHistoryRecord
+//
+// One record in the AppTimingHistory.
+struct AppTimingHistoryRecord
+{
+    uint32_t  FrameIndex;
+    AppTiming Timing;
+    double    RenderIMUTime;
+
+    // Initializes members to zero
+    AppTimingHistoryRecord();
 };
 
 
@@ -362,31 +203,39 @@ protected:
 // Keep a history of recent application render timing data, to keep a record of
 // when frame indices are expected to scanout.  This is used later to compare
 // with when those frames scan out to self-test the timing code.
-//
-// This class is not thread-safe.
 class AppTimingHistory
 {
 public:
     AppTimingHistory();
     ~AppTimingHistory();
 
+    // Clear history
     void Clear();
-    void SetScanoutTimeForFrame(uint32_t frameIndex, double scanoutTime);
 
-    // Returns 0.0 if not found.
-    double LookupScanoutTime(uint32_t frameIndex);
+    // Setters
+    void SetTiming(uint32_t frameIndex, AppTiming const& timing);
+    void SetRenderIMUTime(double predTime, double renderIMUTime);
+
+    // Looks up the frame index
+    AppTimingHistoryRecord Lookup(uint32_t frameIndex) const;
 
 protected:
     static const int kFramesMax = 8;
 
-    struct Record
-    {
-        uint32_t FrameIndex;
-        double   ScanoutTime;
-    };
+    // Lock to allow multiple app threads to access the history without races
+    mutable Lock SyncLock;
 
-    int    LastWriteIndex;
-    Record History[kFramesMax];
+    // Last index written
+    int LastWriteIndex;
+
+    // History circular buffer
+    AppTimingHistoryRecord History[kFramesMax];
+
+    // Find record by frame index
+    // Returns -1 if not found, otherwise the array index containing it
+    int findRecordByIndex(uint32_t frameIndex) const;
+
+    int openNextIndex(uint32_t frameIndex);
 };
 
 

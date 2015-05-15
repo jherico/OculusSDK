@@ -70,10 +70,10 @@ static const int SOCKET_ERROR = -1;
 // Types of network transport
 enum TransportType
 {
-	TransportType_None,          // No transport (useful placeholder for invalid states)
-	TransportType_TCP,           // TCP/IPv4/v6
-	TransportType_UDP,           // UDP/IPv4/v6
-	TransportType_PacketizedTCP  // Packetized TCP: Message framing is automatic
+    TransportType_None,          // No transport (useful placeholder for invalid states)
+    TransportType_TCP,           // TCP/IPv4/v6
+    TransportType_UDP,           // UDP/IPv4/v6
+    TransportType_PacketizedTCP  // Packetized TCP: Message framing is automatic
 };
 
 
@@ -84,11 +84,11 @@ enum TransportType
 class Socket : public RefCountBase<Socket>
 {
 public:
-	Socket();
-	virtual void Close() = 0;
+    Socket();
+    virtual void Close() = 0;
 
 public:
-	TransportType Transport; // Type of transport
+    TransportType Transport; // Type of transport
 };
 
 
@@ -97,11 +97,11 @@ public:
 struct BerkleyBindParameters
 {
 public:
-	BerkleyBindParameters();
+    BerkleyBindParameters();
 
 public:
-	uint16_t Port;     // Port
-	String Address;
+    uint16_t Port;     // Port
+    String Address;
     uint32_t blockingTimeout;
 };
 
@@ -111,16 +111,16 @@ public:
 class BerkleySocket : public Socket
 {
 public:
-	BerkleySocket();
-	virtual ~BerkleySocket();
+    BerkleySocket();
+    virtual ~BerkleySocket();
 
-	virtual void   Close();
-	virtual int32_t GetSockname(SockAddr* pSockAddrOut);
-	virtual void   SetBlockingTimeout(int timeoutMs) // milliseconds
-	{
+    virtual void   Close();
+    virtual int32_t GetSockname(SockAddr* pSockAddrOut);
+    virtual void   SetBlockingTimeout(int timeoutMs) // milliseconds
+    {
         TimeoutSec = timeoutMs / 1000;
         TimeoutUsec = (timeoutMs % 1000) * 1000;
-	}
+    }
     int            GetBlockingTimeoutUsec() const
     {
         return TimeoutUsec;
@@ -135,7 +135,7 @@ public:
     }
 
 protected:
-	SocketHandle TheSocket;           // Socket handle
+    SocketHandle TheSocket;           // Socket handle
     int TimeoutUsec, TimeoutSec;
 };
 
@@ -145,13 +145,13 @@ protected:
 class SocketEvent_UDP
 {
 public:
-	virtual ~SocketEvent_UDP(){}
+    virtual ~SocketEvent_UDP(){}
 
-	virtual void UDP_OnRecv(Socket* pSocket, uint8_t* pData,
-							uint32_t bytesRead, SockAddr* pSockAddr)
-	{
-		OVR_UNUSED4(pSocket, pData, bytesRead, pSockAddr);
-	}
+    virtual void UDP_OnRecv(Socket* pSocket, uint8_t* pData,
+                            uint32_t bytesRead, SockAddr* pSockAddr)
+    {
+        OVR_UNUSED4(pSocket, pData, bytesRead, pSockAddr);
+    }
 };
 
 
@@ -160,28 +160,28 @@ public:
 class SocketEvent_TCP
 {
 public:
-	virtual ~SocketEvent_TCP(){}
+    virtual ~SocketEvent_TCP(){}
 
-	virtual void TCP_OnRecv     (Socket* pSocket,
+    virtual void TCP_OnRecv     (Socket* pSocket,
                                  uint8_t* pData,
                                  int bytesRead)
-	{
-		OVR_UNUSED3(pSocket, pData, bytesRead);
-	}
-	virtual void TCP_OnClosed   (TCPSocket* pSocket)
-	{
-		OVR_UNUSED(pSocket);
-	}
-	virtual void TCP_OnAccept   (TCPSocket* pListener,
+    {
+        OVR_UNUSED3(pSocket, pData, bytesRead);
+    }
+    virtual void TCP_OnClosed   (TCPSocket* pSocket)
+    {
+        OVR_UNUSED(pSocket);
+    }
+    virtual void TCP_OnAccept   (TCPSocket* pListener,
                                  SockAddr* pSockAddr,
-								 SocketHandle newSock)
-	{
-		OVR_UNUSED3(pListener, pSockAddr, newSock);
-	}
-	virtual void TCP_OnConnected(TCPSocket* pSocket)
-	{
-		OVR_UNUSED(pSocket);
-	}
+                                 SocketHandle newSock)
+    {
+        OVR_UNUSED3(pListener, pSockAddr, newSock);
+    }
+    virtual void TCP_OnConnected(TCPSocket* pSocket)
+    {
+        OVR_UNUSED(pSocket);
+    }
 };
 
 
@@ -192,19 +192,19 @@ public:
 class UDPSocketBase : public BerkleySocket
 {
 public:
-	UDPSocketBase();
+    UDPSocketBase();
 
 public:
-	virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters) = 0;
-	virtual int          Send(const void* pData,
+    virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters) = 0;
+    virtual int          Send(const void* pData,
                               int bytes,
                               SockAddr* pSockAddr) = 0;
-	virtual void         Poll(SocketEvent_UDP* eventHandler) = 0;
+    virtual void         Poll(SocketEvent_UDP* eventHandler) = 0;
 
 protected:
-	virtual void         OnRecv(SocketEvent_UDP* eventHandler,
+    virtual void         OnRecv(SocketEvent_UDP* eventHandler,
                                 uint8_t* pData,
-								int bytesRead,
+                                int bytesRead,
                                 SockAddr* address) = 0;
 };
 
@@ -216,22 +216,22 @@ protected:
 class TCPSocketBase : public BerkleySocket
 {
 public:
-	TCPSocketBase();
-	TCPSocketBase(SocketHandle handle);
+    TCPSocketBase();
+    TCPSocketBase(SocketHandle handle);
 
 public:
-	virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters) = 0;
-	virtual int          Listen() = 0;
-	virtual int          Connect(SockAddr* pSockAddr) = 0;
-	virtual int          Send(const void* pData,
+    virtual SocketHandle Bind(BerkleyBindParameters* pBindParameters) = 0;
+    virtual int          Listen() = 0;
+    virtual int          Connect(SockAddr* pSockAddr) = 0;
+    virtual int          Send(const void* pData,
                               int bytes) = 0;
 protected:
-	virtual void         OnRecv(SocketEvent_TCP* eventHandler,
+    virtual void         OnRecv(SocketEvent_TCP* eventHandler,
                                 uint8_t* pData,
                                 int bytesRead) = 0;
 
 protected:
-	bool IsListenSocket; // Is the socket listening (acting as a server)?
+    bool IsListenSocket; // Is the socket listening (acting as a server)?
 };
 
 

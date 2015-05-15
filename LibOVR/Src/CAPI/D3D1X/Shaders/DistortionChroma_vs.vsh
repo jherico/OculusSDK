@@ -25,10 +25,10 @@ float2   EyeToSourceUVScale;
 float2   EyeToSourceUVOffset;
 
 void main(in float2 Position    : POSITION,
-          in float4 Color       : COLOR0,
           in float2 TexCoord0   : TEXCOORD0,
           in float2 TexCoord1   : TEXCOORD1,
           in float2 TexCoord2   : TEXCOORD2,
+          in float2 VigetteTimewarp : TEXCOORD3,
           out float4 oPosition  : SV_Position,          
           out float1 oColor     : COLOR,
           out float2 oTexCoord0 : TEXCOORD0,
@@ -48,6 +48,6 @@ void main(in float2 Position    : POSITION,
     oTexCoord0  = tc0scaled;        // R sample.
     oTexCoord1  = tc1scaled;        // G sample.
     oTexCoord2  = tc2scaled;        // B sample.
-    oColor      = Color.r;          // Used for vignette fade.
+    oColor      = VigetteTimewarp.x;          // Used for vignette fade.
 }
 

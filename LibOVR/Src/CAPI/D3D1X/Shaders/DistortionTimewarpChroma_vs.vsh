@@ -21,7 +21,7 @@ limitations under the License.
 
 ************************************************************************************/
 
-Texture2DMS<float,1>  DepthTexture1x : register(t0);
+Texture2D             DepthTexture1x : register(t0);
 Texture2DMS<float,2>  DepthTexture2x : register(t1);
 Texture2DMS<float,4>  DepthTexture4x : register(t2);
 
@@ -47,7 +47,7 @@ float4 PositionFromDepth(float2 inTexCoord)
     {
         float depth;
         if(depthMsaaSamples <= 1.5)
-            depth = DepthTexture1x.Load(int2(eyeToSourceTexCoord * DepthDimSize), 0).x;
+            depth = DepthTexture1x.Load(int3(eyeToSourceTexCoord * DepthDimSize, 0)).x;
         else if(depthMsaaSamples <= 2.5)
             depth = DepthTexture2x.Load(int2(eyeToSourceTexCoord * DepthDimSize), 0).x;
         else
@@ -77,10 +77,10 @@ float2 TimewarpTexCoordToWarpedPos(float2 inTexCoord, float4x4 rotMat)
 }
 
 void main(  in float2 Position      : POSITION,
-            in float4 Color         : COLOR0,
             in float2 TexCoord0     : TEXCOORD0,
             in float2 TexCoord1     : TEXCOORD1,
             in float2 TexCoord2     : TEXCOORD2,
+            in float2 VigetteTimewarp : TEXCOORD3,
             out float4 oPosition    : SV_Position,
             out float1 oColor       : COLOR,
             out float2 oTexCoord0   : TEXCOORD0,
@@ -92,7 +92,7 @@ void main(  in float2 Position      : POSITION,
     oPosition.z = 0.5;
     oPosition.w = 1.0;
       	     
-    float timewarpLerpFactor = Color.a;
+    float timewarpLerpFactor = VigetteTimewarp.y;
     float4x4 lerpedEyeRot = lerp(EyeRotationStart, EyeRotationEnd, timewarpLerpFactor);
 
     // warped positions are a bit more involved, hence a separate function
@@ -100,5 +100,5 @@ void main(  in float2 Position      : POSITION,
 	oTexCoord1 = TimewarpTexCoordToWarpedPos(TexCoord1, lerpedEyeRot);
 	oTexCoord2 = TimewarpTexCoordToWarpedPos(TexCoord2, lerpedEyeRot);
 
-     oColor = Color.r;                  // Used for vignette fade.
+     oColor = VigetteTimewarp.x;                  // Used for vignette fade.
 }

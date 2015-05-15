@@ -1088,13 +1088,18 @@ void Thread::SetThreadName(const char* name, ThreadId threadId)
             DWORD  dwThreadID; // Thread ID (-1 for caller thread)
             DWORD  dwFlags;    // Reserved for future use; must be zero
         };
+        union TNIUnion
+        {
+            THREADNAME_INFO tni;
+            ULONG_PTR       upArray[4];
+        };
         #pragma pack(pop)
 
-        THREADNAME_INFO info = { 0x1000, name, (DWORD)threadId, 0 };
+        TNIUnion tniUnion = { 0x1000, name, (DWORD)threadId, 0 };
 
         __try
         {
-            RaiseException( 0x406D1388, 0, sizeof(info)/sizeof(ULONG_PTR), reinterpret_cast<ULONG_PTR*>(&info));
+            RaiseException( 0x406D1388, 0, OVR_ARRAY_COUNT(tniUnion.upArray), tniUnion.upArray);
         }
         __except( GetExceptionCode()==0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER )
         {

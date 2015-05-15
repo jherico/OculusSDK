@@ -25,19 +25,36 @@ limitations under the License.
 ************************************************************************************/
 
 #include "Service_Win32_FastIPC_Client.h"
+#include "Service_NetSessionCommon.h"
 
 namespace OVR { namespace Service { namespace Win32 {
 
 using namespace OVR::Net;
 
 
-//// FastIPCClient
+//-----------------------------------------------------------------------------
+// FastIPCKey
 
-FastIPCClient::FastIPCClient()
+bool FastIPCKey::Serialize(bool write, BitStream& bs)
+{
+    return bs.Serialize(write, SharedMemoryName);
+}
+
+
+//-----------------------------------------------------------------------------
+// FastIPCClient
+
+FastIPCClient::FastIPCClient() :
+    IsInitialized(false),
+    IPCKey(),
+    Scratch(),
+    DataEvent(),
+    ReturnEvent(),
+    IPCMessageIndex(0)
 {
 }
 
-bool FastIPCClient::ReadInitialData(const char* buffer)
+OVRError FastIPCClient::readInitialData(const char* buffer)
 {
     uint32_t magic    = *(uint32_t*)(buffer);
     uint32_t verMajor = *(uint32_t*)(buffer + 4);
@@ -45,20 +62,17 @@ bool FastIPCClient::ReadInitialData(const char* buffer)
 
     if (magic != Magic)
     {
-        LogError("Magic does not match");
-        return false;
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC magic does not match");
     }
 
     if (verMajor != MajorVersion)
     {
-        LogError("Major version mismatch");
-        return false;
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC major version mismatch");
     }
 
     if (verMinor < MinorVersion)
     {
-        LogError("Remote minor version too old for our feature level");
-        return false;
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC remote minor version too old for our feature level");
     }
 
     HANDLE remoteDataEvent   = (HANDLE)*(uint64_t*)(buffer + 12);
@@ -66,69 +80,98 @@ bool FastIPCClient::ReadInitialData(const char* buffer)
     pid_t serverProcessId    = (pid_t) *(uint64_t*)(buffer + 28);
     OVR_UNUSED(serverProcessId);
 
-    if (!remoteDataEvent || !remoteReturnEvent)
+    // Open server process for duplication
+    ScopedProcessHANDLE proc = ::OpenProcess(PROCESS_DUP_HANDLE, FALSE, serverProcessId);
+
+    if (!proc.IsValid())
     {
-        LogError("Handshake was malformed.  It seems like a version mismatch.");
-        return false;
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC unable to open server process. Did it die?");
     }
 
-    DataEvent.Attach(remoteDataEvent);
-    ReturnEvent.Attach(remoteReturnEvent);
+    if (!::DuplicateHandle(proc.Get(), remoteDataEvent,
+            ::GetCurrentProcess(), &DataEvent.GetRawRef(), GENERIC_ALL, FALSE, 0) ||
+        !::DuplicateHandle(proc.Get(), remoteReturnEvent,
+            ::GetCurrentProcess(), &ReturnEvent.GetRawRef(), GENERIC_ALL, FALSE, 0))
+    {
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC unable to duplicate server event handles. Did it die?");
+    }
 
-    return true;
+    if (!DataEvent.IsValid() || !ReturnEvent.IsValid())
+    {
+        return OVR_MAKE_ERROR(ovrError_Initialize, "IPC corrupt data");
+    }
+
+    return OVRError::Success();
 }
 
-bool FastIPCClient::Initialize(const char* sharedMemoryName)
+OVRError FastIPCClient::Initialize(const FastIPCKey& key)
 {
+    // Make sure we release the old IPCKey handles
+    Shutdown();
+
     SharedMemory::OpenParameters params;
     params.accessMode   = SharedMemory::AccessMode_ReadWrite;
-    params.globalName   = sharedMemoryName;
+    params.globalName   = key.SharedMemoryName;
     params.minSizeBytes = RegionSize;
     params.openMode     = SharedMemory::OpenMode_OpenOnly;
     params.remoteMode   = SharedMemory::RemoteMode_ReadWrite;
     Scratch             = SharedMemoryFactory::GetInstance()->Open(params);
     IPCMessageIndex     = 1;
 
+    // If unable to open,
     if (!Scratch || Scratch->GetSizeI() < RegionSize)
     {
-        OVR_ASSERT(false);
-        LogError("Unable to open shared memory region");
-        return false;
+        return OVR_MAKE_ERROR(ovrError_Initialize, "Unable to open shared memory region");
     }
 
-    char* data = (char*)Scratch->GetData();
+    OVRError err = readInitialData((char*)Scratch->GetData());
 
     // If unable to read handshake,
-    if (!ReadInitialData(data))
+    if (!err.Succeeded())
     {
-        return false;
+        return err;
     }
 
-    return true;
+    IPCKey = key;
+
+    return OVRError::Success();
+}
+
+void FastIPCClient::Shutdown()
+{
+    DataEvent     = nullptr;
+    ReturnEvent   = nullptr;
+    IsInitialized = false;
+
+    Scratch         = nullptr; // Extraneous
+    IPCKey          = FastIPCKey(); // Extraneous
+    IPCMessageIndex = 0; // Extraneous
 }
 
 FastIPCClient::~FastIPCClient()
 {
 }
 
-bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData, int timeoutMs)
+OVRError FastIPCClient::Call(BitStream& parameters, BitStream& returnData, int timeoutMs)
 {
+    // TBD: Currently timeouts are not recovered gracefully, so do not use them!
+    // Please pardon our dust. -cat
+    OVR_ASSERT(timeoutMs == -1);
+
     // If not initialized,
-    if (!ReturnEvent.IsValid())
+    if (!IsInitialized)
     {
-        OVR_ASSERT(false);
-        return false;
+        return OVR_MAKE_ERROR(ovrError_NotInitialized, "IPC not initialized");
     }
 
     volatile unsigned char* scratch = (unsigned char*)Scratch->GetData();
 
-    uint32_t bytesUsed = ((uint32_t)parameters->GetNumberOfBitsUsed() + 7) / 8;
+    uint32_t bytesUsed = ((uint32_t)parameters.GetNumberOfBitsUsed() + 7) / 8;
 
     // If data is too long,
     if (bytesUsed > RegionSize - 4)
     {
-        OVR_ASSERT(false);
-        return false;
+        return OVR_MAKE_ERROR_F(ovrError_InvalidParameter, "IPC region size %d too small to fit buffer of size %d bytes", RegionSize, bytesUsed);
     }
 
     // First 4 bytes will be the size of the parameters
@@ -136,7 +179,7 @@ bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData,
     *(uint32_t*)(scratch + 4) = bytesUsed;
 
     // Copy data into place
-    memcpy((char*)scratch + 8, parameters->GetData(), bytesUsed);
+    memcpy((char*)scratch + 8, parameters.GetData(), bytesUsed);
 
     // Don't allow read/write operations to move around this point
     MemoryBarrier();
@@ -147,8 +190,7 @@ bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData,
     // Wake the remote thread to service our request
     if (!::SetEvent(DataEvent.Get()))
     {
-        OVR_ASSERT(false);
-        return false;
+        return OVR_MAKE_SYS_ERROR(ovrError_ServiceError, ::GetLastError(), "IPC set event failed");
     }
 
     // Wait for result of call:
@@ -156,19 +198,18 @@ bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData,
     ++IPCMessageIndex;
 
     // Use the GetTickCount() API for low-resolution timing
-    DWORD t0 = ::GetTickCount();
+    ULONGLONG t0 = ::GetTickCount64();
     int remaining = timeoutMs;
 
-    // Forever,
+    // Breaks out of this loop when a timeout occurs.
     for (;;)
     {
         // Wait on the return event
-        DWORD result = ::WaitForSingleObject(ReturnEvent.Get(), timeoutMs < 0 ? INFINITE : remaining);
+        DWORD result = ::WaitForSingleObject(ReturnEvent.Get(), timeoutMs < 0 ? INFINITE : (DWORD)remaining);
 
         if (result == WAIT_FAILED)
         {
-            int err = GetLastError();
-            LogError("[FastIPC] Wait failed with error %d", err);
+            return OVR_MAKE_SYS_ERROR(ovrError_ServiceError, ::GetLastError(), "IPC wait failed");
         }
 
         // If wait succeeded,
@@ -182,32 +223,40 @@ bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData,
                 {
                     if (Timer::GetSeconds() - callTimeoutStart > 1.)
                     {
-                        LogError("[FastIPC] Timed out waiting for remote IPC message to be written.");
-                        OVR_ASSERT(false);
-                        return false;
+                        break;
                     }
 
                     Thread::YieldCurrentThread();
                 }
             }
 
-            _ReadBarrier();
+            // If message index is synchronized,
+            if (*(volatile uint32_t*)scratch == IPCMessageIndex)
+            {
+                _ReadBarrier();
 
-            // Wrap the scratch buffer
-            uint32_t len = *(uint32_t*)(scratch + 4);
-            returnData->WrapBuffer((unsigned char*)scratch + 8, len);
+                // Wrap the scratch buffer
+                uint32_t len = *(uint32_t*)(scratch + 4);
+                returnData.WrapBuffer((unsigned char*)scratch + 8, len);
 
-            ++IPCMessageIndex;
+                ++IPCMessageIndex;
 
-            // Return true for success
-            return true;
+                OVRError err;
+                if (!Service::NetSessionCommon::SerializeOVRError(returnData, err, false))
+                {
+                    return OVR_MAKE_ERROR(ovrError_ServiceError, "IPC corrupt");
+                }
+
+                // Return error code from server
+                return err;
+            }
         }
 
         // If not waiting forever,
         if (timeoutMs > 0)
         {
             // If wait time has elapsed,
-            int elapsed = ::GetTickCount() - t0;
+            int elapsed = (int)(::GetTickCount64() - t0); // elapsed is guaranteed to be >= 0.
             if (elapsed >= timeoutMs)
             {
                 // Break out of loop returning false
@@ -221,7 +270,7 @@ bool FastIPCClient::Call(Net::BitStream* parameters, Net::BitStream* returnData,
         // Continue waiting
     }
 
-    return false;
+    return OVR_MAKE_ERROR(ovrError_Timeout, "IPC timeout");
 }
 
 

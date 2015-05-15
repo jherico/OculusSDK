@@ -60,8 +60,15 @@ static int SFerror ()
         return FileConstants::Error_IOError;
 };
 
+
+#if defined(OVR_CC_MSVC)
+#include "share.h"
+#endif
+
+
 #if defined(OVR_OS_WIN32)
 #include "OVR_Win32_IncludeWindows.h"
+
 // A simple helper class to disable/enable system error mode, if necessary
 // Disabling happens conditionally only if a drive name is involved
 class SysErrorModeDisabler
@@ -237,8 +244,8 @@ void FILEFile::init()
     wchar_t *pwFileName = (wchar_t*)OVR_ALLOC((UTF8Util::GetLength(FileName.ToCStr())+1) * sizeof(wchar_t));
     UTF8Util::DecodeString(pwFileName, FileName.ToCStr());
     OVR_ASSERT(strlen(omode) < sizeof(womode)/sizeof(womode[0]));
-    UTF8Util::DecodeString(womode, omode);
-    _wfopen_s(&fs, pwFileName, womode);
+    UTF8Util::DecodeString(womode, omode); 
+    fs = _wfsopen(pwFileName, womode, _SH_DENYWR); // Allow others to read the file when we are writing it.
     OVR_FREE(pwFileName);
 #else
     fs = fopen(FileName.ToCStr(), omode);

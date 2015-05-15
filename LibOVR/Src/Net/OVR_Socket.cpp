@@ -33,7 +33,7 @@ namespace OVR { namespace Net {
 // Socket
 
 Socket::Socket() :
-	Transport(TransportType_None)
+    Transport(TransportType_None)
 {
 }
 
@@ -42,7 +42,7 @@ Socket::Socket() :
 // BerkleyBindParameters
 
 BerkleyBindParameters::BerkleyBindParameters() :
-	Port(0),
+    Port(0),
     Address(),
     blockingTimeout(0x7fffffff)
 {
@@ -52,7 +52,7 @@ BerkleyBindParameters::BerkleyBindParameters() :
 // BerkleySocket
 
 BerkleySocket::BerkleySocket() :
-	TheSocket(INVALID_SOCKET)
+    TheSocket(INVALID_SOCKET)
   //TimeoutUsec(0) // Initialized by SetBlockingTimeout
   //TimeoutSec(0)  // "
 {
@@ -61,8 +61,8 @@ BerkleySocket::BerkleySocket() :
 
 BerkleySocket::~BerkleySocket()
 {
-	// Close socket on destruction
-	Close();
+    // Close socket on destruction
+    Close();
 }
 
 
@@ -71,24 +71,24 @@ BerkleySocket::~BerkleySocket()
 
 UDPSocketBase::UDPSocketBase()
 {
-	Transport = TransportType_UDP;
+    Transport = TransportType_UDP;
 }
 
 
 //-----------------------------------------------------------------------------
 // TCPSocketBase
 
-TCPSocketBase::TCPSocketBase()
-  : IsListenSocket(false)
+TCPSocketBase::TCPSocketBase() :
+    IsListenSocket(false)
 {
-	Transport = TransportType_TCP;
+    Transport = TransportType_TCP;
 }
 
-TCPSocketBase::TCPSocketBase(SocketHandle handle)
-  : IsListenSocket(false)
+TCPSocketBase::TCPSocketBase(SocketHandle handle) :
+    IsListenSocket(false)
 {
-	TheSocket = handle;
+    TheSocket = handle;
 }
 
 
-}} // OVR::Net
+}} // namespace OVR::Net

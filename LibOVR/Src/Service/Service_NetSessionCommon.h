@@ -27,13 +27,13 @@ limitations under the License.
 #ifndef OVR_Service_NetSessionCommon_h
 #define OVR_Service_NetSessionCommon_h
 
-#include <atomic>
-
 #include "OVR_CAPI.h"
+#include "OVR_Error.h"
 #include "Kernel/OVR_Threads.h"
 #include "Kernel/OVR_System.h"
 #include "Net/OVR_RPC1.h"
 #include "Net/OVR_BitStream.h"
+#include <atomic>
 
 
 namespace OVR {
@@ -41,6 +41,8 @@ namespace OVR {
 class HMDInfo;
 
 namespace Service {
+
+using namespace Net;
 
 
 //-----------------------------------------------------------------------------
@@ -65,28 +67,34 @@ struct SharedMemoryNames
 // HMDInfo section related to networking
 struct HMDNetworkInfo
 {
-	HMDNetworkInfo() :
-		NetId(InvalidVirtualHmdId)
-	{
-	}
+    HMDNetworkInfo() :
+        NetId(InvalidVirtualHmdId),
+        SharedMemoryName()
+    {
+    }
 
-	// Network identifier for HMD
-	VirtualHmdId NetId;
+    // Network identifier for HMD
+    VirtualHmdId NetId;
 
-	// Names of the shared memory objects
-	SharedMemoryNames SharedMemoryName;
+    // Names of the shared memory objects
+    SharedMemoryNames SharedMemoryName;
 
-    bool Serialize(Net::BitStream* bs, bool write = true)
-	{
-        bs->Serialize(write, NetId);
-        bs->Serialize(write, SharedMemoryName.Hmd);
-        if (!bs->Serialize(write, SharedMemoryName.Camera))
+    bool Serialize(BitStream& bs, bool write = true)
+    {
+        bs.Serialize(write, NetId);
+        bs.Serialize(write, SharedMemoryName.Hmd);
+        bs.Serialize(write, SharedMemoryName.Camera);
+
+        String temp;
+        bs.Serialize(write, temp);
+        if(!bs.Serialize(write, temp))
             return false;
+
         return true;
-	}
+    }
 
     // Assignment operator
-    HMDNetworkInfo& operator=(HMDNetworkInfo const & rhs)
+    HMDNetworkInfo& operator=(HMDNetworkInfo const& rhs)
     {
         NetId = rhs.NetId;
         SharedMemoryName = rhs.SharedMemoryName;
@@ -110,16 +118,24 @@ public:
     NetSessionCommon();
     virtual ~NetSessionCommon();
 
-	Net::Plugins::RPC1* GetRPC1() const
+    Plugins::RPC1* GetRPC1() const
     {
         return pRPC;
     }
-	Net::Session* GetSession() const
+    Session* GetSession() const
     {
         return pSession;
     }
 
-	static bool SerializeHMDInfo(Net::BitStream* bitStream, HMDInfo* hmdInfo, bool write = true);
+    /// \brief Serializes the hmdInfo to or from the bitStream, depending on the write parameter.
+    /// \return true if the serialization succeeded, false if it failed, which can occur only due to a memory allocation failure.
+    /// \note This function doesn't generate an OVRError upon failure; it merely returns false and expects the caller to act accordingly.
+    static bool SerializeHMDInfo(BitStream& bitStream, HMDInfo& hmdInfo, bool write = true);
+
+    /// \brief Serializes the OVRError to or from the bitStream, depending on the write parameter.
+    /// \return true if the serialization succeeded, false if it failed, which can occur only due to a memory allocation failure.
+    /// \note This function doesn't generate an OVRError upon failure; it merely returns false and expects the caller to act accordingly.
+    static bool SerializeOVRError(BitStream& bitStream, OVRError& ovrError, bool write = true);
 
 public:
     // Getter/setter tools
@@ -143,12 +159,12 @@ public:
     };
 
     static const char* FilterKeyPrefix(const char* key);
-    static bool IsServiceProperty(EGetterSetters e, const char* key);
+    static bool        IsServiceProperty(EGetterSetters e, const char* key);
 
 protected:
-    std::atomic<bool>   Terminated; // Thread termination flag
-    Net::Session*       pSession;   // Networking session
-    Net::Plugins::RPC1* pRPC;       // Remote procedure calls object
+    std::atomic<bool> Terminated; // Thread termination flag
+    Session*          pSession;   // Networking session
+    Plugins::RPC1*    pRPC;       // Remote procedure calls object
 };
 
 

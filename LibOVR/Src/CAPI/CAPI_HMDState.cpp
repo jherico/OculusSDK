@@ -29,12 +29,16 @@ limitations under the License.
 #include "../Service/Service_NetClient.h"
 
 #ifdef OVR_OS_WIN32
-    #include "../Displays/OVR_Win32_ShimFunctions.h"
-
     // For auto-detection of window handle for direct mode:
     #include <OVR_CAPI_D3D.h>
     #include <GL/CAPI_GLE.h>
     #include <OVR_CAPI_GL.h>
+
+    #include "D3D1X/CAPI_D3D11_CliCompositorClient.h"
+
+#elif defined(OVR_OS_MAC)
+
+    #include "GL/CAPI_GL_CliCompositorClient_OSX.h"
 
 #elif defined(OVR_OS_LINUX)
 
@@ -59,14 +63,12 @@ static OVR::List<HMDState> hmdStateList; // List of all created HMDStates.
 HMDState::HMDState(HMDInfo const & hmdInfo,
                    Profile* profile,
                    Service::HMDNetworkInfo const * netInfo,
-                   Service::NetClient* client) :
-    TimewarpTimer(),
+                   Service::NetClient* client) :    
     RenderTimer(),
-    RenderIMUTimeSeconds(0.),
     pProfile(profile),
     pHmdDesc(0),
-    pWindow(0),
     pClient(client),
+    pCompClient(),
     NetId(InvalidVirtualHmdId),
     NetInfo(),
     OurHMDInfo(hmdInfo),
@@ -75,31 +77,20 @@ HMDState::HMDState(HMDInfo const & hmdInfo,
     EnabledServiceHmdCaps(0),
     CombinedHmdReader(),
     TheTrackingStateReader(),
-    TheLatencyTestStateReader(),
     LatencyTestActive(false),
   //LatencyTestDrawColor(),
-    LatencyTest2Active(false),
-  //LatencyTest2DrawColor(),
-    ScreenLatencyTracker(),
     RenderState(),
-    pRenderer(),
-    pHSWDisplay(),
   //LastGetStringValue(),
-    RenderingConfigured(false),
-    BeginFrameCalled(false),
-    BeginFrameThreadId(),
-    BeginFrameIndex(0),
-    RenderAPIThreadChecker(),
-    BeginFrameTimingCalled(false)
+    AppFrameIndex(0),
+    RenderAPIThreadChecker(),    
+    LayerDescList(),
+    LayersOtherThan0MayBeEnabled(true)
 {
     if (netInfo)
     {
         NetId = netInfo->NetId;
         NetInfo = *netInfo;
     }
-
-    // Hook up the app timing lockless updater
-    RenderTimer.SetUpdater(TimewarpTimer.GetUpdater());
 
     // TBD: We should probably be looking up the default profile for the given
     // device type + user if profile == 0.    
@@ -120,29 +111,12 @@ HMDState::HMDState(HMDInfo const & hmdInfo,
     RenderState.ClearColor[3] = 0.0f;
     RenderState.EnabledHmdCaps = 0;
 
-    if (!TimewarpTimer.Initialize(&RenderState, &ScreenLatencyTracker))
-    {
-        OVR_ASSERT(false);
-    }
 
     /*
     LatencyTestDrawColor[0] = 0;
     LatencyTestDrawColor[1] = 0;
     LatencyTestDrawColor[2] = 0;
     */
-
-    RenderingConfigured    = false;
-    BeginFrameCalled       = false;
-    BeginFrameThreadId     = 0;
-    BeginFrameTimingCalled = false;
-
-    // Construct the HSWDisplay. We will later reconstruct it with a specific ovrRenderAPI type if the application starts using SDK-based rendering.
-    if(!pHSWDisplay)
-    {
-        pHSWDisplay = *OVR::CAPI::HSWDisplay::Factory(ovrRenderAPI_None, pHmdDesc, RenderState);
-    }
-
-    RenderIMUTimeSeconds = 0.;
 
     hmdStateListLock.DoLock();
     hmdStateList.PushBack(this);
@@ -155,13 +129,13 @@ HMDState::~HMDState()
     hmdStateList.Remove(this);
     hmdStateListLock.Unlock();
 
+    pCompClient.Clear();
+
     if (pClient)
     {
         pClient->Hmd_Release(NetId);
         pClient = 0;
     }
-
-    ConfigureRendering(0,0,0,0);
 
     if (pHmdDesc)
     {
@@ -170,19 +144,32 @@ HMDState::~HMDState()
     }
 }
 
-bool HMDState::InitializeSharedState()
+ovrResult HMDState::InitializeSharedState()
 {
+    // Open up the camera and HMD shared memory sections
     if (!CombinedHmdReader.Open(NetInfo.SharedMemoryName.Hmd.ToCStr()) ||
         !CameraReader.Open(NetInfo.SharedMemoryName.Camera.ToCStr()))
     {
-        return false;
+        return ovrError_Initialize;
     }
 
     TheTrackingStateReader.SetUpdaters(CombinedHmdReader.Get(), CameraReader.Get());
-    TheLatencyTestStateReader.SetUpdater(CombinedHmdReader.Get());
 
 
-    return true;
+    // Connect to the compositor. Note that this doesn't fully initialize the connection
+    // with graphics information. That is delay initialized on demand on first texture set creation
+#if defined(OVR_OS_MS)
+    pCompClient = *new CliD3D11CompositorClient(this);
+#else
+    //pCompClient = *new CliCompositorClient(this);
+#endif
+    if (!pCompClient)
+    {
+        OVR_ASSERT(false);
+        return ovrError_Initialize;
+    }
+
+    return ovrSuccess;
 }
 
 static Vector3f GetNeckModelFromProfile(Profile* profile)
@@ -273,26 +260,19 @@ HMDState* HMDState::CreateHMDState(NetClient* client, const HMDNetworkInfo& netI
 {
     // HMDState works through a handle to service HMD....
     HMDInfo hinfo;
-    if (!client->Hmd_GetHmdInfo(netInfo.NetId, &hinfo))
+    if (!client->Hmd_GetHmdInfo(netInfo.NetId, hinfo))
     {
-        OVR_DEBUG_LOG(("[HMDState] Unable to get HMD info"));
+        OVR_DEBUG_LOG(("[HMDState] Unable to get HMD info.\n"));
         return nullptr;
     }
 
-#ifdef OVR_OS_WIN32
-    OVR_DEBUG_LOG(("[HMDState] Setting up display shim"));
-
-    // Initialize the display shim before reporting the display to the user code
-    // so that this will happen before the D3D display object is created.
-    Win32::DisplayShim::GetInstance().Update(&hinfo.ShimInfo);
-#endif
-
     Ptr<Profile> pDefaultProfile = *ProfileManager::GetInstance()->GetDefaultUserProfile(&hinfo);
-    OVR_DEBUG_LOG(("[HMDState] Using profile %s", pDefaultProfile->GetValue(OVR_KEY_USER)));
+    OVR_DEBUG_LOG(("[HMDState] Using profile %s\n", pDefaultProfile->GetValue(OVR_KEY_USER)));
 
     HMDState* hmds = new HMDState(hinfo, pDefaultProfile, &netInfo, client);
 
-    if (!hmds->InitializeSharedState())
+    ovrResult result = hmds->InitializeSharedState();
+    if (result != ovrSuccess)
     {
         delete hmds;
         return nullptr;
@@ -301,7 +281,7 @@ HMDState* HMDState::CreateHMDState(NetClient* client, const HMDNetworkInfo& netI
     return hmds;
 }
 
-HMDState* HMDState::CreateDebugHMDState(ovrHmdType hmdType)
+HMDState* HMDState::CreateDebugHMDState(NetClient* client, ovrHmdType hmdType)
 {
     HmdTypeEnum t = HmdType_None;
     if (hmdType == ovrHmd_DK1)
@@ -312,7 +292,23 @@ HMDState* HMDState::CreateDebugHMDState(ovrHmdType hmdType)
     // FIXME: This does not actually grab the right user..
     Ptr<Profile> pDefaultProfile = *ProfileManager::GetInstance()->GetDefaultProfile(t);
     
-    return new HMDState(CreateDebugHMDInfo(t), pDefaultProfile);
+    HMDState* hmds = new HMDState(CreateDebugHMDInfo(t), pDefaultProfile, nullptr, client);
+
+    // Connect to the compositor. Note that this doesn't fully initialize the connection
+    // with graphics information. That is delay initialized on demand on first texture set creation
+#if defined(OVR_OS_MS)
+    hmds->pCompClient = *new CliD3D11CompositorClient(hmds);
+#else
+    //pCompClient = *new CliCompositorClient(this);
+#endif
+    if (!hmds->pCompClient)
+    {
+        OVR_ASSERT(false);
+        delete hmds;
+        return nullptr;
+    }
+
+    return hmds;
 }
 
 // Enumerate each open HMD
@@ -333,14 +329,19 @@ unsigned HMDState::EnumerateHMDStateList(bool (*callback)(const HMDState *state)
 //-------------------------------------------------------------------------------------
 // *** Sensor 
 
-bool HMDState::ConfigureTracking(unsigned supportedCaps, unsigned requiredCaps)
+ovrResult HMDState::ConfigureTracking(unsigned supportedCaps, unsigned requiredCaps)
 {
-    return pClient ? pClient->Hmd_ConfigureTracking(NetId, supportedCaps, requiredCaps) : true;
+    return pClient ? pClient->Hmd_ConfigureTracking(NetId, supportedCaps, requiredCaps) : ovrError_NotInitialized;
 }
 
-void HMDState::ResetTracking(bool visionReset)
+void HMDState::ResetBackOfHeadTracking()
 {
-    if (pClient) pClient->Hmd_ResetTracking(NetId, visionReset);
+    if (pClient) pClient->Hmd_ResetTracking(NetId, true);
+}
+
+void HMDState::ResetTracking()
+{
+    if (pClient) pClient->Hmd_ResetTracking(NetId, false);
 }        
 
 // Re-center the orientation.
@@ -357,16 +358,14 @@ ovrTrackingState HMDState::PredictedTrackingState(double absTime, void*)
     Vision::TrackingState ss;
     TheTrackingStateReader.GetTrackingStateAtTime(absTime, ss);
 
+    // Record the render IMU time in seconds from the raw sensor data.
+    TimingHistory.SetRenderIMUTime(absTime, ss.RawSensorData.AbsoluteTimeSeconds);
+
     // Zero out the status flags
     if (!pClient || !pClient->IsConnected(false, false))
     {
         ss.StatusFlags = 0;
     }
-
-#ifdef OVR_OS_WIN32
-    // Set up display code for Windows
-    Win32::DisplayShim::GetInstance().Active = (ss.StatusFlags & ovrStatus_HmdConnected) != 0;
-#endif
 
 
     return ss;
@@ -381,18 +380,6 @@ void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
 
         // disable dynamic prediction using the internal latency tester
         hmdCaps &= ~ovrHmdCap_DynamicPrediction;
-    }
-
-    if ((EnabledHmdCaps ^ hmdCaps) & ovrHmdCap_NoMirrorToWindow)
-    {
-#ifdef OVR_OS_WIN32
-        Win32::DisplayShim::GetInstance().UseMirroring = (hmdCaps & ovrHmdCap_NoMirrorToWindow)  ?
-                                                         false : true;
-        if (pWindow)
-        {   // Force window repaint so that stale mirrored image doesn't persist.
-            ::InvalidateRect((HWND)pWindow, 0, true);
-        }
-#endif
     }
 
     // TBD: Should this include be only the rendering flags? Otherwise, bits that failed
@@ -413,7 +400,7 @@ void HMDState::SetEnabledHmdCaps(unsigned hmdCaps)
 }
 
 
-unsigned HMDState::SetEnabledHmdCaps()
+unsigned HMDState::GetEnabledHmdCaps() const
 {
     unsigned serviceCaps = pClient ? pClient->Hmd_GetEnabledCaps(NetId) :
                                       EnabledServiceHmdCaps;
@@ -429,9 +416,17 @@ unsigned HMDState::SetEnabledHmdCaps()
 // need to keep a white-list of keys.  This is also way cool because it allows us to add
 // new settings keys from outside CAPI that can modify internal server data.
 
-bool HMDState::getBoolValue(const char* propertyName, bool defaultVal)
+bool HMDState::getBoolValue(const char* propertyName, bool defaultVal) const
 {
-    if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetBoolValue, propertyName))
+    if (OVR_strcmp(propertyName, "QueueAheadEnabled") == 0)
+    {
+        OVR_ASSERT(pCompClient);
+        if (pCompClient)
+        {
+            return pCompClient->GetQueueAheadSeconds() > 0.f;
+        }
+    }
+    else if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetBoolValue, propertyName))
     {
        return NetClient::GetInstance()->GetBoolValue(GetNetId(), propertyName, defaultVal);
     }
@@ -444,7 +439,17 @@ bool HMDState::getBoolValue(const char* propertyName, bool defaultVal)
 
 bool HMDState::setBoolValue(const char* propertyName, bool value)
 {
-    if (NetSessionCommon::IsServiceProperty(NetSessionCommon::ESetBoolValue, propertyName))
+    if (OVR_strcmp(propertyName, "QueueAheadEnabled") == 0)
+    {
+        OVR_ASSERT(pCompClient);
+        if (pCompClient)
+        {
+            // 2.8ms queue ahead by default
+            static const float DefaultQueueAheadSeconds = 0.0028f;
+            return pCompClient->SetQueueAheadSeconds(value ? DefaultQueueAheadSeconds : 0.f).Succeeded();
+        }
+    }
+    else if (NetSessionCommon::IsServiceProperty(NetSessionCommon::ESetBoolValue, propertyName))
     {
         return NetClient::GetInstance()->SetBoolValue(GetNetId(), propertyName, value);
     }
@@ -452,7 +457,7 @@ bool HMDState::setBoolValue(const char* propertyName, bool value)
     return false;
 }
 
-int HMDState::getIntValue(const char* propertyName, int defaultVal)
+int HMDState::getIntValue(const char* propertyName, int defaultVal) const
 {
     if (NetSessionCommon::IsServiceProperty(NetSessionCommon::EGetIntValue, propertyName))
     {
@@ -475,7 +480,7 @@ bool HMDState::setIntValue(const char* propertyName, int value)
     return false;
 }
 
-float HMDState::getFloatValue(const char* propertyName, float defaultVal)
+float HMDState::getFloatValue(const char* propertyName, float defaultVal) const
 {
     if (OVR_strcmp(propertyName, "LensSeparation") == 0)
     {
@@ -536,13 +541,12 @@ unsigned HMDState::getFloatArray(const char* propertyName, float values[], unsig
         }
         else if (OVR_strcmp(propertyName, "DK2Latency") == 0)
         {
-            if (OurHMDInfo.HmdType < HmdType_DK2)
+            if (OurHMDInfo.HmdType < HmdType_DK2 || !pCompClient)
             {
                 return 0;
             }
 
-            OutputLatencyTimings timings;
-            ScreenLatencyTracker.GetLatencyTimings(timings);
+            CAPI::OutputLatencyTimings timings = pCompClient->GetLatencyTimings();
 
             if (arraySize > 0)
             {
@@ -699,8 +703,8 @@ AppTiming HMDState::GetAppTiming(uint32_t frameIndex)
     const bool VsyncOn = ((RenderState.EnabledHmdCaps & ovrHmdCap_NoVSync) == 0);
     RenderTimer.GetAppTimingForIndex(timing, VsyncOn, frameIndex);
 
-    // Update the predicted scanout time for this frame index
-    TimingHistory.SetScanoutTimeForFrame(frameIndex, timing.ScanoutStartTime);
+    // Update the timing for this frame index
+    TimingHistory.SetTiming(frameIndex, timing);
 
     return timing;
 }
@@ -709,374 +713,329 @@ ovrFrameTiming HMDState::GetFrameTiming(uint32_t frameIndex)
 {
     AppTiming timing = GetAppTiming(frameIndex);
 
-    // Calculate eye render times based on shutter type
-    double eyePhotonsTimes[2];
-    CalculateEyeRenderTimes(timing.VisibleMidpointTime, timing.FrameInterval,
-                            RenderState.RenderInfo.Shutter.Type,
-                            eyePhotonsTimes[0], eyePhotonsTimes[1]);
-
-    RenderIMUTimeSeconds = Timer::GetSeconds(); // RenderPrediction.RawSensorData.TimeInSeconds;
-
     // Construct a ovrFrameTiming object from the base app timing information
     ovrFrameTiming result;
-    result.DeltaSeconds           = (float)timing.FrameInterval;
-    result.EyeScanoutSeconds[0]   = eyePhotonsTimes[0];
-    result.EyeScanoutSeconds[1]   = eyePhotonsTimes[1];
-    result.ScanoutMidpointSeconds = timing.VisibleMidpointTime;
-    result.ThisFrameSeconds       = timing.ScanoutStartTime - timing.FrameInterval;
-    result.NextFrameSeconds       = timing.ScanoutStartTime;
-    // Deprecated: This should be queried after render work completes.  Please delete me from CAPI.
-    result.TimewarpPointSeconds   = 0.;
+    result.FrameIntervalSeconds   = timing.FrameInterval;
+    result.DisplayMidpointSeconds = timing.VisibleMidpointTime;
+    result.AppFrameIndex          = frameIndex;
+    result.DisplayFrameIndex      = timing.DisplayFrameIndex;
     return result;
 }
 
 ovrTrackingState HMDState::GetMidpointPredictionTracking(uint32_t frameIndex)
 {
     AppTiming timing = GetAppTiming(frameIndex);
-    RenderIMUTimeSeconds = Timer::GetSeconds(); // RenderPrediction.RawSensorData.TimeInSeconds;
+
     return PredictedTrackingState(timing.VisibleMidpointTime);
 }
 
-Posef HMDState::GetEyePredictionPose(ovrEyeType eye)
-{
-    // Note that this function does not get the frame index parameter and depends
-    // on whichever value is passed into the BeginFrame() function.
-    ovrTrackingState ts = GetMidpointPredictionTracking(BeginFrameIndex);
-    TraceTrackingState(ts);
-    Posef const & hmdPose = ts.HeadPose.ThePose;
 
-    // Currently HmdToEyeViewOffset is only a 3D vector
-    // (Negate HmdToEyeViewOffset because offset is a view matrix offset and not a camera offset)
-    if (eye == ovrEye_Left)
+
+static const ovrTexture &GetCurrentTexture ( const ovrSwapTextureSet* texSet )
+{
+    // This is belt-and-braces, but it seems worryingly easy for apps to feed us a bad CurrentIndex and blow up everything.
+    OVR_ASSERT ( texSet != nullptr );
+    if ( ( texSet->CurrentIndex >= 0 ) && ( texSet->CurrentIndex < texSet->TextureCount ) )
     {
-        return Posef(hmdPose.Rotation, ((Posef)hmdPose).Apply(-((Vector3f)RenderState.EyeRenderDesc[0].HmdToEyeViewOffset)));
+        return texSet->Textures[texSet->CurrentIndex];
     }
     else
     {
-        return Posef(hmdPose.Rotation, ((Posef)hmdPose).Apply(-((Vector3f)RenderState.EyeRenderDesc[1].HmdToEyeViewOffset)));
+        OVR_DEBUG_LOG(("[HMDState] Invalid ovrSwapTextureSet::CurrentIndex %i", texSet->CurrentIndex));
+        return texSet->Textures[0];
     }
 }
 
-void HMDState::endFrameRenderTiming()
+
+// We convert the public ovrLayerEye_Union and friends to our internal DistortionRendererLayerDesc.
+// Requires a valid pLayerHeader pointer.
+static void ConvertLayerHeaderToLayerDesc(const ovrLayerHeader* pLayerHeader, DistortionRendererLayerDesc& layerDesc)
 {
-    TimewarpTimer.SetLastPresentTime(); // Record approximate vsync time
+    OVR_ASSERT(pLayerHeader);
 
-    bool dk2LatencyTest = (EnabledHmdCaps & ovrHmdCap_DynamicPrediction) != 0;
-    if (dk2LatencyTest)
+    layerDesc.Desc.Type                       = (LayerDesc::LayerType)pLayerHeader->Type;
+    layerDesc.Desc.bTextureOriginAtBottomLeft = (pLayerHeader->Flags & ovrLayerFlag_TextureOriginAtBottomLeft) != 0;
+
+    layerDesc.Desc.bAnisoFiltering = false;
+    layerDesc.Desc.Quality = LayerDesc::QualityType_Normal;
+    if ( (pLayerHeader->Flags & ovrLayerFlag_HighQuality) != 0 )
     {
-        Util::FrameTimeRecordSet recordSet;
-        TheLatencyTestStateReader.GetRecordSet(recordSet);
-
-        FrameLatencyData data;
-        data.DrawColor                    = LatencyTest2DrawColor[0];
-        data.RenderIMUTime                = RenderIMUTimeSeconds;
-        data.RenderPredictedScanoutTime   = TimingHistory.LookupScanoutTime(BeginFrameIndex);
-        data.PresentTime                  = TimewarpTimer.GetLatencyTesterPresentTime();
-        data.TimewarpPredictedScanoutTime = TimewarpTimer.GetTimewarpTiming()->ScanoutTime;
-        data.TimewarpIMUTime              = TimewarpTimer.GetTimewarpIMUTime();
-
-        //OVR_ASSERT(data.TimewarpIMUTime == 0. || data.TimewarpIMUTime >= data.RenderIMUTime);
-
-        ScreenLatencyTracker.SaveDrawColor(data);
-        ScreenLatencyTracker.MatchRecord(recordSet);
+        // TODO: for sRGB, don't use aniso - it's not energy-conserving.
+        // TODO: different "high quality" for eye buffers vs quads, since quads are more frequently at an angle.
+        // Note - currently for the EWA types, aniso doesn't do anything because they always sample level 0.
+        layerDesc.Desc.bAnisoFiltering = true;
+        layerDesc.Desc.Quality = LayerDesc::QualityType_Normal;
     }
-}
 
-void HMDState::getTimewarpStartEnd(ovrEyeType eyeId, double timewarpStartEnd[2])
-{
-    // Get eye start/end scanout times
-    TimewarpTiming const* timewarpTiming = TimewarpTimer.GetTimewarpTiming();
-
-    for (int i = 0; i < 2; ++i)
+    switch(pLayerHeader->Type)
     {
-        timewarpStartEnd[i] = timewarpTiming->EyeStartEndTimes[eyeId][i];
-    }
-}
-
-void HMDState::GetTimewarpMatricesEx(ovrEyeType eyeId,
-                                     ovrPosef renderPose, 
-                                     bool calcPosition, const ovrVector3f hmdToEyeViewOffset[2], 
-                                     ovrMatrix4f twmOut[2], double debugTimingOffsetInSeconds)
-{
-    // Get timewarp start/end timing
-    double timewarpStartEnd[2];
-    getTimewarpStartEnd(eyeId, timewarpStartEnd);
-
-    //TPH, to vary timing, to allow developers to debug, to shunt the predicted time forward 
-    //and back, and see if the SDK is truly delivering the correct time.  Also to allow
-    //illustration of the detrimental effects when this is not done right. 
-    timewarpStartEnd[0] += debugTimingOffsetInSeconds;
-    timewarpStartEnd[1] += debugTimingOffsetInSeconds;
-
-    ovrTrackingState startState = PredictedTrackingState(timewarpStartEnd[0]);
-    ovrTrackingState endState   = PredictedTrackingState(timewarpStartEnd[1]);
-
-    ovrPosef startHmdPose = startState.HeadPose.ThePose;
-    ovrPosef endHmdPose   = endState.HeadPose.ThePose;
-    Vector3f eyeOffset    = Vector3f(0.0f, 0.0f, 0.0f);
-    Matrix4f timewarpStart, timewarpEnd;
-    if (calcPosition)
-    {
-        if (!hmdToEyeViewOffset)
+        case ovrLayerType_EyeFov:
         {
-            OVR_ASSERT(false);
-            LogError("{ERR-102} [FrameTime] No hmdToEyeViewOffset provided even though calcPosition is true.");
+            const ovrLayerEyeFov* pLayerEyeFov = reinterpret_cast<const ovrLayerEyeFov*>(pLayerHeader);
+            OVR_ASSERT(pLayerEyeFov);
 
-            // disable position to avoid positional issues
-            renderPose.Position = Vector3f::Zero();
-            startHmdPose.Position = Vector3f::Zero();
-            endHmdPose.Position = Vector3f::Zero();
+            const ovrSwapTextureSet* texSet[2];
+            texSet[0] = pLayerEyeFov->ColorTexture[0];
+            texSet[1] = pLayerEyeFov->ColorTexture[1];
+            if ( texSet[1] == nullptr )
+            {
+                // Only one texture supplied, so use it for both eyes.
+                texSet[1] = pLayerEyeFov->ColorTexture[0];
+            }
+            if ( texSet[0] == nullptr )
+            {
+                OVR_DEBUG_LOG(("[HMDState] NULL texture set pointer in layer %i - disabling", layerDesc.LayerNum));
+                layerDesc.SetToDisabled();
+                return;
+            }
+
+            for (int eyeId = 0; eyeId < 2; eyeId++)
+            {
+                layerDesc.Desc.EyeRenderPose[eyeId]     = pLayerEyeFov->RenderPose[eyeId];
+                layerDesc.Desc.EyeTextureSize[eyeId]    = GetCurrentTexture(texSet[eyeId]).Header.TextureSize;
+                layerDesc.Desc.EyeRenderViewport[eyeId] = pLayerEyeFov->Viewport[eyeId];
+                layerDesc.Desc.EyeRenderFovPort[eyeId]  = pLayerEyeFov->Fov[eyeId];
+                layerDesc.Desc.pEyeTextureSets[eyeId]   = texSet[eyeId];
+
+                // Unused for this layer type:
+                layerDesc.Desc.QuadSize[eyeId]             = ovrVector2f();
+                layerDesc.Desc.pEyeDepthTextureSets[eyeId] = nullptr;
+            }
+
+            break;
         }
-        else if (hmdToEyeViewOffset[eyeId].x >= MATH_FLOAT_MAXVALUE)
-        {
-            OVR_ASSERT(false);
-            LogError("{ERR-103} [FrameTime] Invalid hmdToEyeViewOffset provided by client.");
 
-            // disable position to avoid positional issues
-            renderPose.Position = Vector3f::Zero();
-            startHmdPose.Position = Vector3f::Zero();
-            endHmdPose.Position = Vector3f::Zero();
+        case ovrLayerType_EyeFovDepth:
+        {
+            const ovrLayerEyeFovDepth* pLayerEyeFovDepth = reinterpret_cast<const ovrLayerEyeFovDepth*>(pLayerHeader);
+            OVR_ASSERT(pLayerEyeFovDepth);
+
+            const ovrSwapTextureSet* colorTexSet[2];
+            colorTexSet[0] = pLayerEyeFovDepth->ColorTexture[0];
+            colorTexSet[1] = pLayerEyeFovDepth->ColorTexture[1];
+            if ( colorTexSet[1] == nullptr )
+            {
+                // Only one texture supplied, so use it for both eyes.
+                colorTexSet[1] = pLayerEyeFovDepth->ColorTexture[0];
+            }
+            if ( colorTexSet[0] == nullptr )
+            {
+                OVR_DEBUG_LOG(("[HMDState] NULL texture set pointer in layer %i - disabling", layerDesc.LayerNum));
+                layerDesc.SetToDisabled();
+                return;
+            }
+
+            const ovrSwapTextureSet* depthTexSet[2];
+            depthTexSet[0] = pLayerEyeFovDepth->DepthTexture[0];
+            depthTexSet[1] = pLayerEyeFovDepth->DepthTexture[1];
+            if ( depthTexSet[1] == nullptr )
+            {
+                // Only one texture supplied, so use it for both eyes.
+                depthTexSet[1] = pLayerEyeFovDepth->DepthTexture[0];
+            }
+            if ( depthTexSet[0] == nullptr )
+            {
+                OVR_DEBUG_LOG(("[HMDState] NULL texture set pointer in layer %i - disabling", layerDesc.LayerNum));
+                layerDesc.SetToDisabled();
+                return;
+            }
+
+            for (int eyeId = 0; eyeId < 2; eyeId++)
+            {
+                // Force the sanity-checking that GetCurrentTexture does.
+                ovrTexture const &ignored = GetCurrentTexture(depthTexSet[eyeId]);
+                OVR_UNUSED ( ignored );
+
+                layerDesc.Desc.EyeRenderPose[eyeId]        = pLayerEyeFovDepth->RenderPose[eyeId];
+                layerDesc.Desc.EyeTextureSize[eyeId]       = GetCurrentTexture(colorTexSet[eyeId]).Header.TextureSize;
+                layerDesc.Desc.EyeRenderViewport[eyeId]    = pLayerEyeFovDepth->Viewport[eyeId];
+                layerDesc.Desc.EyeRenderFovPort[eyeId]     = pLayerEyeFovDepth->Fov[eyeId];
+                layerDesc.Desc.pEyeTextureSets[eyeId]      = colorTexSet[eyeId];
+                layerDesc.Desc.pEyeDepthTextureSets[eyeId] = depthTexSet[eyeId];
+                layerDesc.Desc.ProjectionDesc = pLayerEyeFovDepth->ProjectionDesc;
+
+                // Unused for this layer type:
+                layerDesc.Desc.QuadSize[eyeId] = ovrVector2f();
+            }
+
+            break;
+        }
+
+        case ovrLayerType_QuadInWorld:
+        case ovrLayerType_QuadHeadLocked:
+        {
+            const ovrLayerQuad* pLayerQuad = reinterpret_cast<const ovrLayerQuad*>(pLayerHeader);
+            OVR_ASSERT(pLayerQuad);
+
+            if ( pLayerQuad->ColorTexture == nullptr )
+            {
+                OVR_DEBUG_LOG(("[HMDState] NULL texture set pointer in layer %i - disabling", layerDesc.LayerNum));
+                layerDesc.SetToDisabled();
+                return;
+            }
+
+            for (int eyeId = 0; eyeId < 2; eyeId++)
+            {
+                // TODO: write a stereo-pair-capable version of this call.
+                layerDesc.Desc.EyeRenderPose[eyeId]     = pLayerQuad->QuadPoseCenter;
+                layerDesc.Desc.QuadSize[eyeId]          = pLayerQuad->QuadSize;
+                layerDesc.Desc.EyeTextureSize[eyeId]    = GetCurrentTexture(pLayerQuad->ColorTexture).Header.TextureSize;
+                layerDesc.Desc.EyeRenderViewport[eyeId] = pLayerQuad->Viewport;
+                layerDesc.Desc.pEyeTextureSets[eyeId]   = pLayerQuad->ColorTexture;
+
+                // Unused for this layer type:
+                layerDesc.Desc.pEyeDepthTextureSets[eyeId] = nullptr;
+                layerDesc.Desc.EyeRenderFovPort[eyeId]     = FovPort();
+            }
+
+            break;
+        }
+
+        case ovrLayerType_Direct:
+        {
+            const ovrLayerDirect* pLayerDirect = reinterpret_cast<const ovrLayerDirect*>(pLayerHeader);
+            OVR_ASSERT(pLayerDirect);
+
+            const ovrSwapTextureSet* texSet[2];
+            texSet[0] = pLayerDirect->ColorTexture[0];
+            texSet[1] = pLayerDirect->ColorTexture[1];
+            if ( texSet[1] == nullptr )
+            {
+                // Only one texture supplied, so use it for both eyes.
+                texSet[1] = pLayerDirect->ColorTexture[0];
+            }
+            if ( texSet[0] == nullptr )
+            {
+                OVR_DEBUG_LOG(("[HMDState] NULL texture set pointer in layer %i - disabling", layerDesc.LayerNum));
+                layerDesc.SetToDisabled();
+                return;
+            }
+
+            for (int eyeId = 0; eyeId < 2; eyeId++)
+            {
+                layerDesc.Desc.EyeTextureSize[eyeId]       = GetCurrentTexture(texSet[eyeId]).Header.TextureSize;
+                layerDesc.Desc.EyeRenderViewport[eyeId]    = pLayerDirect->Viewport[eyeId];
+                layerDesc.Desc.pEyeTextureSets[eyeId]      = texSet[eyeId];
+
+                // Unused for this layer type:
+                layerDesc.Desc.QuadSize[eyeId]             = ovrVector2f();
+                layerDesc.Desc.pEyeDepthTextureSets[eyeId] = nullptr;
+                layerDesc.Desc.EyeRenderPose[eyeId]        = Posef();
+                layerDesc.Desc.EyeRenderFovPort[eyeId]     = FovPort();
+            }
+
+            break;
+        }
+    }
+}
+
+
+ovrResult HMDState::SubmitLayers(ovrLayerHeader const * const * layerPtrList, unsigned int layerCount)
+{
+    OVR_ASSERT(pCompClient);
+
+    // Ignore layers that are beyond the supported count.
+    if(layerCount > MaxNumLayersTotal)
+       layerCount = MaxNumLayersTotal;
+
+    // Make it so our LayerDescList can have an entry for every user-supplied ovrLayerHeader.
+    if(LayerDescList.GetSize() < layerCount)
+        LayerDescList.Resize(layerCount);            
+
+    for (unsigned int i = 0; i < layerCount; ++i)
+    {
+        DistortionRendererLayerDesc& layerDesc = LayerDescList[i];
+
+        layerDesc.LayerNum = i; // To do: LayerNum is always the same for this layer index, so we could assign this value externally.
+
+        // Should we return an error code or log an error if the user passes an invalid Type?
+        if (layerPtrList[i] && (layerPtrList[i]->Type >= ovrLayerType_EyeFov) && 
+                               (layerPtrList[i]->Type <= ovrLayerType_Direct))
+        {
+            ConvertLayerHeaderToLayerDesc(layerPtrList[i], layerDesc);
+            OVRError err;
+            if ( layerDesc.Desc.Type == LayerDesc::LayerType_Disabled )
+            {
+                // ConvertLayerHeaderToLayerDesc found something scary and disabled the layer.
+                err = pCompClient->DisableLayer(i);
+            }
+            else
+            {
+                err = pCompClient->SubmitLayer(i, &layerDesc.Desc);
+            }
+
+            if (!err.Succeeded())
+            {
+                OVR_SET_ERROR(err);
+                return err.GetCode();
+            }
+
+            if (i > 0)
+                LayersOtherThan0MayBeEnabled = true;
         }
         else
         {
-            // Currently HmdToEyeViewOffset is only a 3D vector
-            // (Negate HmdToEyeViewOffset because offset is a view matrix offset and not a camera offset)
-            eyeOffset = ((Posef)startHmdPose).Apply(-((Vector3f)hmdToEyeViewOffset[eyeId]));
-        }
-
-        Posef fromEye = Posef(renderPose).Inverted();   // because we need the view matrix, not the camera matrix
-        CalculatePositionalTimewarpMatrix(fromEye, startHmdPose, eyeOffset, timewarpStart);
-        CalculatePositionalTimewarpMatrix(fromEye,   endHmdPose, eyeOffset, timewarpEnd);
-    }
-    else
-    {
-        Quatf fromEye = Quatf(renderPose.Orientation).Inverted();   // because we need the view matrix, not the camera matrix
-        CalculateOrientationTimewarpMatrix(fromEye, startHmdPose.Orientation, timewarpStart);
-        CalculateOrientationTimewarpMatrix(fromEye,   endHmdPose.Orientation, timewarpEnd);
-    }
-    twmOut[0] = timewarpStart;
-    twmOut[1] = timewarpEnd;
-}
-
-void HMDState::GetTimewarpMatrices(ovrEyeType eyeId, ovrPosef renderPose,
-                                   ovrMatrix4f twmOut[2])
-{
-    // Get timewarp start/end timing
-    double timewarpStartEnd[2];
-    getTimewarpStartEnd(eyeId, timewarpStartEnd);
-
-    ovrTrackingState startState = PredictedTrackingState(timewarpStartEnd[0]);
-    ovrTrackingState endState   = PredictedTrackingState(timewarpStartEnd[1]);
-
-    Quatf quatFromEye = Quatf(renderPose.Orientation);
-    quatFromEye.Invert();   // because we need the view matrix, not the camera matrix
-
-    Matrix4f timewarpStart, timewarpEnd;
-    CalculateOrientationTimewarpMatrix(
-        quatFromEye, startState.HeadPose.ThePose.Orientation, timewarpStart);
-    CalculateOrientationTimewarpMatrix(
-        quatFromEye, endState.HeadPose.ThePose.Orientation, timewarpEnd);
-
-    twmOut[0] = timewarpStart;
-    twmOut[1] = timewarpEnd;
-}
-
-
-//-------------------------------------------------------------------------------------
-// *** Rendering
-
-bool HMDState::ConfigureRendering(ovrEyeRenderDesc eyeRenderDescOut[2],
-                                  const ovrFovPort eyeFovIn[2],
-                                  const ovrRenderAPIConfig* apiConfig,                                  
-                                  unsigned distortionCaps)
-{
-    ThreadChecker::Scope checkScope(&RenderAPIThreadChecker, "ovrHmd_ConfigureRendering");
-
-    // null -> shut down.
-    if (!apiConfig)
-    {
-        if (pHSWDisplay)
-        {
-            pHSWDisplay->Shutdown();
-            pHSWDisplay.Clear();
-        }
-
-        if (pRenderer)
-            pRenderer.Clear();        
-        RenderingConfigured = false; 
-        return true;
-    }
-
-    if (pRenderer &&
-        (apiConfig->Header.API != pRenderer->GetRenderAPI()))
-    {
-        // Shutdown old renderer.
-        if (pHSWDisplay)
-        {
-            pHSWDisplay->Shutdown();
-            pHSWDisplay.Clear();
-        }
-
-        if (pRenderer)
-            pRenderer.Clear();
-    }
-
-    distortionCaps = distortionCaps & pHmdDesc->DistortionCaps;
-
-    // Step 1: do basic setup configuration
-    RenderState.EnabledHmdCaps = EnabledHmdCaps;     // This is a copy... Any cleaner way?
-    RenderState.DistortionCaps = distortionCaps;
-    RenderState.EyeRenderDesc[0] = RenderState.CalcRenderDesc(ovrEye_Left,  eyeFovIn[0]);
-    RenderState.EyeRenderDesc[1] = RenderState.CalcRenderDesc(ovrEye_Right, eyeFovIn[1]);
-    eyeRenderDescOut[0] = RenderState.EyeRenderDesc[0];
-    eyeRenderDescOut[1] = RenderState.EyeRenderDesc[1];
-
-    // Set RenderingConfigured early to avoid ASSERTs in renderer initialization.
-    RenderingConfigured = true;
-
-    if (!pRenderer)
-    {
-        pRenderer = *DistortionRenderer::APICreateRegistry
-                        [apiConfig->Header.API]();
-    }
-
-    if (!pRenderer ||
-        !pRenderer->Initialize(apiConfig, &TheTrackingStateReader,
-                               &TimewarpTimer, &RenderState))
-    {
-        RenderingConfigured = false;
-        return false;
-    }
-
-    // Setup the Health and Safety Warning display system.
-    if(pHSWDisplay && (pHSWDisplay->GetRenderAPIType() != apiConfig->Header.API)) // If we need to reconstruct the HSWDisplay for a different graphics API type, delete the existing display.
-    {
-        pHSWDisplay->Shutdown();
-        pHSWDisplay.Clear();
-    }
-
-    if(!pHSWDisplay) // Use * below because that for of operator= causes it to inherit the refcount the factory gave the object.
-    {
-        pHSWDisplay = *OVR::CAPI::HSWDisplay::Factory(apiConfig->Header.API, pHmdDesc, RenderState);
-    }
-
-    if (pHSWDisplay)
-    {
-        pHSWDisplay->Initialize(apiConfig); // This is potentially re-initializing it with a new config.
-    }
-
-#ifdef OVR_OS_WIN32
-    if (!pWindow)
-    {
-        // We can automatically populate the window to attach to by
-        // pulling that information off the swap chain that the
-        // application provides.  If the application later calls the
-        // ovrHmd_AttachToWindow() function these will get harmlessly
-        // overwritten.  The check above verifies that the window is
-        // not set yet, and it insures that this default doesn't
-        // overwrite the application setting.
-
-        if (apiConfig->Header.API == ovrRenderAPI_D3D11)
-        {
-            ovrD3D11Config* d3d11Config = (ovrD3D11Config*)apiConfig;
-            if (d3d11Config->D3D11.pSwapChain)
+            OVRError err = pCompClient->DisableLayer(i);
+            if (!err.Succeeded())
             {
-                DXGI_SWAP_CHAIN_DESC desc = {};
-                HRESULT hr = d3d11Config->D3D11.pSwapChain->GetDesc(&desc);
-                if (SUCCEEDED(hr))
-                {
-                    pWindow = (void*)desc.OutputWindow;
-                }
+                OVR_SET_ERROR(err);
+                return err.GetCode();
             }
         }
-        else if (apiConfig->Header.API == ovrRenderAPI_OpenGL)
-        {
-            ovrGLConfig* glConfig = (ovrGLConfig*)apiConfig;
-            pWindow = (void*)glConfig->OGL.Window;
-        }
-OVR_DISABLE_MSVC_WARNING(4996) // Disable deprecation warning
-        else if (apiConfig->Header.API == ovrRenderAPI_D3D9)
-        {
-            ovrD3D9Config* dx9Config = (ovrD3D9Config*)apiConfig;
-            if (dx9Config->D3D9.pDevice)
-            {
-                D3DDEVICE_CREATION_PARAMETERS  params = {};
-                HRESULT hr = dx9Config->D3D9.pDevice->GetCreationParameters(&params);
-                if (SUCCEEDED(hr))
-                {
-                    pWindow = (void*)params.hFocusWindow;
-                }
-            }
-        }
-OVR_RESTORE_MSVC_WARNING()
+    }
 
-        // If a window handle was implied by render configuration,
-        if (pWindow)
+    for(unsigned int i = layerCount; i < MaxNumLayersPublic; ++i)
+    {
+        OVRError err = pCompClient->DisableLayer(i);
+        if (!err.Succeeded())
         {
-            // This is the same logic as ovrHmd_AttachToWindow() on Windows:
-            if (pClient)
-                pClient->Hmd_AttachToWindow(GetNetId(), pWindow);
-            Win32::DisplayShim::GetInstance().hWindow = (HWND)pWindow;
-            // On the server side it is updating the association of connection
-            // to window handle.  This is perfectly safe to update later to
-            // a new window handle (verified).  Also verified that if this
-            // handle is garbage that it doesn't crash anything.
+            OVR_SET_ERROR(err);
+            return err.GetCode();
         }
     }
-#endif
 
-    return true;
+    return ovrSuccess;
 }
 
-
-void  HMDState::SubmitEyeTextures(const ovrPosef renderPose[2],
-                                  const ovrTexture eyeTexture[2],
-                                  const ovrTexture eyeDepthTexture[2])
+ovrResult HMDState::SubmitFrame(uint32_t appFrameIndex, const ovrViewScaleDesc* viewScaleDesc, ovrLayerHeader const * const * layerPtrList, unsigned int layerCount)
 {
-    RenderState.EyeRenderPoses[0] = renderPose[0];
-    RenderState.EyeRenderPoses[1] = renderPose[1];
+    OVR_ASSERT(layerCount >= 0);
+    OVR_ASSERT((layerCount == 0) || (layerPtrList && (*layerPtrList != nullptr)));
+    OVR_ASSERT(pCompClient);
+    OVR_ASSERT(viewScaleDesc != NULL);
 
-    if (pRenderer)
+    ovrResult result = SubmitLayers(layerPtrList, layerCount);
+
+    if (result != ovrSuccess)
     {
-        if(eyeDepthTexture)
+        // To do: We need to call OVR_MAKE_ERROR if it hasn't been done yet, in order to record the error for posterity.
+        OVR_ASSERT(false);
+        return result;
+    }
+
+    #if defined (OVR_OS_MS) || defined(OVR_OS_MAC)
+        OVRError err = pCompClient->EndFrame(appFrameIndex, viewScaleDesc);
+
+        if (!err.Succeeded())
         {
-            pRenderer->SubmitEyeWithDepth(0, &eyeTexture[0], &eyeDepthTexture[0]);
-            pRenderer->SubmitEyeWithDepth(1, &eyeTexture[1], &eyeDepthTexture[1]);
+            OVR_SET_ERROR(err);
+            return err.GetCode();
         }
-        else
-        {
-            //OVR_ASSERT(!(RenderState.DistortionCaps & ovrDistortionCap_DepthProjectedTimeWarp));
-            //LogError("{ERR-104} [HMDState] Even though ovrDistortionCap_DepthProjectedTimeWarp is enabled, no depth buffer was provided.");
 
-        pRenderer->SubmitEye(0, &eyeTexture[0]);
-        pRenderer->SubmitEye(1, &eyeTexture[1]);
-    }
+        result = err.GetCode();
+    #else
+        OVR_UNUSED(appFrameIndex);
+        OVR_UNUSED(viewScaleDesc);
+    #endif
+
+    // Next App Frame Index
+    AppFrameIndex++;
+
+    return result;
 }
-}
 
-bool  HMDState::CreateDistortionMesh(ovrEyeType eyeType, ovrFovPort fov,
-                                     unsigned int distortionCaps,
-                                     ovrDistortionMesh *meshData,
-                                     float overrideEyeReliefIfNonZero)
-{
-    const HmdRenderInfo& hmdri = RenderState.RenderInfo;
 
-    DistortionRenderDesc& distortion = RenderState.Distortion[eyeType];
-    if (overrideEyeReliefIfNonZero)
-    {
-        distortion.Lens = GenerateLensConfigFromEyeRelief(overrideEyeReliefIfNonZero, hmdri);
-    }
 
-    if (CalculateDistortionMeshFromFOV(
-            hmdri, distortion,
-            (eyeType == ovrEye_Left ? StereoEye_Left : StereoEye_Right),
-            fov, distortionCaps, meshData))
-    {
-        return 1;
-    }
-
-    return 0;
-}
 
 
 }} // namespace OVR::CAPI

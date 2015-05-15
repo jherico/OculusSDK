@@ -2,6 +2,8 @@
 setlocal
 REM run this script from an Admin shell to set up ETW tracing
 
+set SCRIPTDIR=%~dp0
+
 REM set SDK_MANIFEST_PATH to the SDK install path (e.g. C:\Program Files (x86)\Oculus)
 for /f "delims=" %%a in ('reg query "HKLM\System\CurrentControlSet\Services\OVRService" -v "ImagePath"') do set SDK_MANIFEST_PATH=%%a
 set SDK_MANIFEST_PATH=%SDK_MANIFEST_PATH:~34,-31%\Tools\ETW
@@ -42,46 +44,46 @@ echo ************************
 
 :SkipRegCheck
 
-set RIFTDISPLAYDRIVER_DIR=..\..\..\RiftDisplayDriver
-set RIFTCAMERADRIVER_DIR=..\..\..\RiftPTDriver
+set RIFTDISPLAYDRIVER_DIR=%SCRIPTDIR%..\..\..\RiftDisplayDriver
+set RIFTCAMERADRIVER_DIR=%SCRIPTDIR%..\..\..\RiftPTDriver
 
-if exist "%SDK_MANIFEST_PATH%\OVRKernelEvents.man" set KERNEL_EVENTS_MAN=%SDK_MANIFEST_PATH%\OVRKernelEvents.man
+set KERNEL_EVENTS_MAN=%SDK_MANIFEST_PATH%\OVRKernelEvents.man
 if exist "%RIFTDISPLAYDRIVER_DIR%\RiftEnabler\OVRKernelEvents.man" set KERNEL_EVENTS_MAN=%RIFTDISPLAYDRIVER_DIR%\RiftEnabler\OVRKernelEvents.man
-if exist ".\OVRKernelEvents.man" set KERNEL_EVENTS_MAN=.\OVRKernelEvents.man
+if exist "%SCRIPTDIR%OVRKernelEvents.man" set KERNEL_EVENTS_MAN=%SCRIPTDIR%OVRKernelEvents.man
 
 echo Installing %RIFTENABLER_SYS% manifest...
 REM uninstall any existing manifest first
 wevtutil.exe uninstall-manifest "%KERNEL_EVENTS_MAN%"
 if %errorlevel% neq 0 echo WARNING: This step failed.
-wevtutil.exe install-manifest "%KERNEL_EVENTS_MAN%" /rf:%RIFTENABLER_SYS% /mf:%RIFTENABLER_SYS%
+wevtutil.exe install-manifest "%KERNEL_EVENTS_MAN%" /rf:"%RIFTENABLER_SYS%" /mf:"%RIFTENABLER_SYS%"
 REM make sure it worked
 wevtutil get-publisher OVR-Kernel > nul
 if %errorlevel% neq 0 echo WARNING: This step failed.
 echo Installed %KERNEL_EVENTS_MAN%
 
-if exist "%SDK_MANIFEST_PATH%\RTFilterEvents.man" set RFILTER_EVENTS_MAN=%SDK_MANIFEST_PATH%\RTFilterEvents.man
+set RFILTER_EVENTS_MAN=%SDK_MANIFEST_PATH%\RTFilterEvents.man
 if exist "%RIFTDISPLAYDRIVER_DIR%\rt_filter\RTFilterEvents.man" set RFILTER_EVENTS_MAN=%RIFTDISPLAYDRIVER_DIR%\rt_filter\RTFilterEvents.man
-if exist ".\RTFilterEvents.man" set RFILTER_EVENTS_MAN=.\RTFilterEvents.man
+if exist "%SCRIPTDIR%RTFilterEvents.man" set RFILTER_EVENTS_MAN=%SCRIPTDIR%RTFilterEvents.man
 
 echo Installing %OVRDISPLAYRT_DLL% manifest...
 REM uninstall any existing manifest first
 wevtutil.exe uninstall-manifest "%RFILTER_EVENTS_MAN%"
 if %errorlevel% neq 0 echo WARNING: This step failed.
-wevtutil.exe install-manifest "%RFILTER_EVENTS_MAN%" /rf:%OVRDISPLAYRT_DLL% /mf:%OVRDISPLAYRT_DLL%
+wevtutil.exe install-manifest "%RFILTER_EVENTS_MAN%" /rf:"%OVRDISPLAYRT_DLL%" /mf:"%OVRDISPLAYRT_DLL%"
 REM make sure it worked
 wevtutil get-publisher OVR-RTFilter > nul
 if %errorlevel% neq 0 echo WARNING: This step failed.
 echo Installed %RFILTER_EVENTS_MAN%
 
-if exist "%SDK_MANIFEST_PATH%\OVRUSBVidEvents.man" set USBVID_EVENTS_MAN=%SDK_MANIFEST_PATH%\OVRUSBVidEvents.man
+set USBVID_EVENTS_MAN=%SDK_MANIFEST_PATH%\OVRUSBVidEvents.man
 if exist "%RIFTCAMERADRIVER_DIR%\OCUSBVID\OVRUSBVidEvents.man" set USBVID_EVENTS_MAN=%RIFTCAMERADRIVER_DIR%\OCUSBVID\OVRUSBVidEvents.man
-if exist ".\OVRUSBVidEvents.man" set USBVID_EVENTS_MAN=.\OVRUSBVidEvents.man
+if exist "%SCRIPTDIR%OVRUSBVidEvents.man" set USBVID_EVENTS_MAN=%SCRIPTDIR%OVRUSBVidEvents.man
 
 echo Installing %OCUSBVID_SYS% manifest...
 REM uninstall any existing manifest first
 wevtutil.exe uninstall-manifest "%USBVID_EVENTS_MAN%"
 if %errorlevel% neq 0 echo WARNING: This step failed.
-wevtutil.exe install-manifest "%USBVID_EVENTS_MAN%" /rf:%OCUSBVID_SYS% /mf:%OCUSBVID_SYS%
+wevtutil.exe install-manifest "%USBVID_EVENTS_MAN%" /rf:"%OCUSBVID_SYS%" /mf:"%OCUSBVID_SYS%"
 REM make sure it worked
 wevtutil get-publisher OVR-USBVid > nul
 if %errorlevel% neq 0 echo WARNING: This step failed.
@@ -89,27 +91,38 @@ echo Installed %USBVID_EVENTS_MAN%
 
 REM XXX eventually add OVR-Compositor here...
 
-if exist "%SDK_MANIFEST_PATH%\LibOVREvents.man" set LIBOVR_EVENTS_MAN=%SDK_MANIFEST_PATH%\LibOVREvents.man
-if exist ".\LibOVREvents.man" set LIBOVR_EVENTS_MAN=.\LibOVREvents.man
+set LIBOVR_EVENTS_MAN=%SDK_MANIFEST_PATH%\LibOVREvents.man
+if exist "%SCRIPTDIR%LibOVREvents.man" set LIBOVR_EVENTS_MAN=%SCRIPTDIR%LibOVREvents.man
 
 REM this nightmare command copies the newest version of LibOVRRT*.dll into the current directory without prompting...
-forfiles /p:c:\Windows\System32 /m:LibOVRRT*.dll /c "cmd /c xcopy /y /f /d @path %cd% >nul" >nul 2>nul
-forfiles /s /p:..\..\..\LibOVR\Lib\Windows /m:LibOVRRT*.dll /c "cmd /c xcopy /y /f /d @path %cd% >nul" >nul 2>nul
-for /f "delims=" %%a in ('dir /b /o:d LibOVRRT*.dll') do set LIBOVR_DLL=%%a
-set LIBOVR_DLL=%cd%\%LIBOVR_DLL%
+forfiles /p:"%SystemRoot%\System32" /m:LibOVRRT*.dll /c "cmd /c xcopy /y /f /d @path \"%SCRIPTDIR%.\" >nul" >nul 2>nul
+if not exist "%SCRIPTDIR%..\..\..\LibOVR\Lib\Windows" goto NoLibOVRSource
+forfiles /s /p:"%SCRIPTDIR%..\..\..\LibOVR\Lib\Windows" /m:LibOVRRT*.dll /c "cmd /c xcopy /y /f /d @path \"%SCRIPTDIR%.\" >nul" >nul 2>nul
+:NoLibOVRSource
+for /f "delims=" %%a in ('dir /b /o:d "%SCRIPTDIR%LibOVRRT*.dll"') do set LIBOVR_DLL=%%a
 echo Installing %LIBOVR_DLL% manifest...
 REM uninstall any existing manifest first
 wevtutil uninstall-manifest "%LIBOVR_EVENTS_MAN%"
 if %errorlevel% neq 0 exit /b 1
-wevtutil install-manifest "%LIBOVR_EVENTS_MAN%" /rf:%LIBOVR_DLL% /mf:%LIBOVR_DLL%
+
+REM try relative paths to the RT .dll
+wevtutil install-manifest "%LIBOVR_EVENTS_MAN%" /rf:"%LIBOVR_DLL%" /mf:"%LIBOVR_DLL%"
+wevtutil get-publisher OVR-SDK-LibOVR > nul
+if %errorlevel% equ 0 goto LibOVRInstalled
+REM try absolute paths to the RT .dll
+wevtutil install-manifest "%LIBOVR_EVENTS_MAN%" /rf:"%SCRIPTDIR%%LIBOVR_DLL%" /mf:"%SCRIPTDIR%%LIBOVR_DLL%"
+:LibOVRInstalled
+del /f /q "%SCRIPTDIR%LibOVRRT*.dll"
 REM make sure it worked
 wevtutil get-publisher OVR-SDK-LibOVR > nul
 if %errorlevel% neq 0 exit /b 1
 echo Installed %LIBOVR_EVENTS_MAN%
 
+if not exist "%SCRIPTDIR%..\..\..\Tools" exit /b 0
+
 echo You can now start/stop traces with the GUI:
-echo   cd ..\..\..\Tools\TraceScript\ovrtap
+echo   cd %SCRIPTDIR%..\..\..\Tools\TraceScript\ovrtap
 echo   .\startovrtap.cmd
 echo or (command-line):
-echo   cd ..\..\..\Tools\Xperf
+echo   cd %SCRIPTDIR%..\..\..\Tools\Xperf
 echo   log

@@ -40,136 +40,103 @@ static const int LENGTH_FIELD_BYTES = 4;
 
 PacketizedTCPSocket::PacketizedTCPSocket()
 {
-	pRecvBuff = 0;
-	pRecvBuffSize = 0;
-	Transport = TransportType_PacketizedTCP;
+    pRecvBuff = 0;
+    pRecvBuffSize = 0;
+    Transport = TransportType_PacketizedTCP;
 }
 
 PacketizedTCPSocket::PacketizedTCPSocket(SocketHandle _sock, bool isListenSocket) : PacketizedTCPSocketBase(_sock, isListenSocket)
 {
-	pRecvBuff = 0;
-	pRecvBuffSize = 0;
-	Transport = TransportType_PacketizedTCP;
+    pRecvBuff = 0;
+    pRecvBuffSize = 0;
+    Transport = TransportType_PacketizedTCP;
 }
 
 PacketizedTCPSocket::~PacketizedTCPSocket()
 {
-	OVR_FREE(pRecvBuff);
+    OVR_FREE(pRecvBuff);
 }
 
 int PacketizedTCPSocket::Send(const void* pData, int bytes)
 {
-    Lock::Locker locker(&sendLock);
+    int retval = -1; // Default return value on error
 
-	if (bytes <= 0)
-	{
-		return -1;
-	}
+    if (bytes > 0)
+    {
+        const void* buffers[2];
+        char fourBytes[4];
+        const uint32_t lengthWord = (uint32_t)bytes;
+        static_assert(LENGTH_FIELD_BYTES == 4, "Update this part");
+        fourBytes[0] = (uint8_t)lengthWord;
+        fourBytes[1] = (uint8_t)(lengthWord >> 8);
+        fourBytes[2] = (uint8_t)(lengthWord >> 16);
+        fourBytes[3] = (uint8_t)(lengthWord >> 24);
+        buffers[0] = fourBytes;
+        buffers[1] = pData;
 
-	// Convert length to 4 endian-neutral bytes
-	uint32_t lengthWord = bytes;
-	uint8_t lengthBytes[LENGTH_FIELD_BYTES] = {
-		(uint8_t)lengthWord,
-		(uint8_t)(lengthWord >> 8),
-		(uint8_t)(lengthWord >> 16),
-		(uint8_t)(lengthWord >> 24)
-	};
+        int buffersLengths[2];
+        buffersLengths[0] = LENGTH_FIELD_BYTES;
+        buffersLengths[1] = bytes;
 
-	int s = PacketizedTCPSocketBase::Send(lengthBytes, LENGTH_FIELD_BYTES);
-	if (s > 0)
-	{
-		return PacketizedTCPSocketBase::Send(pData,bytes);
-	}
-	else
-	{
-		return s;
-	}
-}
+        // Send it
+        retval = PacketizedTCPSocketBase::Send(buffers, buffersLengths, 2) - LENGTH_FIELD_BYTES;
+    }
 
-int PacketizedTCPSocket::SendAndConcatenate(const void** pDataArray, int* dataLengthArray, int arrayCount)
-{
-    Lock::Locker locker(&sendLock);
-
-    if (arrayCount == 0)
-		return 0;
-
-	int totalBytes = 0;
-	for (int i = 0; i < arrayCount; i++)
-		totalBytes += dataLengthArray[i];
-
-	// Convert length to 4 endian-neutral bytes
-	uint32_t lengthWord = totalBytes;
-	uint8_t lengthBytes[LENGTH_FIELD_BYTES] = {
-		(uint8_t)lengthWord,
-		(uint8_t)(lengthWord >> 8),
-		(uint8_t)(lengthWord >> 16),
-		(uint8_t)(lengthWord >> 24)
-	};
-
-	int s = PacketizedTCPSocketBase::Send(lengthBytes, LENGTH_FIELD_BYTES);
-	if (s > 0)
-	{
-		for (int i = 0; i < arrayCount; i++)
-		{
-			PacketizedTCPSocketBase::Send(pDataArray[i], dataLengthArray[i]);
-		}
-	}
-
-	return s;
+    return retval;
 }
 
 void PacketizedTCPSocket::OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, int bytesRead)
 {
-	uint8_t* dataSource = NULL;
-	int dataSourceSize = 0;
+    uint8_t* dataSource = nullptr;
+    int dataSourceSize = 0;
 
-	recvBuffLock.DoLock();
+    recvBuffLock.DoLock();
 
-	if (pRecvBuff == NULL)
-	{
-		dataSource = pData;
-		dataSourceSize = bytesRead;
-	}
-	else
-	{
-		uint8_t* pRecvBuffNew = (uint8_t*)OVR_REALLOC(pRecvBuff, bytesRead + pRecvBuffSize);
-		if (!pRecvBuffNew)
-		{
-			OVR_FREE(pRecvBuff);
-			pRecvBuff = NULL;
-			pRecvBuffSize = 0;
-			recvBuffLock.Unlock();
-			return;
-		}
-		else
-		{
-			pRecvBuff = pRecvBuffNew;
-
-			memcpy(pRecvBuff + pRecvBuffSize, pData, bytesRead);
-
-			dataSourceSize = pRecvBuffSize + bytesRead;
-			dataSource = pRecvBuff;
-		}
-	}
-
-	int bytesReadFromStream;
-	while (bytesReadFromStream = BytesFromStream(dataSource, dataSourceSize),
-		   LENGTH_FIELD_BYTES + bytesReadFromStream <= dataSourceSize)
-	{
-		dataSource += LENGTH_FIELD_BYTES;
-		dataSourceSize -= LENGTH_FIELD_BYTES;
-
-		TCPSocket::OnRecv(eventHandler, dataSource, bytesReadFromStream);
-
-		dataSource += bytesReadFromStream;
-		dataSourceSize -= bytesReadFromStream;
-	}
-
-	if (dataSourceSize > 0)
-	{
-        if (dataSource != NULL)
+    if (pRecvBuff == nullptr)
+    {
+        dataSource = pData;
+        dataSourceSize = bytesRead;
+    }
+    else
+    {
+        uint8_t* pRecvBuffNew = (uint8_t*)OVR_REALLOC(pRecvBuff, bytesRead + pRecvBuffSize);
+        if (!pRecvBuffNew)
         {
-            if (pRecvBuff == NULL)
+            OVR_FREE(pRecvBuff);
+            pRecvBuff = nullptr;
+            pRecvBuffSize = 0;
+            recvBuffLock.Unlock();
+            return;
+        }
+        else
+        {
+            pRecvBuff = pRecvBuffNew;
+
+            memcpy(pRecvBuff + pRecvBuffSize, pData, bytesRead);
+
+            dataSourceSize = pRecvBuffSize + bytesRead;
+            dataSource = pRecvBuff;
+        }
+    }
+
+    int bytesReadFromStream;
+    while (bytesReadFromStream = BytesFromStream(dataSource, dataSourceSize),
+           LENGTH_FIELD_BYTES + bytesReadFromStream <= dataSourceSize)
+    {
+        dataSource += LENGTH_FIELD_BYTES;
+        dataSourceSize -= LENGTH_FIELD_BYTES;
+
+        TCPSocket::OnRecv(eventHandler, dataSource, bytesReadFromStream);
+
+        dataSource += bytesReadFromStream;
+        dataSourceSize -= bytesReadFromStream;
+    }
+
+    if (dataSourceSize > 0)
+    {
+        if (dataSource != nullptr)
+        {
+            if (pRecvBuff == nullptr)
             {
                 pRecvBuff = (uint8_t*)OVR_ALLOC(dataSourceSize);
                 if (!pRecvBuff)
@@ -188,28 +155,29 @@ void PacketizedTCPSocket::OnRecv(SocketEvent_TCP* eventHandler, uint8_t* pData, 
                 memmove(pRecvBuff, dataSource, dataSourceSize);
             }
         }
-	}
-	else
-	{
-		if (pRecvBuff != NULL)
-			OVR_FREE(pRecvBuff);
+    }
+    else
+    {
+        if (pRecvBuff != nullptr)
+            OVR_FREE(pRecvBuff);
 
-		pRecvBuff = NULL;
-	}
-	pRecvBuffSize = dataSourceSize;
+        pRecvBuff = nullptr;
+    }
+    pRecvBuffSize = dataSourceSize;
 
-	recvBuffLock.Unlock();
+    recvBuffLock.Unlock();
 }
 
 int PacketizedTCPSocket::BytesFromStream(uint8_t* pData, int bytesRead)
 {
-	if (pData != 0 && bytesRead >= LENGTH_FIELD_BYTES)
-	{
-		return pData[0] | ((uint32_t)pData[1] << 8) | ((uint32_t)pData[2] << 16) | ((uint32_t)pData[3] << 24);
-	}
+    if (pData != 0 && bytesRead >= LENGTH_FIELD_BYTES)
+    {
+        static_assert(LENGTH_FIELD_BYTES == 4, "Update this part");
+        return pData[0] | ((uint32_t)pData[1] << 8) | ((uint32_t)pData[2] << 16) | ((uint32_t)pData[3] << 24);
+    }
 
-	return 0;
+    return 0;
 }
 
 
-}} // OVR::Net
+}} // namespace OVR::Net

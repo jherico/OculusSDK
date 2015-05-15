@@ -99,8 +99,11 @@ struct ArrayDataBase
 
     ~ArrayDataBase() 
     {
-        Allocator::DestructArray(Data, Size);
-        Allocator::Free(Data);
+        if (Data)
+        {
+            Allocator::DestructArray(Data, Size);
+            Allocator::Free(Data);
+        }
     }
 
     size_t GetCapacity() const 
@@ -110,9 +113,12 @@ struct ArrayDataBase
 
     void ClearAndRelease()
     {
-        Allocator::DestructArray(Data, Size);
-        Allocator::Free(Data);
-        Data = 0;
+        if (Data)
+        {
+            Allocator::DestructArray(Data, Size);
+            Allocator::Free(Data);
+            Data = 0;
+        }
         Size = 0;
         Policy.SetCapacity(0);
     }
@@ -668,6 +674,10 @@ public:
     Iterator Begin() { return Iterator(this); }
     Iterator End()   { return Iterator(this, (intptr_t)GetSize()); }
     Iterator Last()  { return Iterator(this, (intptr_t)GetSize() - 1); }
+
+    // C++11 ranged-based for loop support.
+    Iterator begin() { return Begin(); }
+    Iterator end() { return End(); }
 
     class ConstIterator
     {

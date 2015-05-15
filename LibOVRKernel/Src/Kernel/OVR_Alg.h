@@ -30,8 +30,96 @@ limitations under the License.
 
 #include "OVR_Types.h"
 #include <string.h>
+#if defined(_MSC_VER)
+    #include <intrin.h>
+    #pragma intrinsic(_BitScanForward)
+    #if defined(_M_AMD64)
+        #pragma intrinsic(_BitScanForward64)
+    #endif
+#elif defined(__GNUC__) || defined(__clang__)
+    #include <x86intrin.h>
+#endif
 
 namespace OVR { namespace Alg {
+
+
+
+
+
+inline int CountTrailing0Bits(uint16_t x)
+{
+    #if defined(_MSC_VER)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward(&i, x);
+        return nonZero ? (int)i : 16;
+
+    #elif defined(__GNUC__) || defined(__clang__)
+        if (x)
+            return __builtin_ctz(x);
+        return 16;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0x000000ff) == 0) {n += 8; x >>= 8;}
+            if((x & 0x0000000f) == 0) {n += 4; x >>= 4;}
+            if((x & 0x00000003) == 0) {n += 2; x >>= 2;}
+            return n - int(x & 1);
+        }
+        return 16;
+    #endif
+}
+
+
+inline int CountTrailing0Bits(uint32_t x)
+{
+    #if defined(_MSC_VER)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward(&i, x);
+        return nonZero ? (int)i : 32;
+    #elif defined(__GNUC__) || defined(__clang__)
+        if (x)
+            return __builtin_ctz(x);
+        return 32;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0x0000ffff) == 0) { n += 16; x >>= 16; }
+            if((x & 0x000000ff) == 0) { n +=  8; x >>=  8; }
+            if((x & 0x0000000f) == 0) { n +=  4; x >>=  4; }
+            if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+            return n - int(x & 1);
+        }
+        return 32;
+    #endif
+}
+
+
+inline int CountTrailing0Bits(uint64_t x)
+{
+    #if defined(_MSC_VER) && defined(_M_AMD64)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward64(&i, x);
+        return nonZero ? (int)i : 64;
+    #elif (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+        if (x)
+            return __builtin_ctzll(x);
+        return 64;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0xffffffff) == 0) { n += 32; x >>= 32; }
+            if((x & 0x0000ffff) == 0) { n += 16; x >>= 16; }
+            if((x & 0x000000ff) == 0) { n +=  8; x >>=  8; }
+            if((x & 0x0000000f) == 0) { n +=  4; x >>=  4; }
+            if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+            return n - (int)(uint32_t)(x & 1);
+        }
+        return 64;
+    #endif
+}
 
 
 //-----------------------------------------------------------------------------------
@@ -1055,6 +1143,84 @@ inline int8_t DecodeBCD(uint8_t byte)
     int decimal = digit1 * 10 + digit2;   // maximum value = 99
     return (int8_t)decimal;
 }
+
+
+
+// Returns true if T is a signed built in type and (x + y) would overflow or underflow the storage maximum or minimum of type T.
+template <typename T>
+inline bool SignedAdditionWouldOverflow(T x, T y)
+{
+    const T temp = (T)(x + y);
+    return (((temp ^ x) & (temp ^ y)) >> ((sizeof(T) * (T)8) - 1)) != 0;
+}
+
+// Returns true if T is a signed type and (x - y) would overflow or underflow the storage maximum or minimum of type T.
+template <typename T>
+inline bool SignedSubtractionWouldOverflow(T x, T y)
+{
+    const T tMin = (T)((T)1 << (T)((sizeof(T) * 8) - 1)); // This is not portable.
+    return (x >= 0) ? (y < (T)(x - (T)-(tMin + 1))) : (y > (T)(x - tMin));
+}
+
+// Returns true if T is an unsigned type and (x + y) would overflow the storage maximum of type T.
+template <typename T>
+inline bool UnsignedAdditionWouldOverflow(T x, T y)
+{
+    const T temp = (T)(x + y);
+    return (temp < x) && (temp < y);
+}
+
+// Returns true if T is an unsigned type and (x - y) would underflow the storage minimum of type T.
+template <typename T>
+inline bool UnsignedSubtractionWouldOverflow(T x, T y)
+{
+    return y > x;
+}
+
+// Returns true if T is an unsigned type and (x * y) would overflow the storage maximum of type T.
+template <typename T>
+inline bool UnsignedMultiplyWouldOverflow(T x, T y)
+{
+    if(y)
+        return (((T)(x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x * y) would overflow or underflow the storage maximum or minimum of type int32_t.
+inline bool SignedMultiplyWouldOverflow(int32_t x, int32_t y)
+{
+    if((y < 0) && (x == (int32_t)INT32_C(0x80000000)))
+        return true;
+    if(y)
+        return (((x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x * y) would overflow or underflow the storage maximum or minimum of type int64_t.
+inline bool SignedMultiplyWouldOverflow(int64_t x, int64_t y)
+{
+    if((y < 0) && (x == (int64_t)INT64_C(0x8000000000000000)))
+        return true;
+    if(y)
+        return (((x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x / y) would overflow the maximum of type T.
+template <typename T>
+inline bool UnsignedDivisionWouldOverflow(T /*x*/, T y)
+{
+    return y == 0;
+}
+
+
+// Returns true if (x / y) would overflow or underflow the maximum or mimumum of type T.
+template <typename T>
+inline bool SignedDivisionWouldOverflow(T x, T y)
+{
+    return (y == 0) || ((x == (T)((T)1 << ((sizeof(T) * 8) - 1))) && (y == -1));
+}
+
 
 
 }} // OVR::Alg

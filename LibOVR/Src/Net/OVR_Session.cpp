@@ -42,41 +42,43 @@ SDKVersion RuntimeSDKVersion;
 static const char* OfficialHelloString      = "OculusVR_Hello";
 static const char* OfficialAuthorizedString = "OculusVR_Authorized";
 
-bool RPC_C2S_Hello::Serialize(bool writeToBitstream, Net::BitStream* bs)
+bool RPC_C2S_Hello::Serialize(bool writeToBitstream, BitStream& bs)
 {
-    bs->Serialize(writeToBitstream, HelloString);
-    bs->Serialize(writeToBitstream, MajorVersion);
-    bs->Serialize(writeToBitstream, MinorVersion);
-    if (!bs->Serialize(writeToBitstream, PatchVersion))
+    bs.Serialize(writeToBitstream, HelloString);
+    bs.Serialize(writeToBitstream, MajorVersion);
+    bs.Serialize(writeToBitstream, MinorVersion);
+    if (!bs.Serialize(writeToBitstream, PatchVersion))
         return false;
+
+    // The following was version code was added to RPC version 1.2
+    // without bumping it up to 1.3 and introducing an incompatibility.
+    // We can do this because an older server will not read this additional data.
 
     // If an older client is connecting to us,
     if (!writeToBitstream && (MajorVersion * 100) + (MinorVersion * 10) + PatchVersion < 121)
     {
-        // The following was version code was added to RPC version 1.2
-        // without bumping it up to 1.3 and introducing an incompatibility.
-        // We can do this because an older server will not read this additional data.
+        CodeVersion.Reset(); // Make it so that we see the client as having an unspecified version number.
         return true;
     }
 
-    bs->Serialize(writeToBitstream, CodeVersion.ProductVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.MajorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.MinorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.RequestedMinorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.PatchVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.BuildNumber);
-    return bs->Serialize(writeToBitstream, CodeVersion.FeatureVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.ProductVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.MajorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.MinorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.RequestedMinorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.PatchVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.BuildNumber);
+    return bs.Serialize(writeToBitstream, CodeVersion.FeatureVersion);
 }
 
-void RPC_C2S_Hello::ClientGenerate(Net::BitStream* bs)
+void RPC_C2S_Hello::ClientGenerate(BitStream& bs)
 {
     RPC_C2S_Hello hello;
     hello.HelloString  = OfficialHelloString;
     hello.MajorVersion = RPCVersion_Major;
     hello.MinorVersion = RPCVersion_Minor;
     hello.PatchVersion = RPCVersion_Patch;
-    OVR_ASSERT(OVR::Net::RuntimeSDKVersion.ProductVersion != UINT16_MAX);
-    hello.CodeVersion = OVR::Net::RuntimeSDKVersion; // This should have been set to a value earlier in the first steps of ovr initialization.
+    OVR_ASSERT(RuntimeSDKVersion.ProductVersion != UINT16_MAX);
+    hello.CodeVersion = RuntimeSDKVersion; // This should have been set to a value earlier in the first steps of ovr initialization.
     hello.Serialize(true, bs);
 }
 
@@ -88,12 +90,12 @@ bool RPC_C2S_Hello::ServerValidate()
            HelloString.CompareNoCase(OfficialHelloString) == 0;
 }
 
-bool RPC_S2C_Authorization::Serialize(bool writeToBitstream, Net::BitStream* bs)
+bool RPC_S2C_Authorization::Serialize(bool writeToBitstream, BitStream& bs)
 {
-    bs->Serialize(writeToBitstream, AuthString);
-    bs->Serialize(writeToBitstream, MajorVersion);
-    bs->Serialize(writeToBitstream, MinorVersion);
-    if (!bs->Serialize(writeToBitstream, PatchVersion))
+    bs.Serialize(writeToBitstream, AuthString);
+    bs.Serialize(writeToBitstream, MajorVersion);
+    bs.Serialize(writeToBitstream, MinorVersion);
+    if (!bs.Serialize(writeToBitstream, PatchVersion))
         return false;
 
     // If an older client is connecting to us,
@@ -105,16 +107,16 @@ bool RPC_S2C_Authorization::Serialize(bool writeToBitstream, Net::BitStream* bs)
         return true;
     }
 
-    bs->Serialize(writeToBitstream, CodeVersion.ProductVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.MajorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.MinorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.RequestedMinorVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.PatchVersion);
-    bs->Serialize(writeToBitstream, CodeVersion.BuildNumber);
-    return bs->Serialize(writeToBitstream, CodeVersion.FeatureVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.ProductVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.MajorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.MinorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.RequestedMinorVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.PatchVersion);
+    bs.Serialize(writeToBitstream, CodeVersion.BuildNumber);
+    return bs.Serialize(writeToBitstream, CodeVersion.FeatureVersion);
 }
 
-void RPC_S2C_Authorization::ServerGenerate(Net::BitStream* bs, String errorString)
+void RPC_S2C_Authorization::ServerGenerate(BitStream& bs, String errorString)
 {
     RPC_S2C_Authorization auth;
     if (errorString.IsEmpty())
@@ -157,8 +159,30 @@ bool Session::IsSingleProcess()
 //-----------------------------------------------------------------------------
 // Session
 
+Session::Session() :
+    SocketListenersLock(),
+    ConnectionsLock(),
+    SessionListenersLock(),
+    SocketListeners(),
+    AllConnections(),
+    FullConnections(),
+    SessionListeners(),
+    AllBlockingTCPSockets(),
+    HaveFullConnections(false),
+    SingleTargetSession(nullptr)
+{
+}
+
+Session::~Session()
+{
+    // Ensure memory backing the sockets array is released
+    AllBlockingTCPSockets.ClearAndRelease();
+}
+
 void Session::Shutdown()
 {
+    Error.Reset(); // Reset the error in case this class instance gets used again in the future. 
+
     {
         Lock::Locker locker(&SocketListenersLock);
 
@@ -185,7 +209,7 @@ void Session::Shutdown()
     }
 }
 
-SessionResult Session::Listen(ListenerDescription* pListenerDescription)
+SessionResult Session::Listen(ListenerDescription const* pListenerDescription)
 {
     if (pListenerDescription->Transport == TransportType_PacketizedTCP)
     {
@@ -208,7 +232,7 @@ SessionResult Session::Listen(ListenerDescription* pListenerDescription)
     return SessionResult_OK;
 }
 
-SessionResult Session::Connect(ConnectParameters *cp)
+SessionResult Session::Connect(ConnectParameters const* cp)
 {
     if (cp->Transport == TransportType_PacketizedTCP)
     {
@@ -218,8 +242,7 @@ SessionResult Session::Connect(ConnectParameters *cp)
         {
             Lock::Locker locker(&ConnectionsLock);
 
-            int connIndex;
-            Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, cp2->BoundSocketToConnectWith, &connIndex);
+            Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, cp2->BoundSocketToConnectWith);
             if (conn)
             {
                 return SessionResult_AlreadyConnected;
@@ -238,9 +261,10 @@ SessionResult Session::Connect(ConnectParameters *cp)
                 Connection* arrayItem = AllConnections[i].GetPtr();
 
                 OVR_ASSERT(arrayItem);
-                if (arrayItem) {
-                    if (arrayItem->State == Client_ConnectedWait
-                        || arrayItem->State == Client_Connecting)
+                if (arrayItem)
+                {
+                    if (arrayItem->State == Client_ConnectedWait ||
+                        arrayItem->State == Client_Connecting)
                     {
                         return SessionResult_ConnectInProgress;
                     }
@@ -297,9 +321,10 @@ SessionResult Session::Connect(ConnectParameters *cp)
     return SessionResult_OK;
 }
 
+// Reference to the Session object for the SingleProcess mode server.
 static Session* SingleProcessServer = nullptr;
 
-SessionResult Session::ListenPTCP(OVR::Net::BerkleyBindParameters *bbp)
+SessionResult Session::ListenPTCP(BerkleyBindParameters* bbp)
 {
     if (Session::IsSingleProcess())
     {
@@ -308,7 +333,7 @@ SessionResult Session::ListenPTCP(OVR::Net::BerkleyBindParameters *bbp)
         return SessionResult_OK;
     }
 
-    Ptr<PacketizedTCPSocket> listenSocket = *new OVR::Net::PacketizedTCPSocket();
+    Ptr<PacketizedTCPSocket> listenSocket = *new PacketizedTCPSocket();
     if (listenSocket->Bind(bbp) == INVALID_SOCKET)
     {
         return SessionResult_BindFailure;
@@ -321,7 +346,7 @@ SessionResult Session::ListenPTCP(OVR::Net::BerkleyBindParameters *bbp)
     return Listen(&bld);
 }
 
-SessionResult Session::ConnectPTCP(OVR::Net::BerkleyBindParameters* bbp, SockAddr* remoteAddress, bool blocking)
+SessionResult Session::ConnectPTCP(BerkleyBindParameters* bbp, SockAddr* remoteAddress, bool blocking)
 {
     if (Session::IsSingleProcess())
     {
@@ -353,7 +378,7 @@ SessionResult Session::ConnectPTCP(OVR::Net::BerkleyBindParameters* bbp, SockAdd
         return SessionResult_OK;
     }
 
-    ConnectParametersBerkleySocket cp(NULL, remoteAddress, blocking, TransportType_PacketizedTCP);
+    ConnectParametersBerkleySocket cp(nullptr, remoteAddress, blocking, TransportType_PacketizedTCP);
     Ptr<PacketizedTCPSocket> connectSocket = *new PacketizedTCPSocket();
 
     cp.BoundSocketToConnectWith = connectSocket.GetPtr();
@@ -365,42 +390,21 @@ SessionResult Session::ConnectPTCP(OVR::Net::BerkleyBindParameters* bbp, SockAdd
     return Connect(&cp);
 }
 
-Ptr<PacketizedTCPConnection> Session::findConnectionBySockAddr(SockAddr* address)
+int Session::Send(SendParameters const& payload)
 {
-    const int count = AllConnections.GetSizeI();
-    for (int i = 0; i < count; ++i)
-    {
-        Connection* arrayItem = AllConnections[i].GetPtr();
-
-        if (arrayItem->Transport == TransportType_PacketizedTCP)
-        {
-            PacketizedTCPConnection* conn = (PacketizedTCPConnection*)arrayItem;
-
-            if (conn->Address == *address)
-            {
-                return conn;
-            }
-        }
-    }
-
-    return 0;
-}
-
-int Session::Send(SendParameters *payload)
+    if (payload.pConnection->Transport == TransportType_PacketizedTCP)
 {
-    if (payload->pConnection->Transport == TransportType_PacketizedTCP)
-    {
         if (Session::IsSingleProcess())
         {
             OVR_ASSERT(SingleTargetSession->AllConnections.GetSizeI() > 0);
             PacketizedTCPConnection* conn = (PacketizedTCPConnection*)SingleTargetSession->AllConnections[0].GetPtr();
-            SingleTargetSession->TCP_OnRecv(conn->pSocket, (uint8_t*)payload->pData, payload->Bytes);
-            return payload->Bytes;
+            SingleTargetSession->TCP_OnRecv(conn->pSocket, (uint8_t*)payload.pData, payload.Bytes);
+            return payload.Bytes;
         }
         else
         {
-            PacketizedTCPConnection* conn = (PacketizedTCPConnection*)payload->pConnection.GetPtr();
-            return conn->pSocket->Send(payload->pData, payload->Bytes);
+            PacketizedTCPConnection* conn = (PacketizedTCPConnection*)payload.pConnection.GetPtr();
+            return conn->pSocket->Send(payload.pData, payload.Bytes);
         }
     }
 
@@ -408,11 +412,11 @@ int Session::Send(SendParameters *payload)
     return 0;
 }
 
-void Session::Broadcast(BroadcastParameters *payload)
+void Session::Broadcast(BroadcastParameters const& payload)
 {
     SendParameters sp;
-    sp.Bytes=payload->Bytes;
-    sp.pData=payload->pData;
+    sp.Bytes = payload.Bytes;
+    sp.pData = payload.pData;
 
     {
         Lock::Locker locker(&ConnectionsLock);
@@ -421,22 +425,22 @@ void Session::Broadcast(BroadcastParameters *payload)
         for (int i = 0; i < connectionCount; ++i)
         {
             sp.pConnection = FullConnections[i];
-            Send(&sp);
+            Send(sp);
         }    
     }
 }
 
-// DO NOT CALL Poll() FROM MULTIPLE THREADS due to AllBlockingTcpSockets being a member
+// DO NOT CALL Poll() FROM MULTIPLE THREADS due to AllBlockingTCPSockets being a member
 void Session::Poll(bool listeners)
 {
-    if (Net::Session::IsSingleProcess())
+    if (Session::IsSingleProcess())
     {
         // Spend a lot of time sleeping in single process mode
         Thread::MSleep(100);
         return;
     }
 
-    AllBlockingTcpSockets.Clear();
+    AllBlockingTCPSockets.Clear();
 
     if (listeners)
     {
@@ -445,7 +449,7 @@ void Session::Poll(bool listeners)
         const int listenerCount = SocketListeners.GetSizeI();
         for (int i = 0; i < listenerCount; ++i)
         {
-            AllBlockingTcpSockets.PushBack(SocketListeners[i]);
+            AllBlockingTCPSockets.PushBack(SocketListeners[i]);
         }
     }
 
@@ -461,7 +465,7 @@ void Session::Poll(bool listeners)
             {
                 PacketizedTCPConnection* ptcp = (PacketizedTCPConnection*)arrayItem;
 
-                AllBlockingTcpSockets.PushBack(ptcp->pSocket);
+                AllBlockingTCPSockets.PushBack(ptcp->pSocket);
             }
             else
             {
@@ -470,7 +474,7 @@ void Session::Poll(bool listeners)
         }
     }
 
-    const int count = AllBlockingTcpSockets.GetSizeI();
+    const int count = AllBlockingTCPSockets.GetSizeI();
     if (count > 0)
     {
         TCPSocketPollState state;
@@ -478,7 +482,7 @@ void Session::Poll(bool listeners)
         // Add all the sockets for polling,
         for (int i = 0; i < count; ++i)
         {
-            Net::TCPSocket* sock = AllBlockingTcpSockets[i].GetPtr();
+            TCPSocket* sock = AllBlockingTCPSockets[i].GetPtr();
 
             // If socket handle is invalid,
             if (sock->GetSocketHandle() == INVALID_SOCKET)
@@ -494,12 +498,12 @@ void Session::Poll(bool listeners)
         }
 
         // If polling returns with an event,
-        if (state.Poll(AllBlockingTcpSockets[0]->GetBlockingTimeoutUsec(), AllBlockingTcpSockets[0]->GetBlockingTimeoutSec()))
+        if (state.Poll(AllBlockingTCPSockets[0]->GetBlockingTimeoutUsec(), AllBlockingTCPSockets[0]->GetBlockingTimeoutSec()))
         {
             // Handle any events for each socket
             for (int i = 0; i < count; ++i)
             {
-                state.HandleEvent(AllBlockingTcpSockets[i], this);
+                state.HandleEvent(AllBlockingTCPSockets[i], this);
             }
         }
     }
@@ -507,6 +511,7 @@ void Session::Poll(bool listeners)
 
 void Session::AddSessionListener(SessionListener* se)
 {
+    {
     Lock::Locker locker(&SessionListenersLock);
 
     const int count = SessionListeners.GetSizeI();
@@ -520,11 +525,16 @@ void Session::AddSessionListener(SessionListener* se)
     }
 
     SessionListeners.PushBack(se);
+    }
+
     se->OnAddedToSession(this);
 }
 
 void Session::RemoveSessionListener(SessionListener* se)
 {
+    bool removed = false;
+
+    {
     Lock::Locker locker(&SessionListenersLock);
 
     const int count = SessionListeners.GetSizeI();
@@ -532,11 +542,16 @@ void Session::RemoveSessionListener(SessionListener* se)
     {
         if (SessionListeners[i] == se)
         {
-            se->OnRemovedFromSession(this);
-
             SessionListeners.RemoveAtUnordered(i);
+                removed = true;
             break;
         }
+    }
+}
+
+    if (removed)
+    {
+        se->OnRemovedFromSession(this);
     }
 }
 
@@ -556,7 +571,7 @@ Ptr<Connection> Session::AllocConnection(TransportType transport)
         break;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 Ptr<PacketizedTCPConnection> Session::findConnectionBySocket(Array< Ptr<Connection> >& connectionArray, Socket* s, int *connectionIndex)
@@ -581,10 +596,10 @@ Ptr<PacketizedTCPConnection> Session::findConnectionBySocket(Array< Ptr<Connecti
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
-int Session::invokeSessionListeners(ReceivePayload* rp)
+int Session::invokeSessionListeners(ReceivePayload const& rp)
 {
     Lock::Locker locker(&SessionListenersLock);
 
@@ -592,15 +607,63 @@ int Session::invokeSessionListeners(ReceivePayload* rp)
     for (int j = 0; j < count; ++j)
     {
         ListenerReceiveResult lrr = LRR_CONTINUE;
-        SessionListeners[j]->OnReceive(rp, &lrr);
+        SessionListeners[j]->OnReceive(rp, lrr);
 
-        if (lrr == LRR_RETURN || lrr == LRR_BREAK)
+        if (lrr == LRR_RETURN ||
+            lrr == LRR_BREAK)
         {
             break;
         }
     }
 
-    return rp->Bytes;
+    return rp.Bytes;
+}
+
+int Session::findConnectionIndex(Array< Ptr<Connection> >& connectionArray, Connection* search)
+{
+    const int count = connectionArray.GetSizeI();
+    for (int i = 0; i < count; ++i)
+    {
+        if (connectionArray[i].GetPtr() == search)
+            return i;
+    }
+
+    return -1;
+}
+
+void Session::promoteConnectionToFull(Connection* conn)
+{
+    Lock::Locker locker(&ConnectionsLock);
+
+    conn->SetState(State_Connected);
+
+    // If the connection can be moved into the full connections list,
+    if (connectionInArray(AllConnections, conn) &&
+        !connectionInArray(FullConnections, conn))
+    {
+        FullConnections.PushBack(conn);
+
+        // Indicate that we have a full connection
+        HaveFullConnections.store(true, std::memory_order_relaxed);
+    }
+}
+
+void Session::removeFullConnection(Connection* conn)
+{
+    Lock::Locker locker(&ConnectionsLock);
+
+    // If in the full connection list,
+    int fullConnIndex = findConnectionIndex(FullConnections, conn);
+    if (fullConnIndex >= 0)
+    {
+        FullConnections.RemoveAtUnordered(fullConnIndex);
+
+        // If there are no full connections,
+        if (FullConnections.GetSizeI() < 1)
+        {
+            HaveFullConnections.store(false, std::memory_order_relaxed);
+        }
+}
 }
 
 void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
@@ -609,10 +672,10 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
     // Lock::Locker locker(&ConnectionsLock);
 
     // Look for the connection in the full connection list first
-    int connIndex;
     ConnectionsLock.DoLock();
-    Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, pSocket, &connIndex);
+    Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, pSocket);
     ConnectionsLock.Unlock();
+
     if (conn)
     {
         if (conn->State == State_Connected)
@@ -623,7 +686,7 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
             rp.pData = pData;
 
             // Call listeners
-            invokeSessionListeners(&rp);
+            invokeSessionListeners(rp);
         }
         else if (conn->State == Client_ConnectedWait)
         {
@@ -631,10 +694,10 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
             BitStream bsIn((char*)pData, bytesRead, false);
 
             RPC_S2C_Authorization auth;
-            if (!auth.Serialize(false, &bsIn) ||
+            if (!auth.Serialize(false, bsIn) ||
                 !auth.ClientValidate())
             {
-                LogError("{ERR-001} [Session] REJECTED: OVRService did not authorize us: %s", auth.AuthString.ToCStr());
+                Error = OVR_MAKE_ERROR_F(ovrError_ServiceVersion, "OVRServer authorization failure: %s", auth.AuthString.ToCStr());
 
                 conn->SetState(State_Zombie);
                 invokeSessionEvent(&SessionListener::OnIncompatibleProtocol, conn);
@@ -648,15 +711,9 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
                 conn->RemoteCodeVersion  = auth.CodeVersion;
 
                 // Mark as connected
-                conn->SetState(State_Connected);
-                ConnectionsLock.DoLock();
-                int connIndex2;
-                if (findConnectionBySocket(AllConnections, pSocket, &connIndex2)==conn && findConnectionBySocket(FullConnections, pSocket, &connIndex2)==NULL)
-                {
-                    FullConnections.PushBack(conn);
-                    HaveFullConnections.store(true, std::memory_order_relaxed);
-                }
-                ConnectionsLock.Unlock();
+                promoteConnectionToFull(conn);
+
+                // React to connection request accepted
                 invokeSessionEvent(&SessionListener::OnConnectionRequestAccepted, conn);
             }
         }
@@ -666,30 +723,34 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
             BitStream bsIn((char*)pData, bytesRead, false);
 
             RPC_C2S_Hello hello;
-            if (!hello.Serialize(false, &bsIn) ||
+            if (!hello.Serialize(false, bsIn) ||
                 !hello.ServerValidate())
             {
-                LogError("{ERR-002} [Session] REJECTED: Rift application is using an incompatible version %d.%d.%d, feature version %d (my version=%d.%d.%d, feature version %d)",
+                OVR::StringBuffer errorString;
+                errorString.AppendFormat("Server session failure: incompatible client version %d.%d.%d, feature version %d (server version %d.%d.%d, feature version %d). Please make sure your OVRService and SDK are both up to date.",
                          hello.MajorVersion, hello.MinorVersion, hello.PatchVersion, hello.CodeVersion.FeatureVersion,
                          RPCVersion_Major, RPCVersion_Minor, RPCVersion_Patch, OVR_FEATURE_VERSION);
+
+                // We don't set ourselves to be in an error state here nor generate a formal Error, as we are the Server and it's the client that is in error here, not us.
+                LogText("[Session] REJECTED: %s", errorString.ToCStr());
 
                 conn->SetState(State_Zombie);
 
                 // Send auth response
                 BitStream bsOut;
-                RPC_S2C_Authorization::ServerGenerate(&bsOut, "Incompatible protocol version.  Please make sure your OVRService and SDK are both up to date.");
+                RPC_S2C_Authorization::ServerGenerate(bsOut, errorString.ToCStr());
 
                 SendParameters sp;
                 sp.Bytes = bsOut.GetNumberOfBytesUsed();
                 sp.pData = bsOut.GetData();
                 sp.pConnection = conn;
-                Send(&sp);
+                Send(sp);
             }
             else
             {
                 if (hello.CodeVersion.FeatureVersion != OVR_FEATURE_VERSION)
                 {
-                    LogError("[Session] WARNING: Rift application is using a different feature version than the server (server version = %d, app version = %d)",
+                    LogText("[Session] WARNING: Rift application is using a different feature version than the server (server version = %d, app version = %d)",
                         OVR_FEATURE_VERSION, hello.CodeVersion.FeatureVersion);
                 }
 
@@ -701,24 +762,18 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
 
                 // Send auth response
                 BitStream bsOut;
-                RPC_S2C_Authorization::ServerGenerate(&bsOut);
+                RPC_S2C_Authorization::ServerGenerate(bsOut);
 
                 SendParameters sp;
                 sp.Bytes = bsOut.GetNumberOfBytesUsed();
                 sp.pData = bsOut.GetData();
                 sp.pConnection = conn;
-                Send(&sp);
+                Send(sp);
 
                 // Mark as connected
-                conn->SetState(State_Connected);
-                ConnectionsLock.DoLock();
-                int connIndex2;
-                if (findConnectionBySocket(AllConnections, pSocket, &connIndex2)==conn && findConnectionBySocket(FullConnections, pSocket, &connIndex2)==NULL)
-                {
-                    FullConnections.PushBack(conn);
-                    HaveFullConnections.store(true, std::memory_order_relaxed);
-                }
-                ConnectionsLock.Unlock();
+                promoteConnectionToFull(conn);
+
+                // React to a new incoming connection
                 invokeSessionEvent(&SessionListener::OnNewIncomingConnection, conn);
 
             }
@@ -732,24 +787,19 @@ void Session::TCP_OnRecv(Socket* pSocket, uint8_t* pData, int bytesRead)
 
 void Session::TCP_OnClosed(TCPSocket* s)
 {
+    Ptr<PacketizedTCPConnection> conn;
+
+    {
     Lock::Locker locker(&ConnectionsLock);
 
     // If found in the full connection list,
     int connIndex = 0;
-    Ptr<PacketizedTCPConnection> conn = findConnectionBySocket(AllConnections, s, &connIndex);
+        conn = findConnectionBySocket(AllConnections, s, &connIndex);
     if (conn)
     {
         AllConnections.RemoveAtUnordered(connIndex);
 
-        // If in the full connection list,
-        if (findConnectionBySocket(FullConnections, s, &connIndex))
-        {
-            FullConnections.RemoveAtUnordered(connIndex);
-            if (FullConnections.GetSizeI() < 1)
-            {
-                HaveFullConnections.store(false, std::memory_order_relaxed);
-            }
-        }
+            removeFullConnection(conn);
 
         // Generate an appropriate event for the current state
         switch (conn->State)
@@ -772,6 +822,9 @@ void Session::TCP_OnClosed(TCPSocket* s)
 
         conn->SetState(State_Zombie);
     }
+}
+
+    // Connection may go out of scope here.
 }
 
 void Session::TCP_OnAccept(TCPSocket* pListener, SockAddr* pSockAddr, SocketHandle newSock)
@@ -820,13 +873,13 @@ void Session::TCP_OnConnected(TCPSocket *s)
 
         // Send hello message
         BitStream bsOut;
-        RPC_C2S_Hello::ClientGenerate(&bsOut);
+        RPC_C2S_Hello::ClientGenerate(bsOut);
 
         SendParameters sp;
         sp.Bytes = bsOut.GetNumberOfBytesUsed();
         sp.pData = bsOut.GetData();
         sp.pConnection = conn;
-        Send(&sp);
+        Send(sp);
     }
 }
 
@@ -841,19 +894,17 @@ void Session::invokeSessionEvent(void(SessionListener::*f)(Connection*), Connect
     }
 }
 
-Ptr<Connection> Session::GetConnectionAtIndex(int index)
+Ptr<Connection> Session::GetFirstConnection()
 {
     Lock::Locker locker(&ConnectionsLock);
 
-    const int count = FullConnections.GetSizeI();
-
-    if (index < count)
+    if (FullConnections.GetSizeI() <= 0)
     {
-        return FullConnections[index];
+        return nullptr;
     }
 
-    return NULL;
+    return FullConnections[0];
 }
 
 
-}} // OVR::Net
+}} // namespace OVR::Net
