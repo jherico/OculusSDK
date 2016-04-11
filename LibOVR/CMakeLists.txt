@@ -19,7 +19,7 @@ if (OVR_USE_SHIM)
 
     include_directories(Include Src ../LibOVRKernel/Src)
     file(GLOB_RECURSE SOURCE_FILES 
-        Src/OVR_CAPIShim.c
+        Src/OVR_CAPIShim.cpp
         Src/OVR_CAPI_Util.cpp  
         Src/OVR_StereoProjection.cpp  
         Include/*.h
