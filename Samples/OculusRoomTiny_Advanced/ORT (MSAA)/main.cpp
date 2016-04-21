@@ -51,7 +51,7 @@ struct MSAA : BasicVR
 
 		    for (int eye = 0; eye < 2; ++eye)
 		    {
-                if (DIRECTX.Key['1'])
+                if (!DIRECTX.Key['1'])
                 {
                     // Without MSAA, for comparison
                     Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
@@ -67,6 +67,7 @@ struct MSAA : BasicVR
                     ovr_GetTextureSwapChainBufferDX(Session, Layer[0]->pEyeRenderTexture[eye]->TextureChain, destIndex, IID_PPV_ARGS(&dstTex));
                     DIRECTX.Context->ResolveSubresource(dstTex, 0, MSAATexture[eye]->Tex, 0, DXGI_FORMAT_R8G8B8A8_UNORM);
                     dstTex->Release();
+					Layer[0]->pEyeRenderTexture[eye]->Commit();
                 }
 		    }
 

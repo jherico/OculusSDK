@@ -5,7 +5,7 @@ Content     :   An output object for windows that can display raw images for tes
 Created     :   March 13, 2014
 Authors     :   Dean Beeler
 
-Copyright   :   Copyright 2014-2016 Oculus, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus, Inc. All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 

@@ -466,8 +466,8 @@ protected:
     
     bool                TimewarpRenderIntervalEnabled;
     float               TimewarpRenderIntervalInSeconds;
+    bool                NeverRenderedIntoEyeTextures;
     bool                FreezeEyeUpdate;
-    bool                FreezeEyeOneFrameRendered;
     int                 ComputeShaderEnabled;       // 0 = default, 1=on, 2=off
     bool                LayersEnabled;              // Using layers, or just rendering quads into the eye buffers?
     bool                Layer0HighQuality;

@@ -28,7 +28,42 @@ limitations under the License.
 // Include the Oculus SDK
 #include "OVR_CAPI_GL.h"
 
+#if defined(_WIN32)
+    #include <dxgi.h> // for GetDefaultAdapterLuid
+    #pragma comment(lib, "dxgi.lib")
+#endif
+
+
 using namespace OVR;
+
+
+static ovrGraphicsLuid GetDefaultAdapterLuid()
+{
+    ovrGraphicsLuid luid = ovrGraphicsLuid();
+
+    #if defined(_WIN32)
+        IDXGIFactory* factory = nullptr;
+
+        if (SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&factory))))
+        {
+            IDXGIAdapter* adapter = nullptr;
+
+            if (SUCCEEDED(factory->EnumAdapters(0, &adapter)))
+            {
+                DXGI_ADAPTER_DESC desc;
+
+                adapter->GetDesc(&desc);
+                memcpy(&luid, &desc.AdapterLuid, sizeof(luid));
+                adapter->Release();
+            }
+
+            factory->Release();
+        }
+    #endif
+
+    return luid;
+}
+
 
 // return true to retry later (e.g. after display lost)
 static bool MainLoop(bool retryCreate)
@@ -46,6 +81,11 @@ static bool MainLoop(bool retryCreate)
     ovrResult result = ovr_Create(&session, &luid);
     if (!OVR_SUCCESS(result))
         return retryCreate;
+
+    if (memcmp(&luid, &GetDefaultAdapterLuid(), sizeof(luid))) // If luid that the Rift is on is not the default adapter LUID...
+    {
+        VALIDATE(false, "OpenGL supports only the default graphics adapter.");
+    }
 
     ovrHmdDesc hmdDesc = ovr_GetHmdDesc(session);
 

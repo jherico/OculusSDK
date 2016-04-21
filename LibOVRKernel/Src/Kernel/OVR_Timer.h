@@ -29,6 +29,8 @@ limitations under the License.
 #define OVR_Timer_h
 
 #include "OVR_Types.h"
+#include <ctime>
+
 
 namespace OVR {
     
@@ -100,9 +102,32 @@ private:
     #elif defined (OVR_OS_MS)
         // Microsoft-specific data
     #endif
+}; // class Timer
+
+
+
+
+//-----------------------------------------------------------------------------
+// CountdownTimer
+//
+// Acts like a kitchen timer. Resolution is in milliseconds. 
+// To consider: Move this elsewhere.
+//
+struct CountdownTimer
+{
+    size_t DoneTimeMs;
+    size_t CountdownTimeMs;
+
+    CountdownTimer(size_t countdownTimeMs = 0, bool start = false);
+
+    size_t CurrentTimeMs() const;
+    bool IsTimeUp() const;
+    void Restart();
+    void Restart(size_t countdownTimeMs);
 };
 
 
-} // OVR::Timer
+
+} // OVR
 
 #endif

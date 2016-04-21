@@ -140,6 +140,10 @@ typedef enum ovrErrorType_
     ovrError_NordicEnabledNoSync        = -4015,   ///< The nordic indicates that sync is enabled but it is not sending sync pulses
     ovrError_NordicSyncNoFrames         = -4016,   ///< It looks like we're getting a sync signal, but no camera frames have been received
     ovrError_CatastrophicFailure        = -4017,   ///< A catastrophic failure has occurred.  We will attempt to recover by resetting the device
+    ovrError_CatastrophicTimeout        = -4018,   ///< The catastrophic recovery has timed out.
+    ovrError_RepeatCatastrophicFail     = -4019,   ///< Catastrophic failure has repeated too many times.
+    ovrError_USBOpenDeviceFailure       = -4020,   ///< Could not open handle for Rift device (likely already in use by another process).
+    ovrError_HMDGeneralFailure          = -4021,   ///< Unexpected HMD issues that don't fit a specific bucket.
 
     ovrError_HMDFirmwareMismatch        = -4100,   ///< The HMD Firmware is out of date and is unacceptable.
     ovrError_TrackerFirmwareMismatch    = -4101,   ///< The sensor Firmware is out of date and is unacceptable.
@@ -152,13 +156,17 @@ typedef enum ovrErrorType_
     ovrError_FeatureReportFailure       = -4202,   ///< A feature report has failed.
 
     /* Synchronization errors */
-    ovrError_Incomplete                 = -5000,   ///<Requested async work not yet complete.
-    ovrError_Abandoned                  = -5001,   ///<Requested async work was abandoned and result is incomplete.
+    ovrError_Incomplete                 = -5000,   ///< Requested async work not yet complete.
+    ovrError_Abandoned                  = -5001,   ///< Requested async work was abandoned and result is incomplete.
 
     /* Rendering errors */
-    ovrError_DisplayLost                = -6000,   ///<In the event of a system-wide graphics reset or cable unplug this is returned to the app.
-    ovrError_TextureSwapChainFull       = -6001,   ///<ovr_CommitTextureSwapChain was called too many times on a texture swapchain without calling submit to use the chain.
-    ovrError_TextureSwapChainInvalid    = -6002,   ///<The ovrTextureSwapChain is in an incomplete or inconsistent state. Ensure ovr_CommitTextureSwapChain was called at least once first.
+    ovrError_DisplayLost                = -6000,   ///< In the event of a system-wide graphics reset or cable unplug this is returned to the app.
+    ovrError_TextureSwapChainFull       = -6001,   ///< ovr_CommitTextureSwapChain was called too many times on a texture swapchain without calling submit to use the chain.
+    ovrError_TextureSwapChainInvalid    = -6002,   ///< The ovrTextureSwapChain is in an incomplete or inconsistent state. Ensure ovr_CommitTextureSwapChain was called at least once first.
+    ovrError_GraphicsDeviceReset        = -6003,   ///< Graphics device has been reset (TDR, etc...)
+    ovrError_DisplayRemoved             = -6004,   ///< HMD removed from the display adapter
+    ovrError_ApplicationInvisible       = -6005,   ///< Application declared itself as an invisible type and is not allowed to submit frames.
+    ovrError_Disallowed                 = -6006,   ///< The given request is disallowed under the current conditions.
 
     /* Fatal errors */
     ovrError_RuntimeException           = -7000,   ///< A runtime exception occurred. The application is required to shutdown LibOVR and re-initialize it before this error state will be cleared.

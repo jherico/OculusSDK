@@ -80,6 +80,7 @@ struct CockpitMonoExterior : BasicVR
              
                     // Render the mono part, at infinity.
                     renderEyeTexture->Render(&XMMatrixIdentity(), 1, 1, 1, 1, true);
+					Layer[0]->pEyeRenderTexture[eye]->Commit();
                 }
 
                 // Zero the depth buffer, to ensure the cockpit is rendered in the foreground

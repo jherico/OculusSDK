@@ -479,5 +479,38 @@ void Timer::shutdownTimerSystem()
 
 #endif  // OS-specific
 
+
+
+CountdownTimer::CountdownTimer(size_t countdownTimeMs, bool start)
+      : DoneTimeMs(0)
+      , CountdownTimeMs(countdownTimeMs)
+    {
+        if(start)
+            Restart();
+    }
+
+    size_t CountdownTimer::CurrentTimeMs() const
+    {
+        return (std::clock() * 1000) / CLOCKS_PER_SEC;   
+    }
+
+    bool CountdownTimer::IsTimeUp() const
+    {
+        return (CurrentTimeMs() > DoneTimeMs);
+    }
+
+    void CountdownTimer::Restart()
+    {
+        DoneTimeMs = (CurrentTimeMs() + CountdownTimeMs);
+    }
+
+    void CountdownTimer::Restart(size_t countdownTimeMs)
+    {
+        CountdownTimeMs = countdownTimeMs;
+        Restart();
+};
+
+
+
 } // OVR
 

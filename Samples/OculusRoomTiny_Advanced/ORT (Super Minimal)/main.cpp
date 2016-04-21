@@ -18,7 +18,7 @@ limitations under the License.
 *************************************************************************************/
 /// Renders tracked triangles on the Rift, no mirror, everything in one file.
 /// This sample is very good for tracking critical changes in the SDK
-/// by providing a minimal diff.
+/// by providing a minimal diff.  Halts automatically after a short time.
 
 #include "d3d11.h"
 #include "d3dcompiler.h"
@@ -96,9 +96,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, LPWSTR, int)
 			ovr_CommitTextureSwapChain(session, ld.ColorTexture[i]);
 		}
 
-		// Send rendered eye buffers to HMD
+		// Send rendered eye buffers to HMD, and increment the frame if we're visible
 		ovrLayerHeader* layers[1] = { &ld.Header };
-		ovr_SubmitFrame(session, frameIndex++, nullptr, layers, 1);
+		if (ovrSuccess == ovr_SubmitFrame(session, frameIndex, nullptr, layers, 1)) frameIndex++;
 	}
 
 	ovr_Shutdown();

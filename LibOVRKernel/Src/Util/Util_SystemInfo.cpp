@@ -40,6 +40,7 @@ limitations under the License.
     #include <Shlobj.h>
     #include <Shlwapi.h>
     #include <wtsapi32.h>
+    #include <Psapi.h>
 
     #pragma comment(lib, "Shlwapi") // PathFileExistsW
     #pragma comment(lib, "Wtsapi32.lib") // WTSQuerySessionInformation
@@ -1014,6 +1015,26 @@ bool IsAtMostWindowsVersion(WindowsVersion version)
     return false;
 #endif // OVR_OS_MS
 }
+
+
+
+
+ProcessMemoryInfo GetCurrentProcessMemoryInfo()
+{
+    ProcessMemoryInfo pmi = {};
+    PROCESS_MEMORY_COUNTERS_EX pmce = { sizeof(PROCESS_MEMORY_COUNTERS_EX), 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    // This should always succeed for the current process.
+    // We need PROCESS_QUERY_LIMITED_INFORMATION rights if we want to read the info from a different process.
+    // This call used nearly 1ms on a sampled computer, and so should be called infrequently.
+    if (::GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmce), sizeof(pmce)))
+    {
+        pmi.UsedMemory = (uint64_t)pmce.WorkingSetSize; // The set of pages in the virtual address space of the process that are currently resident in physical memory. 
+    }
+
+    return pmi;
+}
+
 
 
 }} // namespace OVR::Util

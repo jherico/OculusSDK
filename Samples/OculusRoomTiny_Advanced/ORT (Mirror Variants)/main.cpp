@@ -40,30 +40,35 @@ struct MirrorVariants : BasicVR
 
     void SetMirrorMode(int mode)
     {
-        scaleWindowW = 1.0f;
-        scaleWindowH = 1.0f;
-        scaleMirrorW = 0.375f;
-        scaleMirrorH = 0.75f;
+		scaleWindowW = 0.50f;
+		scaleWindowH = 0.50f;
+		scaleMirrorW = 1.0f;
+		scaleMirrorH = 1.0f;
         windowed = true;
 
         switch (mirrorMode = mode)
         {
         case(0) :
-            scaleWindowW = 0.75f;
             break;
         case(1) :
             scaleMirrorW = 2.0f;
-            break;
+			scaleWindowW = 0.375f;
+			scaleWindowH = 0.75f;
+			break;
         case(2) :
             windowed = false;
             scaleMirrorW = 2.0f;
             break;
         case(3) :
-            scaleMirrorW = (2.0f * 5.0f) / 4.0f;
+			scaleWindowW = 0.375f;
+			scaleWindowH = 0.75f;
+			scaleMirrorW = (2.0f * 5.0f) / 4.0f;
             scaleMirrorH = (1.0f * 5.0f) / 4.0f;
             break;
         case(4) :
-            break;
+			scaleWindowW = 0.375f;
+			scaleWindowH = 0.75f;
+			break;
         case(5) :
             scaleWindowW = 1.0f;
             scaleWindowH = 1.0f;
@@ -71,12 +76,12 @@ struct MirrorVariants : BasicVR
             break;
         }
     }
-
+	
     void MainLoop()
     {
         Layer[0] = new VRLayer(Session);
 
-        // Special treatment for mode 5
+        // Special treatment for mode 4 and 5
         Model *renderEyeTexture = nullptr;
         if ((mirrorMode == 4) || (mirrorMode == 5))
         {
@@ -84,6 +89,7 @@ struct MirrorVariants : BasicVR
             // Note that we are going to just use the 0th of the texture set, 
             // so the mirror window will be a lower framerate than in the HUD which
             // cycles through all textures in the set.
+			// We do it this way for simplicity and brevity.
             auto mirrorEyeBufferTexture = new Texture();
             ID3D11Texture2D* texture = nullptr;
             ovr_GetTextureSwapChainBufferDX(Session, Layer[0]->pEyeRenderTexture[0]->TextureChain, 0, IID_PPV_ARGS(&texture));

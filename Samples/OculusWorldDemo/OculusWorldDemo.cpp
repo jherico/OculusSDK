@@ -187,8 +187,8 @@ OculusWorldDemoApp::OculusWorldDemoApp() :
 
     TimewarpRenderIntervalEnabled(true),
     TimewarpRenderIntervalInSeconds(0.0f),
+    NeverRenderedIntoEyeTextures(false),
     FreezeEyeUpdate(false),
-    FreezeEyeOneFrameRendered(false),
     ComputeShaderEnabled(0),
 
 #ifdef OVR_OS_MS
@@ -1514,8 +1514,8 @@ Sizei OculusWorldDemoApp::EnsureRendertargetAtLeastThisBig(int rtNum, Sizei requ
         int colorFormat = GetRenderDeviceTextureFormatForEyeTextureFormat(EyeTextureFormat);
         colorFormat |= Texture_RenderTarget;
 
-        // If the scene is frozen, we need to render at least one frame to the newly-allocated texture, otherwise we just get junk.
-        FreezeEyeOneFrameRendered = false;
+        // We need to render at least one frame to the newly-allocated texture, otherwise we just get junk.
+        NeverRenderedIntoEyeTextures = true;
 
         GenMipCount[rtNum] = genMipCount;
         int genMipsFlag = requestGenMips ? Texture_GenMipmaps : 0;
@@ -2832,18 +2832,17 @@ bool OculusWorldDemoApp::FrameNeedsRendering(double curtime)
         renderInterval = 0.0;
     }
 
-    if (FreezeEyeUpdate)
+    if (NeverRenderedIntoEyeTextures)
     {
-        // Draw one frame after (FreezeEyeUpdate = true) to update message text.
-        if (FreezeEyeOneFrameRendered)
-            updateRenderedView = false;
-        else
-            FreezeEyeOneFrameRendered = true;
+        updateRenderedView = true;
+        NeverRenderedIntoEyeTextures = false;
+    }
+    else if (FreezeEyeUpdate)
+    {
+        updateRenderedView = false;
     }
     else
     {
-        FreezeEyeOneFrameRendered = false;
-
         if ( (timeSinceLast < 0.0) || ((float)timeSinceLast > renderInterval) )
         {
             // This allows us to do "fractional" speeds, e.g. 45fps rendering on a 60fps display.

@@ -1,7 +1,7 @@
 /********************************************************************************//**
 \file      OVR_CAPI.h
 \brief     C Interface to the Oculus PC SDK tracking and rendering library.
-\copyright Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
+\copyright Copyright 2014 Oculus VR, LLC All Rights reserved.
 ************************************************************************************/
 
 #ifndef OVR_CAPI_h  //   We don't use version numbers within this name, as all versioned variations of this file are currently mutually exclusive.

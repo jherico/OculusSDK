@@ -137,6 +137,22 @@ String GetSystemFileVersionStringW(wchar_t filePath[MAX_PATH]);
 String GetBaseOVRPath(bool create_dir);
 
 
+
+//-----------------------------------------------------------------------------
+// Retrieves memory usage info for the current process.
+//
+// Do not call this function frequently as it takes hundreds of microseconds to 
+// execute on typical computers.
+
+struct ProcessMemoryInfo
+{
+    uint64_t UsedMemory;        // Same as Windows working set size. https://msdn.microsoft.com/en-us/library/windows/desktop/cc441804%28v=vs.85%29.aspx
+};
+
+ProcessMemoryInfo GetCurrentProcessMemoryInfo();
+
+
+
 } } // namespace OVR { namespace Util {
 
 #endif // OVR_Util_SystemInfo_h

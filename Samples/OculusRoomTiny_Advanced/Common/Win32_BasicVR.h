@@ -225,6 +225,8 @@ struct VRLayer
         if (doWeSetupRender)
         {
             // If none specified, then using special, and default, Oculus eye buffer render target
+			// Note that otherwise we might be using just an ordinary texture, so can't 
+			// always assume its an Oculus texture chain.
             if (rtv)
                 DIRECTX.SetAndClearRenderTarget(rtv, depthBuffer, backRed, backGre, backBlu);
             else

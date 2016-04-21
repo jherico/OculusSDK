@@ -52,6 +52,10 @@ struct MatchingAlternateEye : BasicVR
 	    OculusTexture extraRenderTexture;
         if (!extraRenderTexture.Init(Session, Layer[0]->pEyeRenderTexture[0]->SizeW, Layer[0]->pEyeRenderTexture[0]->SizeH))
             return;
+		//Need to commit it at least once here, or its possible when going into '1'
+		//to have the SDK use it before any texture has been committed
+		extraRenderTexture.Commit(); 
+
 
 	    while (HandleMessages())
 	    {
@@ -92,7 +96,8 @@ struct MatchingAlternateEye : BasicVR
                         extraRenderPose = tempEyeRenderPose[eye];
                         extraOrientationAtRender = playerOrientation;
                         auto rtv = extraRenderTexture.GetRTV();
-                        Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye, rtv, &extraRenderPose);
+						Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye, rtv, &extraRenderPose);
+						extraRenderTexture.Commit(); 
                         continue;
                     }
                 }

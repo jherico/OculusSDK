@@ -30,13 +30,14 @@ limitations under the License.
 #include "../Common/Win32_DirectXAppUtil.h" // DirectX
 #include "../Common/Win32_BasicVR.h"        // Basic VR
 
-struct UsingBasicVR : BasicVR
+struct DirectQuad : BasicVR
 {
-    UsingBasicVR(HINSTANCE hinst) : BasicVR(hinst, L"Using BasicVR") {}
+    DirectQuad(HINSTANCE hinst) : BasicVR(hinst, L"DirectQuad") {}
 
     void MainLoop()
     {
 	    Layer[0] = new VRLayer(Session);
+
 
 	    // Make a duplicate of the left eye texture, and render a static image into it
 	    OculusTexture extraRenderTexture;
@@ -52,8 +53,11 @@ struct UsingBasicVR : BasicVR
 	    zeroPose.Orientation.x = 0;
 	    zeroPose.Orientation.y = 0;
 	    zeroPose.Orientation.z = 0;
-
 	    Layer[0]->RenderSceneToEyeBuffer(&zeroCam, RoomScene, 0, extraRenderTexture.TexRtv[0], &zeroPose, 1, 1, 0.5f);
+		// Mustn't forget to tell the SDK about it
+		extraRenderTexture.Commit();
+
+
 
 	    while (HandleMessages())
 	    {
@@ -67,27 +71,28 @@ struct UsingBasicVR : BasicVR
 
 		    Layer[0]->PrepareLayerHeader();
 
+
 		    // Expanded distort and present from the basic sample, to allow for direct quad
 		    ovrLayerHeader* layerHeaders[2];
 
 		    // The standard one
-		    layerHeaders[0] = &Layer[0]->ovrLayer.Header;
+			layerHeaders[0] = &Layer[0]->ovrLayer.Header;
 
 		    // ...and now the new quad
 		    static ovrLayerQuad myQuad;
-                    myQuad.Header.Type = ovrLayerType_Quad;
+            myQuad.Header.Type = ovrLayerType_Quad;
 		    myQuad.Header.Flags = 0;
-		    myQuad.ColorTexture = extraRenderTexture.TextureChain;
-		    myQuad.Viewport.Pos.x = 0;
+			myQuad.ColorTexture = extraRenderTexture.TextureChain;
+			myQuad.Viewport.Pos.x = 0;
 		    myQuad.Viewport.Pos.y = 0;
-		    myQuad.Viewport.Size.w = extraRenderTexture.SizeW;
-		    myQuad.Viewport.Size.h = extraRenderTexture.SizeH;
+			myQuad.Viewport.Size.w = extraRenderTexture.SizeW;
+			myQuad.Viewport.Size.h = extraRenderTexture.SizeH;
 		    myQuad.QuadPoseCenter = zeroPose;
 		    myQuad.QuadPoseCenter.Position.z = -1.0f;
 		    myQuad.QuadSize.x = 1.0f;
 		    myQuad.QuadSize.y = 2.0f;
 		    layerHeaders[1] = &myQuad.Header;
-
+			
 		    // Submit them
 		    presentResult = ovr_SubmitFrame(Session, 0, nullptr, layerHeaders, 2);
             if (!OVR_SUCCESS(presentResult))
@@ -106,6 +111,6 @@ struct UsingBasicVR : BasicVR
 //-------------------------------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
 {
-	UsingBasicVR app(hinst);
+	DirectQuad app(hinst);
     return app.Run();
 }

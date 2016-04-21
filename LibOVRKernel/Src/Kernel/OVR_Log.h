@@ -117,6 +117,7 @@ inline void LogDebug(Args&&... args)
 
 #define OVR_DEBUG_LOG(args)      do { OVR::LogDebug args; } while(0);
 #define OVR_DEBUG_LOG_TEXT(args) do { OVR::LogDebug args; } while(0);
+#define OVR_ERROR_LOG(args)      do { OVR::LogError args; } while(0);
 
 // Conditional logging & asserting. It asserts/logs when the condition 'c' is NOT true.
 #define OVR_ASSERT_LOG(c, args)	  do { if (!(c)) { OVR::LogError args; OVR_DEBUG_BREAK; } } while(0)

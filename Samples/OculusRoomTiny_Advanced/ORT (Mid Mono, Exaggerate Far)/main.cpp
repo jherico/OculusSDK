@@ -71,10 +71,10 @@ struct MidMonoExaggerateFar : BasicVR
 
             // Lets render the scene again, but this time move it backwards, so it can represent
             // some other geometry in the distance.
-		    MainCam->Pos = XMVectorAdd(MainCam->Pos, XMVectorSet(0, 0, -60, 0));
+		    MainCam->Pos = XMVectorAdd(MainCam->Pos, XMVectorSet(0, 0, +60, 0));
 		    Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, 0, farMonoEyeTexture->TexRtv, &ots.HeadPose.ThePose, 1, 1, 1, 1, 1,
 				                             switchPoint + (visible ? 0.1f : -0.1f), 1000.0f);
-		    MainCam->Pos = XMVectorAdd(MainCam->Pos, XMVectorSet(0, 0, +60, 0));
+		    MainCam->Pos = XMVectorAdd(MainCam->Pos, XMVectorSet(0, 0, -60, 0));
 
             for (int eye = 0; eye < 2; ++eye)
             {

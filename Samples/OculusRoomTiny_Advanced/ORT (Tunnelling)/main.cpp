@@ -47,7 +47,14 @@ struct Tunnelling : BasicVR
 
     void MainLoop()
     {
-	    Layer[0] = new VRLayer(Session);
+		//Ensure symmetric frustom to make simple sample work
+		ovrFovPort newFov[2];
+		newFov[0].UpTan = max(HmdDesc.DefaultEyeFov[0].UpTan, HmdDesc.DefaultEyeFov[1].UpTan);
+		newFov[0].DownTan = max(HmdDesc.DefaultEyeFov[0].DownTan, HmdDesc.DefaultEyeFov[1].DownTan);
+		newFov[0].LeftTan = max(HmdDesc.DefaultEyeFov[0].LeftTan, HmdDesc.DefaultEyeFov[1].LeftTan);
+		newFov[0].RightTan = max(HmdDesc.DefaultEyeFov[0].RightTan, HmdDesc.DefaultEyeFov[1].RightTan);
+		newFov[1] = newFov[0];
+		Layer[0] = new VRLayer(Session, newFov);
 
         // We create an extra eye buffer, a means to render it, and a static camera
         auto width = max(Layer[0]->pEyeRenderTexture[0]->SizeW, Layer[0]->pEyeRenderTexture[1]->SizeW);
@@ -56,8 +63,8 @@ struct Tunnelling : BasicVR
  		TriangleSet quad;
 		Material * staticMat = new Material(staticEyeTexture);
 		Model * renderEyeTexture = 0;
-		float marginx = 0.35f;//25f;
-		float marginy = 0.35f;//25f;
+		float marginx = 0.35f;
+		float marginy = 0.35f;
 
 
 

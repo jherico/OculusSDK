@@ -5,7 +5,7 @@ Content     :   Small helper header to include Windows.h properly
 Created     :   Oct 16, 2014
 Authors     :   Chris Taylor, Scott Bassett
 
-Copyright   :   Copyright 2014-2016 Oculus, Inc. All Rights reserved.
+Copyright   :   Copyright 2014 Oculus, Inc. All Rights reserved.
 
 Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 

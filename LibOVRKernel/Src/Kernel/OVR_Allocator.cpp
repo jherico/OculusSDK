@@ -552,6 +552,7 @@ int Allocator::DumpMemory()
     const size_t leakReportBufferSize = 8192;
     char* leakReportBuffer = nullptr;
 
+    // Print out detail for each leaked pointer, but filtering away some that we ignore.
     for (int i = 0; i < OVR_HASH_SIZE; ++i)
     {
         for (TrackedAlloc* t = AllocHashMap[i]; t; t = t->pNext)
@@ -564,6 +565,7 @@ int Allocator::DumpMemory()
                 if (!leakReportBuffer)
                     break;
             }
+            leakReportBuffer[0] = '\0';
 
             char line[2048];
             OVR_snprintf(line, OVR_ARRAY_COUNT(line), "\n[Leak] ** Detected leaked allocation at %p (size = %u) (%d frames)\n", t->pAlloc, (unsigned)t->Size, (unsigned)t->FrameCount);

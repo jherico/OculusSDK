@@ -49,10 +49,16 @@ struct AutoLinearVelocity : BasicVR
 
             // Calculate velocity from this
             const float sensitivity = 0.2f;
-		    XMVECTOR vel = XMVectorScale(XMVectorSet(-XMVectorGetX(perturb), 0, -XMVectorGetZ(perturb), 0), sensitivity);
+		    XMVECTOR vel = XMVectorScale(XMVectorSet(XMVectorGetX(perturb), 0, XMVectorGetZ(perturb), 0), sensitivity);
 
               // Add velocity to camera
-            MainCam->Pos = XMVectorAdd(MainCam->Pos, vel);
+			//Need to check we're visible, before proceeding with velocity changes, 
+			//otherwise it does this a lot of times, and we
+			//end up miles away from our start point from the sheer number of iterations.
+			ovrSessionStatus sessionStatus;
+			ovr_GetSessionStatus(Session, &sessionStatus);
+			if (sessionStatus.IsVisible)
+				MainCam->Pos = XMVectorAdd(MainCam->Pos, vel);
 
             for (int eye = 0; eye < 2; ++eye)
 		    {

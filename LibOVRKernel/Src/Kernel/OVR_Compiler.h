@@ -1545,4 +1545,22 @@ limitations under the License.
 
 
 
+// -----------------------------------------------------------------------------------
+// ***** OVR_popcnt
+//
+// Defines a C equivalent of the SSE4.2 _popcnt intrinsic, which is not available
+// on older processors. These processors are not in our current recommended specificiation
+// but we are seeing a number of users using them and encountering a crash on this.
+//
+
+// algorithm from http://danluu.com/assembly-intrinsics/
+inline int OVR_popcnt(unsigned int x)
+{
+    x = x - ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    x = (x + (x >> 4)) & 0x0F0F0F0F;
+    return (int)((x * 0x01010101) >> 24);
+}
+
+
 #endif  // header include guard

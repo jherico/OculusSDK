@@ -924,101 +924,117 @@ void GetOSVersionName(char* versionName, size_t versionNameCapacity)
     #if defined(OVR_OS_MS)
         const char* name = "unknown";
 
-        OSVERSIONINFOEXW vi;
-        memset(&vi, 0, sizeof(vi));
+        RTL_OSVERSIONINFOEXW vi = {};
         vi.dwOSVersionInfoSize = sizeof(vi);
 
-        if(GetVersionExW((LPOSVERSIONINFOW)&vi))
+        // We use RtlGetVersion instead of GetVersionExW because the latter doesn't actually return the version of Windows, it returns
+        // the highest version of Windows that this application's manifest declared that it was compatible with. We want to know the 
+        // real version of Windows and so need to fall back to RtlGetVersion.
+        LONG(WINAPI * pfnRtlGetVersion)(RTL_OSVERSIONINFOEXW*);
+        pfnRtlGetVersion = (decltype(pfnRtlGetVersion))(uintptr_t)GetProcAddress(GetModuleHandleW((L"ntdll.dll")), "RtlGetVersion");
+
+        if (pfnRtlGetVersion) // This will virtually always succeed.
         {
-            if (vi.dwMajorVersion == 10)
+            if (pfnRtlGetVersion(&vi) != 0) // pfnRtlGetVersion will virtually always succeed.
+                memset(&vi, 0, sizeof(vi));
+        }
+
+        if (vi.dwMajorVersion == 10)
+        {
+            if (vi.dwMinorVersion == 0)
             {
-                if (vi.dwMinorVersion == 0)
+                if(vi.dwBuildNumber >= 10586)
                 {
-                    if(vi.dwBuildNumber >= 10586)
-                    {
-                        if (vi.wProductType == VER_NT_WORKSTATION)
-                            name = "Windows 10 TH2+";
-                        else
-                            name = "Windows Server 2016 Technical Preview TH2+";
-                    }
-                    else
-                    {
-                        if (vi.wProductType == VER_NT_WORKSTATION)
-                            name = "Windows 10";
-                        else
-                            name = "Windows Server 2016 Technical Preview";
-                    }
-                }
-                else
-                {
-                    // Unknown recent version.
                     if (vi.wProductType == VER_NT_WORKSTATION)
-                        name = "Windows 10 Unknown";
+                        name = "Windows 10 TH2+";
                     else
-                        name = "Windows Server 2016 Unknown";
-                }
-            }
-            else if(vi.dwMajorVersion >= 7)
-            {
-                // Unknown recent version.
-            }
-            else if(vi.dwMajorVersion >= 6)
-            {
-                if(vi.dwMinorVersion >= 4)
-                    name = "Windows 10 Pre Released";
-                else if(vi.dwMinorVersion >= 3)
-                {
-                    if(vi.wProductType == VER_NT_WORKSTATION)
-                        name = "Windows 8.1";
-                    else
-                        name = "Windows Server 2012 R2";
-                }
-                else if(vi.dwMinorVersion >= 2)
-                {
-                    if(vi.wProductType == VER_NT_WORKSTATION)
-                        name = "Windows 8";
-                    else
-                        name = "Windows Server 2012";
-                }
-                else if(vi.dwMinorVersion >= 1)
-                {
-                    if(vi.wProductType == VER_NT_WORKSTATION)
-                        name = "Windows 7";
-                    else
-                        name = "Windows Server 2008 R2";
+                        name = "Windows Server 2016 Technical Preview TH2+";
                 }
                 else
                 {
-                    if(vi.wProductType == VER_NT_WORKSTATION)
-                        name = "Windows Vista";
+                    if (vi.wProductType == VER_NT_WORKSTATION)
+                        name = "Windows 10";
                     else
-                        name = "Windows Server 2008";
-                }
-            }
-            else if(vi.dwMajorVersion >= 5)
-            {
-                if(vi.dwMinorVersion == 0)
-                    name = "Windows 2000";
-                else if(vi.dwMinorVersion == 1)
-                    name = "Windows XP";
-                else // vi.dwMinorVersion == 2
-                {
-                    if(GetSystemMetrics(SM_SERVERR2) != 0)
-                        name = "Windows Server 2003 R2";
-                    else if(vi.wSuiteMask & VER_SUITE_WH_SERVER)
-                        name = "Windows Home Server";
-                    if(GetSystemMetrics(SM_SERVERR2) == 0)
-                        name = "Windows Server 2003";
-                    else
-                        name = "Windows XP Professional x64 Edition";
+                        name = "Windows Server 2016 Technical Preview";
                 }
             }
             else
-                name = "Windows 98 or earlier";
+            {
+                // Unknown recent version.
+                if (vi.wProductType == VER_NT_WORKSTATION)
+                    name = "Windows 10 Unknown";
+                else
+                    name = "Windows Server 2016 Unknown";
+            }
         }
+        else if(vi.dwMajorVersion >= 7)
+        {
+            // Unknown recent version.
+        }
+        else if(vi.dwMajorVersion >= 6)
+        {
+            if(vi.dwMinorVersion >= 4)
+                name = "Windows 10 Pre Released";
+            else if(vi.dwMinorVersion >= 3)
+            {
+                if(vi.wProductType == VER_NT_WORKSTATION)
+                    name = "Windows 8.1";
+                else
+                    name = "Windows Server 2012 R2";
+            }
+            else if(vi.dwMinorVersion >= 2)
+            {
+                if(vi.wProductType == VER_NT_WORKSTATION)
+                    name = "Windows 8";
+                else
+                    name = "Windows Server 2012";
+            }
+            else if(vi.dwMinorVersion >= 1)
+            {
+                if(vi.wProductType == VER_NT_WORKSTATION)
+                    name = "Windows 7";
+                else
+                    name = "Windows Server 2008 R2";
+            }
+            else
+            {
+                if(vi.wProductType == VER_NT_WORKSTATION)
+                    name = "Windows Vista";
+                else
+                    name = "Windows Server 2008";
+            }
+        }
+        else if(vi.dwMajorVersion >= 5)
+        {
+            if(vi.dwMinorVersion == 0)
+                name = "Windows 2000";
+            else if(vi.dwMinorVersion == 1)
+                name = "Windows XP";
+            else // vi.dwMinorVersion == 2
+            {
+                if(GetSystemMetrics(SM_SERVERR2) != 0)
+                    name = "Windows Server 2003 R2";
+                else if(vi.wSuiteMask & VER_SUITE_WH_SERVER)
+                    name = "Windows Home Server";
+                if(GetSystemMetrics(SM_SERVERR2) == 0)
+                    name = "Windows Server 2003";
+                else
+                    name = "Windows XP Professional x64 Edition";
+            }
+        }
+        else
+            name = "Windows 98 or earlier";
 
         OVR_strlcpy(versionName, name, versionNameCapacity);
 
+        if (vi.szCSDVersion[0]) // If the version is reporting a service pack string...
+        {
+            OVR_strlcat(versionName, ", ", versionNameCapacity);
+
+            char servicePackname8[128];
+            OVR::UTF8Util::Strlcpy(servicePackname8, sizeof(servicePackname8), vi.szCSDVersion);
+            OVR_strlcat(versionName, servicePackname8, versionNameCapacity);
+        }
     #elif defined(OVR_OS_UNIX) || defined(OVR_OS_APPLE)
         utsname utsName;
         memset(&utsName, 0, sizeof(utsName));
@@ -1355,8 +1371,12 @@ size_t SymbolLookup::GetBacktrace(void* addressArray[], size_t addressArrayCapac
                     }
                     else
                     {
-                        context.Rip  = (ULONG64)(*(PULONG64)context.Rsp);
-                        context.Rsp += 8;
+                        // This would be viable only if we could rely on the presence of stack frames.
+                        // context.Rip  = (ULONG64)(*(PULONG64)context.Rsp);
+                        // context.Rsp += 8;
+
+                        // Be safe and just bail.
+                        context.Rip = 0;
                     }
 
                     if (context.Rip && (frameIndex < addressArrayCapacity))
@@ -4072,6 +4092,7 @@ static bool IsModuleDataSegmentNeeded(const wchar_t* modulePath)
             L"dxgi",
             L"nv",
             L"ati",
+            L"amd"
         };
 
         wchar_t fileName[MAX_PATH] = {};

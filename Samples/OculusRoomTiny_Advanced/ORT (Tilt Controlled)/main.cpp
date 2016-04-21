@@ -37,13 +37,21 @@ struct TiltControlled : BasicVR
     {
 	    Layer[0] = new VRLayer(Session);
 
+	///	MainCam->Pos = XMVectorSet(0, 0, 0, 0);
+
 	    while (HandleMessages())
 	    {
 		    ActionFromInput();
             ovrTrackingState trackingState = Layer[0]->GetEyePoses();
 
             // Add velocity to camera
-            MainCam->Pos = XMVectorAdd(MainCam->Pos, FindVelocityFromTilt(this, Layer[0], &trackingState));
+			//Need to check we're visible, before proceeding with velocity changes, 
+			//otherwise it does this a lot of times, and we
+			//end up miles away from our start point from the sheer number of iterations.
+			ovrSessionStatus sessionStatus;
+			ovr_GetSessionStatus(Session, &sessionStatus);
+			if (sessionStatus.IsVisible)
+				MainCam->Pos = XMVectorAdd(MainCam->Pos, FindVelocityFromTilt(this, Layer[0], &trackingState));
 
 		    for (int eye = 0; eye < 2; ++eye)
 		    {
