@@ -1,6 +1,5 @@
 /************************************************************************************
 
-PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Atomic.h
 Content     :   Contains atomic operations and inline fastest locking
                 functionality. Will contain #ifdefs for OS efficiency.
@@ -8,16 +7,16 @@ Content     :   Contains atomic operations and inline fastest locking
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,8 +43,90 @@ limitations under the License.
 #pragma intrinsic(_ReadBarrier, _WriteBarrier, _ReadWriteBarrier)
 #endif
 
-namespace OVR {
+#ifdef OVR_OS_LINUX
+#include <atomic>
 
+namespace OVR {
+template<class T>
+class AtomicTranslator : public std::atomic<T>
+{
+public:
+    AtomicTranslator() :
+        std::atomic<T>(T())
+    {
+    }
+
+    AtomicTranslator(const T &from) :
+        std::atomic<T>(from)
+    {
+    }
+
+    AtomicTranslator(const AtomicTranslator<T> &from) :
+        std::atomic<T>(from.Load_Acquire())
+    {
+    }
+
+    T operator = (const T &from)
+    {
+        Store_Release(from);
+        return from;
+    }
+
+    operator T() const
+    {
+        return Load_Acquire();
+    }
+
+    T Exchange_Sync(T& other)
+    {
+        return std::atomic<T>::exchange(other);
+    }
+
+    T Exchange_Sync(const T& other)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::exchange(tmp_val);
+    }
+
+    T ExchangeAdd_Sync(const T &val)
+    {
+        return std::atomic<T>::fetch_add(val);
+    }
+
+    T ExchangeAdd_NoSync(const T &val)
+    {
+        return std::atomic<T>::fetch_add(val, std::memory_order_relaxed);
+    }
+
+    bool CompareAndSet_Sync(const T &other, const T &val)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::compare_exchange_strong(tmp_val, val);
+    }
+
+    bool CompareAndSet_NoSync(const T &other, const T &val)
+    {
+        T tmp_val = other;
+        return std::atomic<T>::compare_exchange_weak(tmp_val, val);
+    }
+
+    T Load_Acquire() const
+    {
+        return std::atomic<T>::load(std::memory_order_acquire);
+    }
+
+    void Store_Release(const T &val)
+    {
+        std::atomic<T>::store(val, std::memory_order_release);
+    }
+};
+template<class T> using AtomicOps = AtomicTranslator<T>;
+template<class T> using AtomicInt = AtomicTranslator<T>;
+template<class T> using AtomicPtr = AtomicTranslator<T*>;
+
+#else // OVR_OS_LINUX
+
+namespace OVR {
 
 // ****** Declared classes
 
@@ -809,6 +890,7 @@ public:
     }
 };
 
+#endif // OVR_OS_LINUX
 
 //-----------------------------------------------------------------------------------
 // ***** Lock
@@ -817,16 +899,7 @@ public:
 // Unlike Mutex, it cannot be waited on.
 
 class Lock
-{
-    // NOTE: Locks are not allocatable and they themselves should not allocate 
-    // memory by standard means. This is the case because StandardAllocator
-    // relies on this class.
-    // Make 'delete' private. Don't do this for 'new' since it can be redefined.  
-    void    operator delete(void*) {}
-
-
-    // *** Lock implementation for various platforms.
-    
+{    
 #if !defined(OVR_ENABLE_THREADS)
 
 public:
@@ -847,7 +920,7 @@ public:
     // Locking functions.
     inline void DoLock()    { ::EnterCriticalSection(&cs); }
     inline void Unlock()    { ::LeaveCriticalSection(&cs); }
-
+    inline bool TryLock()   { return (::TryEnterCriticalSection(&cs) == TRUE); }
 #else
     pthread_mutex_t mutex;
 
@@ -877,12 +950,42 @@ public:
     // Locker class, used for automatic locking
     class Locker
     {
-    public:     
         Lock *pLock;
-        inline Locker(Lock *plock)
-        { pLock = plock; pLock->DoLock(); }
-        inline ~Locker()
-        { pLock->Unlock();  }
+
+    public:
+        Locker(Lock *plock)
+        {
+            pLock = plock;
+            if (plock)
+                pLock->DoLock();
+        }
+        ~Locker()
+        {
+            Release();
+        }
+
+        void Release()
+        {
+            if (pLock)
+                pLock->Unlock();
+            pLock = nullptr;
+        }
+    };
+
+    // Unlocker class, used for automatic unlocking
+    class Unlocker
+    {
+        //OVR_NON_COPYABLE(Unlocker);
+        Lock* mLock;
+
+    public:
+        Unlocker(Lock *lock) : mLock(lock) { }
+        ~Unlocker() { Release(); }
+        void Release()
+        {
+            if (mLock) mLock->Unlock();
+            mLock = nullptr;
+        }
     };
 };
 
@@ -902,11 +1005,60 @@ private:
     Lock* toLock() { return (Lock*)Buffer; }
 
     // UseCount and max alignment.
-    volatile int    UseCount;
+    AtomicInt<int>  UseCount;
     uint64_t        Buffer[(sizeof(Lock)+sizeof(uint64_t)-1)/sizeof(uint64_t)];
 };
 
 
-} // OVR
+//-------------------------------------------------------------------------------------
+// Thin locking wrapper around data
+
+template<class T> class LockedData
+{
+public:
+    LockedData(Lock& lock) :
+        TheLock(lock)
+    {
+    }
+    LockedData& operator=(const LockedData& rhs)
+    {
+        OVR_ASSERT(false);
+        return *this;
+    }
+
+    T Get()
+    {
+        Lock::Locker locker(&TheLock);
+        return Instance;
+    }
+
+    void Set(const T& value)
+    {
+        Lock::Locker locker(&TheLock);
+        Instance = value;
+    }
+
+    // Returns true if the value has changed.
+    // Returns false if the value has not changed.
+    bool GetIfChanged(T& value)
+    {
+        Lock::Locker locker(&TheLock);
+
+        if (value != Instance)
+        {
+            value = Instance;
+            return true;
+        }
+
+        return false;
+    }
+
+protected:
+    T Instance;
+    Lock& TheLock;
+};
+
+
+} // namespace OVR
 
 #endif

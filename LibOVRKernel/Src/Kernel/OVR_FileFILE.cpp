@@ -6,16 +6,16 @@ Content     :   File wrapper class implementation (Win32)
 Created     :   April 5, 1999
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -60,8 +60,15 @@ static int SFerror ()
         return FileConstants::Error_IOError;
 };
 
+
+#if defined(OVR_CC_MSVC)
+#include "share.h"
+#endif
+
+
 #if defined(OVR_OS_WIN32)
 #include "OVR_Win32_IncludeWindows.h"
+
 // A simple helper class to disable/enable system error mode, if necessary
 // Disabling happens conditionally only if a drive name is involved
 class SysErrorModeDisabler
@@ -234,11 +241,15 @@ void FILEFile::init()
 
 #if defined(OVR_CC_MSVC) && (OVR_CC_MSVC >= 1400)
     wchar_t womode[16];
-    wchar_t *pwFileName = (wchar_t*)OVR_ALLOC((UTF8Util::GetLength(FileName.ToCStr())+1) * sizeof(wchar_t));
-    UTF8Util::DecodeString(pwFileName, FileName.ToCStr());
-    OVR_ASSERT(strlen(omode) < sizeof(womode)/sizeof(womode[0]));
-    UTF8Util::DecodeString(womode, omode);
-    _wfopen_s(&fs, pwFileName, womode);
+    auto fileNameLength = (size_t)UTF8Util::GetLength(FileName.ToCStr()) + 1;
+    wchar_t *pwFileName = (wchar_t*)OVR_ALLOC(fileNameLength * sizeof(pwFileName[0]));
+    auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(pwFileName, fileNameLength, FileName.ToCStr());
+    if(requiredUTF8Length < fileNameLength)
+    {
+        requiredUTF8Length = OVR::UTF8Util::Strlcpy(womode, OVR_ARRAY_COUNT(womode), omode);
+        OVR_ASSERT(requiredUTF8Length < OVR_ARRAY_COUNT(womode));
+        fs = _wfsopen(pwFileName, womode, _SH_DENYWR); // Allow others to read the file when we are writing it.
+    }
     OVR_FREE(pwFileName);
 #else
     fs = fopen(FileName.ToCStr(), omode);
@@ -585,16 +596,17 @@ bool    SysFile::GetFileStat(FileStat* pfileStat, const String& path)
 {
 #if defined(OVR_OS_MS)
     // 64-bit implementation on Windows.
-    struct __stat64 fileStat;
-    // Stat returns 0 for success.
-    wchar_t *pwpath = (wchar_t*)OVR_ALLOC((UTF8Util::GetLength(path.ToCStr())+1)*sizeof(wchar_t));
-    UTF8Util::DecodeString(pwpath, path.ToCStr());
-
-    int ret = _wstat64(pwpath, &fileStat);
-    OVR_FREE(pwpath);
+    struct __stat64 fileStat{};
+    auto pathLength = (size_t)UTF8Util::GetLength(path.ToCStr()) + 1;
+    wchar_t *pwPath = (wchar_t*)OVR_ALLOC(pathLength * sizeof(pwPath[0]));
+    auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(pwPath, pathLength, path.ToCStr());
+    int ret = -1; // Stat returns 0 for success.
+    if(requiredUTF8Length < pathLength)
+        ret = _wstat64(pwPath, &fileStat);
+    OVR_FREE(pwPath);
     if (ret) return false;
 #else
-    struct stat fileStat;
+    struct stat fileStat{};
     // Stat returns 0 for success.
     if (stat(path, &fileStat) != 0)
         return false;

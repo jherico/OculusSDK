@@ -6,16 +6,16 @@ Content     :   Compiler-specific feature identification and utilities
 Created     :   June 19, 2014
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,6 +69,7 @@ limitations under the License.
 // MSVC 10.0 (VC2010)           = 1600
 // MSVC 11.0 (VC2012)           = 1700
 // MSVC 12.0 (VC2013)           = 1800
+// MSVC 14.0 (VC2015)           = 1900
 #  define OVR_CC_MSVC        _MSC_VER
 
 #if _MSC_VER == 0x1600
@@ -302,7 +303,7 @@ limitations under the License.
     #if defined(OVR_CC_MSVC)
         #define OVR_DISABLE_ALL_MSVC_WARNINGS() \
             __pragma(warning(push, 0)) \
-            __pragma(warning(disable: 4263 4264 4266))
+            __pragma(warning(disable: 4263 4264 4265 4266))
     #else
         #define OVR_DISABLE_ALL_MSVC_WARNINGS()
     #endif
@@ -604,7 +605,7 @@ limitations under the License.
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 209))  /* clang 2.9+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 300))  /* Apple clang 3.0+ */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 401))                     /* GCC 4.1+         */ && \
-         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
+         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2015+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 400)))            /* EDG 4.0+         */
         #define OVR_CPP_NO_ALIGNOF 1
     #endif
@@ -622,7 +623,7 @@ limitations under the License.
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 300))  /* clang 3.0+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))                     /* GCC 4.8+         */ && \
-         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
+         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2015+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         #define OVR_CPP_NO_ALIGNAS 1
     #endif
@@ -711,7 +712,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_noexcept))  /* clang     */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 406))            /* GCC 4.6+  */ && \
-         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                 /* VS2014+   */ && \
+         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                 /* VS2015+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))   /* EDG 4.5+  */
         #define OVR_CPP_NO_NOEXCEPT 1
     #endif
@@ -948,7 +949,7 @@ limitations under the License.
     #if !defined(OVR_CPP11_ENABLED) || \
         (!(defined(__clang__) && OVR_CC_HAS_FEATURE(cxx_inheriting_constructors))  /* clang     */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 408))                           /* GCC 4.8+  */ && \
-         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                                /* VS2014+   */ && \
+         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                                /* VS2015+   */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))                  /* EDG 4.8+  */
         #define OVR_CPP_NO_INHERITING_CONSTRUCTORS 1
     #endif
@@ -1018,7 +1019,7 @@ limitations under the License.
         (!(defined(__clang__) && !defined(__APPLE__) && (__clang__ >= 301))  /* clang 3.1+       */ && \
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 401))  /* Apple clang 4.1+ */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 405))                     /* GCC 4.5+         */ && \
-         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2014+          */ && \
+         !(defined(_MSC_VER) && (_MSC_VER >= 1900))                          /* VS2015+          */ && \
          !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 405)))            /* EDG 4.5+         */
         #define OVR_CPP_NO_EXTENDED_SIZEOF 1
     #endif
@@ -1342,11 +1343,15 @@ limitations under the License.
 //         { T t(3); }
 //
 #if !defined(OVR_NOEXCEPT)
-    #if defined(OVR_CPP_NOEXCEPT)
+    #if defined(OVR_CPP_NO_NOEXCEPT)
         #define OVR_NOEXCEPT
         #define OVR_NOEXCEPT_IF(predicate)
         #define OVR_NOEXCEPT_EXPR(expression) false
     #else
+        #if defined(OVR_CC_MSVC)
+            // ignore warning C4577: 'noexcept' used with no exception handling mode specified; termination on exception is not guaranteed. Specify /EHsc
+            #pragma warning(disable: 4577)
+        #endif
         #define OVR_NOEXCEPT noexcept
         #define OVR_NOEXCEPT_IF(predicate) noexcept((predicate))
         #define OVR_NOEXCEPT_EXPR(expression) noexcept((expression))

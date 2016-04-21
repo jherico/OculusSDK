@@ -3,16 +3,16 @@
 Filename    :   Util_SystemGUI.cpp
 Content     :   OS GUI access, usually for diagnostics.
 Created     :   October 20, 2014
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,7 @@ limitations under the License.
     #include "Kernel/OVR_Win32_IncludeWindows.h"
 #endif // OVR_OS_WIN32
 #include "Kernel/OVR_Std.h"
+#include "Kernel/OVR_Allocator.h"
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -36,7 +37,7 @@ limitations under the License.
 namespace OVR { namespace Util {
 
 
-static bool DisplayMessageBoxVaList(const char* pTitle, const char* pFormat, va_list argList)
+bool DisplayMessageBoxVaList(const char* pTitle, const char* pFormat, va_list argList)
 {
     char  buffer[512];
     char* pBuffer = buffer;
@@ -104,13 +105,13 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
         static BOOL CALLBACK Proc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
         {
             switch (iMsg)
-	        {
+            {
                 case WM_INITDIALOG:
                 {
                     HWND hWndEdit = GetDlgItem(hDlg, ID_EDIT);
 
-                    const char* pText = (const char*)lParam;
-                    SetWindowTextA(hWndEdit, pText);
+                    const wchar_t* pText = (const wchar_t*)lParam;
+                    SetWindowTextW(hWndEdit, pText);
 
                     HFONT hFont = CreateFontW(-11, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Courier New");
                     if(hFont)
@@ -124,18 +125,21 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
                 case WM_COMMAND:
                     switch (LOWORD(wParam))
                     {
-				        case ID_EDIT:
+                        case ID_EDIT:
                         {
                             // Handle messages from the edit control here.
                             HWND hWndEdit = GetDlgItem(hDlg, ID_EDIT);
                             SendMessage(hWndEdit, EM_SETSEL, (WPARAM)0, (LPARAM)0);
-					        return TRUE;
+                            return TRUE;
                         }
 
-		                case IDOK:
+                        case IDOK:
                             EndDialog(hDlg, 0);
-			                return TRUE;
-		            }
+                            return TRUE;
+                        case IDABORT:
+                            _exit(0); // We don't call abort() because the visual studio runtime
+                                      // will capture the signal and throw up another dialog
+                    }
                     break;
                 case WM_CLOSE:
 
@@ -150,21 +154,21 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 
     char dialogTemplateMemory[1024];
     memset(dialogTemplateMemory, 0, sizeof(dialogTemplateMemory));
-    DLGTEMPLATE* pDlg = (LPDLGTEMPLATE)dialogTemplateMemory;
+    LPDLGTEMPLATEW pDlg = (LPDLGTEMPLATEW)dialogTemplateMemory;
 
     const size_t textLength    = strlen(pText);
     const size_t textLineCount = Dialog::LineCount(pText);
 
     // Sizes are in Windows dialog units, which are relative to a character size. Depends on the font and environment settings. Often the pixel size will be ~3x the dialog unit x size. Often the pixel size will be ~3x the dialog unit y size.
     const int    kGutterSize   =  6; // Empty border space around controls within the dialog
-    const int    kButtonWidth  = 24;
+    const int    kButtonWidth  = 30;
     const int    kButtonHeight = 10;
     const int    kDialogWidth  = ((textLength > 1000) ? 600 : ((textLength > 400) ? 300 : 200));    // To do: Clip this against screen bounds.
     const int    kDialogHeight = ((textLineCount > 100) ? 400 : ((textLineCount > 25) ? 300 : ((textLineCount > 10) ? 200 : 100)));
 
     // Define a dialog box.
     pDlg->style = WS_POPUP | WS_BORDER | WS_SYSMENU | DS_MODALFRAME | WS_CAPTION;
-    pDlg->cdit  = 2;    // Control count
+    pDlg->cdit  = 3;    // Control count
     pDlg->x     = 10;   // X position To do: Center the dialog.
     pDlg->y     = 10;
     pDlg->cx    = (short)kDialogWidth;
@@ -175,13 +179,14 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 
     WCHAR* pWchar = (WCHAR*)pWord;
     const size_t titleLength = strlen(pTitle);
-    size_t wcharCount = OVR::UTF8Util::DecodeString(pWchar, pTitle, (titleLength > 128) ? 128 : titleLength);
-    pWord += wcharCount + 1;
+    size_t wcharCount = OVR::UTF8Util::Strlcpy(pWchar, 128, pTitle, titleLength);
+
+    pWord += wcharCount +1;
 
     // Define an OK button.
     pWord = Dialog::WordUp(pWord);
 
-    DLGITEMTEMPLATE* pDlgItem = (DLGITEMTEMPLATE*)pWord;
+    PDLGITEMTEMPLATEW pDlgItem = (PDLGITEMTEMPLATEW)pWord;
     pDlgItem->x     = pDlg->cx - (kGutterSize + kButtonWidth);
     pDlgItem->y     = pDlg->cy - (kGutterSize + kButtonHeight);
     pDlgItem->cx    = kButtonWidth;
@@ -198,10 +203,30 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
     pWord     += 3; // OK\0
     *pWord++   = 0; // no creation data
 
+    // Define a QUIT button
+    pWord = Dialog::WordUp(pWord);
+
+    pDlgItem = (PDLGITEMTEMPLATEW)pWord;
+    pDlgItem->x = pDlg->cx - ((kGutterSize + kButtonWidth) * 2);
+    pDlgItem->y = pDlg->cy - (kGutterSize + kButtonHeight);
+    pDlgItem->cx = kButtonWidth;
+    pDlgItem->cy = kButtonHeight;
+    pDlgItem->id = IDABORT;
+    pDlgItem->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON;
+
+    pWord = (WORD*)(pDlgItem + 1);
+    *pWord++ = 0xFFFF;
+    *pWord++ = 0x0080; // button class
+
+    pWchar = (WCHAR*)pWord;
+    pWchar[0] = 'Q'; pWchar[1] = 'U'; pWchar[2] = 'I'; pWchar[3] = 'T'; pWchar[4] = '\0'; // Not currently localized.
+    pWord += 5; // QUIT\0
+    *pWord++ = 0; // no creation data
+
     // Define an EDIT contol.
     pWord = Dialog::WordUp(pWord);
 
-    pDlgItem = (DLGITEMTEMPLATE*)pWord;
+    pDlgItem = (PDLGITEMTEMPLATEW)pWord;
     pDlgItem->x  = kGutterSize;
     pDlgItem->y  = kGutterSize;
     pDlgItem->cx = pDlg->cx - (kGutterSize + kGutterSize);
@@ -214,7 +239,17 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
     *pWord++ = 0x0081;  // edit class atom
     *pWord++ = 0;       // no creation data
 
-    LRESULT ret = DialogBoxIndirectParam(NULL, (LPDLGTEMPLATE)pDlg, NULL, (DLGPROC)Dialog::Proc, (LPARAM)pText);
+    // We use SafeMMapAlloc instead of malloc/new because we may be in a situation with a broken heap, which triggered this message box.
+    LRESULT  ret = 0;
+    size_t   textBuffWCapacity = textLength + 1;
+    wchar_t* textBuffW = (wchar_t*)OVR::SafeMMapAlloc(textBuffWCapacity * sizeof(wchar_t));
+
+    if(textBuffW)
+    {
+        OVR::UTF8Util::Strlcpy(textBuffW, textBuffWCapacity, pText, textLength);
+        ret = DialogBoxIndirectParamW(NULL, (LPDLGTEMPLATEW)pDlg, NULL, (DLGPROC)Dialog::Proc, (LPARAM)textBuffW);
+        OVR::SafeMMapFree(textBuffW, textBuffWCapacity * sizeof(wchar_t));
+    }
 
     return (ret != 0);
 }

@@ -5,16 +5,16 @@ Content     :   Shared code for Direct3D
 Created     :   Oct 14, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,65 +44,11 @@ bool VerifyHRESULT(const char* file, int line, HRESULT hr)
     return true;
 }
 
-bool CheckD3D9Ex()
-{
-    bool available = false;
-    HMODULE libHandle = LoadLibraryW(L"d3d9.dll");
-
-    if (libHandle != nullptr)
-    {
-        available = (GetProcAddress(libHandle, "Direct3DCreate9Ex") != nullptr);
-        FreeLibrary(libHandle);
-    }
-
-    return available;
-}
-
 String GetWindowsErrorString(HRESULT hr)
 {
-    // DirectX 9 error strings
-    switch (hr)
-    {
-    case D3DERR_WRONGTEXTUREFORMAT: return "D3DERR_WRONGTEXTUREFORMAT";
-    case D3DERR_UNSUPPORTEDCOLOROPERATION: return "D3DERR_UNSUPPORTEDCOLOROPERATION";
-    case D3DERR_UNSUPPORTEDCOLORARG: return "D3DERR_UNSUPPORTEDCOLORARG";
-    case D3DERR_UNSUPPORTEDALPHAOPERATION: return "D3DERR_UNSUPPORTEDALPHAOPERATION";
-    case D3DERR_UNSUPPORTEDALPHAARG: return "D3DERR_UNSUPPORTEDALPHAARG";
-    case D3DERR_TOOMANYOPERATIONS: return "D3DERR_TOOMANYOPERATIONS";
-    case D3DERR_CONFLICTINGTEXTUREFILTER: return "D3DERR_CONFLICTINGTEXTUREFILTER";
-    case D3DERR_UNSUPPORTEDFACTORVALUE: return "D3DERR_UNSUPPORTEDFACTORVALUE";
-    case D3DERR_CONFLICTINGRENDERSTATE: return "D3DERR_CONFLICTINGRENDERSTATE";
-    case D3DERR_UNSUPPORTEDTEXTUREFILTER: return "D3DERR_UNSUPPORTEDTEXTUREFILTER";
-    case D3DERR_CONFLICTINGTEXTUREPALETTE: return "D3DERR_CONFLICTINGTEXTUREPALETTE";
-    case D3DERR_DRIVERINTERNALERROR: return "D3DERR_DRIVERINTERNALERROR";
-    case D3DERR_NOTFOUND: return "D3DERR_NOTFOUND";
-    case D3DERR_MOREDATA: return "D3DERR_MOREDATA";
-    case D3DERR_DEVICELOST: return "D3DERR_DEVICELOST";
-    case D3DERR_DEVICENOTRESET: return "D3DERR_DEVICENOTRESET";
-    case D3DERR_NOTAVAILABLE: return "D3DERR_NOTAVAILABLE";
-    case D3DERR_OUTOFVIDEOMEMORY: return "D3DERR_OUTOFVIDEOMEMORY";
-    case D3DERR_INVALIDDEVICE: return "D3DERR_INVALIDDEVICE";
-    case D3DERR_INVALIDCALL: return "D3DERR_INVALIDCALL";
-    case D3DERR_DRIVERINVALIDCALL: return "D3DERR_DRIVERINVALIDCALL";
-    case D3DERR_WASSTILLDRAWING: return "D3DERR_WASSTILLDRAWING";
-    case D3DOK_NOAUTOGEN: return "D3DOK_NOAUTOGEN";
-    case D3DERR_DEVICEREMOVED: return "D3DERR_DEVICEREMOVED";
-    case S_NOT_RESIDENT: return "S_NOT_RESIDENT";
-    case S_RESIDENT_IN_SHARED_MEMORY: return "S_RESIDENT_IN_SHARED_MEMORY";
-    case S_PRESENT_MODE_CHANGED: return "S_PRESENT_MODE_CHANGED";
-    case S_PRESENT_OCCLUDED: return "S_PRESENT_OCCLUDED";
-    case D3DERR_DEVICEHUNG: return "D3DERR_DEVICEHUNG";
-    case D3DERR_UNSUPPORTEDOVERLAY: return "D3DERR_UNSUPPORTEDOVERLAY";
-    case D3DERR_UNSUPPORTEDOVERLAYFORMAT: return "D3DERR_UNSUPPORTEDOVERLAYFORMAT";
-    case D3DERR_CANNOTPROTECTCONTENT: return "D3DERR_CANNOTPROTECTCONTENT";
-    case D3DERR_UNSUPPORTEDCRYPTO: return "D3DERR_UNSUPPORTEDCRYPTO";
-    case D3DERR_PRESENT_STATISTICS_DISJOINT: return "D3DERR_PRESENT_STATISTICS_DISJOINT";
-    default: break; // Not a DirectX 9 error, use FormatMessageA...
-    }
+    wchar_t* errorText = nullptr;
 
-    char errorTextAddr[256] = {};
-
-    DWORD slen = FormatMessageA(
+    DWORD slen = FormatMessageW(
         // use system message tables to retrieve error text
         FORMAT_MESSAGE_FROM_SYSTEM
         // allocate buffer on local heap for error text
@@ -113,11 +59,9 @@ String GetWindowsErrorString(HRESULT hr)
         nullptr,    // unused with FORMAT_MESSAGE_FROM_SYSTEM
         hr,
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        errorTextAddr,  // output 
+        (LPWSTR)&errorText,  // output, allocated via LocalAlloc (free with LocalFree) 
         256, // minimum size for output buffer
         nullptr);   // arguments - see note 
-
-    char* errorText = *(char**)errorTextAddr;
 
     char formatStr[512];
     OVR_snprintf(formatStr, sizeof(formatStr), "[Code=%x = %d]", hr, hr);

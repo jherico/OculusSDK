@@ -5,16 +5,16 @@ Content     :   Small helper header to include Windows.h properly
 Created     :   Oct 16, 2014
 Authors     :   Chris Taylor, Scott Bassett
 
-Copyright   :   Copyright 2014 Oculus, Inc. All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus, Inc. All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,6 +39,7 @@ limitations under the License.
 
 // Prevents <Windows.h> from #including <Winsock.h>, as we use <Winsock2.h> instead.
 #ifndef _WINSOCKAPI_
+#define DID_DEFINE_WINSOCKAPI
 #define _WINSOCKAPI_
 #endif
 
@@ -52,7 +53,14 @@ limitations under the License.
 #define _WIN32_WINNT 0x0601 /* Windows 7+ */
 #endif
 
+OVR_DISABLE_ALL_MSVC_WARNINGS()
 #include <Windows.h>
+OVR_RESTORE_ALL_MSVC_WARNINGS()
+
+#ifdef DID_DEFINE_WINSOCKAPI
+#undef _WINSOCKAPI_
+#undef DID_DEFINE_WINSOCKAPI
+#endif
 
 namespace OVR {
 
@@ -109,11 +117,24 @@ public:
         Close();
     }
 
-    bool IsValid()
+    bool IsValid() const
     {
         return hAttachedHandle != Traits::InvalidValue();
     }
-    HANDLE Get()
+
+    #if !OVR_CPP_NO_EXPLICIT_CONVERSION_OPERATORS
+        operator bool() const
+        {
+            return IsValid();
+        }
+
+        operator HANDLE() const
+        {
+            return hAttachedHandle;
+        }
+    #endif
+
+    HANDLE Get() const
     {
         return hAttachedHandle;
     }
@@ -130,6 +151,15 @@ public:
     {
         // Do not close handle
         hAttachedHandle = Traits::InvalidValue();
+    }
+    bool Copy()
+    {
+        Close();
+        if(DuplicateHandle(GetCurrentProcess(), cpuEvent, GetCurrentProcess()
+                           serverProcess.Get(), &hAttachedHandle, 0, FALSE, DUPLICATE_SAME_ACCESS))
+            return true;
+        hAttachedHandle = Traits::InvalidValue();
+        return false;
     }
     bool Close()
     {
@@ -148,9 +178,12 @@ public:
 
 // Different Windows API functions have different invalid values.
 // These types are provided to improve readability.
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedMutexHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedEventHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_InvalidTraits > ScopedFileHANDLE;
 typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedProcessHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedThreadHANDLE;
+typedef ScopedHANDLE < ScopedHANDLE_NullTraits > ScopedSemaphoreHANDLE;
 
 // Scoped registry keys
 class ScopedHKEY

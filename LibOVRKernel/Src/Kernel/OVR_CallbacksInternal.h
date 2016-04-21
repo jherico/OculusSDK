@@ -6,16 +6,16 @@ Content     :   Callback library
 Created     :   Nov 11, 2014
 Author      :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,6 +32,10 @@ limitations under the License.
 #include "OVR_RefCount.h"
 #include "OVR_Delegates.h"
 #include "OVR_Array.h"
+
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+    #include <atomic>
+#endif
 
 namespace OVR {
 
@@ -50,7 +54,7 @@ template<class DelegateT> class CallbackListener;
 class CallbackEmitterBase
 {
 protected:
-    static Lock EmitterLock;
+    static Lock* GetEmitterLock();
 };
 
 template<class DelegateT>
@@ -60,6 +64,9 @@ class FloatingCallbackEmitter : public CallbackEmitterBase, public RefCountBase<
 
     FloatingCallbackEmitter() :
         IsShutdown(false),
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+        ListenersExist(false),
+#endif
         DirtyListenersCache(0)
     {
     }
@@ -74,6 +81,15 @@ public:
     }
 
     bool AddListener(FloatingCallbackListener<DelegateT>* listener);
+    bool HasListeners() const
+    {
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+        return ListenersExist.load(std::memory_order_relaxed);
+#else
+        // This code still has a data race
+        return (Listeners.GetSizeI() > 0);
+#endif
+    }
     void Shutdown();
 
     // Called from the listener object as it is transitioning to canceled state.
@@ -108,6 +124,10 @@ protected:
     // Array of added listeners.
     ListenerPtrArray Listeners;
 
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+    std::atomic<bool> ListenersExist;
+#endif
+
     // Is the cache dirty?  This avoids locking and memory allocation in steady state.
     AtomicInt<uint32_t> DirtyListenersCache;
 
@@ -121,7 +141,7 @@ protected:
     {
         if (DirtyListenersCache != 0)
         {
-            Lock::Locker locker(&EmitterLock);
+            Lock::Locker locker(GetEmitterLock());
 
             // TBD: Should memory allocation be further reduced here?
             ListenersCacheForCalls = Listeners;
@@ -145,7 +165,14 @@ protected:
 
                 break;
             }
+
         }
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+        if (Listeners.GetSizeI() < 1)
+        {
+            ListenersExist.store(false, std::memory_order_relaxed);
+        }
+#endif
     }
 };
 
@@ -184,7 +211,7 @@ public:
 template<class DelegateT>
 bool FloatingCallbackEmitter<DelegateT>::AddListener(FloatingCallbackListener<DelegateT>* listener)
 {
-    Lock::Locker locker(&EmitterLock);
+    Lock::Locker locker(GetEmitterLock());
 
     if (IsShutdown)
     {
@@ -198,6 +225,10 @@ bool FloatingCallbackEmitter<DelegateT>::AddListener(FloatingCallbackListener<De
     // Note: Because the flag is atomic, a portable memory fence is implied.
     DirtyListenersCache = 1;
 
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+    ListenersExist.store(true, std::memory_order_relaxed);
+#endif
+
     return true;
 }
 
@@ -206,7 +237,7 @@ bool FloatingCallbackEmitter<DelegateT>::AddListener(FloatingCallbackListener<De
 template<class DelegateT>
 void FloatingCallbackEmitter<DelegateT>::OnListenerCancel(FloatingCallbackListener<DelegateT>* listener)
 {
-    Lock::Locker emitterLocker(&EmitterLock);
+    Lock::Locker locker(GetEmitterLock());
 
     // If not shut down,
     // Note that if it is shut down then there will be no listeners in the array.
@@ -220,7 +251,7 @@ void FloatingCallbackEmitter<DelegateT>::OnListenerCancel(FloatingCallbackListen
 template<class DelegateT>
 void FloatingCallbackEmitter<DelegateT>::Shutdown()
 {
-    Lock::Locker locker(&EmitterLock);
+    Lock::Locker locker(GetEmitterLock());
 
     IsShutdown = true;
 
@@ -228,6 +259,10 @@ void FloatingCallbackEmitter<DelegateT>::Shutdown()
 
     // Note: Because the flag is atomic, a portable memory fence is implied.
     DirtyListenersCache = 1;
+
+#if !defined(OVR_CC_MSVC) || (OVR_CC_VERSION > 1600) // Newer than VS2010
+    ListenersExist.store(false, std::memory_order_relaxed);
+#endif
 }
 
 //-----------------------------------------------------------------------------

@@ -20,8 +20,8 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef OVR_ExceptionHandler_h
-#define OVR_ExceptionHandler_h
+#ifndef OVR_DebugHelp_h
+#define OVR_DebugHelp_h
 
 #include "OVR_Types.h"
 #include "OVR_String.h"
@@ -68,6 +68,8 @@ namespace OVR {
     void              FreeThreadHandle(OVR::ThreadHandle threadHandle);                 // Frees the handle returned by ConvertThreadSysIdToThreadHandle.
     OVR::ThreadSysId  GetCurrentThreadSysId();
 
+    void GetOSVersionName(char* versionName, size_t versionNameCapacity);
+
     // CPUContext
     #if defined(OVR_OS_MS)
         typedef CONTEXT CPUContext; 
@@ -108,6 +110,89 @@ namespace OVR {
     // The stack limit is a value less than the stack base on most platforms, as stacks usually grow downward.
     // Some platforms (e.g. Microsoft) have dynamically resizing stacks, in which case the stack limit reflects the current limit.
     void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle threadHandle = OVR_THREADHANDLE_INVALID);
+
+
+    /// Used by KillCdeclFunction and RestoreCdeclFunction
+    ///
+    struct SavedFunction
+    {
+        void*   Function;
+        uint8_t Size;
+        uint8_t Data[15];
+
+        SavedFunction() : Function(nullptr), Size(0){}
+    };
+
+    /// Overwrites the implementation of a statically linked function with an implementation
+    /// that unilaterally returns the given int32_t value. Works regardless of the arguments
+    /// passed to that function by the caller. This version is specific to cdecl functions
+    /// as opposed to Microsoft stdcall functions. Requires the ability to use VirtualProtect 
+    /// to change the code memory to be writable. Returns true if the operation was successful.
+    /// 
+    /// Since this function overwrites the memory of the existing function implementation,
+    /// it reequires the function to have at least enough bytes for this. If functionReturnValue
+    /// is zero then pFunction must be at least three bytes in size. If functionReturnValue is 
+    /// non-zero then pFunction must be at least six bytes in size.
+    ///
+    /// Example usage:
+    ///    int __cdecl _CrtIsValidHeapPointer(const void* heapPtr);
+    /// 
+    ///    void main(int, char*[]){
+    ///        KillCdeclFunction(_CrtIsValidHeapPointer, TRUE); // Make _CrtIsValidHeapPointer always return true.
+    ///    }
+    ///
+    bool KillCdeclFunction(void* pFunction, int32_t functionReturnValue, SavedFunction* pSavedFunction = nullptr);
+
+
+    /// This version is for functions that return void. It causes them to immediately return.
+    ///
+    /// Example usage:
+    ///    void __cdecl _CrtCheckMemory();
+    ///
+    ///    void main(int, char*[]){
+    ///        KillCdeclFunction(_CrtCheckMemory);
+    ///    }
+    ///
+    bool KillCdeclFunction(void* pFunction, SavedFunction* pSavedFunction = nullptr);
+
+
+    /// Restores a function which was previously killed by KillCdeclFunction.
+    ///
+    /// Example usage:
+    ///    void main(int, char*[]){
+    ///        SavedFunction savedFunction
+    ///        KillCdeclFunction(_CrtCheckMemory, &savedFunction);
+    ///        [...]
+    ///        RestoreCdeclFunction(&savedFunction);
+    ///    }
+    ///
+    bool RestoreCdeclFunction(SavedFunction* pSavedFunction);
+
+
+    /// Smart class which temporarily kills a function and restores it upon scope completion.
+    ///
+    /// Example usage:
+    ///    void main(int, char*[]){
+    ///        TempCdeclFunctionKill tempKill(_CrtIsValidHeapPointer, TRUE);
+    ///        [...]
+    ///    }
+    ///
+    struct TempCdeclFunctionKill
+    {
+        TempCdeclFunctionKill(void* pFunction, int32_t functionReturnValue) : Success(false), FunctionPtr(nullptr), SavedFunctionData()
+            { Success = KillCdeclFunction(pFunction, functionReturnValue, &SavedFunctionData); }
+
+        TempCdeclFunctionKill(void* pFunction) : Success(false), FunctionPtr(nullptr), SavedFunctionData()
+            { Success = KillCdeclFunction(pFunction, &SavedFunctionData); }
+
+        ~TempCdeclFunctionKill()
+            { if(Success) RestoreCdeclFunction(&SavedFunctionData); }
+
+        bool          Success;
+        void*         FunctionPtr;
+        SavedFunction SavedFunctionData;
+    };
+
 
 
     // OVR_MAX_PATH
@@ -343,6 +428,22 @@ namespace OVR {
         // Allws you to add an arbitrary description of the current application, which will be added to exception reports.
         void SetAppDescription(const char* appDescription);
 
+        // Specifies how much info the minidump has, but also how large it gets.
+        enum MinidumpInfoLevel
+        {
+            kMILNone,       // Don't generate a .mdmp file.
+            kMILSmall,      // Will result in a .mdmp file that's about 10-30 KiB
+            kMILMedium,     // Will result in a .mdmp file that's about 5-15 MiB
+            kMILLarge       // Will result in a .mdmp file that's about 50-150 MiB.
+        };
+
+
+        void SetMinidumpInfoLevel(MinidumpInfoLevel level)
+            { minidumpInfoLevel = level; }
+
+        MinidumpInfoLevel GetMinidumpInfoLevel() const
+            { return minidumpInfoLevel; }
+
         // If the report path has a "%s" in its name, then assume the path is a sprintf format and write it 
         // with the %s specified as a date/time string.
         // The report path can be "default" to signify that you want to use the default user location.
@@ -373,6 +474,12 @@ namespace OVR {
         // Guarantees the presence of the directory upon returning true.
         static size_t GetCrashDumpDirectory(char* directoryPath, size_t directoryPathCapacity);
 
+
+        // Retrieves a directory path for a specific organization and application.
+        // Returns the required strlen of the path.
+        // Guarantees the presence of the directory upon returning true.
+        static void GetCrashDumpDirectoryFromNames(char* path, const char* organizationName, const char* ApplicationName);
+
         // Given an exception report at a given file path, returns a string suitable for displaying in a message
         // box or similar user interface during the handling of an exception. The returned string must be passed
         // to FreeMessageBoxText when complete.
@@ -383,10 +490,17 @@ namespace OVR {
         static void ReportDeadlock(const char* threadName, const char* organizationName = nullptr, const char* applicationName = nullptr);
 
     protected:
+        // Write one log line to log file, console, syslog, and debug output.
+        // If LogFile is null, it will not write to the log file.
+        // The buffer must be null-terminated.
+        void writeLogLine(const char* buffer, int length);
+
         void WriteExceptionDescription();
-        void WriteReport();
+        void WriteReport(const char* reportType);
         void WriteThreadCallstack(ThreadHandle threadHandle, ThreadSysId threadSysId, const char* additionalInfo);
         void WriteMiniDump();
+
+protected:
         // Runtime constants
         bool                enabled;
         OVR::AtomicInt<int> pauseCount;                  // 0 means unpaused. 1+ means paused.
@@ -397,9 +511,9 @@ namespace OVR {
         String              appDescription;
         String              codeBasePathArray[6];        // 6 is arbitrary.
         char                reportFilePath[OVR_MAX_PATH];// May be an encoded path, in that it has "%s" in it or is named "default". See reporFiletPathActual for the runtime actual report path.
-        int                 miniDumpFlags;
+        MinidumpInfoLevel   minidumpInfoLevel;
         char                miniDumpFilePath[OVR_MAX_PATH];
-        FILE*               file;                        // Can/should we use OVR Files for this?
+        FILE*               LogFile;                        // Can/should we use OVR Files for this?
         char                scratchBuffer[4096];
 
         // Runtime variables
@@ -507,4 +621,4 @@ namespace OVR {
 OVR_RESTORE_MSVC_WARNING()
 
 
-#endif // Header include guard
+#endif // OVR_DebugHelp_h

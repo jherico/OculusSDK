@@ -1009,6 +1009,20 @@ namespace OVR
             void glGetMultisamplefv_Hook(GLenum pname, GLuint index, GLfloat *val);
             void glSampleMaski_Hook(GLuint index, GLbitfield mask);
 
+            // GL_ARB_texture_storage
+            void glTexStorage1D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width);
+            void glTexStorage2D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
+            void glTexStorage3D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
+            void glTextureStorage1DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width);
+            void glTextureStorage2DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
+            void glTextureStorage3DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
+
+            // GL_ARB_texture_storage_multisample
+            void glTexStorage2DMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
+            void glTexStorage3DMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
+            void glTextureStorage2DMultisampleEXT(GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
+            void glTextureStorage3DMultisampleEXT(GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
+
             // GL_ARB_timer_query
             void glQueryCounter_Hook(GLuint id, GLenum target);
             void glGetQueryObjecti64v_Hook(GLuint id, GLenum pname, GLint64 *params);
@@ -1694,6 +1708,20 @@ namespace OVR
         // GL_ARB_texture_rectangle
         // (no functions)
 
+        // GL_ARB_texture_storage
+        PFNGLTEXSTORAGE1DPROC        glTexStorage1D_Impl;
+        PFNGLTEXSTORAGE2DPROC        glTexStorage2D_Impl;
+        PFNGLTEXSTORAGE3DPROC        glTexStorage3D_Impl;
+        PFNGLTEXTURESTORAGE1DEXTPROC glTextureStorage1DEXT_Impl;
+        PFNGLTEXTURESTORAGE2DEXTPROC glTextureStorage2DEXT_Impl;
+        PFNGLTEXTURESTORAGE3DEXTPROC glTextureStorage3DEXT_Impl;
+
+        // GL_ARB_texture_storage_multisample
+        PFNGLTEXSTORAGE2DMULTISAMPLEPROC        glTexStorage2DMultisample_Impl;
+        PFNGLTEXSTORAGE3DMULTISAMPLEPROC        glTexStorage3DMultisample_Impl;
+        PFNGLTEXTURESTORAGE2DMULTISAMPLEEXTPROC glTextureStorage2DMultisampleEXT_Impl;
+        PFNGLTEXTURESTORAGE3DMULTISAMPLEEXTPROC glTextureStorage3DMultisampleEXT_Impl;
+
         // GL_ARB_timer_query
         PFNGLGETQUERYOBJECTI64VPROC glGetQueryObjecti64v_Impl;
         PFNGLGETQUERYOBJECTUI64VPROC glGetQueryObjectui64v_Impl;
@@ -1962,12 +1990,15 @@ namespace OVR
         bool gle_ARB_texture_multisample;
         bool gle_ARB_texture_non_power_of_two;
         bool gle_ARB_texture_rectangle;
+        bool gle_ARB_texture_storage;
+        bool gle_ARB_texture_storage_multisample;
         bool gle_ARB_timer_query;
         bool gle_ARB_vertex_array_object;
       //bool gle_ARB_vertex_attrib_binding;
         bool gle_EXT_draw_buffers2;
         bool gle_EXT_texture_compression_s3tc;
         bool gle_EXT_texture_filter_anisotropic;
+        bool gle_EXT_texture_sRGB;
       //bool gle_KHR_context_flush_control;
         bool gle_KHR_debug;
       //bool gle_KHR_robust_buffer_access_behavior;

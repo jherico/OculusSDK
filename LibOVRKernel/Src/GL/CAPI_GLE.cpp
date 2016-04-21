@@ -1,6 +1,6 @@
 /************************************************************************************
 
-Filename    :   Render_GLE.cpp
+Filename    :   CAPI_GLE.cpp
 Content     :   OpenGL Extensions support. Implements a stripped down glew-like 
                 interface with some additional functionality.
 Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
@@ -20,12 +20,13 @@ limitations under the License.
 ************************************************************************************/
 
 #include "CAPI_GLE.h"
-#include "Kernel/OVR_Log.h"
 #if defined(OVR_OS_WIN32)
     #include "Kernel/OVR_Win32_IncludeWindows.h"
 #endif // OVR_OS_WIN32
 #include <string.h>
-
+#include <stdio.h>
+#include <string>
+#include <assert.h>
 
 #if defined(_WIN32)
     #pragma comment(lib, "opengl32.lib")
@@ -36,6 +37,9 @@ limitations under the License.
     #include <dlfcn.h>
 #endif
 
+// To do: redirect these log statements.
+#define OVR_DEBUG_LOG(x)
+#define LogText(x) 
 
 
 //namespace OVR
@@ -193,7 +197,7 @@ limitations under the License.
         int fields = 0, major = 0, minor = 0;
         bool isGLES = false;
 
-        OVR_ASSERT(version);
+        assert(version);
         if (version)
         {
             OVR_DEBUG_LOG(("GL_VERSION: %s", (const char*)version));
@@ -681,7 +685,21 @@ limitations under the License.
         GLELoadProc(glSampleMaski_Impl, glSampleMaski);
         GLELoadProc(glTexImage2DMultisample_Impl, glTexImage2DMultisample);
         GLELoadProc(glTexImage3DMultisample_Impl, glTexImage3DMultisample);
-        
+
+        // GL_ARB_texture_storage
+        GLELoadProc(glTexStorage1D_Impl, glTexStorage1D);
+        GLELoadProc(glTexStorage2D_Impl, glTexStorage2D);
+        GLELoadProc(glTexStorage3D_Impl, glTexStorage3D);
+        GLELoadProc(glTextureStorage1DEXT_Impl, glTextureStorage1DEXT);
+        GLELoadProc(glTextureStorage2DEXT_Impl, glTextureStorage2DEXT);
+        GLELoadProc(glTextureStorage3DEXT_Impl, glTextureStorage3DEXT);
+
+        // GL_ARB_texture_storage_multisample
+        GLELoadProc(glTexStorage2DMultisample_Impl, glTexStorage2DMultisample);
+        GLELoadProc(glTexStorage3DMultisample_Impl, glTexStorage3DMultisample);
+        GLELoadProc(glTextureStorage2DMultisampleEXT_Impl, glTextureStorage2DMultisampleEXT);
+        GLELoadProc(glTextureStorage3DMultisampleEXT_Impl, glTextureStorage3DMultisampleEXT);
+
         // GL_ARB_timer_query
         GLELoadProc(glGetQueryObjecti64v_Impl, glGetQueryObjecti64v);
         GLELoadProc(glGetQueryObjectui64v_Impl, glGetQueryObjectui64v);
@@ -819,11 +837,14 @@ limitations under the License.
             { gle_ARB_texture_rectangle, "GL_ARB_texture_rectangle" },
             { gle_ARB_texture_rectangle, "GL_EXT_texture_rectangle" },  // We also check for GL_EXT_texture_rectangle and GL_NV_texture_rectangle.
             { gle_ARB_texture_rectangle, "GL_NV_texture_rectangle" },
+            { gle_ARB_texture_storage, "GL_ARB_texture_storage" },
+            { gle_ARB_texture_storage_multisample, "GL_ARB_texture_storage_multisample" },
             { gle_ARB_timer_query, "GL_ARB_timer_query" },
             { gle_ARB_vertex_array_object, "GL_ARB_vertex_array_object" },
             { gle_EXT_draw_buffers2, "GL_EXT_draw_buffers2" },
             { gle_EXT_texture_compression_s3tc, "GL_EXT_texture_compression_s3tc" },
             { gle_EXT_texture_filter_anisotropic, "GL_EXT_texture_filter_anisotropic" },
+            { gle_EXT_texture_sRGB, "GL_EXT_texture_sRGB" },
             { gle_KHR_debug, "GL_KHR_debug" },
             { gle_WIN_swap_hint, "GL_WIN_swap_hint" }
             // Windows WGL, Unix GLX, and Apple CGL extensions are handled below, as they require different calls from glGetString(GL_EXTENSIONS).
@@ -853,9 +874,7 @@ limitations under the License.
                
                 if(err == 0)
                 {
-                    #ifdef OVR_BUILD_DEBUG
-                    OVR::StringBuffer extensionsStr;
-                    #endif
+                    std::string sExtensions;
  
                     for(GLint e = 0; e != extensionCount; ++e) // For each extension supported...
                     {
@@ -863,9 +882,8 @@ limitations under the License.
  
                         if(extension) // glGetStringi returns NULL upon error.
                         {
-                            #ifdef OVR_BUILD_DEBUG
-                                extensionsStr.AppendFormat(" %s", extension);
-                            #endif
+                            sExtensions += " ";
+                            sExtensions += extension;
  
                             for(size_t i = 0; i < OVR_ARRAY_COUNT(vspArray); i++) // For each extension we are interested in...
                             {
@@ -879,7 +897,7 @@ limitations under the License.
                             break;
                     }
  
-                    OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", extensionsStr.ToCStr()));
+                    OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", sExtensions.c_str()));
                 }
             }
             // Else we have a problem: no means to read the extensions was successful.
@@ -6735,6 +6753,80 @@ limitations under the License.
         {
             if(glSampleMaski_Impl)
                 glSampleMaski_Impl(index, mask);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+
+        // GL_ARB_texture_storage
+        void OVR::GLEContext::glTexStorage1D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width)
+        {
+            if(glTexStorage1D_Impl)
+                glTexStorage1D_Impl(target, levels, internalformat, width);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTexStorage2D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height)
+        {
+            if(glTexStorage2D_Impl)
+                glTexStorage2D_Impl(target, levels, internalformat, width, height);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTexStorage3D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth)
+        {
+            if(glTexStorage3D_Impl)
+                glTexStorage3D_Impl(target, levels, internalformat, width, height, depth);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTextureStorage1DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width)
+        {
+            if(glTextureStorage1DEXT_Impl)
+                glTextureStorage1DEXT_Impl(texture, target, levels, internalformat, width);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTextureStorage2DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height)
+        {
+            if(glTextureStorage2DEXT_Impl)
+                glTextureStorage2DEXT_Impl(texture, target, levels, internalformat, width, height);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTextureStorage3DEXT(GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth)
+        {
+            if(glTextureStorage3DEXT_Impl)
+                glTextureStorage3DEXT_Impl(texture, target, levels, internalformat, width, height, depth);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+
+        // GL_ARB_texture_storage_multisample
+        void OVR::GLEContext::glTexStorage2DMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations)
+        {
+            if(glTexStorage2DMultisample_Impl)
+                glTexStorage2DMultisample_Impl(target, samples, internalformat, width, height, fixedsamplelocations);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTexStorage3DMultisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations)
+        {
+            if(glTexStorage3DMultisample_Impl)
+                glTexStorage3DMultisample_Impl(target, samples, internalformat, width, height, depth, fixedsamplelocations);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTextureStorage2DMultisampleEXT(GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations)
+        {
+            if(glTextureStorage2DMultisampleEXT_Impl)
+                glTextureStorage2DMultisampleEXT_Impl(texture, target, samples, internalformat, width, height, fixedsamplelocations);
+            PostHook(GLE_CURRENT_FUNCTION);
+        }
+
+        void OVR::GLEContext::glTextureStorage3DMultisampleEXT(GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations)
+        {
+            if(glTextureStorage3DMultisampleEXT_Impl)
+                glTextureStorage3DMultisampleEXT_Impl(texture, target, samples, internalformat, width, height, depth, fixedsamplelocations);
             PostHook(GLE_CURRENT_FUNCTION);
         }
 

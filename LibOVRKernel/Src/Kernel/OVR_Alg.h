@@ -1,21 +1,20 @@
 /************************************************************************************
 
-PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Alg.h
 Content     :   Simple general purpose algorithms: Sort, Binary Search, etc.
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,8 +29,96 @@ limitations under the License.
 
 #include "OVR_Types.h"
 #include <string.h>
+#if defined(_MSC_VER)
+    #include <intrin.h>
+    #pragma intrinsic(_BitScanForward)
+    #if defined(_M_AMD64)
+        #pragma intrinsic(_BitScanForward64)
+    #endif
+#elif defined(__GNUC__) || defined(__clang__)
+    #include <x86intrin.h>
+#endif
 
 namespace OVR { namespace Alg {
+
+
+
+
+
+inline int CountTrailing0Bits(uint16_t x)
+{
+    #if defined(_MSC_VER)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward(&i, x);
+        return nonZero ? (int)i : 16;
+
+    #elif defined(__GNUC__) || defined(__clang__)
+        if (x)
+            return __builtin_ctz(x);
+        return 16;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0x000000ff) == 0) {n += 8; x >>= 8;}
+            if((x & 0x0000000f) == 0) {n += 4; x >>= 4;}
+            if((x & 0x00000003) == 0) {n += 2; x >>= 2;}
+            return n - int(x & 1);
+        }
+        return 16;
+    #endif
+}
+
+
+inline int CountTrailing0Bits(uint32_t x)
+{
+    #if defined(_MSC_VER)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward(&i, x);
+        return nonZero ? (int)i : 32;
+    #elif defined(__GNUC__) || defined(__clang__)
+        if (x)
+            return __builtin_ctz(x);
+        return 32;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0x0000ffff) == 0) { n += 16; x >>= 16; }
+            if((x & 0x000000ff) == 0) { n +=  8; x >>=  8; }
+            if((x & 0x0000000f) == 0) { n +=  4; x >>=  4; }
+            if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+            return n - int(x & 1);
+        }
+        return 32;
+    #endif
+}
+
+
+inline int CountTrailing0Bits(uint64_t x)
+{
+    #if defined(_MSC_VER) && defined(_M_AMD64)
+        unsigned long i;
+        unsigned char nonZero = _BitScanForward64(&i, x);
+        return nonZero ? (int)i : 64;
+    #elif (defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+        if (x)
+            return __builtin_ctzll(x);
+        return 64;
+    #else
+        if (x)
+        {
+            int n = 1;
+            if((x & 0xffffffff) == 0) { n += 32; x >>= 32; }
+            if((x & 0x0000ffff) == 0) { n += 16; x >>= 16; }
+            if((x & 0x000000ff) == 0) { n +=  8; x >>=  8; }
+            if((x & 0x0000000f) == 0) { n +=  4; x >>=  4; }
+            if((x & 0x00000003) == 0) { n +=  2; x >>=  2; }
+            return n - (int)(uint32_t)(x & 1);
+        }
+        return 64;
+    #endif
+}
 
 
 //-----------------------------------------------------------------------------------
@@ -1055,6 +1142,104 @@ inline int8_t DecodeBCD(uint8_t byte)
     int decimal = digit1 * 10 + digit2;   // maximum value = 99
     return (int8_t)decimal;
 }
+
+// Updates the previousCount uint_64t with the new value from the bitCount wrap-around counter newCount32
+// Returns the delta as uint32_t
+// 0 < bitCount <= 32
+template<const unsigned bitCount>
+uint32_t inline UpdateWraparoundCounter(uint64_t* previousCount, uint32_t newCount32)
+{
+    OVR_ASSERT(bitCount <= 32);
+
+    const uint64_t mask = ((uint64_t)1u << bitCount) - 1;
+    OVR_ASSERT((newCount32 & ~mask) == 0);
+
+    // Do int64_t subtraction to avoid invoking what is technically undefined behavior
+    int64_t delta = ((int64_t)newCount32 - (int64_t)(*previousCount & mask));
+    if (delta < 0)
+        delta += ((uint64_t)1u << bitCount);
+
+    *previousCount += delta;
+    // We know that delta >=0 and < (1u << bitCount), and thus fits in a uint32_t
+    return (uint32_t)delta;
+}
+
+
+// Returns true if T is a signed built in type and (x + y) would overflow or underflow the storage maximum or minimum of type T.
+template <typename T>
+inline bool SignedAdditionWouldOverflow(T x, T y)
+{
+    const T temp = (T)(x + y);
+    return ((~(x ^ y)) & (x ^ temp)) < 0;
+}
+
+// Returns true if T is a signed type and (x - y) would overflow or underflow the storage maximum or minimum of type T.
+template <typename T>
+inline bool SignedSubtractionWouldOverflow(T x, T y)
+{
+    y = -y;
+    const T temp = (T)(x + y);
+    return ((temp ^ x) & (temp ^ y)) < 0;
+}
+
+// Returns true if T is an unsigned type and (x + y) would overflow the storage maximum of type T.
+template <typename T>
+inline bool UnsignedAdditionWouldOverflow(T x, T y)
+{
+    return (T)(x + y) < x;
+}
+
+// Returns true if T is an unsigned type and (x - y) would underflow the storage minimum of type T.
+template <typename T>
+inline bool UnsignedSubtractionWouldOverflow(T x, T y)
+{
+    return y > x;
+}
+
+// Returns true if T is an unsigned type and (x * y) would overflow the storage maximum of type T.
+template <typename T>
+inline bool UnsignedMultiplyWouldOverflow(T x, T y)
+{
+    if(y)
+        return (((T)(x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x * y) would overflow or underflow the storage maximum or minimum of type int32_t.
+inline bool SignedMultiplyWouldOverflow(int32_t x, int32_t y)
+{
+    if((y < 0) && (x == (int32_t)INT32_C(0x80000000)))
+        return true;
+    if(y)
+        return (((x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x * y) would overflow or underflow the storage maximum or minimum of type int64_t.
+inline bool SignedMultiplyWouldOverflow(int64_t x, int64_t y)
+{
+    if((y < 0) && (x == (int64_t)INT64_C(0x8000000000000000)))
+        return true;
+    if(y)
+        return (((x * y) / y) != x);
+    return false;
+}
+
+// Returns true if (x / y) would overflow the maximum of type T.
+template <typename T>
+inline bool UnsignedDivisionWouldOverflow(T /*x*/, T y)
+{
+    return y == 0;
+}
+
+
+// Returns true if (x / y) would overflow or underflow the maximum or mimumum of type T.
+template <typename T>
+inline bool SignedDivisionWouldOverflow(T x, T y)
+{
+    return (y == 0) || ((x == (T)((T)1 << ((sizeof(T) * 8) - 1))) && (y == -1));
+}
+
 
 
 }} // OVR::Alg

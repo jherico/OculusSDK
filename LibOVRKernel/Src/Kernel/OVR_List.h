@@ -6,16 +6,16 @@ Content     :   Template implementation for doubly-connected linked List
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,12 +52,46 @@ private:
 
     template<class X, class B> friend class List;
 
+#ifdef OVR_BUILD_DEBUG
+    bool marker; // Is this a marker node (rather than an actual data node)?
+#endif
+
 public:
+#ifdef OVR_BUILD_DEBUG
+    T* GetPrev() const
+    {
+        if (pPrev && !pPrev->marker)
+        {
+            return (T*)(pPrev);
+        }
+        else
+        {
+            OVR_FAIL_M("Unstable call to ListNode<>::GetPrev() without first checking List<>IsFirst()");
+            return nullptr;
+        }
+    }
+    T* GetNext() const
+    {
+        if (pNext && !pNext->marker)
+        {
+            return (T*)(pNext);
+        }
+        else
+        {
+            OVR_FAIL_M("Unstable call to ListNode<>::GetNext() without first checking List<>IsLast()");
+            return nullptr;
+        }
+    }
+#else
     T* GetPrev() const { return (T*)(pPrev); }
     T* GetNext() const { return (T*)(pNext); }
+#endif
 
     ListNode()
     {
+#ifdef OVR_BUILD_DEBUG
+        marker = false; // Most nodes are data nodes, so that is the default.
+#endif
         pPrev = nullptr;
         pNext = nullptr;
     }
@@ -156,6 +190,9 @@ public:
     List()
     {
         Root.pNext = Root.pPrev = &Root;
+#ifdef OVR_BUILD_DEBUG
+        Root.marker = true; // This is a marker node.
+#endif
     }
 
     void Clear()

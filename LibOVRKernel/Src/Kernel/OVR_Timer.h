@@ -6,16 +6,16 @@ Content     :   Provides static functions for precise timing
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,8 +55,14 @@ public:
     // Returns global high-resolution application timer in seconds.
     static double  OVR_STDCALL GetSeconds();    
 
+    // This may return a recorded time if Replaying a recording
+    static double  OVR_STDCALL GetVirtualSeconds();
+
     // Returns time in Nanoseconds, using highest possible system resolution.
     static uint64_t  OVR_STDCALL GetTicksNanos();
+
+    // This may return a recorded time if Replaying a recording
+    static uint64_t  OVR_STDCALL GetVirtualTicksNanos();
 
 #ifdef OVR_OS_MS
     static double OVR_STDCALL GetPerfFrequencyInverse();
@@ -68,11 +74,15 @@ public:
     static uint32_t  OVR_STDCALL GetTicksMs()
     { return  uint32_t(GetTicksNanos() / 1000000); }
 
+    // This may return a recorded time if Replaying a recording
+    static uint32_t  OVR_STDCALL GetVirtualTicksMs()
+    { return  uint32_t(GetVirtualTicksNanos() / 1000000); }
+
     // for recorded data playback
-    static void SetFakeSeconds(double fakeSeconds, bool enable = true) 
+    static void SetVirtualSeconds(double virtualSeconds, bool enable = true) 
     { 
-        FakeSeconds = fakeSeconds; 
-        useFakeSeconds = enable; 
+        VirtualSeconds = virtualSeconds; 
+        useVirtualSeconds = enable; 
     }
 
 private:
@@ -81,9 +91,9 @@ private:
     static void initializeTimerSystem();
     static void shutdownTimerSystem();
 
-    // for recorded data playback
-    static double FakeSeconds;
-    static bool   useFakeSeconds;
+    // for recorded data playback.
+    static double VirtualSeconds;
+    static bool   useVirtualSeconds;
     
     #if defined(OVR_OS_ANDROID)
         // Android-specific data

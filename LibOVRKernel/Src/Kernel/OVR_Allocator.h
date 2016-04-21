@@ -1,21 +1,20 @@
 /************************************************************************************
 
-PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Allocator.h
 Content     :   Installable memory allocator
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,8 +29,11 @@ limitations under the License.
 
 #include "OVR_Types.h"
 #include "OVR_Atomic.h"
+#include "OVR_Std.h"
 #include "stdlib.h"
 #include "stdint.h"
+#include <string.h>
+#include <exception>
 
 
 //-----------------------------------------------------------------------------------
@@ -71,33 +73,106 @@ limitations under the License.
 
 //------------------------------------------------------------------------
 // ***** Macros to redefine class new/delete operators
-
+//
 // Types specifically declared to allow disambiguation of address in
-// class member operator new.
+// class member operator new. This is intended to be used with a
+// macro like OVR_CHECK_DELETE(class_name, p) in the example below.
+//
+// Example usage:
+//    class Widget
+//    {
+//    public:
+//        Widget();
+//
+//        #ifdef OVR_BUILD_DEBUG
+//            #define OVR_MEMORY_CHECK_DELETE(class_name, p)   \
+//                do { if (p) checkInvalidDelete((class_name*)p); } while(0)
+//        #else
+//            #define OVR_MEMORY_CHECK_DELETE(class_name, p)
+//        #endif
+//
+//        OVR_MEMORY_REDEFINE_NEW_IMPL(Widget, OVR_MEMORY_CHECK_DELETE)
+//    };
+//
 
-#define OVR_MEMORY_REDEFINE_NEW_IMPL(class_name, check_delete)                           \
-    void*   operator new(size_t sz)                                                      \
-    { void* p = OVR_ALLOC_DEBUG(sz, __FILE__, __LINE__); return p; }                     \
-    void*   operator new(size_t sz, const char* file, int line)                          \
-    { OVR_UNUSED2(file, line); void* p = OVR_ALLOC_DEBUG(sz, file, line); return p; }    \
-    void    operator delete(void* p)                                                     \
-    { check_delete(class_name, p); OVR_FREE(p); }                                        \
-    void    operator delete(void* p, const char*, int)                                   \
-    { check_delete(class_name, p); OVR_FREE(p); }
+#define OVR_MEMORY_REDEFINE_NEW_IMPL(class_name, check_delete)  \
+    void* operator new(size_t sz)                               \
+    {                                                           \
+        void* p = OVR_ALLOC_DEBUG(sz, __FILE__, __LINE__);      \
+        if (!p)                                                 \
+            throw OVR::bad_alloc();                             \
+        return p;                                               \
+    }                                                           \
+                                                                \
+    void* operator new(size_t sz, const char* file, int line)   \
+    {                                                           \
+        OVR_UNUSED2(file, line);                                \
+        void* p = OVR_ALLOC_DEBUG(sz, file, line);              \
+        if (!p)                                                 \
+            throw OVR::bad_alloc();                             \
+        return p;                                               \
+    }                                                           \
+                                                                \
+    void operator delete(void* p)                               \
+    {                                                           \
+        if (p)                                                  \
+        {                                                       \
+            check_delete(class_name, p);                        \
+            OVR_FREE(p);                                        \
+        }                                                       \
+    }                                                           \
+                                                                \
+    void operator delete(void* p, const char*, int)             \
+    {                                                           \
+        if (p)                                                  \
+        {                                                       \
+            check_delete(class_name, p);                        \
+            OVR_FREE(p);                                        \
+        }                                                       \
+    }
 
-#define OVR_MEMORY_DEFINE_PLACEMENT_NEW                                                  \
-    void*   operator new        (size_t n, void* ptr)   { OVR_UNUSED(n); return ptr; }   \
-    void    operator delete     (void* ptr, void* ptr2) { OVR_UNUSED2(ptr, ptr2); }
 
-
+// Used by OVR_MEMORY_REDEFINE_NEW
 #define OVR_MEMORY_CHECK_DELETE_NONE(class_name, p)
 
-// Redefined all delete/new operators in a class without custom memory initialization
+// Redefine all delete/new operators in a class without custom memory initialization.
 #define OVR_MEMORY_REDEFINE_NEW(class_name) \
     OVR_MEMORY_REDEFINE_NEW_IMPL(class_name, OVR_MEMORY_CHECK_DELETE_NONE)
 
 
 namespace OVR {
+
+
+// We subclass std::bad_alloc for the purpose of overriding the 'what' function
+// to provide additional information about the exception, such as context about
+// how or where the exception occurred in our code. We subclass std::bad_alloc
+// instead of creating a new type because it's intended to override std::bad_alloc
+// and be caught by code that uses catch(std::bad_alloc&){}. Also, the std::bad_alloc
+// constructor actually attempts to allocate memory!
+
+struct bad_alloc : public std::bad_alloc
+{
+    bad_alloc(const char* description = "OVR::bad_alloc") OVR_NOEXCEPT;
+
+    bad_alloc(const bad_alloc& oba) OVR_NOEXCEPT
+    {
+        OVR_strlcpy(Description, oba.Description, sizeof(Description));
+    }
+
+    bad_alloc& operator=(const bad_alloc& oba) OVR_NOEXCEPT
+    {
+        OVR_strlcpy(Description, oba.Description, sizeof(Description));
+        return *this;
+    }
+
+    virtual const char* what() const OVR_NOEXCEPT
+    {
+        return Description;
+    }
+
+    char Description[256]; // Fixed size because we cannot allocate memory.
+};
+
 
 
 //-----------------------------------------------------------------------------------
@@ -193,10 +268,7 @@ public:
 
     // Returns the pointer to the current globally installed Allocator instance.
     // This pointer is used for most of the memory allocations.
-    static Allocator* GetInstance()
-    {
-        return pInstance;
-    }
+    static Allocator* GetInstance();
 
 
     // *** Standard Alignment Alloc/Free
@@ -240,81 +312,26 @@ protected:
     // Remove the allocation from the tracking database
     void            untrackAlloc(void* p);
 
-protected:
-    // onSystemShutdown is called on the allocator during System::Shutdown.
-    // At this point, all allocations should've been freed.
-    virtual void    onSystemShutdown()
-    { }
-
-public:
-    static  void    setInstance(Allocator* palloc)    
-    {
-        OVR_ASSERT((pInstance == 0) || (palloc == 0));
-        pInstance = palloc;
-    }
-
-private:
-    static Allocator* pInstance;
-
-public:
     // Lock used during LibOVR execution to guard the tracked allocation list.
     Lock TrackLock;
 
-    static void     SetLeakTracking(bool enabled);
-    static bool     IsTrackingLeaks();
-};
-
-
-//------------------------------------------------------------------------
-// ***** Allocator_SingletonSupport
-
-// Allocator_SingletonSupport is a Allocator wrapper class that implements
-// the InitSystemSingleton static function, used to create a global singleton
-// used for the OVR::System default argument initialization.
-//
-// End users implementing custom Allocator interface don't need to make use of this base
-// class; they can just create an instance of their own class on stack and pass it to System.
-
-template<class D>
-class Allocator_SingletonSupport : public Allocator
-{
-    struct AllocContainer
-    {        
-        size_t Data[(sizeof(D) + sizeof(size_t)-1) / sizeof(size_t)];
-        bool  Initialized;
-        AllocContainer() : Initialized(0) { }
-    };
-
-    AllocContainer* pContainer;
+protected:
+    Allocator() {}
 
 public:
-    Allocator_SingletonSupport() : pContainer(0)
-    { }
+    //------------------------------------------------------------------------
+    // ***** DumpMemory
 
-    // Creates a singleton instance of this Allocator class used
-    // on OVR_DEFAULT_ALLOCATOR during System initialization.
-    static  D*  InitSystemSingleton()
-    {
-        static AllocContainer Container;
-        OVR_ASSERT(Container.Initialized == false);
+    // Enable/disable leak tracking mode and check if currently tracking.
+    static void     SetLeakTracking(bool enabled);
+    static bool     IsTrackingLeaks();
 
-        Allocator_SingletonSupport<D> *presult = Construct<D>((void*)Container.Data);
-        presult->pContainer   = &Container;
-        Container.Initialized = true;
-        return (D*)presult;
-    }
-
-protected:
-    virtual void onSystemShutdown()
-    {
-        Allocator::onSystemShutdown();
-        if (pContainer)
-        {
-            pContainer->Initialized = false;
-            pContainer = nullptr;
-            Destruct((D*)this);
-        }
-    }
+    // Displays information about outstanding allocations, typically for the 
+    // purpose of reporting leaked memory on application or module shutdown.
+    // This should be used instead of, for example, VC++ _CrtDumpMemoryLeaks 
+    // because it allows us to dump additional information about our allocations.
+    // Returns the number of currently outstanding heap allocations.
+    static int      DumpMemory();
 };
 
 
@@ -324,7 +341,7 @@ protected:
 // This allocator is created and used if no other allocator is installed.
 // Default allocator delegates to system malloc.
 
-class DefaultAllocator : public Allocator_SingletonSupport<DefaultAllocator>
+class DefaultAllocator : public Allocator
 {
 public:
     virtual void*   Alloc(size_t size);
@@ -413,7 +430,7 @@ public:
 //   Allocations made with AllocAligned or ReallocAligned must be Freed via FreeAligned, as per the base class requirement.
 //
 
-class DebugPageAllocator : public Allocator_SingletonSupport<DebugPageAllocator>
+class DebugPageAllocator : public Allocator
 {
 public:
     DebugPageAllocator();
@@ -422,8 +439,8 @@ public:
     void  Init();
     void  Shutdown();
 
-    void   SetDelayedFreeCount(size_t delayedFreeCount); // Sets how many freed blocks we should save before purging the oldest of them.
-    size_t GetDelayedFreeCount() const;
+    void   SetMaxDelayedFreeCount(size_t delayedFreeCount); // Sets how many freed blocks we should save before purging the oldest of them.
+    size_t GetMaxDelayedFreeCount() const;                  // Returns the max number of delayed free allocations before the oldest ones are purged (finally freed).
     void   EnableOverrunDetection(bool enableOverrunDetection, bool enableOverrunGuardBytes);  // enableOverrunDetection is by default. enableOverrunGuardBytes is enabled by default in debug builds.
 
     void*  Alloc(size_t size);
@@ -671,17 +688,6 @@ public:
 
 
 //------------------------------------------------------------------------
-// ***** DumpMemory
-
-// Displays information about outstanding allocations, typically for the 
-// purpose of reporting leaked memory on application or module shutdown.
-// This should be used instead of, for example, VC++ _CrtDumpMemoryLeaks 
-// because it allows us to dump additional information about our allocations.
-// Returns the number of currently outstanding heap allocations.
-int DumpMemory();
-
-
-//------------------------------------------------------------------------
 // ***** Mapped memory allocation
 //
 // Equates to VirtualAlloc/VirtualFree on Windows, mmap/munmap on Unix.
@@ -705,4 +711,4 @@ void  SafeMMapFree (const void* memory, size_t size);
 #pragma warning(pop)
 #endif
 
-#endif // OVR_Memory
+#endif // OVR_Allocator_h

@@ -215,6 +215,57 @@ static size_t SprintfAddress(char* addressStr, size_t addressStrCapacity, const 
 }
 
 
+
+enum MemoryAccess
+{
+    kMANone    = 0x00,
+    kMARead    = 0x01,
+    kMAWrite   = 0x02,
+    kMAExecute = 0x04
+};
+
+
+///////////////////////////////////////////////////////////////////////////////
+// GetMemoryAccess
+//
+// Returns MemoryAccess flags. Returns kMAUnknown for unknown access.
+//
+static int GetMemoryAccess(const void* p)
+{
+    int memoryAccessFlags = 0;
+    
+    #if defined(_WIN32)
+        MEMORY_BASIC_INFORMATION mbi;
+
+        if(VirtualQuery(p, &mbi, sizeof(mbi)))
+        {
+            if(mbi.State == MEM_COMMIT) // If the memory page has been committed for use....
+            {
+                if(mbi.Protect & PAGE_READONLY)
+                    memoryAccessFlags |= kMARead;
+                if(mbi.Protect & PAGE_READWRITE)
+                    memoryAccessFlags |= (kMARead | kMAWrite);
+                if(mbi.Protect & PAGE_EXECUTE)
+                    memoryAccessFlags |= kMAExecute;
+                if(mbi.Protect & PAGE_EXECUTE_READ)
+                    memoryAccessFlags |= (kMARead | kMAExecute);
+                if(mbi.Protect & PAGE_EXECUTE_READWRITE)
+                    memoryAccessFlags |= (kMARead | kMAWrite | kMAExecute);
+                if(mbi.Protect & PAGE_EXECUTE_WRITECOPY)
+                    memoryAccessFlags |= (kMAWrite | kMAExecute);
+                if(mbi.Protect & PAGE_WRITECOPY)
+                    memoryAccessFlags |= kMAWrite;
+            }
+        }
+    #else
+        OVR_UNUSED(p);
+    #endif
+
+    return memoryAccessFlags;
+}
+
+
+
 // threadHandleStrCapacity should be at least 2+16+1 = 19 characters.
 static size_t SprintfThreadHandle(char* threadHandleStr, size_t threadHandleStrCapacity, const ThreadHandle& threadHandle)
 {
@@ -266,14 +317,17 @@ void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle th
                 // It turns out we don't need to suspend the thread when getting SegFs/SegGS, as that's
                 // constant per thread and doesn't require the thread to be suspended.
                 //SuspendThread((HANDLE)threadHandle);
+
                 CONTEXT context;
                 memset(&context, 0, sizeof(context));
                 context.ContextFlags = CONTEXT_SEGMENTS;
-                GetThreadContext((HANDLE)threadHandle, &context); // Requires THREAD_QUERY_INFORMATION privileges.
 
-                LDT_ENTRY ldtEntry;
-                if(GetThreadSelectorEntry(threadHandle, context.SegFs, &ldtEntry)) // Requires THREAD_QUERY_INFORMATION
-                    pTIB = (NT_TIB*)((ldtEntry.HighWord.Bits.BaseHi << 24 ) | (ldtEntry.HighWord.Bits.BaseMid << 16) | ldtEntry.BaseLow);
+                if (::GetThreadContext((HANDLE)threadHandle, &context)) // Requires THREAD_QUERY_INFORMATION privileges.
+                {
+                    LDT_ENTRY ldtEntry;
+                    if(GetThreadSelectorEntry(threadHandle, context.SegFs, &ldtEntry)) // Requires THREAD_QUERY_INFORMATION
+                        pTIB = (NT_TIB*)((ldtEntry.HighWord.Bits.BaseHi << 24 ) | (ldtEntry.HighWord.Bits.BaseMid << 16) | ldtEntry.BaseLow);
+                }
 
                 //ResumeThread((HANDLE)threadHandle);
             #else
@@ -287,7 +341,7 @@ void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle th
 
                 if(!spNtQueryInformationThread)
                 {
-                    HMODULE hNTDLL = GetModuleHandleA("ntdll.dll");
+                    HMODULE hNTDLL = GetModuleHandleW(L"ntdll.dll");
                     spNtQueryInformationThread = (NtQueryInformationThreadFunc)(uintptr_t)GetProcAddress(hNTDLL, "NtQueryInformationThread");
                 }
 
@@ -303,7 +357,7 @@ void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle th
             #endif
         }
 
-        if(pTIB)
+        if(pTIB && (GetMemoryAccess(pTIB) & kMARead))
         {
             pStackBase  = (void*)pTIB->StackBase;
             pStackLimit = (void*)pTIB->StackLimit;
@@ -345,6 +399,97 @@ void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle th
         }
 
     #endif
+}
+
+
+bool KillCdeclFunction(void* pFunction, int32_t functionReturnValue, SavedFunction* pSavedFunction)
+{
+    #if defined(OVR_OS_MS)
+        // The same implementation works for both 32 bit x86 and 64 bit x64.
+        DWORD dwOldProtect;
+        const uint8_t size = ((functionReturnValue == 0) ? 3 : 6);
+    
+        if(VirtualProtect(pFunction, size, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+        {
+            if(pSavedFunction) // If the user wants to save the implementation for later restoration...
+            {
+                pSavedFunction->Function = pFunction;
+                pSavedFunction->Size = size;
+                memcpy(pSavedFunction->Data, pFunction, pSavedFunction->Size);
+            }
+
+            if(functionReturnValue == 0)
+            {
+                const uint8_t instructionBytes[] = { 0x33, 0xc0, 0xc3 };              // xor eax, eax; ret
+                memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
+            }
+            else
+            {
+                uint8_t instructionBytes[] = { 0xb8, 0x00, 0x00, 0x00, 0x00, 0xc3 };  // mov eax, 0x00000000; ret
+                memcpy(instructionBytes + 1, &functionReturnValue, sizeof(int32_t));  // mov eax, functionReturnValue; ret
+                memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
+            }
+
+            VirtualProtect(pFunction, size, dwOldProtect, &dwOldProtect);
+            return true;
+        }
+    #else
+        OVR_UNUSED3(pFunction, functionReturnValue, pSavedFunction);
+    #endif
+
+    return false;
+}
+
+
+bool KillCdeclFunction(void* pFunction, SavedFunction* pSavedFunction)
+{
+    #if defined(OVR_OS_MS)
+        // The same implementation works for both 32 bit x86 and 64 bit x64.
+        DWORD dwOldProtect;
+        const uint8_t size = 1;
+
+        if(VirtualProtect(pFunction, size, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+        {
+            if(pSavedFunction) // If the user wants to save the implementation for later restoration...
+            {
+                pSavedFunction->Function = pFunction;
+                pSavedFunction->Size = size;
+                memcpy(pSavedFunction->Data, pFunction, pSavedFunction->Size);
+            }
+
+            const uint8_t instructionBytes[] = { 0xc3 };                        // asm ret
+            memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
+            VirtualProtect(pFunction, size, dwOldProtect, &dwOldProtect);
+            return true;
+        }
+
+    #else
+        OVR_UNUSED2(pFunction, pSavedFunction);
+    #endif
+
+    return false;
+}
+
+
+bool RestoreCdeclFunction(SavedFunction* pSavedFunction)
+{
+    if(pSavedFunction->Size)
+    {
+        #if defined(OVR_OS_MS)
+            DWORD dwOldProtect;
+
+            if(VirtualProtect(pSavedFunction->Function, pSavedFunction->Size, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+            {
+                memcpy(pSavedFunction->Function, pSavedFunction->Data, pSavedFunction->Size);
+                VirtualProtect(pSavedFunction->Function, pSavedFunction->Size, dwOldProtect, &dwOldProtect);
+                return true;
+            }
+        #else
+            OVR_UNUSED(pSavedFunction);
+        #endif
+    }
+
+    return false;
 }
 
 
@@ -581,6 +726,9 @@ OVR::ThreadSysId ConvertThreadHandleToThreadSysId(OVR::ThreadHandle threadHandle
 
 OVR::ThreadHandle ConvertThreadSysIdToThreadHandle(OVR::ThreadSysId threadSysId)
 {
+    if(threadSysId == OVR_THREADSYSID_INVALID)
+        return OVR_THREADHANDLE_INVALID;
+
     #if defined(OVR_OS_MS)
         // We currently request the given rights because that's what users of this function typically need it for. Ideally there would
         // be a way to specify the requested rights in order to avoid the problem if we need only a subset of them but can't get it.
@@ -636,17 +784,11 @@ static void GetCurrentProcessFilePath(char* appPath, size_t appPathCapacity)
         wchar_t pathW[OVR_MAX_PATH];
         GetModuleFileNameW(0, pathW, (DWORD)OVR_ARRAY_COUNT(pathW));
 
-        size_t requiredUTF8Length = (size_t)OVR::UTF8Util::GetEncodeStringSize(pathW); // Returns required strlen.
-
-        if(requiredUTF8Length < appPathCapacity)
-        {
-            OVR::UTF8Util::EncodeString(appPath, pathW, -1);
-        }
-        else
+        auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(appPath, appPathCapacity, pathW);
+        if (requiredUTF8Length >= appPathCapacity)
         {
             appPath[0] = 0;
         }
-
     #elif defined(OVR_OS_APPLE)
         struct BunderFolder
         {
@@ -777,7 +919,7 @@ static void FormatDateTime(char* buffer, size_t bufferCapacity, time_t timeValue
 }
 
 
-static void GetOSVersionName(char* versionName, size_t versionNameCapacity)
+void GetOSVersionName(char* versionName, size_t versionNameCapacity)
 {
     #if defined(OVR_OS_MS)
         const char* name = "unknown";
@@ -788,14 +930,42 @@ static void GetOSVersionName(char* versionName, size_t versionNameCapacity)
 
         if(GetVersionExW((LPOSVERSIONINFOW)&vi))
         {
-            if(vi.dwMajorVersion >= 7)
+            if (vi.dwMajorVersion == 10)
+            {
+                if (vi.dwMinorVersion == 0)
+                {
+                    if(vi.dwBuildNumber >= 10586)
+                    {
+                        if (vi.wProductType == VER_NT_WORKSTATION)
+                            name = "Windows 10 TH2+";
+                        else
+                            name = "Windows Server 2016 Technical Preview TH2+";
+                    }
+                    else
+                    {
+                        if (vi.wProductType == VER_NT_WORKSTATION)
+                            name = "Windows 10";
+                        else
+                            name = "Windows Server 2016 Technical Preview";
+                    }
+                }
+                else
+                {
+                    // Unknown recent version.
+                    if (vi.wProductType == VER_NT_WORKSTATION)
+                        name = "Windows 10 Unknown";
+                    else
+                        name = "Windows Server 2016 Unknown";
+                }
+            }
+            else if(vi.dwMajorVersion >= 7)
             {
                 // Unknown recent version.
             }
-            if(vi.dwMajorVersion >= 6)
+            else if(vi.dwMajorVersion >= 6)
             {
                 if(vi.dwMinorVersion >= 4)
-                    name = "Windows 10";
+                    name = "Windows 10 Pre Released";
                 else if(vi.dwMinorVersion >= 3)
                 {
                     if(vi.wProductType == VER_NT_WORKSTATION)
@@ -998,11 +1168,16 @@ void CreateException(CreateExceptionType exceptionType)
     static SymGetLineFromAddr64Type     pSymGetLineFromAddr64 = nullptr;
     static int32_t                      sSymUsageCount = 0;
     static HMODULE                      sDbgHelp = nullptr;
-    static OVR::Lock                    sDbgHelpLock;
+
+    static OVR::Lock* GetSymbolLookupLockPtr()
+    {
+        static OVR::Lock sDbgHelpLock;
+        return &sDbgHelpLock;
+    }
 
     bool SymbolLookup::Initialize()
     {
-        OVR::Lock::Locker autoLock(&sDbgHelpLock);
+        OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
 
         if (++sSymUsageCount > 1)
         {
@@ -1038,7 +1213,7 @@ void CreateException(CreateExceptionType exceptionType)
                 {
                     if (pSymSetOptions)
                     {
-                        pSymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+                        pSymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES);
                     }
 
                     return true;
@@ -1052,13 +1227,13 @@ void CreateException(CreateExceptionType exceptionType)
     bool SymbolLookup::IsInitialized()
     {
         // Note that it's possible that another thread could change the state of this right after the return.
-        OVR::Lock::Locker autoLock(&sDbgHelpLock);
+        OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
         return (sSymUsageCount != 0);
     }
 
     void SymbolLookup::Shutdown()
     {
-        OVR::Lock::Locker autoLock(&sDbgHelpLock);
+        OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
 
         if (sSymUsageCount > 0 &&
             --sSymUsageCount <= 0)
@@ -1128,12 +1303,10 @@ bool SymbolLookup::Refresh()
 OVR_DISABLE_MSVC_WARNING(4740) // flow in or out of inline asm code suppresses global optimization
 OVR_DISABLE_MSVC_WARNING(4748) // /GS can not protect parameters and local variables from local buffer overrun because optimizations are disabled in function
 
-
+// Requires the thread to be suspended if not the current thread.
 size_t SymbolLookup::GetBacktrace(void* addressArray[], size_t addressArrayCapacity, size_t skipCount, void* platformThreadContext, OVR::ThreadSysId threadSysIdHelp)
 {
     #if defined(OVR_OS_WIN64)
-        OVR_UNUSED(threadSysIdHelp);
-
         // The DbgHelp library must be loaded already.
         OVR_ASSERT(sSymUsageCount > 0);
 
@@ -1142,41 +1315,61 @@ size_t SymbolLookup::GetBacktrace(void* addressArray[], size_t addressArrayCapac
 
         // We need to get the call stack of another thread.
         size_t            frameIndex = 0;
-        CONTEXT           context;
+        CONTEXT           context = {};
         PRUNTIME_FUNCTION pRuntimeFunction;
         ULONG64           imageBase = 0;
         ULONG64           imageBasePrev = 0;
+        HANDLE            hThread = ConvertThreadSysIdToThreadHandle(threadSysIdHelp);
 
-        memcpy(&context, (CONTEXT*)platformThreadContext, sizeof(CONTEXT));
-        context.ContextFlags = CONTEXT_CONTROL;
-
-        if(context.Rip && (frameIndex < addressArrayCapacity))
-            addressArray[frameIndex++] = (void*)(uintptr_t)context.Rip;
-
-        while(context.Rip && (frameIndex < addressArrayCapacity))
+        if (hThread)
         {
-            imageBasePrev = imageBase;
-            pRuntimeFunction = (PRUNTIME_FUNCTION)RtlLookupFunctionEntry(context.Rip, &imageBase, nullptr);
+            // We need to get the full thread context if possible on x64 platforms.
+            // See for example https://bugzilla.mozilla.org/show_bug.cgi?id=1120126
+            context.ContextFlags = CONTEXT_FULL;
 
-            if(pRuntimeFunction)
+            if (::GetThreadContext(hThread, &context)) // GetThreadContext will fail if the caller didn't suspend the thread. 
             {
-                VOID*   handlerData = nullptr;
-                ULONG64 establisherFramePointers[2] = { 0, 0 };
-                RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, context.Rip, pRuntimeFunction, &context, &handlerData,  establisherFramePointers, nullptr);
-            }
-            else
-            {
-                context.Rip  = (ULONG64)(*(PULONG64)context.Rsp);
-                context.Rsp += 8;
-            }
-
-            if(context.Rip && (frameIndex < addressArrayCapacity))
-            {
-                if(skipCount)
-                    --skipCount;
-                else
+                if (context.Rip && (frameIndex < addressArrayCapacity))
                     addressArray[frameIndex++] = (void*)(uintptr_t)context.Rip;
+
+                while (context.Rip && (frameIndex < addressArrayCapacity))
+                {
+                    imageBasePrev = imageBase;
+                    pRuntimeFunction = (PRUNTIME_FUNCTION)RtlLookupFunctionEntry(context.Rip, &imageBase, nullptr);
+
+                    if (pRuntimeFunction)
+                    {
+                        // We have observed a problem in which the thread we are trying to read has exited by the time we get here, 
+                        // despite that we both suspended the thread and successfully read its context. This is contrary to the 
+                        // expectations set here: https://blogs.msdn.microsoft.com/oldnewthing/20150205-00/?p=44743.
+                        // This code only executes in debugging situations and so should not be an issue for the large majority of 
+                        // end users. It's not safe in general in shipping applications to suspend threads.
+                        __try{
+                            VOID*   handlerData = nullptr;
+                            ULONG64 establisherFramePointers[2] = { 0, 0 };
+                            RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, context.Rip, pRuntimeFunction, &context, &handlerData,  establisherFramePointers, nullptr);
+                        }
+                        __except(GetExceptionCode() == 0x406D1388 /*set thread name*/ ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER){
+                            break; // If you encounter this under a debugger, just continue and let this code eat the exception.
+                        }
+                    }
+                    else
+                    {
+                        context.Rip  = (ULONG64)(*(PULONG64)context.Rsp);
+                        context.Rsp += 8;
+                    }
+
+                    if (context.Rip && (frameIndex < addressArrayCapacity))
+                    {
+                        if(skipCount)
+                            --skipCount;
+                        else
+                            addressArray[frameIndex++] = (void*)(uintptr_t)context.Rip;
+                    }
+                }
             }
+
+            FreeThreadHandle(hThread);
         }
 
         return frameIndex;
@@ -1184,7 +1377,7 @@ size_t SymbolLookup::GetBacktrace(void* addressArray[], size_t addressArrayCapac
     #elif defined(OVR_OS_WIN32)
         OVR_UNUSED(threadSysIdHelp);
 
-        OVR::Lock::Locker autoLock(&sDbgHelpLock);
+        OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
         size_t frameIndex = 0;
 
         if(pStackWalk64)
@@ -1377,21 +1570,23 @@ size_t SymbolLookup::GetBacktraceFromThreadHandle(void* addressArray[], size_t a
 
         // Compare to 0, compare to the self 'pseudohandle' and compare to the self id.
         if((threadHandle == OVR_THREADHANDLE_INVALID) || (threadHandle == ::GetCurrentThread()) || (threadSysId == ::GetCurrentThreadId())) // If threadSysId refers to the current thread...
-            return GetBacktrace(addressArray, addressArrayCapacity, skipCount, nullptr);
+            return GetBacktrace(addressArray, addressArrayCapacity, skipCount, nullptr, OVR_THREADSYSID_INVALID);
 
         // We are working with another thread. We need to suspend it and get its CONTEXT.
         // Suspending other threads is risky, as they may be in some state that cannot be safely blocked.
-        BOOL  result = false;
         DWORD suspendResult = ::SuspendThread(threadHandle); // Requires that the handle have THREAD_SUSPEND_RESUME rights.
 
         if(suspendResult != (DWORD)-1) // Returns previous suspend count, or -1 if failed.
         {
-            CONTEXT context;
+            CONTEXT context = {};
             context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER; // Requires that the handle have THREAD_GET_CONTEXT rights.
-            result = ::GetThreadContext(threadHandle, &context);
-            count = GetBacktrace(addressArray, addressArrayCapacity, skipCount, &context);
-            suspendResult = ::ResumeThread(threadHandle);
-            OVR_ASSERT_AND_UNUSED(suspendResult != (DWORD)-1, suspendResult);
+
+            if (::GetThreadContext(threadHandle, &context))  // This is supposed to ensure that the thread really is stopped.
+            {
+                count = GetBacktrace(addressArray, addressArrayCapacity, skipCount, &context, threadSysId);
+                suspendResult = ::ResumeThread(threadHandle);
+                OVR_ASSERT_AND_UNUSED(suspendResult != (DWORD)-1, suspendResult);
+            }
         }
 
         return count;
@@ -1429,7 +1624,7 @@ size_t SymbolLookup::GetBacktraceFromThreadSysId(void* addressArray[], size_t ad
 
         if(thread == threadCurrent)
         {
-            return GetBacktrace(addressArray, addressArrayCapacity, skipCount, nullptr);
+            return GetBacktrace(addressArray, addressArrayCapacity, skipCount, nullptr, OVR_THREADSYSID_INVALID);
         }
         else
         {
@@ -1496,26 +1691,30 @@ size_t SymbolLookup::GetModuleInfoArray(ModuleInfo* pModuleInfoArray, size_t mod
                 if(result)
                 {
                     wchar_t pathW[OVR_MAX_PATH];
-                    char    pathA[OVR_MAX_PATH * 3]; // *3 to handle UTF8 multibyte encoding.
 
                     moduleInfo.handle      = hModuleArray[i];
                     moduleInfo.baseAddress = (uintptr_t)mi.lpBaseOfDll;
                     moduleInfo.size        = mi.SizeOfImage;
 
                     GetModuleFileNameW(hModuleArray[i], pathW, OVR_ARRAY_COUNT(pathW));
-                    OVR::UTF8Util::EncodeString(pathA, pathW, -1); // Problem: DecodeString provides no way to specify the destination capacity.
-                    OVR::OVR_strlcpy(moduleInfo.filePath, pathA, OVR_ARRAY_COUNT(moduleInfo.filePath));
-
-                    const char* fileName = GetFileNameFromPath(pathA);
-                    OVR::OVR_strlcpy(moduleInfo.name, fileName, OVR_ARRAY_COUNT(moduleInfo.name));
+                    auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(moduleInfo.filePath, OVR_ARRAY_COUNT(moduleInfo.filePath), pathW);
+                    if (requiredUTF8Length < OVR_ARRAY_COUNT(moduleInfo.filePath))
+                    {
+                        OVR::OVR_strlcpy(moduleInfo.name, GetFileNameFromPath(moduleInfo.filePath), OVR_ARRAY_COUNT(moduleInfo.name));
+                    }
+                    else
+                    {
+                        moduleInfo.filePath[0] = '\0';
+                        moduleInfo.name[0] = '\0';
+                    }
                 }
                 else
                 {
                     moduleInfo.handle = 0;
                     moduleInfo.baseAddress = 0;
                     moduleInfo.size = 0;
-                    moduleInfo.filePath[0] = 0;
-                    moduleInfo.name[0] = 0;
+                    moduleInfo.filePath[0] = '\0';
+                    moduleInfo.name[0] = '\0';
                 }
             }
         }
@@ -1744,7 +1943,6 @@ bool SymbolLookup::ReportThreadCallstack(OVR::String& sOutput, size_t skipCount,
     // Print the header
     char         headerBuffer[256];
     char         threadName[32];
-    char         threadHandleStr[24];
     char         threadSysIdStr[48];
     char         stackBaseStr[24];
     char         stackLimitStr[24];
@@ -1755,15 +1953,14 @@ bool SymbolLookup::ReportThreadCallstack(OVR::String& sOutput, size_t skipCount,
     OVR::GetThreadStackBounds(pStackBase, pStackLimit, threadHandle);
 
     Thread::GetThreadName(threadName, OVR_ARRAY_COUNT(threadName), threadName);
-    SprintfThreadHandle(threadHandleStr, OVR_ARRAY_COUNT(threadHandleStr), threadHandle);
     SprintfThreadSysId(threadSysIdStr, OVR_ARRAY_COUNT(threadSysIdStr), threadSysId);
     SprintfAddress(stackBaseStr, OVR_ARRAY_COUNT(stackBaseStr), pStackBase);
     SprintfAddress(stackLimitStr, OVR_ARRAY_COUNT(stackLimitStr), pStackLimit);
 
     if(threadName[0])
-        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread \"%s\" handle: %s, id: %s, stack base: %s, stack limit: %s\n", threadName, threadHandleStr, threadSysIdStr, stackBaseStr, stackLimitStr);
+        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread \"%s\" id: %s, stack base: %s, stack limit: %s\n", threadName, threadSysIdStr, stackBaseStr, stackLimitStr);
     else
-        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread handle: %s, id: %s, stack base: %s, stack limit: %s\n", threadHandleStr, threadSysIdStr, stackBaseStr, stackLimitStr);
+        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread id: %s, stack base: %s, stack limit: %s\n", threadSysIdStr, stackBaseStr, stackLimitStr);
 
     sOutput += headerBuffer;
 
@@ -1852,7 +2049,7 @@ bool SymbolLookup::RefreshModuleList()
     if(!ModuleListUpdated)
     {
         #if defined(OVR_OS_MS)
-            OVR::Lock::Locker autoLock(&sDbgHelpLock);
+            OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
 
             // We can't rely on SymRefreshModuleList because it's present in DbgHelp 6.5,
             // which doesn't distribute with Windows 7.
@@ -1899,7 +2096,7 @@ bool SymbolLookup::LookupSymbols(uint64_t* addressArray, SymbolInfo* pSymbolInfo
     }
 
     #if defined(OVR_OS_MS)
-        OVR::Lock::Locker autoLock(&sDbgHelpLock);
+        OVR::Lock::Locker autoLock(GetSymbolLookupLockPtr());
 
         union SYMBOL_INFO_UNION
         {
@@ -2033,6 +2230,7 @@ bool SymbolLookup::LookupSymbols(uint64_t* addressArray, SymbolInfo* pSymbolInfo
             if(pSymbolInfoArray[i].pModuleInfo && pSymbolInfoArray[i].pModuleInfo->filePath[0] && (stat(pSymbolInfoArray[i].pModuleInfo->filePath, &statStruct) == 0))
             {
                 char command[PATH_MAX * 2];   // Problem: We can't unilaterally use pSymbolInfoArray[0] for all addresses. We need to match addresses to the corresponding modules.
+                // FIXME: atos is moving. Should start with 'xcrun atos'.
                 OVR_snprintf(command, OVR_ARRAY_COUNT(command), "atos -o %s -l 0x%llx 0x%llx",
                             pSymbolInfoArray[i].pModuleInfo->filePath, (int64_t)pSymbolInfoArray[i].pModuleInfo->baseAddress, (int64_t)pSymbolInfoArray[i].address);
 
@@ -2120,9 +2318,9 @@ ExceptionHandler::ExceptionHandler()
   , appDescription()
   , codeBasePathArray()
   , reportFilePath()
-  , miniDumpFlags(0)
+  , minidumpInfoLevel(kMILMedium)
   , miniDumpFilePath()
-  , file(nullptr)
+  , LogFile(nullptr)
   , scratchBuffer()
   , exceptionOccurred(false)
   , handlingBusy(0)
@@ -2146,18 +2344,19 @@ ExceptionHandler::ExceptionHandler()
     SetExceptionPaths("default", "default");
 }
 
-void ExceptionHandler::SetPathsFromNames(const char* organizationName, const char* ApplicationName, const char* exceptionFormat, const char* minidumpFormat)
-{
-    char exceptionPath[OVR_MAX_PATH];
-    char miniDumpPath[OVR_MAX_PATH];
-    GetCrashDumpDirectory(exceptionPath, OVR_MAX_PATH);
-    OVR_strlcat(exceptionPath, organizationName, OVR_MAX_PATH);
 
-    //make the organization folder if necessary
+void ExceptionHandler::GetCrashDumpDirectoryFromNames(char* path, const char* organizationName, const char* ApplicationName)
+{
+    ExceptionHandler::GetCrashDumpDirectory(path, OVR_MAX_PATH);
+    OVR_strlcat(path, organizationName, OVR_MAX_PATH);
+
+    // make the organization folder if necessary
     #ifdef OVR_OS_MS
-        WCHAR wpath[128];
-        OVR::UTF8Util::DecodeString(wpath, exceptionPath);
-        CreateDirectoryW(wpath,NULL);
+        WCHAR wpath[OVR_MAX_PATH];
+        auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(wpath, OVR_ARRAY_COUNT(wpath), path);
+        // XXX error handling/logging?
+        if (requiredUTF8Length < OVR_ARRAY_COUNT(wpath))
+            CreateDirectoryW(wpath, NULL);
     #else
         mkdir(exceptionPath,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     #endif
@@ -2167,16 +2366,26 @@ void ExceptionHandler::SetPathsFromNames(const char* organizationName, const cha
     #else
       const char* separator = "/";
     #endif
-    OVR_strlcat(exceptionPath, separator, OVR_MAX_PATH);
-    OVR_strlcat(exceptionPath, ApplicationName, OVR_MAX_PATH);
+    OVR_strlcat(path, separator, OVR_MAX_PATH);
+    OVR_strlcat(path, ApplicationName, OVR_MAX_PATH);
     #ifdef OVR_OS_MS
-        OVR::UTF8Util::DecodeString(wpath, exceptionPath);
-        CreateDirectoryW(wpath, NULL);
+        requiredUTF8Length = OVR::UTF8Util::Strlcpy(wpath, OVR_ARRAY_COUNT(wpath), path);
+        // XXX error handling/logging?
+        if (requiredUTF8Length < OVR_ARRAY_COUNT(wpath))
+            CreateDirectoryW(wpath, NULL);
     #else
         mkdir(exceptionPath,S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     #endif
-    OVR_strlcat(exceptionPath, separator, OVR_MAX_PATH);
-    OVR_strcpy(miniDumpPath, OVR_MAX_PATH, exceptionPath);
+    OVR_strlcat(path, separator, OVR_MAX_PATH);
+}
+
+void ExceptionHandler::SetPathsFromNames(const char* organizationName, const char* ApplicationName, const char* exceptionFormat, const char* minidumpFormat)
+{
+    char exceptionPath[OVR_MAX_PATH];
+    char miniDumpPath[OVR_MAX_PATH];
+    ExceptionHandler::GetCrashDumpDirectoryFromNames(exceptionPath, organizationName, ApplicationName);
+    ExceptionHandler::GetCrashDumpDirectoryFromNames(miniDumpPath, organizationName, ApplicationName);
+    
 
     OVR::OVR_strlcat(exceptionPath, exceptionFormat, OVR_MAX_PATH);
     OVR::OVR_strlcat(miniDumpPath, minidumpFormat, OVR_MAX_PATH);
@@ -2194,20 +2403,24 @@ ExceptionHandler::~ExceptionHandler()
 
 size_t ExceptionHandler::GetCrashDumpDirectory(char* directoryPath, size_t directoryPathCapacity)
 {
+    
     #if defined(OVR_OS_MS)
-        wchar_t pathW[OVR_MAX_PATH + 1]; // +1 because we append a path separator.
-        HRESULT hr = SHGetFolderPathW(nullptr, CSIDL_APPDATA | CSIDL_FLAG_CREATE, nullptr, SHGFP_TYPE_CURRENT, pathW);
+        wchar_t pathW[OVR_MAX_PATH];
+        HRESULT hr = SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA | CSIDL_FLAG_CREATE, nullptr, SHGFP_TYPE_CURRENT, pathW); // Expects pathW to be MAX_PATH. The returned path does not include a trailing backslash. 
 
         if (SUCCEEDED(hr))
         {
-            intptr_t requiredUTF8Length = OVR::UTF8Util::GetEncodeStringSize(pathW); // Returns required strlen.
-            if (requiredUTF8Length < OVR_MAX_PATH) // We need space for a trailing path separator.
+            auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(directoryPath, directoryPathCapacity, pathW);
+            if (requiredUTF8Length < directoryPathCapacity) // We need space for a trailing path separator.
             {
-                OVR::UTF8Util::EncodeString(directoryPath, pathW, -1);
-                OVR::OVR_strlcat(directoryPath, "\\", directoryPathCapacity);
+                if((requiredUTF8Length == 0) || (directoryPath[requiredUTF8Length - 1] != '\\')) // If there is no trailing \ char...
+                {
+                    OVR::OVR_strlcat(directoryPath, "\\", directoryPathCapacity);
+                    requiredUTF8Length++;
+                }
             }
 
-            return (requiredUTF8Length + 1);
+            return requiredUTF8Length; // Returns the required strlen.
         }
 
     #elif defined(OVR_OS_MAC)
@@ -2239,21 +2452,21 @@ static ExceptionHandler* sExceptionHandler = nullptr;
             caller->WriteMiniDump();
 
         if (caller->reportFilePath[0])
-            caller->WriteReport();
+            caller->WriteReport("Exception");
 
         if (caller->exceptionListener)
             caller->exceptionListener->HandleException(caller->exceptionListenerUserValue, caller, &caller->exceptionInfo, caller->reportFilePathActual);
         return 1;
     }
 
-    LONG WINAPI Win32ExceptionFilter(LPEXCEPTION_POINTERS pExceptionPointers)
+    LONG WINAPI Win32ExceptionFilter(LPEXCEPTION_POINTERS pExceptionPointersArg)
     {
         if(sExceptionHandler)
-            return (LONG)sExceptionHandler->ExceptionFilter(pExceptionPointers);
+            return (LONG)sExceptionHandler->ExceptionFilter(pExceptionPointersArg);
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    LONG ExceptionHandler::ExceptionFilter(LPEXCEPTION_POINTERS pExceptionPointers)
+    LONG ExceptionHandler::ExceptionFilter(LPEXCEPTION_POINTERS pExceptionPointersArg)
     {
         if(pauseCount)
             return EXCEPTION_CONTINUE_SEARCH;
@@ -2262,13 +2475,13 @@ static ExceptionHandler* sExceptionHandler = nullptr;
         // DBG_TERMINATE_PROCESS, DBG_CONTROL_BREAK, DBG_COMMAND_EXCEPTION, DBG_CONTROL_C, DBG_PRINTEXCEPTION_C, DBG_RIPEXCEPTION,
         // and 0x406d1388 (thread named, http://blogs.msdn.com/b/stevejs/archive/2005/12/19/505815.aspx).
 
-        if(pExceptionPointers->ExceptionRecord->ExceptionCode < 0x80000000)
+        if(pExceptionPointersArg->ExceptionRecord->ExceptionCode < 0x80000000)
             return EXCEPTION_CONTINUE_SEARCH;
 
         // VC++ C++ exceptions use code 0xe06d7363 ('Emsc')
         // http://support.microsoft.com/kb/185294
         // http://blogs.msdn.com/b/oldnewthing/archive/2010/07/30/10044061.aspx
-        if(pExceptionPointers->ExceptionRecord->ExceptionCode == 0xe06d7363)
+        if(pExceptionPointersArg->ExceptionRecord->ExceptionCode == 0xe06d7363)
             return EXCEPTION_CONTINUE_SEARCH;
 
         if(handlingBusy.CompareAndSet_Acquire(0, 1)) // If we can successfully change it from 0 to 1.
@@ -2277,7 +2490,7 @@ static ExceptionHandler* sExceptionHandler = nullptr;
 
             SymbolLookup::Initialize();
 
-            this->pExceptionPointers = pExceptionPointers;
+            this->pExceptionPointers = pExceptionPointersArg;
 
             // Disable the handler while we do this processing.
             ULONG result = RemoveVectoredExceptionHandler(vectoredHandle);
@@ -2296,20 +2509,20 @@ static ExceptionHandler* sExceptionHandler = nullptr;
             OVR::GetThreadName(exceptionInfo.threadHandle, exceptionInfo.threadName, OVR_ARRAY_COUNT(exceptionInfo.threadName));
 
             // Backtraces
-            exceptionInfo.backtraceCount = symbolLookup.GetBacktrace(exceptionInfo.backtrace, OVR_ARRAY_COUNT(exceptionInfo.backtrace));
+            exceptionInfo.backtraceCount = symbolLookup.GetBacktrace(exceptionInfo.backtrace, OVR_ARRAY_COUNT(exceptionInfo.backtrace), 0, nullptr, OVR_THREADSYSID_INVALID); // Get current thread backtrace.
 
             // Context
-            exceptionInfo.cpuContext = *pExceptionPointers->ContextRecord;
-            exceptionInfo.exceptionRecord = *pExceptionPointers->ExceptionRecord;
+            exceptionInfo.cpuContext = *pExceptionPointersArg->ContextRecord;
+            exceptionInfo.exceptionRecord = *pExceptionPointersArg->ExceptionRecord;
             exceptionInfo.pExceptionInstructionAddress  = exceptionInfo.exceptionRecord.ExceptionAddress;
             if((exceptionInfo.exceptionRecord.ExceptionCode == EXCEPTION_ACCESS_VIOLATION) || (exceptionInfo.exceptionRecord.ExceptionCode == EXCEPTION_IN_PAGE_ERROR))
                 exceptionInfo.pExceptionMemoryAddress = (void*)exceptionInfo.exceptionRecord.ExceptionInformation[1]; // ExceptionInformation[0] indicates if it was a read (0), write (1), or data execution attempt (8).
             else
-                exceptionInfo.pExceptionMemoryAddress = pExceptionPointers->ExceptionRecord->ExceptionAddress;
+                exceptionInfo.pExceptionMemoryAddress = pExceptionPointersArg->ExceptionRecord->ExceptionAddress;
 
             WriteExceptionDescription();
 
-            if (pExceptionPointers->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW){
+            if (pExceptionPointersArg->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW){
                 unsigned int IdValue;
 
                 void* ThreadHandle = (HANDLE)_beginthreadex(0, (unsigned)128 * 1024,
@@ -2324,7 +2537,7 @@ static ExceptionHandler* sExceptionHandler = nullptr;
                     WriteMiniDump();
 
                 if (reportFilePath[0])
-                    WriteReport();
+                    WriteReport("Exception");
 
                 if (exceptionListener)
                     exceptionListener->HandleException(exceptionListenerUserValue, this, &exceptionInfo, reportFilePathActual);
@@ -2482,7 +2695,7 @@ static ExceptionHandler* sExceptionHandler = nullptr;
             WriteExceptionDescription();
 
             if(reportFilePath[0])
-                WriteReport();
+                WriteReport("Exception");
 
             if(miniDumpFilePath[0])
                 WriteMiniDump();
@@ -2922,12 +3135,24 @@ void ExceptionHandler::WriteExceptionDescription()
     #endif
 }
 
+void ExceptionHandler::writeLogLine(const char* buffer, int length)
+{
+    OVR_ASSERT((int)strlen(buffer) == length); // Input must be null-terminated.
+
+    if (LogFile != nullptr)
+        fwrite(buffer, length, 1, LogFile);
+
+    fwrite(buffer, length, 1, stdout);
+
+#if defined(OVR_OS_WIN32)
+    ::OutputDebugStringA(buffer);
+#endif
+}
 
 void ExceptionHandler::WriteReportLine(const char* pLine)
 {
-    fwrite(pLine, strlen(pLine), 1, file);
+    writeLogLine(pLine, (int)strlen(pLine));
 }
-
 
 void ExceptionHandler::WriteReportLineF(const char* format, ...)
 {
@@ -2938,7 +3163,7 @@ void ExceptionHandler::WriteReportLineF(const char* format, ...)
         length = (OVR_ARRAY_COUNT(scratchBuffer) - 1);    // ... use what we have.
     va_end(args);
 
-    fwrite(scratchBuffer, length, 1, file);
+    writeLogLine(scratchBuffer, length);
 }
 
 
@@ -2954,7 +3179,6 @@ void ExceptionHandler::WriteThreadCallstack(ThreadHandle threadHandle, ThreadSys
 
     // Print the header
     char    threadName[32];
-    char    threadHandleStr[32];
     char    threadSysIdStr[32];
     char    stackBaseStr[24];
     char    stackLimitStr[24];
@@ -2978,16 +3202,15 @@ void ExceptionHandler::WriteThreadCallstack(ThreadHandle threadHandle, ThreadSys
     OVR::GetThreadStackBounds(pStackBase, pStackLimit, threadHandle);
 
     OVR::Thread::GetThreadName(threadName, OVR_ARRAY_COUNT(threadName), threadName);
-    SprintfThreadHandle(threadHandleStr,  OVR_ARRAY_COUNT(threadHandleStr), threadHandle);
     SprintfThreadSysId(threadSysIdStr, OVR_ARRAY_COUNT(threadSysIdStr), threadSysId);
     SprintfAddress(stackBaseStr, OVR_ARRAY_COUNT(stackBaseStr), pStackBase);
     SprintfAddress(stackLimitStr, OVR_ARRAY_COUNT(stackLimitStr), pStackLimit);
     SprintfAddress(stackCurrentStr, OVR_ARRAY_COUNT(stackCurrentStr), pStackCurrent);
 
     if(threadName[0])
-        WriteReportLineF("Thread \"%s\" handle: %s, id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadName, threadHandleStr, threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
+        WriteReportLineF("Thread \"%s\" id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadName, threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
     else
-        WriteReportLineF("Thread handle: %s, id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadHandleStr, threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
+        WriteReportLineF("Thread id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
 
     // Print the backtrace info
     void*       addressArray[64];
@@ -3049,11 +3272,13 @@ void ExceptionHandler::WriteThreadCallstack(ThreadHandle threadHandle, ThreadSys
     }
 }
 
-
-void ExceptionHandler::WriteReport()
+void ExceptionHandler::WriteReport(const char* reportType)
 {
     // It's important that we don't allocate any memory here if we can help it.
     using namespace OVR;
+
+    if (!reportType)
+        reportType = "Exception";
 
     if(strstr(reportFilePath, "%s")) // If the user-specified file path includes a date/time component...
     {
@@ -3066,22 +3291,44 @@ void ExceptionHandler::WriteReport()
         OVR_strlcpy(reportFilePathActual, reportFilePath, OVR_ARRAY_COUNT(reportFilePathActual));
     }
 
-    file = fopen(reportFilePathActual, "w");
-    OVR_ASSERT(file != nullptr);
-    if(!file)
+    // Since LogFile is still null at this point, ...
+    OVR_ASSERT(LogFile == nullptr);
+
+    // ...we are writing this to the console/syslog but not the log file.
+    if (strcmp(reportType, "Exception") == 0)
+        WriteReportLine("[ExceptionHandler] Exception caught! ");
+
+    WriteReportLineF("Writing report to file: %s\n", reportFilePathActual);
+     
+#if defined(OVR_OS_WIN32)
+    HANDLE hEventSource = ::RegisterEventSourceW(nullptr, OVR_SYSLOG_NAME);
+
+    if (hEventSource)
+    {
+        // This depends on the scratch buffer containing the file location.
+        const char* lines = scratchBuffer;
+        static_assert(sizeof(scratchBuffer) < 31839, "RegisterEventSource has a size limit of 31839 per string");
+        ::ReportEventA(hEventSource, EVENTLOG_ERROR_TYPE, 0, 0, nullptr, 1, 0, &lines, nullptr);
+        ::DeregisterEventSource(hEventSource);
+    }
+#endif
+
+    LogFile = fopen(reportFilePathActual, "w");
+    OVR_ASSERT(LogFile != nullptr);
+    if(!LogFile)
         return;
 
     SymbolLookup::Initialize();
 
     {
         // Exception information
-        WriteReportLine("Exception Info\n");
+        WriteReportLineF("%s Info\n", reportType);
 
-        WriteReportLineF("Exception report file: %s\n", reportFilePathActual);
+        WriteReportLineF("%s report file: %s\n", reportType, reportFilePathActual);
 
         #if defined(OVR_OS_MS)
             if(miniDumpFilePath[0])
-                WriteReportLineF("Exception minidump file: %s\n", minidumpFilePathActual);
+                WriteReportLineF("%s minidump file: %s\n", reportType, minidumpFilePathActual);
         #endif
 
         char dateTimeBuffer[64];
@@ -3118,101 +3365,6 @@ void ExceptionHandler::WriteReport()
         // To consider: print exceptionInfo.cpuContext registers
     }
 
-    #if 0 // Disabled while we move this to the Util module or some other location.
-    /*
-    // OVR information
-    WriteReportLine("\nOVR Info\n");
-    WriteReportLineF("OVR time: %f\n", ovr_GetTimeInSeconds());
-    WriteReportLineF("OVR version: %s\n", ovr_GetVersionString());
-
-    // OVR util information
-    // The following would be useful to use if they didn't allocate memory, which we can't do.
-    // To do: see if we can have versions of the functions below which don't allocate memory
-    // or allocate it safely (e.g. use an alternative heap).
-    // String OVR::GetDisplayDriverVersion();
-    // String OVR::GetCameraDriverVersion();
-
-    // OVR HMD information
-    WriteReportLine("\nOVR HMD Info\n");
-
-    // XXX rewrite this to use EnumerateHMDStateList() with a callback...
-    const OVR::List<OVR::CAPI::HMDState>& hmdStateList = OVR::CAPI::HMDState::GetHMDStateList();
-    const OVR::CAPI::HMDState* pHMDState = hmdStateList.GetFirst();
-
-    if(hmdStateList.IsNull(pHMDState))
-    {
-        WriteReportLine("No HMDs found.\n");
-    }
-
-    while(!hmdStateList.IsNull(pHMDState))
-    {
-        if(pHMDState->pProfile)
-        {
-            const char* user = pHMDState->pProfile->GetValue(OVR_KEY_USER);
-
-            if(user)
-                WriteReportLineF("Profile user: %s\n", reportPrivacyEnabled ? "<disabled by report privacy settings>" : user);
-            else
-                WriteReportLine("Null profile user\n");
-
-            float NeckEyeDistance[2];
-            float EyeToNoseDistance[2];
-            float MaxEyeToPlateDist[2];
-            pHMDState->pProfile->GetFloatValues(OVR_KEY_NECK_TO_EYE_DISTANCE, NeckEyeDistance, 2);
-            pHMDState->pProfile->GetFloatValues(OVR_KEY_EYE_TO_NOSE_DISTANCE, EyeToNoseDistance, 2);
-            pHMDState->pProfile->GetFloatValues(OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE, MaxEyeToPlateDist, 2);
-
-            WriteReportLineF("Player height: %f, eye height: %f, IPD: %f, Neck eye distance: %f,%f, eye relief dial: %d, eye to nose distance: %f,%f, max eye to plate distance: %f,%f, custom eye render: %s\n",
-                        pHMDState->pProfile->GetFloatValue(OVR_KEY_PLAYER_HEIGHT, 0.f),
-                        pHMDState->pProfile->GetFloatValue(OVR_KEY_EYE_HEIGHT, 0.f),
-                        pHMDState->pProfile->GetFloatValue(OVR_KEY_IPD, 0.f),
-                        NeckEyeDistance[0], NeckEyeDistance[1],
-                        pHMDState->pProfile->GetIntValue(OVR_KEY_EYE_RELIEF_DIAL, 0),
-                        EyeToNoseDistance[0], EyeToNoseDistance[1],
-                        MaxEyeToPlateDist[0], MaxEyeToPlateDist[1],
-                        pHMDState->pProfile->GetBoolValue(OVR_KEY_CUSTOM_EYE_RENDER, false) ? "yes" : "no");
-
-            // Not currently used:
-            // OVR_KEY_NAME
-            // OVR_KEY_GENDER
-            // OVR_KEY_EYE_CUP
-            // OVR_KEY_CAMERA_POSITION
-        }
-        else
-        {
-            WriteReportLine("Null HMD profile\n");
-        }
-
-        if(pHMDState->pHmdDesc) // This should usually be true.
-        {
-            WriteReportLineF("HMD %d: Type: %u ProductName: %s, Manufacturer: %s VendorId: %d, ProductId: %d, SerialNumber: %s, FirmwareMajor: %d, FirmwareMinor: %d, Resolution: %dx%d, DisplayDeviceName: %s, DisplayId: %d\n",
-                            0, (unsigned)pHMDState->pHmdDesc->Type, pHMDState->pHmdDesc->ProductName, pHMDState->pHmdDesc->Manufacturer, pHMDState->pHmdDesc->VendorId,
-                            pHMDState->pHmdDesc->ProductId, pHMDState->pHmdDesc->SerialNumber, pHMDState->pHmdDesc->FirmwareMajor, pHMDState->pHmdDesc->FirmwareMinor,
-                            pHMDState->pHmdDesc->Resolution.w, pHMDState->pHmdDesc->Resolution.h, pHMDState->pHmdDesc->DisplayDeviceName, pHMDState->pHmdDesc->DisplayId);
-
-            // HSW display state
-            ovrHSWDisplayState hswDS;
-            ovrHmd_GetHSWDisplayState(pHMDState->pHmdDesc, &hswDS);
-            WriteReportLineF("HSW displayed for hmd: %s\n", hswDS.Displayed ? "yes" : "no");
-        }
-
-        char threadIdStr[24];
-        SprintfAddress(threadIdStr, OVR_ARRAY_COUNT(threadIdStr), pHMDState->BeginFrameThreadId);
-
-        WriteReportLineF("Hmd Caps: %x, Hmd Service Caps: %x, Latency test active: %s, Last frame time: %f, Last get frame time: %f, Rendering configred: %s, Begin frame called: %s, Begin frame thread id: %s\n",
-                    pHMDState->EnabledHmdCaps, pHMDState->EnabledServiceHmdCaps, pHMDState->LatencyTestActive ? "yes" : "no", pHMDState->LastFrameTimeSeconds, pHMDState->LastGetFrameTimeSeconds, pHMDState->RenderingConfigured ? "yes" : "no",
-                    pHMDState->BeginFrameCalled ? "yes" : "no", threadIdStr);
-
-        if(pHMDState->pLastError)
-        {
-            WriteReportLineF("OVR last error for hmd: %s\n", pHMDState->pLastError);
-        }
-
-        pHMDState = hmdStateList.GetNext(pHMDState);
-    }
-    */
-    #endif // #if 0
-
     #if defined(OVR_OS_WIN32)
         {
             WriteReportLine("\nApp Info\n");
@@ -3246,11 +3398,17 @@ void ExceptionHandler::WriteReport()
                         VS_FIXEDFILEINFO* pFFI;
                         UINT size;
 
-                        if(VerQueryValueA(pVersionData, "\\", (void**)&pFFI, &size))
+                        if(VerQueryValueW(pVersionData, L"\\", (void**)&pFFI, &size))
                         {
-                            WriteReportLineF("App version: %u.%u.%u.%u\n",
+                            // This is the convention used by RelEng to encode the CL # for releases.
+                            // This greatly simplifies figuring out which version of the Oculus Runtime
+                            // this file came from, though it may not apply to some users of DebugHelp.
+                            // Feel free to ignore it if you're not looking at the Oculus Runtime.
+                            const unsigned CLNum = LOWORD(pFFI->dwFileVersionLS) + 65536;
+
+                            WriteReportLineF("App version: %u.%u.%u.%u (Runtime Installer CL# %u)\n",
                                             HIWORD(pFFI->dwFileVersionMS), LOWORD(pFFI->dwFileVersionMS),
-                                            HIWORD(pFFI->dwFileVersionLS), LOWORD(pFFI->dwFileVersionLS));
+                                            HIWORD(pFFI->dwFileVersionLS), LOWORD(pFFI->dwFileVersionLS), CLNum);
                         }
                     }
 
@@ -3465,10 +3623,25 @@ void ExceptionHandler::WriteReport()
                     do {
                         if(te32.th32OwnerProcessID == currentProcessId)
                         {
-                            HANDLE hThread = ConvertThreadSysIdToThreadHandle(te32.th32ThreadID);
+                            OVR::ThreadSysId threadSysId = te32.th32ThreadID;
+                            OVR::ThreadSysId threadSysIdCurrent = ::GetCurrentThreadId();
+
+                            HANDLE hThread = ConvertThreadSysIdToThreadHandle(threadSysId);
 
                             if(hThread)
                             {
+                                if(threadSysId != threadSysIdCurrent) // If threadSysId refers to a different thread...
+                                {
+                                    // We are working with another thread. We need to suspend it and get its CONTEXT.
+                                    DWORD suspendResult = ::SuspendThread(hThread); // Requires that the handle have THREAD_SUSPEND_RESUME rights.
+
+                                    if(suspendResult == (DWORD)-1) // If failed...
+                                    {
+                                        WriteReportLineF("Skipping thread id: %u\n", (unsigned)threadSysId);
+                                        continue;
+                                    }
+                                }
+
                                 char buffer[96]; // Can't use scratchBuffer, because it's used by WriteThreadCallstack.
                                 OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "base priority: %ld, delta priority: %ld", te32.tpBasePri, te32.tpDeltaPri);
 
@@ -3477,6 +3650,10 @@ void ExceptionHandler::WriteReport()
                                     OVR_strlcat(buffer, ", exception thread", OVR_ARRAY_COUNT(buffer));
 
                                 WriteThreadCallstack(hThread, (OVR::ThreadSysId)te32.th32ThreadID, buffer);
+
+                                if(threadSysId != threadSysIdCurrent) // If we called SuspendThread above...
+                                    ::ResumeThread(hThread);
+
                                 FreeThreadHandle(hThread);
                             }
                         }
@@ -3860,13 +4037,143 @@ void ExceptionHandler::WriteReport()
 
     SymbolLookup::Shutdown();
 
-    fclose(file);
-    file = nullptr;
+    fclose(LogFile);
+    LogFile = nullptr;
 }
+
+
+
+#if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
+
+
+static bool IsModuleDataSegmentNeeded(const wchar_t* modulePath)
+{
+    if (modulePath)
+    {
+        const wchar_t* recognizedModuleNames[] = 
+        {
+            // To consider: make this dynamically specifiable by the application.
+            L"OVRServer_x64",
+            L"OculusAppFramework",
+            L"hid",
+            L"kernel32",
+            L"KernelBase",
+            L"msvcrt",
+            L"ws2_32",
+            L"mswsock",
+            L"ntdll",
+            L"user32",
+            L"wshtcpip"
+        };
+
+        const wchar_t* recognizedModulePrefixes[] = 
+        {
+            L"d3d",
+            L"dxgi",
+            L"nv",
+            L"ati",
+        };
+
+        wchar_t fileName[MAX_PATH] = {};
+        ::_wsplitpath_s(modulePath, NULL, 0, NULL, 0, fileName, MAX_PATH, NULL, 0);
+        std::transform(fileName, fileName + wcslen(fileName), fileName, ::towlower);
+
+        for(size_t i = 0; i < OVR_ARRAY_COUNT(recognizedModuleNames); ++i)
+        {
+            if (wcscmp(fileName, recognizedModuleNames[i]) == 0) // If fileName equals recognizedModuleNames[i]...
+                return true;
+        }
+
+        for(size_t i = 0; i < OVR_ARRAY_COUNT(recognizedModulePrefixes); ++i)
+        {
+            if (wcsstr(fileName, recognizedModulePrefixes[i]) == fileName) // If fileName begins with recognizedModulePrefixes[i]...
+                return true;
+        }
+    }
+
+    return false;
+}
+
+struct MinidumpCallbackContext
+{
+    ExceptionHandler::MinidumpInfoLevel infoLevel;
+    DWORD minidumpThreadId;
+};
+
+static BOOL CALLBACK MinidumpFilter(PVOID pContext, const PMINIDUMP_CALLBACK_INPUT callbackInput, PMINIDUMP_CALLBACK_OUTPUT callbackOutput)
+{
+    if (!callbackInput || !callbackOutput || !pContext)
+    {
+        // This should not normally occur.
+        return FALSE;
+    }
+
+    // Most of the time, we're going to let the minidump writer do whatever
+    // it needs to do.  However, when trying to limit information for things
+    // like smaller dumps, we want to filter out various things.  So this callback
+    // is used as a way to filter out information that the user has said they
+    // don't want.
+    //
+    // If we were so inclined, we could use a delegate class to allow the user
+    // to customize the dump files even further.  But for right now, this is
+    // close enough.
+    const MinidumpCallbackContext* pFilter = reinterpret_cast<const MinidumpCallbackContext*>(pContext);
+
+    switch (callbackInput->CallbackType) 
+    {
+        case IncludeModuleCallback:
+        case ThreadCallback:
+        case ThreadExCallback:
+            return TRUE;
+
+        case CancelCallback:
+            return FALSE;
+
+        case IncludeThreadCallback:
+            // Return FALSE if the ThreadId is our minidump-writing thread, so it gets skipped.
+            return (callbackInput->IncludeThread.ThreadId != pFilter->minidumpThreadId);
+
+        case MemoryCallback:
+            // Include memory only for large dumps.
+            return (pFilter->infoLevel == ExceptionHandler::kMILLarge);
+
+        case ModuleCallback:
+        {
+            if (pFilter->infoLevel == ExceptionHandler::kMILSmall)
+            {
+                // Filter out modules that aren't being referenced by memory.
+                if (!(callbackOutput->ModuleWriteFlags & ModuleReferencedByMemory))
+                    callbackOutput->ModuleWriteFlags &= ~ModuleWriteModule;
+            }
+            else if (pFilter->infoLevel == ExceptionHandler::kMILMedium)
+            {
+                // Filter out modules that aren't of primary interest to us.
+                if (callbackOutput->ModuleWriteFlags & ModuleWriteDataSeg)
+                {
+                    if (!IsModuleDataSegmentNeeded(callbackInput->Module.FullPath))
+                        callbackOutput->ModuleWriteFlags &= ~ModuleWriteDataSeg;
+                }
+            }
+            else if (pFilter->infoLevel == ExceptionHandler::kMILLarge)
+            {
+                // We currently write all modules.
+            }
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+#endif // defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
 
 
 void ExceptionHandler::WriteMiniDump()
 {
+    if (minidumpInfoLevel == kMILNone)
+         return;
+        
     if(strstr(miniDumpFilePath, "%s")) // If the user-specified file path includes a date/time component...
     {
         char dateTimeBuffer[64];
@@ -3887,25 +4194,97 @@ void ExceptionHandler::WriteMiniDump()
         if(pMiniDumpWriteDump)
         {
             wchar_t miniDumpFilePathW[OVR_MAX_PATH];
-            OVR::UTF8Util::DecodeString(miniDumpFilePathW, minidumpFilePathActual, -1); // Problem: DecodeString provides no way to specify the destination capacity.
-
-            HANDLE hFile = CreateFileW(miniDumpFilePathW, GENERIC_READ | GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, 0);
-
-            if(hFile != INVALID_HANDLE_VALUE)
+            auto requiredUTF8Length = OVR::UTF8Util::Strlcpy(miniDumpFilePathW, OVR_ARRAY_COUNT(miniDumpFilePathW), minidumpFilePathActual);
+            if(requiredUTF8Length < OVR_ARRAY_COUNT(miniDumpFilePathW))
             {
-                MINIDUMP_EXCEPTION_INFORMATION minidumpExceptionInfo = { ::GetCurrentThreadId(), pExceptionPointers, TRUE };
+                HANDLE hFile = CreateFileW(miniDumpFilePathW, GENERIC_READ | GENERIC_WRITE, 0, 0, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, 0);
 
-                BOOL result = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
-                                                    (MINIDUMP_TYPE)miniDumpFlags, &minidumpExceptionInfo,
-                                                    (CONST PMINIDUMP_USER_STREAM_INFORMATION)nullptr, (CONST PMINIDUMP_CALLBACK_INFORMATION)nullptr);
+                if(hFile != INVALID_HANDLE_VALUE)
+                {
+                    MINIDUMP_EXCEPTION_INFORMATION minidumpExceptionInfo = { ::GetCurrentThreadId(), pExceptionPointers, TRUE };
 
-                OVR_ASSERT_AND_UNUSED(result, result);
-                CloseHandle(hFile);
-                hFile = 0;
+                    int miniDumpFlags = MiniDumpNormal;
+
+                    switch ((int)minidumpInfoLevel)
+                    {
+                        case kMILSmall:
+                        {
+                            miniDumpFlags |= MiniDumpWithIndirectlyReferencedMemory |
+                                             MiniDumpScanMemory;
+                            break;
+                        }
+
+                        case kMILMedium:
+                        {
+                            miniDumpFlags |= MiniDumpWithDataSegs |
+                                             MiniDumpWithPrivateReadWriteMemory |
+                                             MiniDumpWithHandleData |
+                                             MiniDumpWithFullMemoryInfo |
+                                             MiniDumpWithThreadInfo |
+                                             MiniDumpWithUnloadedModules;
+                            break;
+                        }
+
+                        case kMILLarge:
+                        {
+                            miniDumpFlags |= MiniDumpWithDataSegs |
+                                             MiniDumpWithPrivateReadWriteMemory |
+                                             MiniDumpWithHandleData |
+                                             MiniDumpWithFullMemory |
+                                             MiniDumpWithFullMemoryInfo |
+                                             MiniDumpWithThreadInfo |
+                                             MiniDumpWithUnloadedModules |
+                                             MiniDumpWithProcessThreadData |
+                                             MiniDumpIgnoreInaccessibleMemory |
+                                             MiniDumpWithTokenInformation;
+                            break;
+                        }
+                    }
+
+                    MinidumpCallbackContext minidumpCallbackContext = { minidumpInfoLevel, ::GetCurrentThreadId() };
+                    MINIDUMP_CALLBACK_INFORMATION minidumpCallbackInfo = { MinidumpFilter, &minidumpCallbackContext };
+
+                    // We are about to write out a minidump due to a crash.  This minidump write can take a very long time.
+                    // Look up the stack to see what went wrong.  This is a bug in the code somewhere.
+                    OVR_ASSERT(false);
+
+                    BOOL result = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
+                                                        (MINIDUMP_TYPE)miniDumpFlags, &minidumpExceptionInfo,
+                                                        (CONST PMINIDUMP_USER_STREAM_INFORMATION)nullptr, &minidumpCallbackInfo);
+                    CloseHandle(hFile);
+                    hFile = 0;
+
+                    OVR_ASSERT(result);
+                    if(!result)
+                    {
+                        // We print out some error information in debug builds. We can't write to 
+                        // a log because we are likely executing this within an exception.
+                        #if defined(OVR_BUILD_DEBUG)
+                            DWORD dwError = GetLastError();
+                            char  errorBufferA[1024];
+                            DWORD errorBufferACapacity = OVR_ARRAY_COUNT(errorBufferA);
+                            DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, dwError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), errorBufferA, errorBufferACapacity, nullptr);
+
+                            if (length)
+                            {
+                                OutputDebugStringA("MiniDumpWriteDump failure: ");
+                                OutputDebugStringA(errorBufferA);
+                            }
+                        #endif
+
+                        DeleteFileW(miniDumpFilePathW);
+                    }
+                }
+                else
+                {
+                    // XXX this will never assert
+                    OVR_ASSERT(pMiniDumpWriteDump);  // OVR_FAIL_F(("ExceptionHandler::WriteMiniDump: Failed to create minidump file at %s", minidumpFilePathActual));
+                }
             }
             else
             {
-                OVR_ASSERT(pMiniDumpWriteDump);  // OVR_FAIL_F(("ExceptionHandler::WriteMiniDump: Failed to create minidump file at %s", minidumpFilePathActual));
+                // failed to convert miniDumpFilePathW
+                OVR_ASSERT(false);
             }
         }
 
@@ -4062,7 +4441,7 @@ void ExceptionHandler::ReportDeadlock(const char* threadName,
 
     handler.exceptionInfo.timeVal = time(nullptr);
     handler.exceptionInfo.time = *gmtime(&handler.exceptionInfo.timeVal);
-    handler.WriteReport();
+    handler.WriteReport("Deadlock");
 }
 
 

@@ -7,16 +7,16 @@ Created     :   April 9, 2013
 Author      :   Brant Lewis
 Notes       :
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -114,7 +114,29 @@ public:
 	int				GetIntByName(const char *name, int defValue = 0);
 	bool			GetBoolByName(const char *name, bool defValue = false);
 	String			GetStringByName(const char *name, const String &defValue = "");
-    int             GetArrayByName(const char *name, double values[], int count);
+
+    template<typename T>
+    int             GetArrayByName(const char *name, T values[], int count, T defaultValue = T(0))
+    {
+        // Zero values in case one or more elements not present in JSON
+        for (int i = 0; i < count; i++)
+            values[i] = defaultValue;
+
+        JSON* array = GetItemByName(name);
+        if (!array || array->Type != JSON_Array)
+            return 0;
+
+        int i = 0;
+        for (JSON* child = array->Children.GetFirst(); !array->Children.IsNull(child); child = array->Children.GetNext(child))
+        {
+            if (i >= count)
+                break;
+            values[i++] = (T)child->dValue;
+        }
+
+        OVR_ASSERT(i <= count);
+        return i;
+    }
 
     // Returns next item in a list of children; 0 if no more items exist.
     JSON*           GetNextItem(JSON* item)  { return Children.IsLast (item) ? nullptr : item->GetNext(); }
@@ -140,6 +162,15 @@ public:
     void            AddArrayNumber(double n)        { AddArrayElement(CreateNumber(n)); }
     void            AddArrayInt(int n)              { AddArrayElement(CreateInt(n)); }
     void            AddArrayString(const char* s)   { AddArrayElement(CreateString(s)); }
+
+    template<typename T>
+    void AddNumberArray(const char* name, const T array[], int arraySize)
+    {
+        JSON* node = JSON::CreateArray();
+        AddItem(name, node);
+        for (int i = 0; i < arraySize; i++)
+            node->AddArrayNumber((double)array[i]);
+    }
 
     // Accessed array elements; currently inefficient.
     int             GetArraySize();

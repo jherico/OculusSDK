@@ -1,21 +1,20 @@
 /************************************************************************************
 
-PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Lockless.h
 Content     :   Lock-less classes for producer/consumer communication
 Created     :   November 9, 2013
 Authors     :   John Carmack
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +26,9 @@ limitations under the License.
 
 #ifndef OVR_Lockless_h
 #define OVR_Lockless_h
+
+#include <cstring>
+using std::memcpy;
 
 #include "OVR_Atomic.h"
 
@@ -106,9 +108,39 @@ public:
 };
 
 
-#ifdef OVR_LOCKLESS_TEST
-void StartLocklessTest();
-#endif
+#pragma pack(push, 8)
+
+// Padded out version stored in the updater slots
+// Designed to be a larger fixed size to allow the data to grow in the future
+// without breaking older compiled code.
+OVR_DISABLE_MSVC_WARNING(4351)
+template <class Payload, int PaddingSize>
+struct LocklessPadding
+{
+    uint8_t buffer[PaddingSize];
+
+    LocklessPadding() : buffer() { }
+
+    LocklessPadding& operator=(const Payload& rhs)
+    {
+        // if this fires off, then increase PaddingSize
+        // IMPORTANT: this WILL break backwards compatibility
+        static_assert(sizeof(buffer) >= sizeof(Payload), "PaddingSize is too small");
+
+        memcpy(buffer, &rhs, sizeof(Payload));
+        return *this;
+    }
+
+    operator Payload() const
+    {
+        Payload result;
+        memcpy(&result, buffer, sizeof(Payload));
+        return result;
+    }
+};
+OVR_RESTORE_MSVC_WARNING()
+
+#pragma pack(pop)
 
 
 } // namespace OVR

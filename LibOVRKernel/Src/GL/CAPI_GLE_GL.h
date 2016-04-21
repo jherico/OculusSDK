@@ -2,16 +2,16 @@
 
 Filename    :   CAPI_GLE_GL.h
 Content     :   GL extensions declarations.
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -96,7 +96,7 @@ limitations under the License.
 // GLAPIENTRY is the calling convention (__stdcall under Microsoft).
 //
 #if defined(GLE_WGL_ENABLED)
-    #include <Kernel/OVR_Win32_IncludeWindows.h>
+    #include "Kernel/OVR_Win32_IncludeWindows.h"
 
     #ifndef WINGDIAPI // Normally defined via windows.h
         #define WINGDIAPI __declspec(dllimport)
@@ -138,11 +138,11 @@ limitations under the License.
 // When using hooking, we map all OpenGL function usage to our member functions that end with _Hook. 
 // These member hook functions will internally call the actual OpenGL functions after doing some internal processing.
 #if defined(GLE_HOOKING_ENABLED)
-    #define GLEGetCurrentFunction(x) GLEContext::GetCurrentContext()->x##_Hook
-    #define GLEGetCurrentVariable(x) GLEContext::GetCurrentContext()->x
+    #define GLEGetCurrentFunction(x) OVR::GLEContext::GetCurrentContext()->x##_Hook
+    #define GLEGetCurrentVariable(x) OVR::GLEContext::GetCurrentContext()->x
 #else
-    #define GLEGetCurrentFunction(x) GLEContext::GetCurrentContext()->x##_Impl
-    #define GLEGetCurrentVariable(x) GLEContext::GetCurrentContext()->x
+    #define GLEGetCurrentFunction(x) OVR::GLEContext::GetCurrentContext()->x##_Impl
+    #define GLEGetCurrentVariable(x) OVR::GLEContext::GetCurrentContext()->x
 #endif
 
 // GLE_CURRENT_FUNCTION
@@ -159,7 +159,7 @@ limitations under the License.
 // Example usage:
 //     if(GLE_WHOLE_VERSION() >= 302) // If OpenGL 3.2 or later...
 //         ...
-#define GLE_WHOLE_VERSION() GLEContext::GetCurrentContext()->WholeVersion()
+#define GLE_WHOLE_VERSION() OVR::GLEContext::GetCurrentContext()->WholeVersion()
 
 
 
@@ -3590,6 +3590,48 @@ extern "C" {
 
 
 
+#ifndef GL_ARB_texture_storage
+    #define GL_ARB_texture_storage 1
+
+    #define GL_TEXTURE_IMMUTABLE_FORMAT 0x912F
+
+    typedef void (GLAPIENTRY * PFNGLTEXSTORAGE1DPROC) (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width);
+    typedef void (GLAPIENTRY * PFNGLTEXSTORAGE2DPROC) (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
+    typedef void (GLAPIENTRY * PFNGLTEXSTORAGE3DPROC) (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
+    typedef void (GLAPIENTRY * PFNGLTEXTURESTORAGE1DEXTPROC) (GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width);
+    typedef void (GLAPIENTRY * PFNGLTEXTURESTORAGE2DEXTPROC) (GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
+    typedef void (GLAPIENTRY * PFNGLTEXTURESTORAGE3DEXTPROC) (GLuint texture, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
+
+    #define glTexStorage1D        GLEGetCurrentFunction(glTexStorage1D)
+    #define glTexStorage2D        GLEGetCurrentFunction(glTexStorage2D)
+    #define glTexStorage3D        GLEGetCurrentFunction(glTexStorage3D)
+    #define glTextureStorage1DEXT GLEGetCurrentFunction(glTextureStorage1DEXT)
+    #define glTextureStorage2DEXT GLEGetCurrentFunction(glTextureStorage2DEXT)
+    #define glTextureStorage3DEXT GLEGetCurrentFunction(glTextureStorage3DEXT)
+
+    #define GLE_ARB_texture_storage GLEGetCurrentVariable(gle_ARB_texture_storage)
+#endif
+
+
+
+#ifndef GL_ARB_texture_storage_multisample
+    #define GL_ARB_texture_storage_multisample 1
+
+    typedef void (GLAPIENTRY * PFNGLTEXSTORAGE2DMULTISAMPLEPROC) (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
+    typedef void (GLAPIENTRY * PFNGLTEXSTORAGE3DMULTISAMPLEPROC) (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
+    typedef void (GLAPIENTRY * PFNGLTEXTURESTORAGE2DMULTISAMPLEEXTPROC) (GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
+    typedef void (GLAPIENTRY * PFNGLTEXTURESTORAGE3DMULTISAMPLEEXTPROC) (GLuint texture, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations);
+
+    #define glTexStorage2DMultisample        GLEGetCurrentFunction(glTexStorage2DMultisample)
+    #define glTexStorage3DMultisample        GLEGetCurrentFunction(glTexStorage3DMultisample)
+    #define glTextureStorage2DMultisampleEXT GLEGetCurrentFunction(glTextureStorage2DMultisampleEXT)
+    #define glTextureStorage3DMultisampleEXT GLEGetCurrentFunction(glTextureStorage3DMultisampleEXT)
+
+    #define GLE_ARB_texture_storage_multisample GLEGetCurrentVariable(gle_ARB_texture_storage_multisample)
+#endif
+
+
+
 #ifndef GL_ARB_timer_query
     #define GL_ARB_timer_query 1
 
@@ -3715,6 +3757,31 @@ extern "C" {
     #define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
 
     #define GLE_EXT_texture_filter_anisotropic GLEGetCurrentVariable(gle_EXT_texture_filter_anisotropic)
+#endif
+
+
+
+#ifndef GL_EXT_texture_sRGB
+    #define GL_EXT_texture_sRGB 1
+
+    #define GL_SRGB_EXT                            0x8C40
+    #define GL_SRGB8_EXT                           0x8C41
+    #define GL_SRGB_ALPHA_EXT                      0x8C42
+    #define GL_SRGB8_ALPHA8_EXT                    0x8C43
+    #define GL_SLUMINANCE_ALPHA_EXT                0x8C44
+    #define GL_SLUMINANCE8_ALPHA8_EXT              0x8C45
+    #define GL_SLUMINANCE_EXT                      0x8C46
+    #define GL_SLUMINANCE8_EXT                     0x8C47
+    #define GL_COMPRESSED_SRGB_EXT                 0x8C48
+    #define GL_COMPRESSED_SRGB_ALPHA_EXT           0x8C49
+    #define GL_COMPRESSED_SLUMINANCE_EXT           0x8C4A
+    #define GL_COMPRESSED_SLUMINANCE_ALPHA_EXT     0x8C4B
+    #define GL_COMPRESSED_SRGB_S3TC_DXT1_EXT       0x8C4C
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT 0x8C4D
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
+
+    #define GLE_EXT_texture_sRGB GLEGetCurrentVariable(gle_EXT_texture_sRGB)
 #endif
 
 
@@ -3910,25 +3977,25 @@ extern "C" {
         typedef DWORD (WINAPI * PFNWGLSWAPMULTIPLEBUFFERSPROC)(UINT, CONST WGLSWAP *);
 
         #if 0
-        #define wglCopyContext             GLEContext::GetCurrentContext()->wglCopyContext_Impl
-        #define wglCreateContext           GLEContext::GetCurrentContext()->wglCreateContext_Impl
-        #define wglCreateLayerContext      GLEContext::GetCurrentContext()->wglCreateLayerContext_Impl
-        #define wglDeleteContext           GLEContext::GetCurrentContext()->wglDeleteContext_Impl
-        #define wglGetCurrentContext       GLEContext::GetCurrentContext()->wglGetCurrentContext_Impl
-        #define wglGetCurrentDC            GLEContext::GetCurrentContext()->wglGetCurrentDC_Impl
-        #define wglGetProcAddress          GLEContext::GetCurrentContext()->wglGetProcAddress_Impl
-        #define wglMakeCurrent             GLEContext::GetCurrentContext()->wglMakeCurrent_Impl
-        #define wglShareLists              GLEContext::GetCurrentContext()->wglShareLists_Impl
-        #define wglUseFontBitmapsA         GLEContext::GetCurrentContext()->wglUseFontBitmapsA_Impl
-        #define wglUseFontBitmapsW         GLEContext::GetCurrentContext()->wglUseFontBitmapsW_Impl
-        #define wglUseFontOutlinesA        GLEContext::GetCurrentContext()->wglUseFontOutlinesA_Impl
-        #define wglUseFontOutlinesW        GLEContext::GetCurrentContext()->wglUseFontOutlinesW_Impl
-        #define wglDescribeLayerPlane      GLEContext::GetCurrentContext()->wglDescribeLayerPlane_Impl
-        #define wglSetLayerPaletteEntries  GLEContext::GetCurrentContext()->wglSetLayerPaletteEntries_Impl
-        #define wglGetLayerPaletteEntries  GLEContext::GetCurrentContext()->wglGetLayerPaletteEntries_Impl
-        #define wglRealizeLayerPalette     GLEContext::GetCurrentContext()->wglRealizeLayerPalette_Impl
-        #define wglSwapLayerBuffers        GLEContext::GetCurrentContext()->wglSwapLayerBuffers_Impl
-        #define wglSwapMultipleBuffers     GLEContext::GetCurrentContext()->wglSwapMultipleBuffers_Impl
+        #define wglCopyContext             OVR::GLEContext::GetCurrentContext()->wglCopyContext_Impl
+        #define wglCreateContext           OVR::GLEContext::GetCurrentContext()->wglCreateContext_Impl
+        #define wglCreateLayerContext      OVR::GLEContext::GetCurrentContext()->wglCreateLayerContext_Impl
+        #define wglDeleteContext           OVR::GLEContext::GetCurrentContext()->wglDeleteContext_Impl
+        #define wglGetCurrentContext       OVR::GLEContext::GetCurrentContext()->wglGetCurrentContext_Impl
+        #define wglGetCurrentDC            OVR::GLEContext::GetCurrentContext()->wglGetCurrentDC_Impl
+        #define wglGetProcAddress          OVR::GLEContext::GetCurrentContext()->wglGetProcAddress_Impl
+        #define wglMakeCurrent             OVR::GLEContext::GetCurrentContext()->wglMakeCurrent_Impl
+        #define wglShareLists              OVR::GLEContext::GetCurrentContext()->wglShareLists_Impl
+        #define wglUseFontBitmapsA         OVR::GLEContext::GetCurrentContext()->wglUseFontBitmapsA_Impl
+        #define wglUseFontBitmapsW         OVR::GLEContext::GetCurrentContext()->wglUseFontBitmapsW_Impl
+        #define wglUseFontOutlinesA        OVR::GLEContext::GetCurrentContext()->wglUseFontOutlinesA_Impl
+        #define wglUseFontOutlinesW        OVR::GLEContext::GetCurrentContext()->wglUseFontOutlinesW_Impl
+        #define wglDescribeLayerPlane      OVR::GLEContext::GetCurrentContext()->wglDescribeLayerPlane_Impl
+        #define wglSetLayerPaletteEntries  OVR::GLEContext::GetCurrentContext()->wglSetLayerPaletteEntries_Impl
+        #define wglGetLayerPaletteEntries  OVR::GLEContext::GetCurrentContext()->wglGetLayerPaletteEntries_Impl
+        #define wglRealizeLayerPalette     OVR::GLEContext::GetCurrentContext()->wglRealizeLayerPalette_Impl
+        #define wglSwapLayerBuffers        OVR::GLEContext::GetCurrentContext()->wglSwapLayerBuffers_Impl
+        #define wglSwapMultipleBuffers     OVR::GLEContext::GetCurrentContext()->wglSwapMultipleBuffers_Impl
         #endif
     #endif
 
@@ -4428,6 +4495,7 @@ extern "C" {
     #define __GLX_glx_h__
     #define __glx_h__
 
+    // FIXME: Including These Raw Causes Major Conflicts!
     #include <X11/Xlib.h>
     #include <X11/Xutil.h>
     #include <X11/Xmd.h>

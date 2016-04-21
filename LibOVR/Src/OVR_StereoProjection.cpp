@@ -5,16 +5,16 @@ Content     :   Stereo rendering functions
 Created     :   November 30, 2013
 Authors     :   Tom Fosyth
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,7 +24,7 @@ limitations under the License.
 
 *************************************************************************************/
 
-#include "OVR_StereoProjection.h"
+#include <Extras/OVR_StereoProjection.h>
 
 
 namespace OVR {
@@ -49,7 +49,7 @@ ScaleAndOffset2D CreateNDCScaleAndOffsetFromFov ( FovPort tanHalfFov )
 
 
 
-Matrix4f CreateProjection( bool rightHanded, bool isOpenGL, FovPort tanHalfFov, StereoEye /*eye*/, 
+Matrix4f CreateProjection( bool leftHanded, bool isOpenGL, FovPort tanHalfFov, StereoEye /*eye*/, 
                            float zNear /*= 0.01f*/, float zFar /*= 10000.0f*/,
                            bool flipZ /*= false*/, bool farAtInfinity /*= false*/)
 {
@@ -62,7 +62,7 @@ Matrix4f CreateProjection( bool rightHanded, bool isOpenGL, FovPort tanHalfFov, 
     // A projection matrix is very like a scaling from NDC, so we can start with that.
     ScaleAndOffset2D scaleAndOffset = CreateNDCScaleAndOffsetFromFov ( tanHalfFov );
 
-    float handednessScale = rightHanded ? -1.0f : 1.0f;
+    float handednessScale = leftHanded ? 1.0f : -1.0f;
 
     Matrix4f projection;
     // Produces X result, mapping clip edges to [-w,+w]
@@ -87,20 +87,31 @@ Matrix4f CreateProjection( bool rightHanded, bool isOpenGL, FovPort tanHalfFov, 
 
     if (farAtInfinity)
     {
-        projection.M[2][2] = 0.0f;
-        projection.M[2][3] = zNear;
+        if (isOpenGL)
+        {
+            // It's not clear this makes sense for OpenGL - you don't get the same precision benefits you do in D3D.
+            projection.M[2][2] = -handednessScale;
+            projection.M[2][3] = 2.0f * zNear;
+        }
+        else
+        {
+            projection.M[2][2] = 0.0f;
+            projection.M[2][3] = zNear;
+        }
     }
     else
     {
         if (isOpenGL)
         {
-            projection.M[2][2] = -handednessScale * (flipZ ? 1.0f : -1.0f) * (zNear + zFar) / (zFar - zNear);
-            projection.M[2][3] = -2.0f * ((flipZ ? -zFar : zFar) * zNear) / (zFar - zNear);
+            // Clip range is [-w,+w], so 0 is at the middle of the range.
+            projection.M[2][2] = -handednessScale * (flipZ ? -1.0f : 1.0f) * (zNear + zFar) / (zNear - zFar);
+            projection.M[2][3] =                    2.0f * ((flipZ ? -zFar : zFar) * zNear) / (zNear - zFar);
         }
         else
         {
-            projection.M[2][2] = -handednessScale * (flipZ ? -zNear : zFar) / (zNear - zFar);
-            projection.M[2][3] = ((flipZ ? -zFar : zFar) * zNear) / (zNear - zFar);
+            // Clip range is [0,+w], so 0 is at the start of the range.
+            projection.M[2][2] = -handednessScale * (flipZ ? -zNear : zFar)                 / (zNear - zFar);
+            projection.M[2][3] =                           ((flipZ ? -zFar : zFar) * zNear) / (zNear - zFar);
         }
     }
 
@@ -131,13 +142,13 @@ Matrix4f CreateOrthoSubProjection ( bool /*rightHanded*/, StereoEye eyeType,
     float orthoHorizontalOffset = interpupillaryDistance * 0.5f / distanceFromCamera;
     switch ( eyeType )
     {
-    case StereoEye_Center:
-        orthoHorizontalOffset = 0.0f;
-        break;
     case StereoEye_Left:
         break;
     case StereoEye_Right:
         orthoHorizontalOffset = -orthoHorizontalOffset;
+        break;
+    case StereoEye_Center:
+        orthoHorizontalOffset = 0.0f;
         break;
     default: 
         break;

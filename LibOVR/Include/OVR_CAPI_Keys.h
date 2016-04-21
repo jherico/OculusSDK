@@ -1,56 +1,53 @@
-/************************************************************************************
-
-Filename    :   OVR_CAPI.h
-Content     :   Keys for CAPI calls
-Created     :   September 25, 2014
-Authors     :   
-
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.2
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+/********************************************************************************//**
+\file      OVR_CAPI.h
+\brief     Keys for CAPI proprty function calls
+\copyright Copyright 2015 Oculus VR, LLC All Rights reserved.
 ************************************************************************************/
 
+#ifndef OVR_CAPI_Keys_h
+#define OVR_CAPI_Keys_h
+
+#include "OVR_Version.h"
 
 
-#define OVR_KEY_USER                        "User"              // string
-#define OVR_KEY_NAME                        "Name"              // string
-#define OVR_KEY_GENDER                      "Gender"            // string
-#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"      // float
-#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"         // float
-#define OVR_KEY_IPD                         "IPD"               // float
-#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"   // float[2]
-#define OVR_KEY_EYE_RELIEF_DIAL             "EyeReliefDial"     // int
-#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"     // float[2]
-#define OVR_KEY_MAX_EYE_TO_PLATE_DISTANCE   "MaxEyeToPlateDist" // float[2]
-#define OVR_KEY_EYE_CUP                     "EyeCup"            // char[16]
-#define OVR_KEY_CUSTOM_EYE_RENDER           "CustomEyeRender"   // bool
-#define OVR_KEY_CAMERA_POSITION				"CenteredFromWorld" // double[7]
 
-// Default measurements empirically determined at Oculus to make us happy
-// The neck model numbers were derived as an average of the male and female averages from ANSUR-88
-// NECK_TO_EYE_HORIZONTAL = H22 - H43 = INFRAORBITALE_BACK_OF_HEAD - TRAGION_BACK_OF_HEAD
-// NECK_TO_EYE_VERTICAL = H21 - H15 = GONION_TOP_OF_HEAD - ECTOORBITALE_TOP_OF_HEAD
-// These were determined to be the best in a small user study, clearly beating out the previous default values
+#define OVR_KEY_USER                        "User"                // string
+
+#define OVR_KEY_NAME                        "Name"                // string
+
+#define OVR_KEY_GENDER                      "Gender"              // string "Male", "Female", or "Unknown"
 #define OVR_DEFAULT_GENDER                  "Unknown"
+
+#define OVR_KEY_PLAYER_HEIGHT               "PlayerHeight"        // float meters
 #define OVR_DEFAULT_PLAYER_HEIGHT           1.778f
+
+#define OVR_KEY_EYE_HEIGHT                  "EyeHeight"           // float meters
 #define OVR_DEFAULT_EYE_HEIGHT              1.675f
-#define OVR_DEFAULT_IPD                     0.064f
+
+#define OVR_KEY_NECK_TO_EYE_DISTANCE        "NeckEyeDistance"     // float[2] meters
 #define OVR_DEFAULT_NECK_TO_EYE_HORIZONTAL  0.0805f
 #define OVR_DEFAULT_NECK_TO_EYE_VERTICAL    0.075f
-#define OVR_DEFAULT_EYE_RELIEF_DIAL         3
-#define OVR_DEFAULT_CAMERA_POSITION			{0,0,0,1,0,0,0}
 
+
+#define OVR_KEY_EYE_TO_NOSE_DISTANCE        "EyeToNoseDist"       // float[2] meters
+
+
+
+
+
+#define OVR_PERF_HUD_MODE                       "PerfHudMode"                       // int, allowed values are defined in enum ovrPerfHudMode
+
+#define OVR_LAYER_HUD_MODE                      "LayerHudMode"                      // int, allowed values are defined in enum ovrLayerHudMode
+#define OVR_LAYER_HUD_CURRENT_LAYER             "LayerHudCurrentLayer"              // int, The layer to show 
+#define OVR_LAYER_HUD_SHOW_ALL_LAYERS           "LayerHudShowAll"                   // bool, Hide other layers when the hud is enabled
+
+#define OVR_DEBUG_HUD_STEREO_MODE               "DebugHudStereoMode"                // int, allowed values are defined in enum ovrDebugHudStereoMode
+#define OVR_DEBUG_HUD_STEREO_GUIDE_INFO_ENABLE  "DebugHudStereoGuideInfoEnable"     // bool
+#define OVR_DEBUG_HUD_STEREO_GUIDE_SIZE         "DebugHudStereoGuideSize2f"         // float[2]
+#define OVR_DEBUG_HUD_STEREO_GUIDE_POSITION     "DebugHudStereoGuidePosition3f"     // float[3]
+#define OVR_DEBUG_HUD_STEREO_GUIDE_YAWPITCHROLL "DebugHudStereoGuideYawPitchRoll3f" // float[3]
+#define OVR_DEBUG_HUD_STEREO_GUIDE_COLOR        "DebugHudStereoGuideColor4f"        // float[4]
+
+
+
+#endif // OVR_CAPI_Keys_h

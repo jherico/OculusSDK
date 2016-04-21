@@ -1,23 +1,22 @@
 /************************************************************************************
 
-PublicHeader:   OVR_Kernel.h
 Filename    :   OVR_Std.h
 Content     :   Standard C function interface
 Created     :   September 19, 2012
-Notes       : 
+Notes       :
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License");
+you may not use the Oculus VR Rift SDK except in compliance with the License,
+which is provided at the time of installation or download, or which
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3
 
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
+Unless required by applicable law or agreed to in writing, the Oculus VR SDK
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
@@ -67,16 +66,16 @@ inline char* OVR_itoa(int val, char* dest, size_t len, int radix)
         if (len > 1)
         {
             dest[0] = '0';
-            dest[1] = '\0';  
+            dest[1] = '\0';
         }
         else if(len > 0)
-            dest[0] = '\0';  
+            dest[0] = '\0';
         return dest;
     }
 
     // FIXME: Fix the following code to avoid memory write overruns when len is in sufficient.
     int cur = val;
-    size_t i    = 0; 
+    size_t i    = 0;
     size_t sign = 0;
 
     if (val < 0)
@@ -85,7 +84,7 @@ inline char* OVR_itoa(int val, char* dest, size_t len, int radix)
         sign = 1;
     }
 
-    while ((val != 0) && (i < (len - 1 - sign)))        
+    while ((val != 0) && (i < (len - 1 - sign)))
     {
         cur    = val % radix;
         val   /= radix;
@@ -116,7 +115,7 @@ inline char* OVR_itoa(int val, char* dest, size_t len, int radix)
                 dest[i] = (char)('0' + cur);
                 break;
             }
-        } 
+        }
         else
         {
             dest[i] = (char)('0' + cur);
@@ -150,10 +149,21 @@ inline size_t OVR_CDECL OVR_strlen(const char* str)
     return strlen(str);
 }
 
+inline size_t OVR_CDECL OVR_strlen(const wchar_t* str)
+{
+    return wcslen(str);
+}
+
+
 inline char* OVR_CDECL OVR_strcpy(char* dest, size_t destsize, const char* src)
 {
 #if defined(OVR_MSVC_SAFESTRING)
-    strcpy_s(dest, destsize, src);
+    // Using strncpy_s() instead of strcpy_s() since strcpy_s will invoke the
+    // invalid parameter exception handler (now in google breakpad) and will
+    // cause the server to crash, and even if it returns the data may not be
+    // copied truncated.  The intent of all users surveyed has been to truncate
+    // so we specify strncpy_s with the truncate option instead.
+    strncpy_s(dest, destsize, src, _TRUNCATE);
     return dest;
 #else
     // FIXME: This should be a safer implementation
@@ -162,12 +172,24 @@ inline char* OVR_CDECL OVR_strcpy(char* dest, size_t destsize, const char* src)
 #endif
 }
 
+inline wchar_t* OVR_CDECL OVR_strcpy(wchar_t* dest, size_t destsize, const wchar_t* src)
+{
+#if defined(OVR_MSVC_SAFESTRING)
+    wcscpy_s(dest, destsize, src);
+    return dest;
+#else
+    // FIXME: This should be a safer implementation
+    OVR_UNUSED(destsize);
+    return wcscpy(dest, src);
+#endif
+}
 
-// Acts the same as the strlcpy function. 
+
+// Acts the same as the strlcpy function.
 // Copies src to dest, 0-terminating even if it involves truncating the write.
 // Returns the required strlen of dest (which is one less than the required size of dest).
 // strlcpy is a safer alternative to strcpy and strncpy and provides size information.
-// However, it still may result in an incomplete copy. 
+// However, it still may result in an incomplete copy.
 //
 // Example usage:
 //     char buffer[256];
@@ -177,16 +199,17 @@ inline char* OVR_CDECL OVR_strcpy(char* dest, size_t destsize, const char* src)
 //         { need a larger buffer }
 //
 size_t OVR_CDECL OVR_strlcpy(char* dest, const char* src, size_t destsize);
+size_t OVR_CDECL OVR_strlcpy(wchar_t* dest, const wchar_t* src, size_t destsize);
 
 // Acts the same as the strlcat function.
 // Appends src to dest, 0-terminating even if it involves an incomplete write.
 // Doesn't 0-terminate in the case that destsize is 0.
 // Returns the required strlen of dest (which is one less than the required size of dest).
-// The terminating 0 char of dest is overwritten by the first 
-// character of src, and a new 0 char is appended to dest. The required capacity 
+// The terminating 0 char of dest is overwritten by the first
+// character of src, and a new 0 char is appended to dest. The required capacity
 // of the destination is (strlen(src) + strlen(dest) + 1).
 // strlcat is a safer alternative to strcat and provides size information.
-// However, it still may result in an incomplete copy. 
+// However, it still may result in an incomplete copy.
 //
 // Example usage:
 //     char buffer[256] = "hello ";
@@ -196,6 +219,7 @@ size_t OVR_CDECL OVR_strlcpy(char* dest, const char* src, size_t destsize);
 //         { need a larger buffer }
 //
 size_t OVR_CDECL OVR_strlcat(char* dest, const char* src, size_t destsize);
+size_t OVR_CDECL OVR_strlcat(wchar_t* dest, const wchar_t* src, size_t destsize);
 
 
 inline char* OVR_CDECL OVR_strncpy(char* dest, size_t destsize, const char* src, size_t count)
@@ -237,31 +261,19 @@ inline char* OVR_CDECL OVR_strchr(char* str, char c)
     return strchr(str, c);
 }
 
-inline const char* OVR_strrchr(const char* str, char c)
+const char* OVR_CDECL OVR_strrchr(const char* pString, int c);
+inline char* OVR_CDECL OVR_strrchr(char* pString, int c)
 {
-    size_t len = OVR_strlen(str);
-    for (size_t i=len; i>0; i--)     
-        if (str[i]==c) 
-            return str+i;
-    return 0;
+    return (char*)OVR_strrchr((const char*)pString, c);
 }
 
 inline const uint8_t* OVR_CDECL OVR_memrchr(const uint8_t* str, size_t size, uint8_t c)
 {
-    for (intptr_t i = (intptr_t)size - 1; i >= 0; i--)     
+    for (intptr_t i = (intptr_t)size - 1; i >= 0; i--)
     {
-        if (str[i] == c) 
+        if (str[i] == c)
             return str + i;
     }
-    return 0;
-}
-
-inline char* OVR_CDECL OVR_strrchr(char* str, char c)
-{
-    size_t len = OVR_strlen(str);
-    for (size_t i=len; i>0; i--)     
-        if (str[i]==c) 
-            return str+i;
     return 0;
 }
 
@@ -273,7 +285,7 @@ inline long OVR_CDECL OVR_strtol(const char* string, char** tailptr, int radix)
     return strtol(string, tailptr, radix);
 }
 
-inline long OVR_CDECL OVR_strtoul(const char* string, char** tailptr, int radix)
+inline unsigned long OVR_CDECL OVR_strtoul(const char* string, char** tailptr, int radix)
 {
     return strtoul(string, tailptr, radix);
 }
@@ -323,7 +335,7 @@ int OVR_CDECL OVR_strnicmp(const char* dest, const char* src, size_t count);
 
 
 // This is like sprintf but with a destination buffer size argument. However, the behavior is different
-// from vsnprintf in that the return value semantics are like sprintf (which returns -1 on capacity overflow) and 
+// from vsnprintf in that the return value semantics are like sprintf (which returns -1 on capacity overflow) and
 // not like snprintf (which returns intended strlen on capacity overflow).
 inline size_t OVR_CDECL OVR_sprintf(char *dest, size_t destsize, const char* format, ...)
 {
@@ -351,7 +363,7 @@ inline size_t OVR_CDECL OVR_sprintf(char *dest, size_t destsize, const char* for
 
 
 // This is like vsprintf but with a destination buffer size argument. However, the behavior is different
-// from vsnprintf in that the return value semantics are like vsprintf (which returns -1 on capacity overflow) and 
+// from vsnprintf in that the return value semantics are like vsprintf (which returns -1 on capacity overflow) and
 // not like vsnprintf (which returns intended strlen on capacity overflow).
 // Return value:
 //    On success, the total number of characters written is returned.
@@ -453,17 +465,17 @@ inline int OVR_CDECL OVR_snprintf(char *dest, size_t destsize, const char * form
 
 
 // Returns the strlen of the resulting formatted string, or a negative value if the format is invalid.
-// Note: If you are planning on printing a string then it's more efficient to just use OVR_vsnprintf and 
+// Note: If you are planning on printing a string then it's more efficient to just use OVR_vsnprintf and
 // look at the return value and handle the uncommon case that there wasn't enough space.
 inline int OVR_CDECL OVR_vscprintf(const char * format, va_list argList)
 {
     int ret;
 #if defined(OVR_CC_MSVC)
     ret = _vscprintf(format, argList);
-#else    
+#else
     ret = vsnprintf(NULL, 0, format, argList);
 #endif
-    return ret;       
+    return ret;
 }
 
 

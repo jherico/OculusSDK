@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <Win10SDK_IncPath>C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\km;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\winrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\shared;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\um;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\km;C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\winrt;</Win10SDK_IncPath>
+    <Win10SDK_LibPathx86>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x86;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10240.0\um\x86</Win10SDK_LibPathx86>
+    <Win10SDK_LibPathx64>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10240.0\um\x64</Win10SDK_LibPathx64>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="Win10SDK_IncPath">
+      <Value>$(Win10SDK_IncPath)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="Win10SDK_LibPathx86">
+      <Value>$(Win10SDK_LibPathx86)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="Win10SDK_LibPathx64">
+      <Value>$(Win10SDK_LibPathx64)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

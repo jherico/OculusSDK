@@ -6,16 +6,16 @@ Content     :   File wrapper class implementation (Win32)
 Created     :   April 5, 1999
 Authors     :   Michael Antonov
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,6 +31,7 @@ limitations under the License.
 #include <stdio.h>
 
 #include "OVR_SysFile.h"
+#include "OVR_File.h"
 #include "OVR_Log.h"
 
 namespace OVR {
@@ -66,7 +67,7 @@ public:
     virtual bool        Flush()                                              { return  0; }
     virtual int         Seek(int /*offset*/, int /*origin*/)                 { return -1; }
     virtual int64_t     LSeek(int64_t /*offset*/, int /*origin*/)            { return -1; }
-    
+
     virtual int         CopyFromStream(File * /*pstream*/, int /*byteSize*/)  { return -1; }
     virtual bool        Close()                                              { return  0; }
 };

@@ -11,16 +11,16 @@ Notes       :   errno may not be preserved across use of BaseFile member functio
             :   Directories cannot be deleted while files opened from them are in use
                 (For the GetFullName function)
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,11 +42,20 @@ limitations under the License.
 
 namespace OVR {
 
-// ***** Declared classes
-class   FileConstants;
-class   File;
-class   DelegatedFile;
-class   BufferedFile;
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_MAX_PATH
+//
+// Max file path length (for most uses).
+// To do: move this to OVR_File.
+//
+#if !defined(OVR_MAX_PATH)
+    #if defined(_WIN32)                // http://msdn.microsoft.com/en-us/library/windows/desktop/aa365247%28v=vs.85%29.aspx
+        #define OVR_MAX_PATH MAX_PATH  // Windows can use paths longer than MAX_PATH in some cases (network paths, UNC paths).
+    #else
+        #define OVR_MAX_PATH 1024      // This isn't a strict limit on all Unix-based platforms.
+    #endif
+#endif
 
 
 // ***** Flags for File & Directory accesses

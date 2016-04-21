@@ -30,16 +30,16 @@ Notes       :
   THE SOFTWARE.
 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -116,12 +116,21 @@ static char* PrintNumber(double d)
             // the whole process by default. That are compiler-specific ways to change this per-thread, but 
             // below we implement the simple solution of simply fixing the decimal after the string was written.
 
-            if ((fabs(floor(d)-d) <= DBL_EPSILON) && (fabs(d) < 1.0e60))
+            if ((fabs(floor(d) - d) <= DBL_EPSILON) && (fabs(d) < 1.0e60))
+            {
+                // Write integral values with no decimals
                 OVR_sprintf(str, kCapacity, "%.0f", d);
-            else if ((fabs(d) < 1.0e-6) || (fabs(d) > 1.0e9))
-                OVR_sprintf(str, kCapacity, "%e", d);
+            }
+            else if ((fabs(d) < 1.0) || (fabs(d) > 1.0e9))
+            {
+                // Write numbers < 1 or larger than 1e9 with 7 significant digits
+                OVR_sprintf(str, kCapacity, "%.7g", d);
+            }
             else
-                OVR_sprintf(str, kCapacity, "%f", d);
+            {
+                // Write numbers >= 1 and <= 1e9 with 6 decimals (7 to 15 sig digits)
+                OVR_sprintf(str, kCapacity, "%.6f", d);
+            }
 
             // Convert any found ',' or ''' char to '.'. This will happen only if the locale was set to write a ',' 
             // instead of a '.' for the decimal point. Decimal points are represented only by one of these
@@ -794,7 +803,10 @@ char* JSON::PrintObject(int depth, bool fmt)
         
         if (fmt)
         {
-            *ptr++='\n';
+#ifdef OVR_OS_WIN32
+            *ptr++ = '\r';
+#endif
+            *ptr++ = '\n';
             for (i=0;i<depth-1;i++)
                 *ptr++='\t';
         }
@@ -1146,26 +1158,6 @@ String JSON::GetStringByName(const char *name, const String &defValue)
         return item->Value;
     }
 }
-
-
-int JSON::GetArrayByName(const char *name, double values[], int count)
-{
-    JSON* array = GetItemByName(name);
-    if (!array || array->Type != JSON_Array)
-        return 0;
-
-    int i = 0;
-    for (JSON* child = array->Children.GetFirst(); !array->Children.IsNull(child); child = array->Children.GetNext(child))
-    {
-        if (i >= count)
-            break;
-        values[i++] = child->dValue;
-    }
-
-    OVR_ASSERT(i <= count);
-    return i;
-}
-
 
 //-----------------------------------------------------------------------------
 // Adds an element to an array object type

@@ -6,16 +6,16 @@ Content     :   String UTF8 string implementation with copy-on-write semantics
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,10 +36,42 @@ limitations under the License.
 
 namespace OVR {
 
+// Return the byte size of the UTF-8 string corresponding to pchar (not including null termination)
+static size_t GetEncodeStringSize(const wchar_t* pchar, size_t length = StringIsNullTerminated)
+{
+    size_t len = 0;
+    if (length == StringIsNullTerminated)
+    {
+        for (size_t i = 0; pchar[i] != 0; ++i)
+        {
+            len += UTF8Util::GetEncodeCharSize(pchar[i]);
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < length; ++i)
+        {
+            len += UTF8Util::GetEncodeCharSize(pchar[i]);
+        }
+    }
+    return len;
+}
+
+static size_t StringStrlcpy(char* pDestUTF8, size_t destCharCountNotIncludingNull, const wchar_t* pSrcUCS, size_t sourceLength = StringIsNullTerminated)
+{
+    // String Data[] buffers always have one extra character for null-termination
+    return UTF8Util::Strlcpy(pDestUTF8, destCharCountNotIncludingNull + 1, pSrcUCS, sourceLength);
+}
+
+static size_t StringStrlcpy(wchar_t* pDestUCS, size_t destCharCountNotIncludingNull, const char* pSrcUTF8, size_t sourceLength = StringIsNullTerminated)
+{
+    // String Data[] buffers always have one extra character for null-termination
+    return UTF8Util::Strlcpy(pDestUCS, destCharCountNotIncludingNull + 1, pSrcUTF8, sourceLength);
+}
+
 #define String_LengthIsSize (size_t(1) << String::Flag_LengthIsSizeShift)
 
-String::DataDesc String::NullData = {String_LengthIsSize, 1, {0} };
-
+String::DataDesc String::NullData = {String_LengthIsSize, AtomicInt<int32_t>(1), {0} };
 
 String::String()
 {
@@ -148,16 +180,13 @@ size_t String::GetLength() const
     if (pdata->LengthIsSize())
         return size;    
     
-    length = (size_t)UTF8Util::GetLength(pdata->Data, (size_t)size);
+    length = (size_t)UTF8Util::GetLength(pdata->Data, size);
     
     if (length == size)
         pdata->Size |= String_LengthIsSize;
     
     return length;
 }
-
-
-//static uint32_t String_CharSearch(const char* buf, )
 
 
 uint32_t String::GetCharAt(size_t index) const 
@@ -228,36 +257,37 @@ void String::AppendChar(uint32_t ch)
 }
 
 
-void String::AppendString(const wchar_t* pstr, intptr_t len)
+void String::AppendString(const wchar_t* pstr, size_t len)
 {
     if (!pstr)
         return;
 
+    size_t encodeSize = GetEncodeStringSize(pstr, len);
+    if (encodeSize == 0)
+        return;
+
     DataDesc*   pdata = GetData();
     size_t      oldSize = pdata->GetSize();    
-    size_t      encodeSize = (size_t)UTF8Util::GetEncodeStringSize(pstr, len);
+    DataDesc*   pnewData = AllocDataCopy1(oldSize + encodeSize, 0, pdata->Data, oldSize);
 
-    DataDesc*   pnewData = AllocDataCopy1(oldSize + (size_t)encodeSize, 0,
-                                          pdata->Data, oldSize);
-    UTF8Util::EncodeString(pnewData->Data + oldSize,  pstr, len);
+    StringStrlcpy(pnewData->Data + oldSize, encodeSize, pstr, len);
 
     SetData(pnewData);
     pdata->Release();
 }
 
 
-void String::AppendString(const char* putf8str, intptr_t utf8StrSz)
+void String::AppendString(const char* putf8str, size_t utf8StrSz)
 {
     if (!putf8str || !utf8StrSz)
         return;
-    if (utf8StrSz == -1)
-        utf8StrSz = (intptr_t)OVR_strlen(putf8str);
+    if (utf8StrSz == StringIsNullTerminated)
+        utf8StrSz = OVR_strlen(putf8str);
 
     DataDesc*   pdata = GetData();
     size_t      oldSize = pdata->GetSize();
 
-    SetData(AllocDataCopy2(oldSize + (size_t)utf8StrSz, 0,
-                           pdata->Data, oldSize, putf8str, (size_t)utf8StrSz));
+    SetData(AllocDataCopy2(oldSize + utf8StrSz, 0, pdata->Data, oldSize, putf8str, utf8StrSz));
     pdata->Release();
 }
 
@@ -285,12 +315,18 @@ void    String::operator = (const char* pstr)
 void    String::operator = (const wchar_t* pwstr)
 {
     pwstr = pwstr ? pwstr : L"";
+    size_t size = GetEncodeStringSize(pwstr);
+    if (size == 0)
+    {
+        Clear();
+        return;
+    }
 
     DataDesc*   poldData = GetData();
-    size_t      size = (size_t)UTF8Util::GetEncodeStringSize(pwstr);
-
     DataDesc*   pnewData = AllocData(size, 0);
-    UTF8Util::EncodeString(pnewData->Data, pwstr);
+
+    StringStrlcpy(pnewData->Data, size, pwstr);
+
     SetData(pnewData);
     poldData->Release();
 }
@@ -342,7 +378,7 @@ String   String::operator + (const String& src) const
     return tmp1;
 }
 
-void    String::Remove(size_t posAt, intptr_t removeLength)
+void    String::Remove(size_t posAt, size_t removeLength)
 {
     DataDesc*   pdata = GetData();
     size_t      oldSize = pdata->GetSize();    
@@ -358,7 +394,7 @@ void    String::Remove(size_t posAt, intptr_t removeLength)
 
     // Get the byte position of the UTF8 char at position posAt.
     intptr_t bytePos    = UTF8Util::GetByteIndex(posAt, pdata->Data, oldSize);
-    intptr_t removeSize = UTF8Util::GetByteIndex(removeLength, pdata->Data + bytePos, oldSize-bytePos);
+    intptr_t removeSize = UTF8Util::GetByteIndex(removeLength, pdata->Data + bytePos, oldSize - bytePos);
 
     SetData(AllocDataCopy2(oldSize - removeSize, pdata->GetLengthFlag(),
                            pdata->Data, bytePos,
@@ -372,6 +408,8 @@ String   String::Substring(size_t start, size_t end) const
     size_t length = GetLength();
     if ((start >= length) || (start >= end))
         return String();   
+    if (end > length)
+        end = length;
 
     DataDesc* pdata = GetData();
     
@@ -379,9 +417,12 @@ String   String::Substring(size_t start, size_t end) const
     if (pdata->LengthIsSize())
         return String(pdata->Data + start, end - start);
     
-    // Get position of starting character.
+    // Get position of starting character and size
     intptr_t byteStart = UTF8Util::GetByteIndex(start, pdata->Data, pdata->GetSize());
-    intptr_t byteSize  = UTF8Util::GetByteIndex(end - start, pdata->Data + byteStart, pdata->GetSize()-byteStart);
+    intptr_t byteSize  = UTF8Util::GetByteIndex(end - start, pdata->Data + byteStart, pdata->GetSize() - byteStart);
+
+    OVR_ASSERT((byteStart >= 0) && (byteSize >= 0));
+
     return String(pdata->Data + byteStart, (size_t)byteSize);
 }
 
@@ -443,15 +484,17 @@ String   String::ToLower() const
 
 
 
-String& String::Insert(const char* substr, size_t posAt, intptr_t strSize)
+String& String::Insert(const char* substr, size_t posAt, size_t strSize)
 {
     DataDesc* poldData   = GetData();
     size_t    oldSize    = poldData->GetSize();
-    size_t    insertSize = (strSize < 0) ? OVR_strlen(substr) : (size_t)strSize;    
+    size_t    insertSize = (strSize == StringIsNullTerminated) ? OVR_strlen(substr) : strSize;
     size_t    byteIndex  =  (poldData->LengthIsSize()) ?
                             posAt : (size_t)UTF8Util::GetByteIndex(posAt, poldData->Data, oldSize);
 
-    OVR_ASSERT(byteIndex <= oldSize);
+    // Insert past end of string degrades into AppendString to match UTF8Util::GetByteIndex case
+    if (byteIndex > oldSize)
+        byteIndex = oldSize;
     
     DataDesc* pnewData = AllocDataCopy2(oldSize + insertSize, 0,
                                         poldData->Data, byteIndex, substr, insertSize);
@@ -461,18 +504,6 @@ String& String::Insert(const char* substr, size_t posAt, intptr_t strSize)
     poldData->Release();
     return *this;
 }
-
-/*
-String& String::Insert(const uint32_t* substr, size_t posAt, intptr_t len)
-{
-    for (intptr_t i = 0; i < len; ++i)
-    {
-        size_t charw = InsertCharAt(substr[i], posAt);
-        posAt += charw;
-    }
-    return *this;
-}
-*/
 
 size_t String::InsertCharAt(uint32_t c, size_t posAt)
 {
@@ -484,37 +515,6 @@ size_t String::InsertCharAt(uint32_t c, size_t posAt)
 
     Insert(buf, posAt, index);
     return (size_t)index;
-}
-
-
-int String::CompareNoCase(const char* a, const char* b)
-{
-    return OVR_stricmp(a, b);
-}
-
-int String::CompareNoCase(const char* a, const char* b, intptr_t len)
-{
-    if (len)
-    {
-        intptr_t f,l;
-        intptr_t slen = len;
-        const char *s = b;
-        do {
-            f = (intptr_t)OVR_tolower((int)(*(a++)));
-            l = (intptr_t)OVR_tolower((int)(*(b++)));
-        } while (--len && f && (f == l) && *b != 0);
-
-        if (f == l && (len != 0 || *b != 0))
-        {
-            f = (intptr_t)slen;
-            l = (intptr_t)OVR_strlen(s);
-            return int(f - l);
-        }
-
-        return int(f - l);
-    }
-    else
-        return (0-(int)OVR_strlen(b));
 }
 
 // ***** Implement hash static functions
@@ -603,13 +603,14 @@ StringBuffer::~StringBuffer()
     if (pData)
         OVR_FREE(pData);
 }
+
 void StringBuffer::SetGrowSize(size_t growSize) 
 { 
     if (growSize <= 16)
         GrowSize = 16;
     else
     {
-        uint8_t bits = Alg::UpperBit(uint32_t(growSize-1));
+        uint8_t bits = Alg::UpperBit(uint32_t(growSize - 1));
 		size_t size = (size_t)1 << bits;
         GrowSize = size == growSize ? growSize : size;
     }
@@ -632,13 +633,14 @@ void    StringBuffer::Reserve(size_t _size)
 {
     if (_size >= BufferSize) // >= because of trailing zero! (!AB)
     {
-        BufferSize = (_size + 1 + GrowSize - 1)& ~(GrowSize-1);
+        BufferSize = (_size + 1 + GrowSize - 1) & ~(GrowSize - 1);
         if (!pData)
             pData = (char*)OVR_ALLOC(BufferSize);
         else 
             pData = (char*)OVR_REALLOC(pData, BufferSize);
     }
 }
+
 void    StringBuffer::Resize(size_t _size)
 {
     Reserve(_size);
@@ -651,16 +653,8 @@ void    StringBuffer::Resize(size_t _size)
 void StringBuffer::Clear()
 {
     Resize(0);
-    /*
-    if (pData != pEmptyNullData)
-    {
-        OVR_FREE(pHeap, pData);
-        pData = pEmptyNullData;
-        Size = BufferSize = 0;
-        LengthIsSize = false;
-    }
-    */
 }
+
 // Appends a character
 void     StringBuffer::AppendChar(uint32_t ch)
 {
@@ -680,26 +674,26 @@ void     StringBuffer::AppendChar(uint32_t ch)
 }
 
 // Append a string
-void     StringBuffer::AppendString(const wchar_t* pstr, intptr_t len)
+void     StringBuffer::AppendString(const wchar_t* pstr, size_t len)
 {
     if (!pstr || !len)
         return;
 
-    intptr_t srcSize  = UTF8Util::GetEncodeStringSize(pstr, len);
-    size_t   origSize = GetSize();
-    size_t   size     = srcSize + origSize;
+    size_t srcSize  = GetEncodeStringSize(pstr, len);
+    size_t origSize = GetSize();
+    size_t size     = srcSize + origSize;
 
     Resize(size);
     OVR_ASSERT(pData != NULL);
-    UTF8Util::EncodeString(pData + origSize,  pstr, len);
+    StringStrlcpy(pData + origSize, srcSize, pstr, len);
 }
 
-void      StringBuffer::AppendString(const char* putf8str, intptr_t utf8StrSz)
+void      StringBuffer::AppendString(const char* putf8str, size_t utf8StrSz)
 {
     if (!putf8str || !utf8StrSz)
         return;
-    if (utf8StrSz == -1)
-        utf8StrSz = (intptr_t)OVR_strlen(putf8str);
+    if (utf8StrSz == StringIsNullTerminated)
+        utf8StrSz = OVR_strlen(putf8str);
 
     size_t  origSize = GetSize();
     size_t  size     = utf8StrSz + origSize;
@@ -723,10 +717,10 @@ void      StringBuffer::operator = (const char* pstr)
 void      StringBuffer::operator = (const wchar_t* pstr)
 {
     pstr = pstr ? pstr : L"";
-    size_t size = (size_t)UTF8Util::GetEncodeStringSize(pstr);
+    size_t size = GetEncodeStringSize(pstr);
     Resize(size);
     OVR_ASSERT((pData != NULL) || (size == 0));
-    UTF8Util::EncodeString(pData, pstr);
+    StringStrlcpy(pData, size, pstr);
 }
 
 void      StringBuffer::operator = (const String& src)
@@ -745,10 +739,10 @@ void      StringBuffer::operator = (const StringBuffer& src)
 
 
 // Inserts substr at posAt
-void      StringBuffer::Insert(const char* substr, size_t posAt, intptr_t len)
+void      StringBuffer::Insert(const char* substr, size_t posAt, size_t len)
 {
     size_t    oldSize    = Size;
-    size_t    insertSize = (len < 0) ? OVR_strlen(substr) : (size_t)len;    
+    size_t    insertSize = (len == StringIsNullTerminated) ? OVR_strlen(substr) : len;
     size_t    byteIndex  = LengthIsSize ? posAt : 
                            (size_t)UTF8Util::GetByteIndex(posAt, pData, (intptr_t)Size);
 
@@ -766,14 +760,79 @@ void      StringBuffer::Insert(const char* substr, size_t posAt, intptr_t len)
 // Inserts character at posAt
 size_t    StringBuffer::InsertCharAt(uint32_t c, size_t posAt)
 {
-    char    buf[8];
-    intptr_t   len = 0;
+    char buf[8];
+    intptr_t len = 0;
     UTF8Util::EncodeChar(buf, &len, c);
     OVR_ASSERT(len >= 0);
     buf[(size_t)len] = 0;
 
     Insert(buf, posAt, len);
     return (size_t)len;
+}
+
+
+
+
+
+
+std::wstring UTF8StringToUCSString(const char* pUTF8, size_t length)
+{
+    if (length == StringIsNullTerminated)
+        length = OVR_strlen(pUTF8);
+
+    std::wstring returnValue(length, wchar_t(0)); // We'll possibly trim this value below.
+
+    // Note that Strlcpy doesn't handle UTF8 encoding errors.
+    size_t decodedLength = StringStrlcpy(&returnValue[0], length, pUTF8, length);
+    OVR_ASSERT(decodedLength <= length);
+
+    returnValue.resize(decodedLength);
+
+    return returnValue;
+}
+
+std::wstring UTF8StringToUCSString(const std::string& sUTF8)
+{
+    return UTF8StringToUCSString(sUTF8.data(), sUTF8.size());
+}
+
+
+std::wstring OVRStringToUCSString(const String& sOVRUTF8)
+{
+    return UTF8StringToUCSString(sOVRUTF8.ToCStr(), sOVRUTF8.GetSize());
+}
+
+std::string UCSStringToUTF8String(const wchar_t* pUCS, size_t length)
+{
+    if (length == StringIsNullTerminated)
+        length = wcslen(pUCS);
+
+    std::string sUTF8;
+    size_t size = GetEncodeStringSize(pUCS, length);
+    sUTF8.resize(size);
+    StringStrlcpy(&sUTF8[0], size, pUCS, length);
+    return sUTF8;
+}
+
+std::string UCSStringToUTF8String(const std::wstring& sUCS)
+{
+    return UCSStringToUTF8String(sUCS.data(), sUCS.size());
+}
+
+String UCSStringToOVRString(const wchar_t* pUCS, size_t length)
+{
+    if (length == StringIsNullTerminated)
+        length = wcslen(pUCS);
+
+    // We use a std::string intermediate because String doesn't support resize or assignment without preallocated data.
+    const std::string sUTF8 = UCSStringToUTF8String(pUCS, length); 
+    const String sOVRUTF8(sUTF8.data(), sUTF8.size());
+    return sOVRUTF8;
+}
+
+String UCSStringToOVRString(const std::wstring& sUCS)
+{
+    return UCSStringToOVRString(sUCS.data(), sUCS.length());
 }
 
 } // OVR

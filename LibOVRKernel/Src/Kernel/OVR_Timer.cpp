@@ -5,16 +5,16 @@ Content     :   Provides static functions for precise timing
 Created     :   September 19, 2012
 Notes       : 
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,9 +41,8 @@ limitations under the License.
 
 #if defined(OVR_BUILD_DEBUG) && defined(OVR_OS_WIN32)
     typedef NTSTATUS (NTAPI* NtQueryTimerResolutionType)(PULONG MaximumTime, PULONG MinimumTime, PULONG CurrentTime);
-    NtQueryTimerResolutionType pNtQueryTimerResolution;
+    static NtQueryTimerResolutionType pNtQueryTimerResolution;
 #endif
-
 
 
 #if defined(OVR_OS_MS) && !defined(OVR_OS_WIN32) // Non-desktop Microsoft platforms...
@@ -60,12 +59,11 @@ extern "C" {
 
 
 
-
 namespace OVR {
 
 // For recorded data playback
-bool   Timer::useFakeSeconds = false;
-double Timer::FakeSeconds    = 0;
+bool   Timer::useVirtualSeconds = false;
+double Timer::VirtualSeconds    = 0.0;
 
 
 
@@ -81,8 +79,8 @@ double Timer::FakeSeconds    = 0;
 // Returns global high-resolution application timer in seconds.
 double Timer::GetSeconds()
 {
-	if(useFakeSeconds)
-		return FakeSeconds;
+	if(useVirtualSeconds)
+		return VirtualSeconds;
 
     // Choreographer vsync timestamp is based on.
     struct timespec tp;
@@ -104,8 +102,8 @@ double Timer::GetSeconds()
 
 uint64_t Timer::GetTicksNanos()
 {
-    if (useFakeSeconds)
-        return (uint64_t) (FakeSeconds * NanosPerSecond);
+    if (useVirtualSeconds)
+        return (uint64_t) (VirtualSeconds * NanosPerSecond);
 
     // Choreographer vsync timestamp is based on.
     struct timespec tp;
@@ -178,7 +176,7 @@ struct PerformanceTimer
         if (PerfFrequency == 0)
         {
             LARGE_INTEGER freq;
-            QueryPerformanceFrequency(&freq);
+            ::QueryPerformanceFrequency(&freq);
             PerfFrequency = freq.QuadPart;
             PerfFrequencyInverse = 1.0 / (double)PerfFrequency;
             PerfFrequencyInverseNanos = 1000000000.0 / (double)PerfFrequency;
@@ -192,7 +190,8 @@ struct PerformanceTimer
         return PerfFrequencyInverse;
     }
 
-	bool            UsingVistaOrLater;
+    // In Vista+ we are able to use QPC exclusively.
+    bool            UsingVistaOrLater;
 
     CRITICAL_SECTION TimeCS;
     // timeGetTime() support with wrap.
@@ -215,65 +214,69 @@ static PerformanceTimer Win32_PerfTimer;
 
 void PerformanceTimer::Initialize()
 {
-    #if defined(OVR_OS_WIN32) // Desktop Windows only
-        // The following has the effect of setting the NT timer resolution (NtSetTimerResolution) to 1 millisecond.
-        MMRESULT mmr = timeBeginPeriod(1);
-        OVR_ASSERT(TIMERR_NOERROR == mmr);
-        OVR_UNUSED(mmr);
-    #endif
-
-    InitializeCriticalSection(&TimeCS);
+    ::InitializeCriticalSection(&TimeCS);
     MMTimeWrapCounter = 0;
     getFrequency();
 
     #if defined(OVR_OS_WIN32) // Desktop Windows only
 	    // Set Vista flag.  On Vista, we can just use QPC() without all the extra work
-        OSVERSIONINFOEX ver;
-	    ZeroMemory(&ver, sizeof(OSVERSIONINFOEX));
-	    ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+        OSVERSIONINFOEXW ver;
+	    ZeroMemory(&ver, sizeof(OSVERSIONINFOEXW));
+	    ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
 	    ver.dwMajorVersion = 6; // Vista+
 
         DWORDLONG condMask = 0;
         VER_SET_CONDITION(condMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
 
 	    // VerifyVersionInfo returns true if the OS meets the conditions set above
-	    UsingVistaOrLater = VerifyVersionInfo(&ver, VER_MAJORVERSION, condMask) != 0;
+	    UsingVistaOrLater = ::VerifyVersionInfoW(&ver, VER_MAJORVERSION, condMask) != 0;
     #else
         UsingVistaOrLater = true;
     #endif
 
-	OVR_DEBUG_LOG(("PerformanceTimer UsingVistaOrLater = %d", (int)UsingVistaOrLater));
+    if (!UsingVistaOrLater)
+    {
+        #if defined(OVR_OS_WIN32) // Desktop Windows only
+            // The following has the effect of setting the NT timer resolution (NtSetTimerResolution) to 1 millisecond.
+            MMRESULT mmr = timeBeginPeriod(1);
+            OVR_ASSERT(TIMERR_NOERROR == mmr);
+            OVR_UNUSED(mmr);
+        #endif
 
-    #if defined(OVR_BUILD_DEBUG) && defined(OVR_OS_WIN32)
-        HMODULE hNtDll = LoadLibraryW(L"NtDll.dll");
-        if (hNtDll)
-        {
-            pNtQueryTimerResolution = (NtQueryTimerResolutionType)GetProcAddress(hNtDll, "NtQueryTimerResolution");
-          //pNtSetTimerResolution = (NtSetTimerResolutionType)GetProcAddress(hNtDll, "NtSetTimerResolution");
-
-            if(pNtQueryTimerResolution)
+        #if defined(OVR_BUILD_DEBUG) && defined(OVR_OS_WIN32)
+            HMODULE hNtDll = ::LoadLibraryW(L"NtDll.dll");
+            if (hNtDll)
             {
-                ULONG MinimumResolution; // in 100-ns units
-                ULONG MaximumResolution;
-                ULONG ActualResolution;
-                pNtQueryTimerResolution(&MinimumResolution, &MaximumResolution, &ActualResolution);
-	            OVR_DEBUG_LOG(("NtQueryTimerResolution = Min %ld us, Max %ld us, Current %ld us", MinimumResolution / 10, MaximumResolution / 10, ActualResolution / 10));
-            }
+                pNtQueryTimerResolution = (NtQueryTimerResolutionType)::GetProcAddress(hNtDll, "NtQueryTimerResolution");
+                //pNtSetTimerResolution = (NtSetTimerResolutionType)::GetProcAddress(hNtDll, "NtSetTimerResolution");
 
-            FreeLibrary(hNtDll);
-        }
-    #endif
+                if (pNtQueryTimerResolution)
+                {
+                    ULONG MinimumResolution; // in 100-ns units
+                    ULONG MaximumResolution;
+                    ULONG ActualResolution;
+                    pNtQueryTimerResolution(&MinimumResolution, &MaximumResolution, &ActualResolution);
+                    OVR_DEBUG_LOG(("NtQueryTimerResolution = Min %ld us, Max %ld us, Current %ld us", MinimumResolution / 10, MaximumResolution / 10, ActualResolution / 10));
+                }
+
+                ::FreeLibrary(hNtDll);
+            }
+        #endif
+    }
 }
 
 void PerformanceTimer::Shutdown()
 {
-    DeleteCriticalSection(&TimeCS);
+    ::DeleteCriticalSection(&TimeCS);
 
-    #if defined(OVR_OS_WIN32) // Desktop Windows only
-        MMRESULT mmr = timeEndPeriod(1);
-        OVR_ASSERT(TIMERR_NOERROR == mmr);
-        OVR_UNUSED(mmr);
-    #endif
+    if (!UsingVistaOrLater)
+    {
+        #if defined(OVR_OS_WIN32) // Desktop Windows only
+            MMRESULT mmr = timeEndPeriod(1);
+            OVR_ASSERT(TIMERR_NOERROR == mmr);
+            OVR_UNUSED(mmr);
+        #endif
+    }
 }
 
 
@@ -282,7 +285,7 @@ uint64_t PerformanceTimer::GetTimeSeconds()
 	if (UsingVistaOrLater)
 	{
         LARGE_INTEGER li;
-		QueryPerformanceCounter(&li);
+        ::QueryPerformanceCounter(&li);
         OVR_ASSERT(PerfFrequencyInverse != 0); // Initialize should have been called earlier.
         return (uint64_t)(li.QuadPart * PerfFrequencyInverse);
     }
@@ -296,7 +299,7 @@ double PerformanceTimer::GetTimeSecondsDouble()
 	if (UsingVistaOrLater)
 	{
         LARGE_INTEGER li;
-		QueryPerformanceCounter(&li);
+        ::QueryPerformanceCounter(&li);
         OVR_ASSERT(PerfFrequencyInverse != 0);
         return (li.QuadPart * PerfFrequencyInverse);
     }
@@ -313,70 +316,69 @@ uint64_t PerformanceTimer::GetTimeNanos()
     OVR_ASSERT(PerfFrequencyInverseNanos != 0); // Initialize should have been called earlier.
 
     if (UsingVistaOrLater) // Includes non-desktop platforms
-	{
-		// Then we can use QPC() directly without all that extra work
-		QueryPerformanceCounter(&li);
+    {
+        // Then we can use QPC() directly without all that extra work
+        ::QueryPerformanceCounter(&li);
         resultNanos = (uint64_t)(li.QuadPart * PerfFrequencyInverseNanos);
-	}
-	else
-	{
-        // On Win32 QueryPerformanceFrequency is unreliable due to SMP and
-        // performance levels, so use this logic to detect wrapping and track
-        // high bits.
-        ::EnterCriticalSection(&TimeCS);
+        return resultNanos;
+    }
 
-        // Get raw value and perf counter "At the same time".
-        QueryPerformanceCounter(&li);
+    // Pre-Vista computers:
+    // Note that the Oculus SDK does not run on PCs before Windows 7 SP1
+    // so this code path should never be taken in practice.  We keep it here
+    // since this is a nice reusable timing library that can be useful for
+    // other projects.
 
-        DWORD mmTimeMs = timeGetTime();
-        if (OldMMTimeMs > mmTimeMs)
-            MMTimeWrapCounter++;
-        OldMMTimeMs = mmTimeMs;
+    // On Win32 QueryPerformanceFrequency is unreliable due to SMP and
+    // performance levels, so use this logic to detect wrapping and track
+    // high bits.
+    ::EnterCriticalSection(&TimeCS);
 
-        // Normalize to nanoseconds.
-        uint64_t  perfCounterNanos   = (uint64_t)(li.QuadPart * PerfFrequencyInverseNanos);
-        uint64_t  mmCounterNanos     = ((uint64_t(MMTimeWrapCounter) << 32) | mmTimeMs) * 1000000;
-        if (PerfMinusTicksDeltaNanos == 0)
-            PerfMinusTicksDeltaNanos = perfCounterNanos - mmCounterNanos;
+    // Get raw value and perf counter "At the same time".
+    ::QueryPerformanceCounter(&li);
+
+    DWORD mmTimeMs = timeGetTime();
+    if (OldMMTimeMs > mmTimeMs)
+        MMTimeWrapCounter++;
+    OldMMTimeMs = mmTimeMs;
+
+    // Normalize to nanoseconds.
+    uint64_t  perfCounterNanos   = (uint64_t)(li.QuadPart * PerfFrequencyInverseNanos);
+    uint64_t  mmCounterNanos     = ((uint64_t(MMTimeWrapCounter) << 32) | mmTimeMs) * 1000000;
+    if (PerfMinusTicksDeltaNanos == 0)
+        PerfMinusTicksDeltaNanos = perfCounterNanos - mmCounterNanos;
  
-        // Compute result before snapping. 
-        //
-        // On first call, this evaluates to:
-        //          resultNanos = mmCounterNanos.    
-        // Next call, assuming no wrap:
-        //          resultNanos = prev_mmCounterNanos + (perfCounterNanos - prev_perfCounterNanos).        
-        // After wrap, this would be:
-        //          resultNanos = snapped(prev_mmCounterNanos +/- 1ms) + (perfCounterNanos - prev_perfCounterNanos).
-        //
-        resultNanos = perfCounterNanos - PerfMinusTicksDeltaNanos;    
+    // Compute result before snapping. 
+    //
+    // On first call, this evaluates to:
+    //          resultNanos = mmCounterNanos.    
+    // Next call, assuming no wrap:
+    //          resultNanos = prev_mmCounterNanos + (perfCounterNanos - prev_perfCounterNanos).        
+    // After wrap, this would be:
+    //          resultNanos = snapped(prev_mmCounterNanos +/- 1ms) + (perfCounterNanos - prev_perfCounterNanos).
+    //
+    resultNanos = perfCounterNanos - PerfMinusTicksDeltaNanos;    
 
-        // Snap the range so that resultNanos never moves further apart then its target resolution.
-        // It's better to allow more slack on the high side as timeGetTime() may be updated at sporadically 
-        // larger then 1 ms intervals even when 1 ms resolution is requested.
-        if (resultNanos > (mmCounterNanos + MMTimerResolutionNanos*2))
-        {
-            resultNanos = mmCounterNanos + MMTimerResolutionNanos*2;
-            if (resultNanos < LastResultNanos)
-                resultNanos = LastResultNanos;
-            PerfMinusTicksDeltaNanos = perfCounterNanos - resultNanos;
-        }
-        else if (resultNanos < (mmCounterNanos - MMTimerResolutionNanos))
-        {
-            resultNanos = mmCounterNanos - MMTimerResolutionNanos;
-            if (resultNanos < LastResultNanos)
-                resultNanos = LastResultNanos;
-            PerfMinusTicksDeltaNanos = perfCounterNanos - resultNanos;
-        }
+    // Snap the range so that resultNanos never moves further apart then its target resolution.
+    // It's better to allow more slack on the high side as timeGetTime() may be updated at sporadically 
+    // larger then 1 ms intervals even when 1 ms resolution is requested.
+    if (resultNanos > (mmCounterNanos + MMTimerResolutionNanos*2))
+    {
+        resultNanos = mmCounterNanos + MMTimerResolutionNanos*2;
+        if (resultNanos < LastResultNanos)
+            resultNanos = LastResultNanos;
+        PerfMinusTicksDeltaNanos = perfCounterNanos - resultNanos;
+    }
+    else if (resultNanos < (mmCounterNanos - MMTimerResolutionNanos))
+    {
+        resultNanos = mmCounterNanos - MMTimerResolutionNanos;
+        if (resultNanos < LastResultNanos)
+            resultNanos = LastResultNanos;
+        PerfMinusTicksDeltaNanos = perfCounterNanos - resultNanos;
+    }
 
-        LastResultNanos = resultNanos;
-        ::LeaveCriticalSection(&TimeCS);
-	}
-
-	//Tom's addition, to keep precision
-	//static uint64_t    initial_time = 0;
-	//if (!initial_time) initial_time = resultNanos;
-	//resultNanos -= initial_time;
-	// FIXME: This cannot be used for cross-process timestamps
+    LastResultNanos = resultNanos;
+    ::LeaveCriticalSection(&TimeCS);
 
     return resultNanos;
 }
@@ -388,20 +390,29 @@ uint64_t PerformanceTimer::GetTimeNanos()
 // Returns global high-resolution application timer in seconds.
 double Timer::GetSeconds()
 {
-	if(useFakeSeconds)
-		return FakeSeconds;
+    return Win32_PerfTimer.GetTimeSecondsDouble();
+}
+
+double Timer::GetVirtualSeconds()
+{
+    if (useVirtualSeconds)
+        return VirtualSeconds;
 
     return Win32_PerfTimer.GetTimeSecondsDouble();
 }
 
 
-
 // Delegate to PerformanceTimer.
+uint64_t Timer::GetVirtualTicksNanos()
+{
+    if (useVirtualSeconds)
+        return (uint64_t) (VirtualSeconds * NanosPerSecond);
+
+    return Win32_PerfTimer.GetTimeNanos();
+}
+
 uint64_t Timer::GetTicksNanos()
 {
-    if (useFakeSeconds)
-        return (uint64_t) (FakeSeconds * NanosPerSecond);
-
     return Win32_PerfTimer.GetTimeNanos();
 }
 
@@ -425,9 +436,21 @@ void Timer::shutdownTimerSystem()
 
 double Timer::GetSeconds()
 {
-    if(useFakeSeconds)
-        return FakeSeconds;
-    
+    if(useVirtualSeconds)
+        return VirtualSeconds;
+
+    using FpSeconds = std::chrono::duration<double, std::chrono::seconds::period>;
+
+    auto now = std::chrono::high_resolution_clock::now();
+    return FpSeconds(now.time_since_epoch()).count();
+}
+
+
+double Timer::GetVirtualSeconds()
+{
+    if(useVirtualSeconds)
+        return VirtualSeconds;
+
     using FpSeconds = std::chrono::duration<double, std::chrono::seconds::period>;
 
     auto now = std::chrono::high_resolution_clock::now();
@@ -437,8 +460,8 @@ double Timer::GetSeconds()
 
 uint64_t Timer::GetTicksNanos()
 {
-    if (useFakeSeconds)
-        return (uint64_t) (FakeSeconds * NanosPerSecond);
+    if (useVirtualSeconds)
+        return (uint64_t) (VirtualSeconds * NanosPerSecond);
     
     using Uint64Nanoseconds = std::chrono::duration<uint64_t, std::chrono::nanoseconds::period>;
 

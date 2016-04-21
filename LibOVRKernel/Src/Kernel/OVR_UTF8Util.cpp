@@ -7,16 +7,16 @@ Notes       :
 Notes       :   Much useful info at "UTF-8 and Unicode FAQ"
                 http://www.cl.cam.ac.uk/~mgk25/unicode.html
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,11 +26,109 @@ limitations under the License.
 
 ************************************************************************************/
 
+
 #include "OVR_UTF8Util.h"
+#include <wchar.h>
+#include <string.h>
+
+
+// sizeof(wchar_t) in preprocessor-accessible form.
+#ifndef OVR_WCHAR_SIZE
+    #if defined(__WCHAR_MAX__)
+        #if (__WCHAR_MAX__ == 127) || (__WCHAR_MAX__ == 255)
+            #define OVR_WCHAR_SIZE 1
+        #elif (__WCHAR_MAX__ == 32767) || (__WCHAR_MAX__ == 65535)
+            #define OVR_WCHAR_SIZE 2
+        #else
+            #define OVR_WCHAR_SIZE 4
+        #endif
+    #elif defined(OVR_OS_UNIX)
+        #define OVR_WCHAR_SIZE 4
+    #else
+        #define OVR_WCHAR_SIZE 2
+    #endif
+#endif
+
+
 
 namespace OVR { namespace UTF8Util {
 
-intptr_t OVR_STDCALL GetLength(const char* buf, intptr_t buflen)
+
+size_t Strlcpy(char* pDestUTF8, size_t destCharCount, const wchar_t* pSrcUCS, size_t sourceLength)
+{
+    if (sourceLength == (size_t)-1)
+        sourceLength = wcslen(pSrcUCS);
+
+    size_t destLength = 0;
+
+    size_t i;
+    for (i = 0; i < sourceLength; ++i)
+    {
+        char     buff[6]; // longest utf8 encoding just to be safe
+        intptr_t count = 0;
+
+        EncodeChar(buff, &count, pSrcUCS[i]);
+
+        // If this character occupies more than the remaining space (leaving room for the trailing '\0'), truncate here
+        if ((destLength + count) >= destCharCount)
+            break;
+
+        memcpy(pDestUTF8 + destLength, buff, count);
+        destLength += (size_t)count;
+    }
+
+    // Should be true for all cases other than destCharCount == 0.
+    if (destLength < destCharCount)
+        pDestUTF8[destLength] = '\0';
+
+    // Compute the required destination size for any remaining source characters
+    // Note a very long wchar string with lots of multibyte encodings can overflow destLength
+    // This should be okay since we'll just treat those cases (likely to be originating
+    // from an attacker) as shorter strings
+    while (i < sourceLength)
+        destLength += GetEncodeCharSize(pSrcUCS[i++]);
+
+    // Return the intended strlen of pDestUTF8.
+    return destLength;
+}
+
+
+size_t Strlcpy(wchar_t* pDestUCS, size_t destCharCount, const char* pSrcUTF8, size_t sourceLength)
+{
+    if (sourceLength == (size_t)-1)
+        sourceLength = strlen(pSrcUTF8);
+
+    size_t destLength = 0, requiredLength = 0;
+    
+    for (const char* pSrcUTF8End = (pSrcUTF8 + sourceLength); pSrcUTF8 < pSrcUTF8End; )
+    {
+        uint32_t c = DecodeNextChar_Advance0(&pSrcUTF8);
+        OVR_ASSERT_M(pSrcUTF8 <= (pSrcUTF8 + sourceLength), "Strlcpy sourceLength was not on a UTF8 boundary.");
+
+        #if (OVR_WCHAR_SIZE == 2)
+            if (c >= 0x0000FFFF)
+                c = 0x0000FFFD;
+        #endif
+
+        if ((destLength + 1) < destCharCount)  // If there is enough space to append a wchar_t (leaving room for a trailing '\0')...
+        {
+            pDestUCS[destLength] = wchar_t(c);
+            destLength++;
+        }
+
+        requiredLength++;
+    }
+
+    if (destLength < destCharCount)
+        pDestUCS[destLength] = L'\0';
+
+    return requiredLength; // Return the intended wcslen of pDestUCS.
+}
+
+
+
+
+intptr_t GetLength(const char* buf, intptr_t buflen)
 {
     const char* p = buf;
     intptr_t length = 0;
@@ -53,7 +151,7 @@ intptr_t OVR_STDCALL GetLength(const char* buf, intptr_t buflen)
     return length;
 }
 
-uint32_t OVR_STDCALL GetCharAt(intptr_t index, const char* putf8str, intptr_t length)
+uint32_t GetCharAt(intptr_t index, const char* putf8str, intptr_t length)
 {
     const char* buf = putf8str;
     uint32_t  c = 0;
@@ -87,34 +185,84 @@ uint32_t OVR_STDCALL GetCharAt(intptr_t index, const char* putf8str, intptr_t le
     return c;
 }
 
-intptr_t OVR_STDCALL GetByteIndex(intptr_t index, const char *putf8str, intptr_t length)
+intptr_t GetByteIndex(intptr_t index, const char *putf8str, intptr_t byteLength)
 {
     const char* buf = putf8str;
 
-    if (length != -1)
+    if (byteLength >= 0)
     {
-        while ((buf - putf8str) < length && index > 0)
+        const char* lastValid = putf8str;
+        while ((buf - putf8str) < byteLength && index > 0)
         {
+            lastValid = buf;
+            // XXX this may read up to 5 bytes past byteLength
             UTF8Util::DecodeNextChar_Advance0(&buf);
             index--;
         }
 
-        return buf-putf8str;
+        // check for UTF8 characters which ran past the end of the buffer
+        if (buf - putf8str > byteLength)
+            return lastValid - putf8str;
+
+        return buf - putf8str;
     }
 
     while (index > 0) 
     {
-        uint32_t c = UTF8Util::DecodeNextChar_Advance0(&buf);
+        uint32_t c = UTF8Util::DecodeNextChar(&buf);
         index--;
 
+        // okay to index past null-terminator, DecodeNextChar will not advance past it
         if (c == 0)
-            return buf-putf8str;
-    };
+            break;
+    }
 
-    return buf-putf8str;
+    return buf - putf8str;
 }
 
-int OVR_STDCALL GetEncodeCharSize(uint32_t ucs_character)
+intptr_t GetByteIndexChecked(intptr_t index, const char *putf8str, intptr_t byteLength)
+{
+    const char* buf = putf8str;
+
+    // before start of string?
+    if (index < 0)
+        return -1;
+
+    if (byteLength >= 0)
+    {
+        while ((buf - putf8str) < byteLength && index > 0)
+        {
+            // XXX this may read up to 5 bytes past byteLength
+            UTF8Util::DecodeNextChar_Advance0(&buf);
+            index--;
+        }
+
+        // check for UTF8 characters which ran past the end of the buffer
+        if ((buf - putf8str) > byteLength)
+            return -1;
+    }
+    else
+    {
+        while (index > 0) 
+        {
+            uint32_t c = UTF8Util::DecodeNextChar_Advance0(&buf);
+            index--;
+
+            // ran past null terminator
+            if (c == 0)
+                return -1;
+        }
+    }
+
+    // ran off end of string
+    if (index != 0)
+        return -1;
+
+    // at the valid index'th character-boundary offset in the string
+    return buf - putf8str;
+}
+
+int GetEncodeCharSize(uint32_t ucs_character)
 {
     if (ucs_character <= 0x7F)
         return 1;
@@ -132,7 +280,7 @@ int OVR_STDCALL GetEncodeCharSize(uint32_t ucs_character)
         return 0;
 }
 
-uint32_t OVR_STDCALL DecodeNextChar_Advance0(const char** putf8Buffer)
+uint32_t DecodeNextChar_Advance0(const char** putf8Buffer)
 {
     uint32_t  uc;
     char    c;
@@ -236,7 +384,7 @@ uint32_t OVR_STDCALL DecodeNextChar_Advance0(const char** putf8Buffer)
 }
 
 
-void OVR_STDCALL EncodeChar(char* pbuffer, intptr_t* pindex, uint32_t ucs_character)
+void EncodeChar(char* pbuffer, intptr_t* pindex, uint32_t ucs_character)
 {
     if (ucs_character <= 0x7F)
     {
@@ -288,269 +436,6 @@ void OVR_STDCALL EncodeChar(char* pbuffer, intptr_t* pindex, uint32_t ucs_charac
         // Invalid char; don't encode anything.
     }
 }
-
-intptr_t OVR_STDCALL GetEncodeStringSize(const wchar_t* pchar, intptr_t length)
-{
-    intptr_t len = 0;
-    if (length != -1)
-        for (int i = 0; i < length; i++)
-        {
-            len += GetEncodeCharSize(pchar[i]);
-        }
-    else
-        for (int i = 0;; i++)
-        {
-            if (pchar[i] == 0)
-                return len;
-            len += GetEncodeCharSize(pchar[i]);
-        }
-    return len;
-}
-
-void OVR_STDCALL EncodeString(char *pbuff, const wchar_t* pchar, intptr_t length)
-{
-    intptr_t ofs = 0;
-    if (length != -1)
-    {
-        for (int i = 0; i < length; i++)
-        {            
-            EncodeChar(pbuff, &ofs, pchar[i]);
-        }
-    }
-    else
-    {
-        for (int i = 0;; i++)
-        {
-            if (pchar[i] == 0)
-                break;
-            EncodeChar(pbuff, &ofs, pchar[i]);
-        }
-    }
-    pbuff[ofs] = 0;
-}
-
-size_t OVR_STDCALL DecodeString(wchar_t *pbuff, const char* putf8str, intptr_t bytesLen)
-{
-    wchar_t *pbegin = pbuff;
-    if (bytesLen == -1)
-    {
-        while (1)
-        {
-            uint32_t ch = DecodeNextChar_Advance0(&putf8str);
-            if (ch == 0)
-                break;
-            else if (ch >= 0xFFFF)
-                ch = 0xFFFD;
-            *pbuff++ = wchar_t(ch);
-        }
-    }
-    else
-    {
-        const char* p = putf8str;
-        while ((p - putf8str) < bytesLen)
-        {
-            uint32_t ch = DecodeNextChar_Advance0(&p);
-            if (ch >= 0xFFFF)
-                ch = 0xFFFD;
-            *pbuff++ = wchar_t(ch);
-        }
-    }
-
-    *pbuff = 0;
-    return pbuff - pbegin;
-}
-
-
-#ifdef UTF8_UNIT_TEST
-
-// Compile this test case with something like:
-//
-// gcc utf8.cpp -g -I.. -DUTF8_UNIT_TEST -lstdc++ -o utf8_test
-//
-//    or
-//
-// cl utf8.cpp -Zi -Od -DUTF8_UNIT_TEST -I..
-//
-// If possible, try running the test program with the first arg
-// pointing at the file:
-//
-// http://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt
-// 
-// and examine the results by eye to make sure they are acceptable to
-// you.
-
-
-#include "base/utility.h"
-#include <stdio.h>
-
-
-bool    check_equal(const char* utf8_in, const uint32_t* ucs_in)
-{
-    for (;;)
-    {
-        uint32_t  next_ucs = *ucs_in++;
-        uint32_t  next_ucs_from_utf8 = utf8::decode_next_unicode_character(&utf8_in);
-        if (next_ucs != next_ucs_from_utf8)
-        {
-            return false;
-        }
-        if (next_ucs == 0)
-        {
-            OVR_ASSERT(next_ucs_from_utf8 == 0);
-            break;
-        }
-    }
-    
-    return true;
-}
-
-
-void    log_ascii(const char* line)
-{
-    for (;;)
-    {
-        unsigned char   c = (unsigned char) *line++;
-        if (c == 0)
-        {
-            // End of line.
-            return;
-        }
-        else if (c != '\n'
-            && (c < 32 || c > 127))
-        {
-            // Non-printable as plain ASCII.
-            printf("<0x%02X>", (int) c);
-        }
-        else
-        {
-            printf("%c", c);
-        }
-    }
-}
-
-
-void    log_ucs(const uint32_t* line)
-{
-    for (;;)
-    {
-        uint32_t  uc = *line++;
-        if (uc == 0)
-        {
-            // End of line.
-            return;
-        }
-        else if (uc != '\n'
-            && (uc < 32 || uc > 127))
-        {
-            // Non-printable as plain ASCII.
-            printf("<U-%04X>", uc);
-        }
-        else
-        {
-            printf("%c", (char) uc);
-        }
-    }
-}
-
-
-// Simple canned test.
-int main(int argc, const char* argv[])
-{
-    {
-        const char* test8 = "Ignacio Castaño";
-        const uint32_t  test32[] =
-        {
-            0x49, 0x67, 0x6E, 0x61, 0x63,
-                0x69, 0x6F, 0x20, 0x43, 0x61,
-                0x73, 0x74, 0x61, 0xF1, 0x6F,
-                0x00
-        };
-        
-        OVR_ASSERT(check_equal(test8, test32));
-    }
-        
-        // If user passed an arg, try reading the file as UTF-8 encoded text.
-        if (argc > 1)
-        {
-            const char* filename = argv[1];
-            FILE*   fp = fopen(filename, "rb");
-            if (fp == NULL)
-            {
-                printf("Can't open file '%s'\n", filename);
-                return 1;
-            }
-            
-            // Read lines from the file, encode/decode them, and highlight discrepancies.
-            const int LINE_SIZE = 200;  // max line size
-            char    line_buffer_utf8[LINE_SIZE];
-            char    reencoded_utf8[6 * LINE_SIZE];
-            uint32_t  line_buffer_ucs[LINE_SIZE];
-            
-            int byte_counter = 0;
-            for (;;)
-            {
-                int c = fgetc(fp);
-                if (c == EOF)
-                {
-                    // Done.
-                    break;
-                }
-                line_buffer_utf8[byte_counter++] = c;
-                if (c == '\n' || byte_counter >= LINE_SIZE - 2)
-                {
-                    // End of line.  Process the line.
-                    line_buffer_utf8[byte_counter++] = 0;   // terminate.
-                    
-                    // Decode into UCS.
-                    const char* p = line_buffer_utf8;
-                    uint32_t* q = line_buffer_ucs;
-                    for (;;)
-                    {
-                        uint32_t  uc = UTF8Util::DecodeNextChar(&p);
-                        *q++ = uc;
-                        
-                        OVR_ASSERT(q < line_buffer_ucs + LINE_SIZE);
-                        OVR_ASSERT(p < line_buffer_utf8 + LINE_SIZE);
-                        
-                        if (uc == 0) break;
-                    }
-                    
-                    // Encode back into UTF-8.
-                    q = line_buffer_ucs;
-                    int index = 0;
-                    for (;;)
-                    {
-                        uint32_t  uc = *q++;
-                        OVR_ASSERT(index < LINE_SIZE * 6 - 6);
-                        int last_index = index;
-                        UTF8Util::EncodeChar(reencoded_utf8, &index, uc);
-                        OVR_ASSERT(index <= last_index + 6);
-                        if (uc == 0) break;
-                    }
-                    
-                    // This can be useful for debugging.
-#if 0
-                    // Show the UCS and the re-encoded UTF-8.
-                    log_ucs(line_buffer_ucs);
-                    log_ascii(reencoded_utf8);
-#endif // 0
-                    
-                    OVR_ASSERT(check_equal(line_buffer_utf8, line_buffer_ucs));
-                    OVR_ASSERT(check_equal(reencoded_utf8, line_buffer_ucs));
-                    
-                    // Start next line.
-                    byte_counter = 0;
-                }
-            }
-            
-            fclose(fp);
-        }
-        
-        return 0;
-}
-
-
-#endif // UTF8_UNIT_TEST
 
 }} // namespace UTF8Util::OVR
 

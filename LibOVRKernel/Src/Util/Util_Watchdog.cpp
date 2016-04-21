@@ -5,16 +5,16 @@ Content     :   Deadlock reaction
 Created     :   June 27, 2013
 Authors     :   Kevin Jenkins, Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,8 +25,8 @@ limitations under the License.
 *************************************************************************************/
 
 #include "Util_Watchdog.h"
-#include <Kernel/OVR_DebugHelp.h>
-#include <Kernel/OVR_Win32_IncludeWindows.h>
+#include "Kernel/OVR_DebugHelp.h"
+#include "Kernel/OVR_Win32_IncludeWindows.h"
 
 #if defined(OVR_OS_LINUX) || defined(OVR_OS_MAC)
     #include <unistd.h>
@@ -43,6 +43,7 @@ OVR_DEFINE_SINGLETON(OVR::Util::WatchDogObserver);
 namespace OVR { namespace Util {
 
 const int DefaultThreshhold = 60000; // milliseconds
+
 
 //-----------------------------------------------------------------------------
 // Tools
@@ -73,7 +74,8 @@ void WatchDogObserver::SetExitingOnDeadlock(bool enabled)
 }
 
 WatchDogObserver::WatchDogObserver() :
-    IsReporting(false)
+    IsReporting(false),
+    Logger("Watchdog")
 {
     Start();
 
@@ -129,7 +131,8 @@ int WatchDogObserver::Run()
                 // Print a stack trace of all threads if there's no debugger present.
                 const bool debuggerPresent = OVRIsDebuggerPresent();
 
-                LogError("{ERR-027} [WatchDogObserver] Deadlock detected: %s", dog->ThreadName.ToCStr());
+                Logger.LogErrorF("Long cycle (possibly deadlock) detected: %s", dog->ThreadName.ToCStr());
+
                 if (!debuggerPresent) // We don't print threads if a debugger is present because otherwise every time the developer paused the app to debug, it would spit out a long thread trace upon resuming.
                 {
                     if (SymbolLookup::Initialize())
@@ -141,7 +144,7 @@ int WatchDogObserver::Run()
                         String threadListOutput, moduleListOutput;
                         symbolLookup.ReportThreadCallstacks(threadListOutput);
                         symbolLookup.ReportModuleInformation(moduleListOutput);
-                        LogText("---DEADLOCK STATE---\n\n%s\n\n%s\n---END OF DEADLOCK STATE---\n", threadListOutput.ToCStr(), moduleListOutput.ToCStr());
+                        Logger.LogErrorF("---LONG CYCLE STATE---\n\n%s\n\n%s\n---END OF LONG CYCLE STATE---", threadListOutput.ToCStr(), moduleListOutput.ToCStr());
                     }
 
                     if (IsReporting)
@@ -155,7 +158,7 @@ int WatchDogObserver::Run()
 
                 if (IsExitingOnDeadlock())
                 {
-                    OVR_ASSERT_M(false, "Watchdog detected a deadlock. Exiting the process."); // This won't have an effect unless asserts are enabled in release builds.
+                    OVR_ASSERT_M(false, "Watchdog detected a long cycle (possibly deadlock). Exiting the process."); // This won't have an effect unless asserts are enabled in release builds.
                     OVR::ExitProcess(-1);
                 }
             }

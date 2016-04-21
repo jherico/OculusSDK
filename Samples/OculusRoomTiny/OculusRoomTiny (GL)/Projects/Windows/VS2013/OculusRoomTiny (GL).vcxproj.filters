@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\main.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.cpp">
+      <Filter>GLE</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\OculusRoomTiny_Advanced\Common\Win32_GLAppUtil.h" />
+    <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE.h">
+      <Filter>GLE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\..\..\LibOVRKernel\Src\GL\CAPI_GLE_GL.h">
+      <Filter>GLE</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="GLE">
+      <UniqueIdentifier>{350d0df2-6c96-486d-82d9-786aa05d811b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -5,16 +5,16 @@ Content     :   Shared code for Direct3D
 Created     :   Oct 14, 2014
 Authors     :   Chris Taylor
 
-Copyright   :   Copyright 2014 Oculus VR, LLC All Rights reserved.
+Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
 
-Licensed under the Oculus VR Rift SDK License Version 3.2 (the "License"); 
+Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
 you may not use the Oculus VR Rift SDK except in compliance with the License, 
 which is provided at the time of installation or download, or which 
 otherwise accompanies this software in either electronic or hard copy form.
 
 You may obtain a copy of the License at
 
-http://www.oculusvr.com/licenses/LICENSE-3.2 
+http://www.oculusvr.com/licenses/LICENSE-3.3 
 
 Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,9 +30,6 @@ limitations under the License.
 // Include Windows correctly first before implicitly including it below
 #include "Kernel/OVR_Win32_IncludeWindows.h"
 #include "Kernel/OVR_String.h"
-
-// DirectX 9 Ex
-#include <d3d9.h>
 
 // Direct3D 11
 #include <D3D11Shader.h>
@@ -57,9 +54,6 @@ limitations under the License.
 namespace OVR { namespace D3DUtil {
 
 
-// Check if D3D9Ex support exists in the environment
-bool CheckD3D9Ex();
-
 String GetWindowsErrorString(HRESULT hr);
 
 
@@ -75,26 +69,87 @@ bool VerifyHRESULT(const char* file, int line, HRESULT hr);
 
 #define OVR_D3D_CHECK(hr) OVR::D3DUtil::VerifyHRESULT(__FILE__, __LINE__, hr)
 
-// Returns provided value on failure
-#define OVR_D3D_CHECK_RET_VAL(hr, failureValue) \
-    { \
-        if (!OVR_D3D_CHECK(hr)) \
-        { \
-            return failureValue; \
-        } \
+// Internal implementation of the OVR_D3D_CHECK_RET family of functions.
+#define OVR_D3D_CHECK_RET_IMPL(hr, returnExpression) \
+    {                                                \
+        if (!OVR_D3D_CHECK(hr))                      \
+        {                                            \
+            returnExpression                         \
+        }                                            \
     }
 
+// Returns provided value on failure.
+// Example usage:
+//     size_t Func() {
+//         . . .
+//         HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice.GetRawRef());
+//         OVR_D3D_CHECK_RET_VAL(hr, 0);
+//         . . .
+//     }
+#define OVR_D3D_CHECK_RET_VAL(hr, failureValue) OVR_D3D_CHECK_RET_IMPL(hr, return failureValue;)
+
 // Returns void on failure
-#define OVR_D3D_CHECK_RET(hr)       OVR_D3D_CHECK_RET_VAL(hr, ;)
+// Example usage:
+//     void Func() {
+//         . . .
+//         HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice.GetRawRef());
+//         OVR_D3D_CHECK_RET(hr);
+//         . . .
+//     }
+#define OVR_D3D_CHECK_RET(hr) OVR_D3D_CHECK_RET_IMPL(hr, return;)
 
 // Returns false on failure
-#define OVR_D3D_CHECK_RET_FALSE(hr) OVR_D3D_CHECK_RET_VAL(hr, false)
+// Example usage:
+//     bool Func() {
+//         . . .
+//         HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice.GetRawRef());
+//         OVR_D3D_CHECK_RET_FALSE(hr);
+//         . . .
+//     }
+#define OVR_D3D_CHECK_RET_FALSE(hr) OVR_D3D_CHECK_RET_IMPL(hr, return false;)
 
 // Returns nullptr on failure
-#define OVR_D3D_CHECK_RET_NULL(hr)  OVR_D3D_CHECK_RET_VAL(hr, nullptr)
+// Example usage:
+//     void* Func() {
+//         . . .
+//         HRESULT hr = Device->QueryInterface(__uuidof(IDXGIDevice), (void **)&pDXGIDevice.GetRawRef());
+//         OVR_D3D_CHECK_RET_NULL(hr);
+//         . . .
+//     }
+#define OVR_D3D_CHECK_RET_NULL(hr) OVR_D3D_CHECK_RET_IMPL(hr, return nullptr;)
 
 // If the result is a failure, it will write the exact compile error to the error log
 void LogD3DCompileError(HRESULT hr, ID3DBlob* errorBlob);
+
+
+#if defined(OVR_BUILD_DEBUG)
+
+    // Enable this to track down double-tagging object warnings from D3D.
+    #define OVR_D3D_TRACK_DOUBLE_TAGGING
+
+    #if defined(OVR_D3D_TRACK_DOUBLE_TAGGING)
+        #define OVR_D3D_CHECK_REUSE(child) \
+                char tagReuseBuffer[1024]; \
+                UINT reuseSize = (UINT)sizeof(tagReuseBuffer); \
+                OVR_ASSERT(FAILED(child->GetPrivateData(WKPDID_D3DDebugObjectName, &reuseSize, tagReuseBuffer)));
+    #else
+        #define OVR_D3D_CHECK_REUSE(child) (void(0))
+    #endif
+
+    #define OVR_D3D_TAG_OBJECT(child) \
+        if (child) { \
+            OVR_D3D_CHECK_REUSE(child); \
+            const char* tagName = OVR_STRINGIZE(child) " " __FILE__ "(" OVR_STRINGIZE(__LINE__) ")"; \
+            UINT tagDataSize = (UINT)strlen(tagName); \
+            HRESULT tagHR = child->SetPrivateData(WKPDID_D3DDebugObjectName, tagDataSize, tagName); \
+            OVR_D3D_CHECK(tagHR); \
+        }
+
+#else // !Debug:
+
+    #define OVR_D3D_TAG_OBJECT(child) (void(0))
+
+#endif // !Debug
 
 
 }} // namespace OVR::D3DUtil
