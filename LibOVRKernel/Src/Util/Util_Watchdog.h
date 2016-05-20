@@ -82,32 +82,47 @@ public:
     // Disables deadlock reports
     void DisableReporting();
 
+    // This is the delay between deciding a deadlock occurred and terminating the process, to allow for logging
+    static const int TerminationDelayMsec = 10000; // 10 seconds in msec
+
+    // Enable/disable auto-terminate on deadlock report
+    // IsDeadlocked() will return true, and after TerminationDelayMsec it will exit the process
+    void SetAutoTerminateOnDeadlock(bool enable = true)
+    {
+        AutoTerminateOnDeadlock = enable;
+    }
+
+    // Is currently in a deadlock state?
+    bool IsDeadlocked() const
+    {
+        return DeadlockSeen;
+    }
+
 protected:
     Lock ListLock;
     Array< WatchDog* > DogList;
 
-    static const int WakeupInterval = 1000; // milliseconds between checks
+    // This indicates that EnableReporting() was requested
+    bool IsReporting = false;
+
     Event TerminationEvent;
 
-    // Used in deadlock reporting.
-    bool IsReporting;
+    // Has a deadlock been seen?
+    bool DeadlockSeen = false;
+    bool AutoTerminateOnDeadlock = true;
 
     // On Windows, deadlock logs are stored in %AppData%\OrganizationName\ApplicationName\.
     // See ExceptionHandler::ReportDeadlock() for how these are used.
     String ApplicationName;
     String OrganizationName;
 
-    ovrlog::Channel Logger;
+    void OnDeadlock(const String& deadlockedThreadName);
 
 protected:
     virtual int Run();
 
     void Add(WatchDog* dog);
     void Remove(WatchDog* dog);
-
-public:
-    static bool IsExitingOnDeadlock();
-    static void SetExitingOnDeadlock(bool enabled);
 };
 
 

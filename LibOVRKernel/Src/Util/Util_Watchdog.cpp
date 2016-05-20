@@ -42,7 +42,8 @@ OVR_DEFINE_SINGLETON(OVR::Util::WatchDogObserver);
 
 namespace OVR { namespace Util {
 
-const int DefaultThreshhold = 60000; // milliseconds
+// Watchdog class default threshold before announcing a long cycle
+const int DefaultThreshholdMsec = 60000; // milliseconds
 
 
 //-----------------------------------------------------------------------------
@@ -61,21 +62,17 @@ static uint32_t GetFastMsTime()
 //-----------------------------------------------------------------------------
 // WatchDogObserver
 
-static bool ExitingOnDeadlock = false;
-
-bool WatchDogObserver::IsExitingOnDeadlock()
-{
-    return ExitingOnDeadlock;
-}
-
-void WatchDogObserver::SetExitingOnDeadlock(bool enabled)
-{
-    ExitingOnDeadlock = enabled;
-}
+static ovrlog::Channel Logger("Watchdog");
 
 WatchDogObserver::WatchDogObserver() :
+    ListLock(),
+    DogList(),
     IsReporting(false),
-    Logger("Watchdog")
+    TerminationEvent(),
+    DeadlockSeen(false),
+    AutoTerminateOnDeadlock(true),
+    ApplicationName(),
+    OrganizationName()
 {
     Start();
 
@@ -100,72 +97,116 @@ void WatchDogObserver::OnSystemDestroy()
     Release();
 }
 
+void WatchDogObserver::OnDeadlock(const String& deadlockedThreadName)
+{
+    // If is reporting deadlock details:
+    if (IsReporting)
+    {
+        if (SymbolLookup::Initialize())
+        {
+            // Static to avoid putting 32 KB on the stack.  This is only called once, so it's safe.
+            static SymbolLookup symbolLookup;
+            String threadListOutput, moduleListOutput;
+            symbolLookup.ReportThreadCallstacks(threadListOutput);
+            symbolLookup.ReportModuleInformation(moduleListOutput);
+
+            Logger.LogWarning("---DEADLOCK STATE---\n\n", threadListOutput.ToCStr(), "\n\n",
+                moduleListOutput.ToCStr(), "\n---END OF DEADLOCK STATE---");
+        }
+
+        ExceptionHandler::ReportDeadlock(deadlockedThreadName, OrganizationName, ApplicationName);
+    }
+
+    // Disable reporting after the first deadlock report.
+    DeadlockSeen = true;
+
+    Logger.LogError("Deadlock detected in thread '", deadlockedThreadName.ToCStr(), "'");
+
+    if (AutoTerminateOnDeadlock)
+    {
+        Logger.LogError("Waiting ", TerminationDelayMsec, " msec until deadlock termination");
+
+        if (!TerminationEvent.Wait(TerminationDelayMsec))
+        {
+            ::TerminateProcess(GetCurrentProcess(), 0xd00ddead);
+        }
+
+        Logger.LogError("Deadlock termination aborted - Graceful shutdown");
+    }
+}
+
 int WatchDogObserver::Run()
 {
-    OVR_DEBUG_LOG(("[WatchDogObserver] Starting"));
-
     SetThreadName("WatchDog");
 
-    while (!TerminationEvent.Wait(WakeupInterval))
+    Logger.LogDebug("Starting watchdog thread");
+
+    // Milliseconds between checks
+    static const int kWakeupIntervalMsec = 4000; // 4 seconds
+
+    // Number of consecutive long cycles before the watchdog dumps a minidump
+    static const int kLongCycleTimeLimitMsec = 60000; // 1 minute
+    static const int kMaxConsecutiveLongCycles = kLongCycleTimeLimitMsec / kWakeupIntervalMsec;
+
+    // By counting consecutive long cycles instead of using a timeout, we prevent false positives
+    // from debugger breakpoints and sleep/resume of the OS.
+    int ConsecutiveLongCycles = 0; // Number of long cycles seen in a row
+
+    // While not requested to terminate:
+    while (!TerminationEvent.Wait(kWakeupIntervalMsec))
     {
-        Lock::Locker locker(&ListLock);
+        bool sawLongCycle = false;
+        String deadlockedThreadName;
 
-        const uint32_t t1 = GetFastMsTime();
-
-        const int count = DogList.GetSizeI();
-        for (int i = 0; i < count; ++i)
         {
-            WatchDog* dog = DogList[i];
+            Lock::Locker locker(&ListLock);
 
-            const int threshold = dog->ThreshholdMilliseconds;
-            const uint32_t t0 = dog->WhenLastFedMilliseconds;
+            const uint32_t t1 = GetFastMsTime();
 
-            // If threshold exceeded, assume there is thread deadlock of some sort.
-            int delta = (int)(t1 - t0);
-            if (delta > threshold)
+            const int count = DogList.GetSizeI();
+            for (int i = 0; i < count; ++i)
             {
-                // Expected behavior:
-                // SingleProcessDebug, SingleProcessRelease, Debug: This is only ever done for internal testing, so we don't want it to trigger the deadlock termination.
-                // Release: This is our release configuration where we want it to terminate itself.
+                WatchDog* dog = DogList[i];
 
-                // Print a stack trace of all threads if there's no debugger present.
-                const bool debuggerPresent = OVRIsDebuggerPresent();
+                const int threshold = dog->ThreshholdMilliseconds;
+                const uint32_t t0 = dog->WhenLastFedMilliseconds;
 
-                Logger.LogErrorF("Long cycle (possibly deadlock) detected: %s", dog->ThreadName.ToCStr());
+                // If threshold exceeded, assume there is thread deadlock of some sort.
+                int delta = static_cast<int>(t1 - t0);
 
-                if (!debuggerPresent) // We don't print threads if a debugger is present because otherwise every time the developer paused the app to debug, it would spit out a long thread trace upon resuming.
+                // Include an upper bound in case the computer went to sleep
+                if (delta > threshold && delta < threshold * 3)
                 {
-                    if (SymbolLookup::Initialize())
-                    {
-                        // symbolLookup is static here to avoid putting 32 KB on the stack
-                        // and potentially overflowing the stack.  This function is only ever
-                        // run by one thread so it should be safe.
-                        static SymbolLookup symbolLookup;
-                        String threadListOutput, moduleListOutput;
-                        symbolLookup.ReportThreadCallstacks(threadListOutput);
-                        symbolLookup.ReportModuleInformation(moduleListOutput);
-                        Logger.LogErrorF("---LONG CYCLE STATE---\n\n%s\n\n%s\n---END OF LONG CYCLE STATE---", threadListOutput.ToCStr(), moduleListOutput.ToCStr());
-                    }
+                    sawLongCycle = true;
 
-                    if (IsReporting)
-                    {
-                        ExceptionHandler::ReportDeadlock(DogList[i]->ThreadName, OrganizationName , ApplicationName);
-
-                        // Disable reporting after the first deadlock report.
-                        IsReporting = false;
-                    }
-                }
-
-                if (IsExitingOnDeadlock())
-                {
-                    OVR_ASSERT_M(false, "Watchdog detected a long cycle (possibly deadlock). Exiting the process."); // This won't have an effect unless asserts are enabled in release builds.
-                    OVR::ExitProcess(-1);
+                    deadlockedThreadName = dog->ThreadName;
+                    Logger.LogWarning("Long cycle detected ", ConsecutiveLongCycles + 1, "x (max=", kMaxConsecutiveLongCycles, ") in thread '", deadlockedThreadName, "'");
                 }
             }
         }
+
+        // If we did not see a long cycle:
+        if (!sawLongCycle)
+        {
+            if (ConsecutiveLongCycles > 0)
+            {
+                // Reset log cycle count
+                ConsecutiveLongCycles = 0;
+
+                Logger.LogWarning("Recovered from long cycles");
+            }
+
+            // Reset deadlock seen flag
+            DeadlockSeen = false;
+        }
+        else if (++ConsecutiveLongCycles >= kMaxConsecutiveLongCycles)
+        {
+            // Since it requires consecutive long cycles, waking up from sleep/resume will not trigger a deadlock.
+            OnDeadlock(deadlockedThreadName);
+        }
     }
 
-    OVR_DEBUG_LOG(("[WatchDogObserver] Good night"));
+    Logger.LogDebug("Terminating watchdog thread");
 
     return 0;
 }
@@ -216,7 +257,7 @@ void WatchDogObserver::DisableReporting()
 // WatchDog
 
 WatchDog::WatchDog(const String& threadName) :
-    ThreshholdMilliseconds(DefaultThreshhold),
+    ThreshholdMilliseconds(DefaultThreshholdMsec),
     ThreadName(threadName),
     Listed(false)
 {

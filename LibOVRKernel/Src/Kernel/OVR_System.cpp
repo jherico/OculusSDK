@@ -29,6 +29,7 @@ limitations under the License.
 #include "OVR_Threads.h"
 #include "OVR_Timer.h"
 #include "OVR_DebugHelp.h"
+#include "OVR_Log.h"
 #include <new>
 
 #if defined(_MSC_VER)
@@ -45,6 +46,7 @@ limitations under the License.
 
 namespace OVR {
 
+ovrlog::Channel SystemLog("System");
 
 
 //-----------------------------------------------------------------------------
@@ -131,8 +133,6 @@ void System::Init()
 
     if (++System_Init_Count == 1)
     {
-        ovrlog::OutputWorker::GetInstance()->Start();
-
         Timer::initializeTimerSystem();
     }
     else
@@ -149,17 +149,23 @@ void System::Destroy()
 
     if (--System_Init_Count == 0)
     {
+        SystemLog.LogInfo("Graceful shutdown: OnThreadDestroy");
+
         // Invoke all of the post-finish callbacks (normal case)
         for (SystemSingletonInternal *listener = SystemShutdownListenerList; listener; listener = listener->NextShutdownSingleton)
         {
             listener->OnThreadDestroy();
         }
 
+        SystemLog.LogInfo("Graceful shutdown: FinishAllThreads");
+
         #ifdef OVR_ENABLE_THREADS
             // Wait for all threads to finish; this must be done so that memory
             // allocator and all destructors finalize correctly.
             Thread::FinishAllThreads();
         #endif
+
+        SystemLog.LogInfo("Graceful shutdown: OnSystemDestroy");
 
         // Invoke all of the post-finish callbacks (normal case)
         for (SystemSingletonInternal* next, *listener = SystemShutdownListenerList; listener; listener = next)
@@ -172,17 +178,20 @@ void System::Destroy()
         SystemShutdownListenerList = nullptr;
 
         Timer::shutdownTimerSystem();
-
-        ovrlog::OutputWorker::GetInstance()->Stop();
     }
     else
     {
-        OVR_DEBUG_LOG(("[System] Destroy recursively called; depth = %d", System_Init_Count));
+        SystemLog.LogDebug("Destroy recursively called; depth = ", System_Init_Count);
     }
 
     GetSSILock().DoLock();
     ShuttingDown = false;
     GetSSILock().Unlock();
+
+    SystemLog.LogInfo("Graceful shutdown: Stopping logger");
+
+    // Prevent memory leak reports
+    ovrlog::ShutdownLogging();
 }
 
 // Returns 'true' if system was properly initialized.
@@ -197,12 +206,9 @@ void System::CheckForAllocatorLeaks()
     if (Allocator::IsTrackingLeaks())
     {
         int ovrLeakCount = Allocator::DumpMemory();
+        (void)ovrLeakCount;
 
         OVR_ASSERT(ovrLeakCount == 0);
-        if (ovrLeakCount == 0)
-        {
-            OVR_DEBUG_LOG(("[System] No OVR object leaks detected."));
-        }
     }
 }
 

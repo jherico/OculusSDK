@@ -38,7 +38,7 @@ public:
     ~GamepadManager();
 
     virtual uint32_t  GetGamepadCount();
-    virtual bool    GetGamepadState(uint32_t index, GamepadState* pState);
+    virtual bool    GetGamepadState(GamepadState* pState);
 
 private:
     // Dynamically ink to XInput to simplify projects.

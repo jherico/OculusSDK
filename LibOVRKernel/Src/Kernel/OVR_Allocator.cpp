@@ -25,8 +25,10 @@ limitations under the License.
 ************************************************************************************/
 
 #include "OVR_Allocator.h"
+#ifndef MICRO_OVR
 #include "OVR_DebugHelp.h"
 #include "Kernel/OVR_Std.h"
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <exception>
@@ -62,6 +64,11 @@ limitations under the License.
     #include <unistd.h>
     #include <sys/mman.h>
     #include <execinfo.h>
+
+#    if defined(__APPLE__)
+#        include <malloc/malloc.h> // malloc_size()
+#    endif
+
 #endif
 
 // This will cause an assertion to trip whenever an allocation occurs outside of our
@@ -159,6 +166,7 @@ namespace OVR {
 
 bad_alloc::bad_alloc(const char* description) OVR_NOEXCEPT
 {
+#ifndef MICRO_OVR
     if(description)
         OVR_strlcpy(Description, description, sizeof(Description));
     else
@@ -186,6 +194,7 @@ bad_alloc::bad_alloc(const char* description) OVR_NOEXCEPT
     }
 
     OVR_strlcat(Description, addressDescription, sizeof(Description));
+#endif
 }
 
 
@@ -400,7 +409,9 @@ void Allocator::SetLeakTracking(bool enabled)
 
     if (enabled)
     {
+#ifndef MICRO_OVR
         SymbolLookup::Initialize();
+#endif
     }
 
     IsLeakTracking = enabled;
@@ -451,10 +462,13 @@ static uint32_t PointerHash(const void* p)
 #define OVR_HASH_MASK (OVR_HASH_SIZE - 1)
 
 static TrackedAlloc* AllocHashMap[OVR_HASH_SIZE] = {nullptr};
+#ifndef MICRO_OVR
 static SymbolLookup Symbols;
+#endif
 
 void Allocator::trackAlloc(void* p, size_t size)
 {
+#ifndef MICRO_OVR
     if (!p || !IsLeakTracking)
         return;
 
@@ -490,6 +504,7 @@ void Allocator::trackAlloc(void* p, size_t size)
         head->pPrev = tracked;
     }
     AllocHashMap[key] = tracked;
+#endif
 }
 
 void Allocator::untrackAlloc(void* p)
@@ -532,6 +547,7 @@ void Allocator::untrackAlloc(void* p)
 
 int Allocator::DumpMemory()
 {
+#ifndef MICRO_OVR
     const bool symbolLookupWasInitialized = SymbolLookup::IsInitialized();
     const bool symbolLookupAvailable = SymbolLookup::Initialize();
 
@@ -637,11 +653,14 @@ int Allocator::DumpMemory()
         SymbolLookup::Shutdown();
 
     return reportedLeakCount;
+#else
+    return 0;
+#endif
 }
 
 
 
-
+#ifndef MICRO_OVR
 //------------------------------------------------------------------------
 // ***** DebugPageAllocator
 
@@ -1244,6 +1263,7 @@ void DebugPageAllocator::FreePageMemory(void* pPageMemory, size_t /*blockSize*/)
     #endif
 }
 
+#endif // MICRO_OVR
 
 
 } // namespace OVR

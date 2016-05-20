@@ -104,7 +104,7 @@ public:
     virtual uint32_t GetGamepadCount() = 0;
 
     // Get the state of the gamepad with a given index.
-    virtual bool    GetGamepadState(uint32_t index, GamepadState* pState) = 0;
+    virtual bool    GetGamepadState(GamepadState* pState) = 0;
 };
 
 }} // OVR::OvrPlatform

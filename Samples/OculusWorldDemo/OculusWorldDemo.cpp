@@ -1192,6 +1192,7 @@ ovrResult OculusWorldDemoApp::CalculateHmdValues()
         MultisampleEnabled = false;
     }
 
+
     // Initialize eye rendering information.
     // The viewport sizes are re-computed in case RenderTargetSize changed due to HW limitations.
     g_EyeFov[0] = HmdDesc.DefaultEyeFov[0];
@@ -3728,10 +3729,10 @@ void OculusWorldDemoApp::DisplayLastErrorMessageBox(const char* pMessage)
 
     if(InteractiveMode)
     {
-        OVR::Util::DisplayMessageBoxF("OculusWorldDemo", "%s %x -- %s", pMessage, errorInfo.Result, errorInfo.ErrorString);
+        OVR::Util::DisplayMessageBoxF("OculusWorldDemo", "%s %d -- %s", pMessage, errorInfo.Result, errorInfo.ErrorString);
     }
 
-    OVR_DEBUG_LOG(("OculusWorldDemo: %s %x -- %s", pMessage, errorInfo.Result, errorInfo.ErrorString));
+    OVR_DEBUG_LOG(("OculusWorldDemo: %s %d -- %s", pMessage, errorInfo.Result, errorInfo.ErrorString));
 }
 
 

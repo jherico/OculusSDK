@@ -36,6 +36,7 @@ limitations under the License.
 #include <queue>
 #include <memory>
 #include <set>
+#include <map>
 
 #pragma warning(push)
 
@@ -44,10 +45,11 @@ limitations under the License.
 namespace ovrlog {
 
 struct LogStringBuffer;
-class OutputWorker;
 class Channel;
 class Configurator;
 
+typedef uint32_t Log_Level_t;
+typedef uint32_t Write_Option_t;
 
 //-----------------------------------------------------------------------------
 // Log Level
@@ -56,7 +58,7 @@ class Configurator;
 // prominently it is displayed on the console window or whether or not a
 // message is displayed at all.
 
-enum class Level
+enum class Level : Log_Level_t
 {
 
     // Trace message.  This is a message that can potentially happen once per
@@ -174,6 +176,13 @@ LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const wchar_t(&first)[
     LogStringize(buffer, str);
 }
 
+template<>
+LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::wstring& first)
+{
+    const wchar_t* str = first.c_str();
+    LogStringize(buffer, str);
+}
+
 
 //-----------------------------------------------------------------------------
 // Log Output Worker Thread
@@ -194,13 +203,50 @@ public:
     virtual void Write(Level level, const char* subsystem, const char* header, const char* utf8msg) = 0;
 };
 
+
+//-----------------------------------------------------------------------------
+// Used by channel to specify how to write
+enum class WriteOption : Write_Option_t
+{
+    // Default log write
+    Default,
+
+    // Dangerously ignore the queue limit
+    DangerouslyIgnoreQueueLimit
+};
+
+
+// Iterate through the list of channels before the CRT has initialized
+#pragma pack(push,1)
+struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; ChannelNode* Next, *Prev; };
+#pragma pack(pop)
+
+// Export the function to access OutputWorker::Write(). This is used by the Channel class
+// to allow writing with OutputWorker possibly in a separate module
+extern "C"
+{
+    __declspec(dllexport) extern void OutputWorkerOutputFunctionC(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
+    typedef void(*OutputWorkerOutputFunctionType)(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
+
+    __declspec(dllexport) extern void ConfiguratorOnChannelLevelChangeC(const char* channelName, Log_Level_t minimumOutputLevel);
+    typedef void(*ConfiguratorOnChannelLevelChangeType)(const char* channelName, Log_Level_t minimumOutputLevel);
+
+    __declspec(dllexport) extern void ConfiguratorRegisterC(ChannelNode* channelNode);
+    typedef void(*ConfiguratorRegisterType)(ChannelNode* channelNode);
+
+    __declspec(dllexport) extern void ConfiguratorUnregisterC(ChannelNode* channelNode);
+    typedef void(*ConfiguratorUnregisterType)(ChannelNode* channelNode);
+}
+
+// Shutdown the logging system and release memory
+void ShutdownLogging();
+
 // Log Output Worker Thread
 class OutputWorker
 {
     OutputWorker(); // Use GetInstance() to get the singleton instance.
 
 public:
-    // Get singleton instance for logging output
     static OutputWorker* GetInstance();
 
     ~OutputWorker();
@@ -214,17 +260,8 @@ public:
     // Blocks until all log messages before this function call are completed.
     void Flush();
 
-    enum class WriteOption
-    {
-        // Default log write
-        Default,
-
-        // Dangerously ignore the queue limit
-        DangerouslyIgnoreQueueLimit
-    };
-
     // Write a log buffer to the output
-    void Write(LogStringBuffer& buffer, WriteOption option = WriteOption::Default);
+    void Write(const char* subsystemName, Level messageLogLevel, const char* stream, bool relogged, WriteOption option);
 
     // Plugin management
     void AddPlugin(std::shared_ptr<OutputPlugin> plugin);
@@ -233,9 +270,15 @@ public:
     // Disable all output
     void DisableAllPlugins();
 
+    // Get the lock used for the channels.
+    Lock* GetChannelsLock();
+
 private:
     // Is the logger running in a debugger?
     bool IsInDebugger;
+
+    // It's here so so we know it is valid in the scope of ~OutputWorker
+    Lock ChannelsLock;
 
     // Plugins
     Lock PluginsLock;
@@ -244,20 +287,14 @@ private:
     // Worker Log Buffer
     struct QueuedLogMessage
     {
+        QueuedLogMessage(const char* subsystemName, Level messageLogLevel, const char* stream, const SYSTEMTIME& time);
+
         Level             MessageLogLevel;
         const char*       SubsystemName;
         std::string       Buffer;
+        SYSTEMTIME        Time;
         QueuedLogMessage* Next;
         HANDLE            FlushEvent;
-
-        QueuedLogMessage(LogStringBuffer& buffer)
-        {
-            MessageLogLevel = buffer.MessageLogLevel;
-            SubsystemName = buffer.SubsystemName;
-            Buffer = buffer.Stream.str();
-            Next = nullptr;
-            FlushEvent = nullptr;
-        }
     };
 
     // Maximum number of logs that we allow in the queue at a time.
@@ -287,14 +324,13 @@ private:
         WorkQueueTail = msg;
         ++WorkQueueSize;
     }
-
+    
     static DWORD WINAPI WorkerThreadEntrypoint_(void* worker);
     void WorkerThreadEntrypoint();
 
     Lock StartStopLock;
     Terminator WorkerTerminator;
     AutoHandle LoggingThread;
-    volatile bool LoggingFromWorkerThread;
 
     // Append level and subsystem name to timestamp buffer
     // The buffer should point to the ending null terminator of
@@ -304,10 +340,8 @@ private:
 
     void ProcessQueuedMessages();
 
-    void FlushMessageImmediately(LogStringBuffer& buffer);
-    void FlushDbgViewLogImmediately(LogStringBuffer& buffer);
+    void FlushDbgViewLogImmediately(const char* subsystemName, Level messageLogLevel, const char* stream);
 };
-
 
 //-----------------------------------------------------------------------------
 // ErrorSilencer
@@ -356,6 +390,7 @@ public:
     // We recommend that the name string must be a string literal not a string
     // allocated on the heap at runtime.
     Channel(const char* nameString);
+    Channel(const Channel& other);
     ~Channel();
 
     // Add an extra prefix to all log messages generated by the channel.
@@ -372,10 +407,10 @@ public:
 
     const char* GetName() const;
     Level GetMinimumOutputLevel() const;
-
+    
     LOGGING_INLINE bool Active(Level level) const
     {
-        return MinimumOutputLevel <= level;
+        return MinimumOutputLevel <= (uint32_t)level;
     }
 
     template<typename... Args>
@@ -529,23 +564,46 @@ public:
             writeLogBuffer(buffer, Prefix, args...);
 
             // Submit buffer to logging subsystem
-            OutputWorker::GetInstance()->Write(buffer, OutputWorker::WriteOption::DangerouslyIgnoreQueueLimit);
+            const std::string& tmp = buffer.Stream.str();
+            OutputWorkerOutputFunction(buffer.SubsystemName, (Log_Level_t)buffer.MessageLogLevel, tmp.c_str(), buffer.Relogged, (Write_Option_t)WriteOption::DangerouslyIgnoreQueueLimit);
         }
     }
     // DANGER DANGER DANGER
-
+    
 private:
     //-------------------------------------------------------------------------
     // Internal Implementation
 
+    Channel() {}
+
+    friend class Configurator;
+
+    // Used to iterate through a linked list of Channel objects
+    // A linked list is used to avoid CRT new / delete during startup as this is called from the constructor
+    ChannelNode Node;
+    
     // Level at which this channel will log.
-    Level MinimumOutputLevel;
+    Log_Level_t MinimumOutputLevel;
 
     // Channel name string
     const char* SubsystemName;
 
     // Optional prefix
     std::string Prefix;
+
+    // Target of doLog function
+    static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;
+
+    // Target of OnChannelLevelChange
+    static ConfiguratorOnChannelLevelChangeType ConfiguratorOnChannelLevelChange;
+
+    // Target of Register
+    static ConfiguratorRegisterType ConfiguratorRegister;
+
+    // Target of Unregister
+    static ConfiguratorUnregisterType ConfiguratorUnregister;
+
+    void GetFunctionPointers();
 
     template<typename T>
     LOGGING_INLINE void writeLogBuffer(LogStringBuffer& buffer, T&& arg) const
@@ -569,7 +627,8 @@ private:
         writeLogBuffer(buffer, Prefix, args...);
 
         // Submit buffer to logging subsystem
-        OutputWorker::GetInstance()->Write(buffer);
+        const std::string& tmp = buffer.Stream.str();
+        OutputWorkerOutputFunction(buffer.SubsystemName, (Log_Level_t)buffer.MessageLogLevel, tmp.c_str(), buffer.Relogged, (Write_Option_t)WriteOption::Default);
     }
 
     // Returns the buffer capacity required to printf the given format+arguments.
@@ -641,7 +700,8 @@ private:
         writeLogBuffer(buffer, Prefix, logChars);
 
         // Submit buffer to logging subsystem
-        OutputWorker::GetInstance()->Write(buffer);
+        const std::string& tmp = buffer.Stream.str();
+        OutputWorkerOutputFunction(buffer.SubsystemName, (Log_Level_t)buffer.MessageLogLevel, tmp.c_str(), buffer.Relogged, (Write_Option_t)WriteOption::Default);
 
         delete[] logCharsAllocated;
     }
@@ -687,18 +747,29 @@ public:
 
     void SetPlugin(std::shared_ptr<ConfiguratorPlugin> plugin);
 
-private:
-    void Register(Channel* channel);
-    void Unregister(Channel* channel);
-    void OnChannelLevelChange(Channel* channel);
+    // Free internal memory to avoid memory leak reports
+    void UnregisterAll();
 
-    // List of registered channels
-    Lock ChannelsLock;
-    Level GlobalMinimumLogLevel;
-    std::set<Channel*> Channels;
+    // Get all channels - note channels do not necessarily have unique names
+    void GetChannels(std::vector< std::pair<std::string, Level> > &channels);
+
+    // Set all channels with channelName to level
+    void SetChannel(std::string channelName, Level level);
+
+    // Internal: Invoked through callbacks
+    void OnChannelLevelChange(const char* channelName, Log_Level_t level);
+    
+    // Internal: Load log level for a channel from disk
+    void RestoreChannelLogLevel(const char* channelName);
+
+    // Internal: Iterate through all channels and store them
+    void RestoreAllChannelLogLevels();
+private:
+
+    uint32_t GlobalMinimumLogLevel;
     std::shared_ptr<ConfiguratorPlugin> Plugin;
 
-    void RestoreChannelLogLevel(Channel* channel);
+    void SetChannelNoLock(std::string channelName, Level level);
 };
 
 

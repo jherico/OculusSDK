@@ -84,6 +84,7 @@ public:
 private:
     // Event source handle initialized in constructor and used for logging
     HANDLE hEventSource;
+    Level  MinReportEventLevel;
 
     virtual const char* GetUniquePluginName() override;
     virtual void Write(Level level, const char* subsystem, const char* header, const char* utf8msg) override;

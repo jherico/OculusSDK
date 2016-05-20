@@ -107,6 +107,7 @@ void OutputConsole::Write(Level level, const char* /*subsystem*/, const char* he
 #endif // OVR_SYSLOG_NAME
 
 OutputEventLog::OutputEventLog()
+  : MinReportEventLevel(Level::Error)
 {
     hEventSource = ::RegisterEventSourceW(
         nullptr, // No server name
@@ -131,6 +132,11 @@ const char* OutputEventLog::GetUniquePluginName()
 void OutputEventLog::Write(Level level, const char* subsystem, const char* header, const char* utf8msg)
 {
     (void)subsystem; // unused
+
+    if (level < MinReportEventLevel)
+    {
+        return;
+    }
 
     if (!hEventSource)
     {

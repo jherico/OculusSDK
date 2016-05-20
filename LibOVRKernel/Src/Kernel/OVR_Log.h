@@ -26,6 +26,28 @@ limitations under the License.
 #ifndef OVR_Log_h
 #define OVR_Log_h
 
+#ifdef MICRO_OVR
+
+namespace OVR {
+template<typename... Args> void LogText(Args&&...) {}
+template<typename... Args> void LogError(Args&&...) {}
+template<typename... Args> void LogDebug(Args&&...) {}
+}
+
+#define OVR_DEBUG_LOG(args)       do {} while(0);
+#define OVR_DEBUG_LOG_TEXT(args)  do {} while(0);
+#define OVR_ASSERT_LOG(c, args)   do {} while(0)
+
+namespace ovrlog {
+    struct Channel{
+        template<typename... Args>Channel(Args&&...){}
+        template<typename... Args> void LogTrace(Args&&...){}
+        template<typename... Args> void LogWarningF(Args&&...){}
+    };
+}
+
+#else
+
 #include "OVR_Types.h"
 #include "OVR_Std.h"
 #include "OVR_String.h"
@@ -134,5 +156,7 @@ namespace ovrlog {
     }
 
 } // namespace ovrlog
+
+#endif // MICRO_OVR
 
 #endif // OVR_Log_h

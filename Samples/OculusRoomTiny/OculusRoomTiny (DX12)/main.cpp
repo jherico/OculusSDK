@@ -190,7 +190,7 @@ static bool MainLoop(bool retryCreate)
         if (!pEyeRenderTexture[eye]->Init(session, idealSize.w, idealSize.h, true))
         {
             if (retryCreate) goto Done;
-	        VALIDATE(OVR_SUCCESS(result), "Failed to create eye texture.");
+	        VALIDATE(false, "Failed to create eye texture.");
         }
 
         eyeRenderViewport[eye].Pos.x = 0;

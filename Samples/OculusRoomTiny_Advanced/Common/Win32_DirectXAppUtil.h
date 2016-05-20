@@ -205,12 +205,15 @@ struct DirectX11
         }
     }
 
-    bool InitDevice(int vpW, int vpH, const LUID* pLuid, bool windowed = true)
+    bool InitDevice(int vpW, int vpH, const LUID* pLuid, bool windowed = true, int scale = 1)
     {
         WinSizeW = vpW;
         WinSizeH = vpH;
 
-        RECT size = { 0, 0, vpW, vpH };
+        if (scale == 0)
+            scale = 1;
+
+        RECT size = { 0, 0, vpW / scale, vpH / scale};
         AdjustWindowRect(&size, WS_OVERLAPPEDWINDOW, false);
         const UINT flags = SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW;
         if (!SetWindowPos(Window, nullptr, 0, 0, size.right - size.left, size.bottom - size.top, flags))

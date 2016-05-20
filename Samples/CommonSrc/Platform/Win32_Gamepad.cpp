@@ -74,11 +74,8 @@ uint32_t GamepadManager::GetGamepadCount()
     return 1;
 }
 
-bool GamepadManager::GetGamepadState(uint32_t index, GamepadState* pState)
+bool GamepadManager::GetGamepadState(GamepadState* pState)
 {
-    // For now we just support one gamepad.
-    OVR_UNUSED(index);
-
     if (pXInputGetState)
     {
         if((NextTryTime == 0) || (GetTickCount() >= NextTryTime)) // If the device is known to be present or if it's time to try testing for it again...

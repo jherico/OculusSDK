@@ -30,7 +30,6 @@ limitations under the License.
 #define OVR_System_h
 
 #include "OVR_Allocator.h"
-#include "OVR_Log.h"
 #include "OVR_Atomic.h"
 
 namespace OVR {

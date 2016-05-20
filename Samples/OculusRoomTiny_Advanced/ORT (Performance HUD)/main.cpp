@@ -36,7 +36,7 @@ limitations under the License.
 ///         to the point when the middle scanline of the target frame is illuminated on the HMD display.
 ///         This is the same info presented in "Application Latency Timing" section, presented here as part of the performance summary.
 ///
-///     Unused performance
+///     Performance Headroom
 ///         The percentage of available PC performance that has not been utilized by the client application and compositor.
 ///         This is essentially the application CPU & GPU time tracked in the "Application Render Timing" pane section divided by the
 ///         native frame time (inverse of refresh rate) of the HMD. It is meant to be a simple guide for the user to verify that their
@@ -52,7 +52,7 @@ limitations under the License.
 ///         This is the same value provided in the "Compositor Render Timing" pane called "Compositor Missed V-Sync Count".
 ///
 ///     Left-side graph:    Plots frame rate of the application
-///     Right-side graph:   Plots the "Unused performance %" provided in the same section
+///     Right-side graph:   Plots the "Performance headroom %" provided in the same section
 ///
 /// Latency Timing Pane :
 ///

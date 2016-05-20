@@ -145,7 +145,7 @@ static bool MainLoop(bool retryCreate)
         if (!pEyeRenderTexture[eye]->Init(session, idealSize.w, idealSize.h))
         {
             if (retryCreate) goto Done;
-	        VALIDATE(OVR_SUCCESS(result), "Failed to create eye texture.");
+	        VALIDATE(false, "Failed to create eye texture.");
         }
 		pEyeDepthBuffer[eye] = new DepthBuffer(DIRECTX.Device, idealSize.w, idealSize.h);
 		eyeRenderViewport[eye].Pos.x = 0;

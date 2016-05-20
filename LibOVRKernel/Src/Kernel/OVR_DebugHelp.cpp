@@ -25,6 +25,7 @@ limitations under the License.
 #include "OVR_UTF8Util.h"
 #include "OVR_Atomic.h"
 #include "OVR_SysFile.h"
+#include "OVR_Log.h"
 #include "Util/Util_SystemGUI.h"
 
 #include <stdlib.h>
@@ -3540,68 +3541,129 @@ void ExceptionHandler::WriteReport(const char* reportType)
 
             WriteReportLine("\nDisplay adapter list\n");
 
+            // helper function to properly init & clear variants
+            struct VariantHelper
+            {
+                VariantHelper()
+                {
+                    ::VariantInit(&var); // must init before use
+                }
+                ~VariantHelper()
+                {
+                    ::VariantClear(&var); // must clear after use to avoid leaks
+                }
+
+                const BSTR getBSTR() const // return a value or default empty string
+                {
+                    if ( ( var.vt == VT_BSTR ) && var.bstrVal )
+                         return var.bstrVal;
+                    return L"";
+                }
+
+                uint32_t getLVal() const // return a value or default 0
+                {
+                    if ( var.vt == VT_I4 )
+                         return var.lVal;
+                    return 0;
+                }
+
+                VARIANT* getVARIANT() // convenience function for passing to Get()
+                {
+                    return &var;
+                }
+
+                private :
+                VARIANT var;
+            };
+
             for(unsigned i = 0; SUCCEEDED(hr) && uReturned; i++)
             {
                 char    sString[256];
-                VARIANT var;
 
                 if(i > 0)
                     WriteReportLine("\n");
 
                 WriteReportLineF("Info for display adapter %u\n", i);
 
-                hr = pObj->Get(L"Name", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
                 {
-                    WideCharToMultiByte(CP_ACP, 0, var.bstrVal, -1, sString, sizeof(sString), nullptr, nullptr);
-                    WriteReportLineF("Display Adapter Name: %s\n", sString);
+                    VariantHelper v;
+                    hr = pObj->Get(L"Name", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                       
+                        WideCharToMultiByte(CP_ACP, 0, v.getBSTR(), -1, sString, sizeof(sString), nullptr, nullptr);
+                        WriteReportLineF("Display Adapter Name: %s\n", sString);
+                    }
+                }
+                {
+                    VariantHelper v;
+                    hr = pObj->Get(L"AdapterRAM", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        uint32_t value( v.getLVal() );
+
+                        WriteReportLineF("Display Adapter RAM: %u %s\n",
+                                (value > (1024*1024*1024) ? value/(1024*1024*1024) : value/(1024*1024)), (value > (1024*1024*1024) ? "GiB" : "MiB"));
+                    }
+                }
+                {
+                    VariantHelper v;
+                    hr = pObj->Get(L"DeviceID", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        WideCharToMultiByte(CP_ACP, 0, v.getBSTR(), -1, sString, sizeof(sString), nullptr, nullptr);
+                        WriteReportLineF("Display Adapter DeviceID: %s\n", sString);
+                    }
+                }
+                {
+                    VariantHelper v;
+                    hr = pObj->Get(L"DriverVersion", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        WideCharToMultiByte(CP_ACP, 0, v.getBSTR(), -1, sString, sizeof(sString), nullptr, nullptr);
+                        WriteReportLineF("Display Adapter DriverVersion: %s\n", sString);
+                    }
                 }
 
-                hr = pObj->Get(L"AdapterRAM", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
                 {
-                    WriteReportLineF("Display Adapter RAM: %u %s\n",
-                            ((uint32_t)var.lVal > (1024*1024*1024) ? (uint32_t)var.lVal/(1024*1024*1024) : (uint32_t)var.lVal/(1024*1024)), ((uint32_t)var.lVal > (1024*1024*1024) ? "GiB" : "MiB"));
+                    VariantHelper v;
+                    hr = pObj->Get(L"DriverDate", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        std::wstring val( v.getBSTR() ); // may return empty string
+
+                        while( val.size() < 8 ) // make at least 8 chars long to simplify below code
+                        {
+                            val += L" ";
+                        }
+
+                        // http://technet.microsoft.com/en-us/library/ee156576.aspx
+                        wchar_t year[5] = { val[0], val[1], val[2], val[3], 0 };
+                        wchar_t month[3] = { val[4], val[5], 0 };
+                        wchar_t monthDay[3] = { val[6], val[7], 0 };
+
+                        WriteReportLineF("Display Adapter DriverDate (US format): %ls/%ls/%ls\n", month, monthDay, year);
+                    }
+                }
+                {
+                    VariantHelper v;
+                    // VideoProcessor
+                    hr = pObj->Get(L"VideoProcessor", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        WideCharToMultiByte(CP_ACP, 0, v.getBSTR(), -1, sString, sizeof(sString), nullptr, nullptr);
+                        WriteReportLineF("Display Adapter VideoProcessor %s\n", sString);
+                    }
                 }
 
-                hr = pObj->Get(L"DeviceID", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
                 {
-                    WideCharToMultiByte(CP_ACP, 0, var.bstrVal, -1, sString, sizeof(sString), nullptr, nullptr);
-                    WriteReportLineF("Display Adapter DeviceID: %s\n", sString);
-                }
-
-                hr = pObj->Get(L"DriverVersion", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
-                {
-                    WideCharToMultiByte(CP_ACP, 0, var.bstrVal, -1, sString, sizeof(sString), nullptr, nullptr);
-                    WriteReportLineF("Display Adapter DriverVersion: %s\n", sString);
-                }
-
-                hr = pObj->Get(L"DriverDate", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
-                {
-                    // http://technet.microsoft.com/en-us/library/ee156576.aspx
-                    wchar_t year[5] = { var.bstrVal[0], var.bstrVal[1], var.bstrVal[2], var.bstrVal[3], 0 };
-                    wchar_t month[3] = { var.bstrVal[4], var.bstrVal[5], 0 };
-                    wchar_t monthDay[3] = { var.bstrVal[6], var.bstrVal[7], 0 };
-
-                    WriteReportLineF("Display Adapter DriverDate (US format): %ls/%ls/%ls\n", month, monthDay, year);
-                }
-
-                // VideoProcessor
-                hr = pObj->Get(L"VideoProcessor", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
-                {
-                    WideCharToMultiByte(CP_ACP, 0, var.bstrVal, -1, sString, sizeof(sString), nullptr, nullptr);
-                    WriteReportLineF("Display Adapter VideoProcessor %s\n", sString);
-                }
-
-                hr = pObj->Get(L"VideoModeDescription", 0, &var, nullptr, nullptr);
-                if(SUCCEEDED(hr))
-                {
-                    WideCharToMultiByte(CP_ACP, 0, var.bstrVal, -1, sString, sizeof(sString), nullptr, nullptr);
-                    WriteReportLineF("Display Adapter VideoModeDescription: %s\n", sString);
+                    VariantHelper v;
+                    hr = pObj->Get(L"VideoModeDescription", 0, v.getVARIANT(), nullptr, nullptr);
+                    if(SUCCEEDED(hr))
+                    {
+                        WideCharToMultiByte(CP_ACP, 0, v.getBSTR(), -1, sString, sizeof(sString), nullptr, nullptr);
+                        WriteReportLineF("Display Adapter VideoModeDescription: %s\n", sString);
+                    }
                 }
 
                 pObj->Release();
@@ -4270,7 +4332,7 @@ void ExceptionHandler::WriteMiniDump()
                     OVR_ASSERT(false);
 
                     BOOL result = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
-                                                        (MINIDUMP_TYPE)miniDumpFlags, &minidumpExceptionInfo,
+                                                        (MINIDUMP_TYPE)miniDumpFlags, pExceptionPointers ? &minidumpExceptionInfo : nullptr,
                                                         (CONST PMINIDUMP_USER_STREAM_INFORMATION)nullptr, &minidumpCallbackInfo);
                     CloseHandle(hFile);
                     hFile = 0;
@@ -4441,20 +4503,14 @@ void ExceptionHandler::ReportDeadlock(const char* threadName,
                                       const char* organizationName,
                                       const char* applicationName)
 {
+    if (!organizationName || !organizationName[0])
+        organizationName = "Oculus";
+    if (!applicationName || !applicationName[0])
+        applicationName = "DefaultApp";
+
     ExceptionHandler handler;
 
-    if (!organizationName || !organizationName[0] ||
-        !applicationName || !applicationName[0])
-    {
-        char tempPath[OVR_MAX_PATH];
-        GetCrashDumpDirectory(tempPath, OVR_ARRAY_COUNT(tempPath));
-        OVR_strlcat(tempPath, "Deadlock Report (%s).txt", OVR_ARRAY_COUNT(tempPath));
-        handler.SetExceptionPaths(tempPath);
-    }
-    else
-    {
-        handler.SetPathsFromNames(organizationName, applicationName, "Deadlock Report (%s).txt");
-    }
+    handler.SetPathsFromNames(organizationName, applicationName, "Deadlock Report (%s).txt", "Deadlock Minidump (%s).mdmp");
 
     OVR_snprintf(handler.exceptionInfo.exceptionDescription,
                  sizeof(handler.exceptionInfo.exceptionDescription),
@@ -4463,6 +4519,7 @@ void ExceptionHandler::ReportDeadlock(const char* threadName,
     handler.exceptionInfo.timeVal = time(nullptr);
     handler.exceptionInfo.time = *gmtime(&handler.exceptionInfo.timeVal);
     handler.WriteReport("Deadlock");
+    handler.WriteMiniDump();
 }
 
 
