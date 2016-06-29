@@ -29,13 +29,14 @@ limitations under the License.
 #endif
 
 #include "../../include/Logging_Tools.h"
-#include <filesystem>
-#include <codecvt>
-#include <time.h>
+
 #include <assert.h>
-#if defined(_WIN32)
-    #include <Windows.h>
-#endif
+#include <time.h>
+
+#include <chrono>
+#include <codecvt>
+#include <filesystem>
+#include <vector>
 
 namespace ovrlog {
 
@@ -325,10 +326,10 @@ bool IsDebuggerAttached()
 }
 
 
-#if defined(_MSC_VER) && (_MSC_VER == 1800) // VS2013
+#if defined(_WIN32)
     static std::wstring UTF8StringToUCSString(const std::string& utf8)
     {
-        #if defined(_WIN32)
+        #if defined(_MSC_VER) && (_MSC_VER < 1900) // VS2013
             // VS2013's wstring_convert is broken, and so we need a custom path: 
             // https://connect.microsoft.com/VisualStudio/feedback/details/796566/vc-stl-alloc-dealloc-mismatch-in-locale
             std::wstring ucs16;
@@ -341,13 +342,13 @@ bool IsDebuggerAttached()
             }
             return ucs16;
         #else
-            return std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(s);
+            return std::wstring_convert<std::codecvt_utf8<wchar_t>>("", L"").from_bytes(utf8);
         #endif
     }
 
     static std::string UCSStringToUTF8String(const std::wstring& ucs16)
     {
-        #if defined(_WIN32)
+        #if defined(_MSC_VER) && (_MSC_VER < 1900) // VS2013
             std::string utf8;
             int len = WideCharToMultiByte(CP_UTF8, 0, ucs16.c_str(), -1, NULL, 0, 0, 0);
             if (len > 1)
@@ -358,15 +359,54 @@ bool IsDebuggerAttached()
             }
             return utf8;
         #else
-            return std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(w);
+            return std::wstring_convert<std::codecvt_utf8<wchar_t>>("", L"").to_bytes(ucs16);
         #endif
     }
 #endif
 
-
 void ForAllLogFiles(const char* dirPath, const char* fileNamePrefix, uint64_t minAge, LogFileFunction logFileFunction)
 {
-    #if defined(_MSC_VER) && (_MSC_VER == 1800) // VS2013 only, as VS2015 doesn't support this.
+    #if defined(_MSC_VER) && (_MSC_VER >= 1900) // VS2015+ only
+        // <filesystem> is accepted into C++17 standard, but is already implemented in MSVC 2015.
+        namespace fs = std::experimental::filesystem::v1;
+
+        // We delete server log files that are older than N days.
+        const std::wstring dirPathW = UTF8StringToUCSString(dirPath);
+        const std::wstring fileNamePrefixW = UTF8StringToUCSString(fileNamePrefix);
+        if (dirPathW.empty() || fileNamePrefixW.empty())
+        {
+            return;
+        }
+
+        const fs::path dirPathObject = dirPathW.c_str();
+        fs::directory_iterator dirIterator(dirPathObject);
+
+        for (const auto& entry : dirIterator)
+        {
+            if (fs::is_regular_file(entry.status()))
+            {
+                const std::wstring& fileNameW = entry.path().filename();
+
+                if ((wcsstr(fileNameW.c_str(), fileNamePrefixW.c_str()) == fileNameW.c_str()))
+                {
+                    auto lastWriteTime = fs::last_write_time(entry);
+                    int daysAge = std::chrono::duration_cast<std::chrono::hours>(
+                        std::chrono::system_clock::now() - lastWriteTime
+                    ).count() / 24;
+                    if (daysAge < 0)
+                    {
+                        daysAge = 0;
+                    }
+                    const std::wstring pathStrW = dirPathW + L'\\' + fileNameW;
+
+                    if (daysAge > minAge) {
+                        const std::string filePath = UCSStringToUTF8String(pathStrW);
+                        logFileFunction(filePath.c_str(), daysAge);
+                    }
+                }
+            }
+        }
+    #else
         // We delete server log files that are older than N days.
         using namespace std::tr2::sys;
 
@@ -425,12 +465,6 @@ void ForAllLogFiles(const char* dirPath, const char* fileNamePrefix, uint64_t mi
 
             ++dirIterator;
         }
-    #else
-        (void)dirPath;
-        (void)fileNamePrefix;
-        (void)minAge;
-        (void)logFileFunction;
-        assert(false); // Need to implement this.
     #endif
 }
 

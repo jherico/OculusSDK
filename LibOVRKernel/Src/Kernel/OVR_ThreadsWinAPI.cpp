@@ -69,10 +69,10 @@ MutexImpl::MutexImpl(bool recursive)
     Recursive                   = recursive;
     LockCount                   = 0;
 #if defined(OVR_OS_WIN32) // Older versions of Windows don't support CreateSemaphoreEx, so stick with CreateSemaphore for portability.
-    hMutexOrSemaphore           = Recursive ? CreateMutex(NULL, 0, NULL) : CreateSemaphore(NULL, 1, 1, NULL);
+    hMutexOrSemaphore           = Recursive ? CreateMutexW(NULL, 0, NULL) : CreateSemaphoreW(NULL, 1, 1, NULL);
 #else
     // No CreateSemaphore() call, so emulate it.
-    hMutexOrSemaphore           = Recursive ? CreateMutex(NULL, 0, NULL) : CreateSemaphoreEx(NULL, 1, 1, NULL, 0, SEMAPHORE_ALL_ACCESS);
+    hMutexOrSemaphore           = Recursive ? CreateMutexW(NULL, 0, NULL) : CreateSemaphoreExW(NULL, 1, 1, NULL, 0, SEMAPHORE_ALL_ACCESS);
 #endif
 }
 MutexImpl::~MutexImpl()
@@ -301,7 +301,7 @@ WaitConditionImpl::EventPoolEntry* WaitConditionImpl::GetNewEvent()
         pentry->pNext   = 0;
         pentry->pPrev   = 0;
         // Non-signaled manual event
-        pentry->hEvent  = ::CreateEvent(NULL, TRUE, 0, NULL);
+        pentry->hEvent  = ::CreateEventW(NULL, TRUE, 0, NULL);
     }
     
     return pentry;
@@ -603,12 +603,12 @@ Thread::~Thread()
 // Default Run implementation
 int Thread::Run()
 {
-	if (!ThreadFunction)
-		return 0;
+    if (!ThreadFunction)
+        return 0;
 
-	int ret = ThreadFunction(this, UserHandle);
+    int ret = ThreadFunction(this, UserHandle);
 
-	return ret;
+    return ret;
 }
 
 void Thread::OnExit()
@@ -1069,6 +1069,9 @@ void Thread::YieldCurrentThread()
     YieldProcessor();
 }
 
+
+static OVR_THREAD_LOCAL char ThreadLocaThreadlName[32] = {};
+
 void Thread::SetThreadName( const char* name )
 {
     if(IdValue)
@@ -1079,6 +1082,9 @@ void Thread::SetThreadName( const char* name )
 
 void Thread::SetThreadName(const char* name, ThreadId threadId)
 {
+    if (threadId == (ThreadId)::GetCurrentThreadId())
+        OVR_strlcpy(ThreadLocaThreadlName, name, sizeof(ThreadLocaThreadlName));
+
     #if !defined(OVR_BUILD_SHIPPING) || defined(OVR_BUILD_PROFILING)
         // http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
         #pragma pack(push,8)
@@ -1122,10 +1128,9 @@ void Thread::GetThreadName(char* name, size_t /*nameCapacity*/, ThreadId /*threa
 }
 
 
-void Thread::GetCurrentThreadName(char* name, size_t /*nameCapacity*/)
+void Thread::GetCurrentThreadName(char* name, size_t nameCapacity)
 {
-    // Not possible on Windows.
-    name[0] = 0;
+    OVR_strlcpy(name, ThreadLocaThreadlName, nameCapacity);
 }
 
 

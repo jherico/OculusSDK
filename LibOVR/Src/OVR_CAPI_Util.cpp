@@ -31,6 +31,11 @@ limitations under the License.
 #endif
 
 #if defined(_WIN32)
+    // Prevents <Windows.h> from defining min() and max() macro symbols.
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+
     #include <windows.h>
 #endif
 

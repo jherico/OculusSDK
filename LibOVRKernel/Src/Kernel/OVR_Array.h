@@ -379,9 +379,9 @@ public:
     void            SetSizePolicy(const SizePolicyType& p) { Data.Policy = p; }
 
     bool    NeverShrinking()const       { return Data.Policy.NeverShrinking(); }
-	size_t  GetSize()       const       { return Data.Size; }
-	int     GetSizeI()      const       { return (int)Data.Size; }
-	bool    IsEmpty()       const       { return Data.Size == 0; }
+    size_t  GetSize()       const       { return Data.Size; }
+    int     GetSizeI()      const       { return (int)Data.Size; }
+    bool    IsEmpty()       const       { return Data.Size == 0; }
     size_t  GetCapacity()   const       { return Data.GetCapacity(); }
     size_t  GetNumBytes()   const       { return Data.GetCapacity() * sizeof(ValueType); }
 

@@ -1269,6 +1269,9 @@ void RenderDevice::GenerateSubresourceData(
     case DXGI_FORMAT_BC3_UNORM_SRGB: // fall thru
     case DXGI_FORMAT_BC3_UNORM: bytesPerBlock = 16;  break;
 
+    case DXGI_FORMAT_BC7_UNORM_SRGB: // fall thru
+    case DXGI_FORMAT_BC7_UNORM: bytesPerBlock = 16;  break;
+
     default:    OVR_ASSERT(false);
     }
 
@@ -1339,7 +1342,10 @@ static ovrTextureFormat ConvertOvrFormatToSrgb(ovrTextureFormat format)
     case OVR_FORMAT_R8G8B8A8_UNORM:    return OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
     case OVR_FORMAT_B8G8R8A8_UNORM:    return OVR_FORMAT_B8G8R8A8_UNORM_SRGB;
     case OVR_FORMAT_B8G8R8X8_UNORM:    return OVR_FORMAT_B8G8R8X8_UNORM_SRGB;
-
+    case OVR_FORMAT_BC1_UNORM:         return OVR_FORMAT_BC1_UNORM_SRGB;
+    case OVR_FORMAT_BC2_UNORM:         return OVR_FORMAT_BC2_UNORM_SRGB;
+    case OVR_FORMAT_BC3_UNORM:         return OVR_FORMAT_BC3_UNORM_SRGB;
+    case OVR_FORMAT_BC7_UNORM:         return OVR_FORMAT_BC7_UNORM_SRGB;
     // For everything else, just use as is
     default:    return format;
     }
@@ -1380,22 +1386,35 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     }
 
     bool isDepth = ((format & Texture_DepthMask) != 0);
+    bool isCompressed = false;
     TextureFormat textureFormat = (TextureFormat)(format & Texture_TypeMask);
 
-    if ((format & Texture_Compressed) != 0)
+    if (((format & Texture_Compressed) != 0) && !(format & Texture_SwapTextureSet || format & Texture_SwapTextureSetStatic))
     {
         int convertedFormat;
-        if (textureFormat == Texture_DXT1)
+        if (textureFormat == Texture_BC1)
         {
             convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
         }
-        else if (textureFormat == Texture_DXT3)
+        else if (textureFormat == Texture_BC2)
         {
             convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC2_UNORM_SRGB : DXGI_FORMAT_BC2_UNORM;
         }
-        else if (textureFormat == Texture_DXT5)
+        else if (textureFormat == Texture_BC3)
         {
             convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+        }
+        else if (textureFormat == Texture_BC6U)
+        {
+            convertedFormat = DXGI_FORMAT_BC6H_UF16;
+        }
+        else if (textureFormat == Texture_BC6S)
+        {
+            convertedFormat = DXGI_FORMAT_BC6H_SF16;
+        }
+        else if (textureFormat == Texture_BC7)
+        {
+            convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
         }
         else
         {
@@ -1511,6 +1530,53 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_B8G8R8X8_UNORM_SRGB : DXGI_FORMAT_B8G8R8X8_UNORM;
             srvFormat = d3dformat;
             break;
+        case Texture_BC1:
+            bpp = 1;
+            ovrFormat = (format & Texture_SRGB) ? OVR_FORMAT_BC1_UNORM_SRGB : OVR_FORMAT_BC1_UNORM;
+            d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+
+        case Texture_BC2:
+            bpp = 1;
+            ovrFormat = (format & Texture_SRGB) ? OVR_FORMAT_BC2_UNORM_SRGB : OVR_FORMAT_BC2_UNORM;
+            d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_BC2_UNORM_SRGB : DXGI_FORMAT_BC2_UNORM;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+
+        case Texture_BC3:
+            bpp = 1;
+            ovrFormat = (format & Texture_SRGB) ? OVR_FORMAT_BC3_UNORM_SRGB : OVR_FORMAT_BC3_UNORM;
+            d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+
+        case Texture_BC6S:
+            bpp = 1;
+            ovrFormat = OVR_FORMAT_BC6H_SF16;
+            d3dformat = DXGI_FORMAT_BC6H_SF16;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+        case Texture_BC6U:
+            bpp = 1;
+            ovrFormat = OVR_FORMAT_BC6H_UF16;
+            d3dformat = DXGI_FORMAT_BC6H_UF16;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+
+        case Texture_BC7:
+            bpp = 1;
+            ovrFormat = (format & Texture_SRGB) ? OVR_FORMAT_BC7_UNORM_SRGB : OVR_FORMAT_BC7_UNORM;
+            d3dformat = (format & Texture_SRGB) ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
+            srvFormat = d3dformat;
+            isCompressed = true;
+            break;
+
         case Texture_RGBA16f:
             bpp = 8;
             ovrFormat = OVR_FORMAT_R16G16B16A16_FLOAT;
@@ -1583,7 +1649,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         {
             dsDesc.BindFlags = createDepthSrv ? (dsDesc.BindFlags | D3D11_BIND_DEPTH_STENCIL) : D3D11_BIND_DEPTH_STENCIL;
         }
-        else if (format & Texture_RenderTarget)
+        else if (format & Texture_RenderTarget && !isCompressed)
         {
             dsDesc.BindFlags |= D3D11_BIND_RENDER_TARGET;
         }
@@ -1683,7 +1749,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             {
                 desc.MiscFlags |= ovrTextureMisc_DX_Typeless;
             }
-            if ((format & Texture_GenMipmaps) > 0)
+            if ((format & Texture_GenMipmaps) > 0 && !isCompressed)
             {
                 desc.MiscFlags |= ovrTextureMisc_AllowGenerateMips;
                 desc.BindFlags |= ovrTextureBind_DX_RenderTarget;   // ovrTextureMisc_AllowGenerateMips requires ovrTextureBind_DX_RenderTarget
@@ -1710,7 +1776,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             OVR_D3D_CHECK_RET_NULL(hr);
         }
 
-        for (int i = 0; i < chainCount; ++i)
+        for (int chainNum = 0; chainNum < chainCount; ++chainNum)
         {
             Ptr<ID3D11Texture2D> tex;
             if (NewTex->Tex)
@@ -1719,7 +1785,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             }
             else
             {
-                ovr_GetTextureSwapChainBufferDX(Session, NewTex->TextureChain, i, IID_PPV_ARGS(&tex.GetRawRef()));
+                ovr_GetTextureSwapChainBufferDX(Session, NewTex->TextureChain, chainNum, IID_PPV_ARGS(&tex.GetRawRef()));
             }
 
             if (dsDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
@@ -1763,76 +1829,136 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
 
             if (data)
             {
-                Context->UpdateSubresource(tex, 0, NULL, data, width * bpp, width * height * bpp);
-                if (format & Texture_GenMipmaps)
+                if (isCompressed)
                 {
-                    // TODO: Just call GenerateMips() instead
-                    OVR_ASSERT((textureFormat) == Texture_RGBA);
-                    int srcw = width, srch = height;
-                    int level = 0;
-                    uint8_t* mipmaps = NULL;
-                    do
+                    int convertedFormat;
+                    if (textureFormat == Texture_BC1)
                     {
-                        level++;
-                        int mipw = srcw >> 1;
-                        if (mipw < 1)
-                        {
-                            mipw = 1;
-                        }
-                        int miph = srch >> 1;
-                        if (miph < 1)
-                        {
-                            miph = 1;
-                        }
-                        if (mipmaps == NULL)
-                        {
-                            mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
-                        }
-                        FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
-                        Context->UpdateSubresource(tex, level, NULL, mipmaps, mipw * bpp, miph * bpp);
-                        srcw = mipw;
-                        srch = miph;
-                    } while (srcw > 1 || srch > 1);
+                        convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+                    }
+                    else if (textureFormat == Texture_BC2)
+                    {
+                        convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC2_UNORM_SRGB : DXGI_FORMAT_BC2_UNORM;
+                    }
+                    else if (textureFormat == Texture_BC3)
+                    {
+                        convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
+                    }
+                    else if (textureFormat == Texture_BC6S)
+                    {
+                        convertedFormat = DXGI_FORMAT_BC6H_SF16;
+                    }
+                    else if (textureFormat == Texture_BC6U)
+                    {
+                        convertedFormat = DXGI_FORMAT_BC6H_UF16;
+                    }
+                    else if (textureFormat == Texture_BC7)
+                    {
+                        convertedFormat = (format & Texture_SRGB) ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
+                    }
+                    else
+                    {
+                        OVR_ASSERT(false);  return NULL;
+                    }
 
-                    if (mipmaps != NULL)
+                    unsigned largestMipWidth = 0;
+                    unsigned largestMipHeight = 0;
+                    unsigned effectiveMipCount = mipcount;
+                    unsigned textureSize = 0;
+
+
+                    D3D11_SUBRESOURCE_DATA* subresData = (D3D11_SUBRESOURCE_DATA*)
+                        OVR_ALLOC(sizeof(D3D11_SUBRESOURCE_DATA) * mipcount);
+                    GenerateSubresourceData(width, height, convertedFormat, imageDimUpperLimit, data, subresData, largestMipWidth,
+                        largestMipHeight, textureSize, effectiveMipCount);
+
+                    for (int i = 0; i < mipcount; ++i)
                     {
-                        OVR_FREE(mipmaps);
+                        Context->UpdateSubresource(tex, i, NULL, subresData[i].pSysMem, subresData[i].SysMemPitch, subresData[i].SysMemSlicePitch);
                     }
                 }
-            }
-
-            if (isDepth)
-            {
-                D3D11_DEPTH_STENCIL_VIEW_DESC depthDsv;
-                ZeroMemory(&depthDsv, sizeof(depthDsv));
-                switch (format & Texture_DepthMask)
+                else
                 {
-                case Texture_Depth32f:          depthDsv.Format = DXGI_FORMAT_D32_FLOAT;            break;
-                case Texture_Depth24Stencil8:   depthDsv.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;    break;
-                case Texture_Depth16:           depthDsv.Format = DXGI_FORMAT_D16_UNORM;            break;
-                case Texture_Depth32fStencil8:  depthDsv.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT; break;
+                    Context->UpdateSubresource(tex, 0, NULL, data, width * bpp, width * height * bpp);
+                    if (format & Texture_GenMipmaps)
+                    {
+                        // TODO: Just call GenerateMips() instead
+                        OVR_ASSERT((textureFormat) == Texture_RGBA);
+                        int srcw = width, srch = height;
+                        int level = 0;
+                        uint8_t* mipmaps = NULL;
+                        do
+                        {
+                            level++;
+                            int mipw = srcw >> 1;
+                            if (mipw < 1)
+                            {
+                                mipw = 1;
+                            }
+                            int miph = srch >> 1;
+                            if (miph < 1)
+                            {
+                                miph = 1;
+                            }
+                            if (mipmaps == NULL)
+                            {
+                                mipmaps = (uint8_t*)OVR_ALLOC(mipw * miph * 4);
+                            }
+                            FilterRgba2x2(level == 1 ? (const uint8_t*)data : mipmaps, srcw, srch, mipmaps);
+                            Context->UpdateSubresource(tex, level, NULL, mipmaps, mipw * bpp, miph * bpp);
+                            srcw = mipw;
+                            srch = miph;
+                        } while (srcw > 1 || srch > 1);
 
-                default:    OVR_ASSERT(false);  depthDsv.Format = DXGI_FORMAT_D32_FLOAT;
+                        if (mipmaps != NULL)
+                        {
+                            OVR_FREE(mipmaps);
+                        }
+                    }
                 }
-                depthDsv.ViewDimension = samples > 1 ? D3D11_DSV_DIMENSION_TEXTURE2DMS : D3D11_DSV_DIMENSION_TEXTURE2D;
-                depthDsv.Texture2D.MipSlice = 0;
 
-                Ptr<ID3D11DepthStencilView> dsv;
-                hr = Device->CreateDepthStencilView(tex, &depthDsv, &dsv.GetRawRef());
-                OVR_D3D_CHECK_RET_NULL(hr);
-                NewTex->TexDsv.PushBack(dsv);
+                if (format & Texture_SwapTextureSetStatic)
+                {
+                    // We've already supplied data so commit this texture set now
+                    ovr_CommitTextureSwapChain(Session, NewTex->TextureChain);
+                }
             }
-            else if (format & Texture_RenderTarget)
-            {
-                D3D11_RENDER_TARGET_VIEW_DESC rtvd = {};
-                rtvd.Format = dsDesc.Format;
-                rtvd.Texture2D.MipSlice = 0;
-                rtvd.ViewDimension = dsDesc.SampleDesc.Count > 1 ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
 
-                Ptr<ID3D11RenderTargetView> rtv;
-                hr = Device->CreateRenderTargetView(tex, &rtvd, &rtv.GetRawRef());
-                OVR_D3D_CHECK_RET_NULL(hr);
-                NewTex->TexRtv.PushBack(rtv);
+            if (!isCompressed)
+            {
+                if (isDepth)
+                {
+                    D3D11_DEPTH_STENCIL_VIEW_DESC depthDsv;
+                    ZeroMemory(&depthDsv, sizeof(depthDsv));
+                    switch (format & Texture_DepthMask)
+                    {
+                    case Texture_Depth32f:          depthDsv.Format = DXGI_FORMAT_D32_FLOAT;            break;
+                    case Texture_Depth24Stencil8:   depthDsv.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;    break;
+                    case Texture_Depth16:           depthDsv.Format = DXGI_FORMAT_D16_UNORM;            break;
+                    case Texture_Depth32fStencil8:  depthDsv.Format = DXGI_FORMAT_D32_FLOAT_S8X24_UINT; break;
+
+                    default:    OVR_ASSERT(false);  depthDsv.Format = DXGI_FORMAT_D32_FLOAT;
+                    }
+                    depthDsv.ViewDimension = samples > 1 ? D3D11_DSV_DIMENSION_TEXTURE2DMS : D3D11_DSV_DIMENSION_TEXTURE2D;
+                    depthDsv.Texture2D.MipSlice = 0;
+
+                    Ptr<ID3D11DepthStencilView> dsv;
+                    hr = Device->CreateDepthStencilView(tex, &depthDsv, &dsv.GetRawRef());
+                    OVR_D3D_CHECK_RET_NULL(hr);
+                    NewTex->TexDsv.PushBack(dsv);
+                }
+                else if (format & Texture_RenderTarget)
+                {
+                    D3D11_RENDER_TARGET_VIEW_DESC rtvd = {};
+                    rtvd.Format = dsDesc.Format;
+                    rtvd.Texture2D.MipSlice = 0;
+                    rtvd.ViewDimension = dsDesc.SampleDesc.Count > 1 ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
+
+                    Ptr<ID3D11RenderTargetView> rtv;
+                    hr = Device->CreateRenderTargetView(tex, &rtvd, &rtv.GetRawRef());
+                    OVR_D3D_CHECK_RET_NULL(hr);
+                    NewTex->TexRtv.PushBack(rtv);
+                }
             }
         }
 

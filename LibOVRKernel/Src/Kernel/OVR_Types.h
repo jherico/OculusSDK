@@ -31,10 +31,12 @@ limitations under the License.
 #include "OVR_Compiler.h"
 
 #if defined(_WIN32) && defined(OVR_KILL_WINDOWS_A_FUNCTIONS)
-    #define NOMINMAX
-    #include <Windows.h>
+    #include "OVR_Win32_IncludeWindows.h"
     #include <commctrl.h>
+#pragma warning (push)
+#pragma warning (disable:4091)
     #include <DbgHelp.h>
+#pragma warning (pop)
     #include <ShlObj.h>
     #include <Shlwapi.h>
     #include <Sddl.h>
@@ -688,7 +690,7 @@ struct OVR_GUID
                                                                                                                    \
                     if (OVR::IsAutomationRunning() && !OVR::OVRIsDebuggerPresent())                                \
                     {                                                                                              \
-                        /* Do nothing to allow error code examination */										   \
+                        /* Do nothing to allow error code examination */                                           \
                     }                                                                                              \
                     else if (ovrAssertUserHandler && !OVR::OVRIsDebuggerPresent())                                 \
                     {                                                                                              \

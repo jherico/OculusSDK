@@ -83,8 +83,8 @@ public:
     // Returns null pointer and fills in *perror in case of parse error.
     static JSON*    Parse(const char* buff, const char** perror = 0);
 
-	// This version works for buffers that are not null terminated strings.
-	static JSON*	ParseBuffer(const char *buff, int len, const char** perror = 0);
+    // This version works for buffers that are not null terminated strings.
+    static JSON*    ParseBuffer(const char *buff, int len, const char** perror = 0);
 
     // Loads and parses a JSON object from a file.
     // Returns 0 and assigns perror with error message on fail.
@@ -109,11 +109,11 @@ public:
     JSON*           GetItemByIndex(unsigned i);
     JSON*           GetItemByName(const char* name);
 
-	// Accessors by name
-	double			GetNumberByName(const char *name, double defValue = 0.0);
-	int				GetIntByName(const char *name, int defValue = 0);
-	bool			GetBoolByName(const char *name, bool defValue = false);
-	String			GetStringByName(const char *name, const String &defValue = "");
+    // Accessors by name
+    double            GetNumberByName(const char *name, double defValue = 0.0);
+    int                GetIntByName(const char *name, int defValue = 0);
+    bool            GetBoolByName(const char *name, bool defValue = false);
+    String            GetStringByName(const char *name, const String &defValue = "");
 
     template<typename T>
     int             GetArrayByName(const char *name, T values[], int count, T defaultValue = T(0))

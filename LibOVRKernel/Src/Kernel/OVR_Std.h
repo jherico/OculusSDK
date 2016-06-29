@@ -267,6 +267,8 @@ inline char* OVR_CDECL OVR_strrchr(char* pString, int c)
     return (char*)OVR_strrchr((const char*)pString, c);
 }
 
+char* OVR_CDECL OVR_stristr(const char* s1, const char* s2);
+
 inline const uint8_t* OVR_CDECL OVR_memrchr(const uint8_t* str, size_t size, uint8_t c)
 {
     for (intptr_t i = (intptr_t)size - 1; i >= 0; i--)

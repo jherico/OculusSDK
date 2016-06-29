@@ -32,42 +32,35 @@ limitations under the License.
 #include "OVR_Std.h"
 #include "stdlib.h"
 #include "stdint.h"
+
+OVR_DISABLE_ALL_MSVC_WARNINGS()
 #include <string.h>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <map>
 #include <exception>
-
-
-//-----------------------------------------------------------------------------------
-
-// ***** Disable template-unfriendly MS VC++ warnings
-#if defined(OVR_CC_MSVC)
-#pragma warning(push)
-// Pragma to prevent long name warnings in in VC++
-#pragma warning(disable : 4503)
-#pragma warning(disable : 4786)
-// In MSVC 7.1, warning about placement new POD default initializer
-#pragma warning(disable : 4345)
+#include <new>
+#include <atomic>
+OVR_RESTORE_ALL_MSVC_WARNINGS()
+#if defined(_WIN32)
+    #include "OVR_Win32_IncludeWindows.h"
 #endif
 
-// Un-define new so that placement constructors work
-#undef new
-
 
 //-----------------------------------------------------------------------------------
-// ***** Placement new overrides
+// ***** Disable template-unfriendly MS VC++ warnings
+//
+#if defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable : 4503) // Pragma to prevent long name warnings in VC++
+    #pragma warning(disable : 4786)
+    #pragma warning(disable : 4345) // In MSVC 7.1, warning about placement new POD default initializer
+    #pragma warning(disable : 4351) // new behavior: elements of array will be default initialized
+#endif
 
-// Calls constructor on own memory created with "new(ptr) type"
-#ifndef __PLACEMENT_NEW_INLINE
-#define __PLACEMENT_NEW_INLINE
-
-#   if defined(OVR_CC_MWERKS) || defined(OVR_CC_BORLAND) || defined(OVR_CC_GNU)
-#      include <new>
-#   else
-    // Useful on MSVC
-    OVR_FORCE_INLINE void* operator new     (size_t n, void *ptr) { OVR_UNUSED(n); return ptr; }
-    OVR_FORCE_INLINE void  operator delete  (void *, void *)     { }
-#   endif
-
-#endif // __PLACEMENT_NEW_INLINE
+// Un-define new so that placement new works
+#undef new
 
 
 
@@ -244,117 +237,687 @@ OVR_FORCE_INLINE void DestructArray(T *pobj, size_t count)
 }
 
 
+
+
 //-----------------------------------------------------------------------------------
-// ***** Allocator
-
-// Allocator defines a memory allocation interface that developers can override
-// to to provide memory for OVR; an instance of this class is typically created on
-// application startup and passed into System or OVR::System constructor.
-// 
+// ***** SysMemAlloc / SysMemFree
 //
-// Users implementing this interface must provide three functions: Alloc, Free,
-// and Realloc. Implementations of these functions must honor the requested alignment.
-// Although arbitrary alignment requests are possible, requested alignment will
-// typically be small, such as 16 bytes or less.
+// System memory allocation functions. Cannot use the C runtime library. Must be able
+// to execute before the C runtime library has initialized or after it has shut down.
+//
+void* SysMemAlloc(size_t n);
+void  SysMemFree(void* p, size_t n);
 
-class Allocator
+
+
+//-----------------------------------------------------------------------------------
+// ***** StdAllocatorSysMem
+//
+// Defines a C++ std allocator, suitable for using with C++ containers.
+// This version by design uses system memory APIs instead of C++ memory APIs.
+//
+// Example usage:
+//     using namespace std;
+//     typedef vector<int, StdAllocatorSysMem<int>>                                              IntArray;
+//     typedef basic_string<char, char_traits<char>, StdAllocatorSysMem<char>>                   CharString;
+//     typedef list<int, StdAllocatorSysMem<int>>                                                IntList;
+//     typedef map<int, long, less<int>, StdAllocatorSysMem<int>>                                IntMap;
+//     typedef multimap<int, long, less<int>, StdAllocatorSysMem<int>>                           IntMultiMap;
+//     typedef set<int, less<int>, StdAllocatorSysMem<int>>                                      IntSet;
+//     typedef multiset<int, less<int>, StdAllocatorSysMem<int>>                                 IntMultiSet;
+//     typedef unordered_map<int, long, hash<int>, equal_to<int>, StdAllocatorSysMem<int>>       IntHashMap;
+//     typedef unordered_multimap<int, long, hash<int>, equal_to<int>, StdAllocatorSysMem<int>>  IntHashMultiMap;
+//     typedef unordered_set<int, hash<int>, equal_to<int>, StdAllocatorSysMem<int>>             IntHashSet;
+//     typedef unordered_multiset<int, hash<int>, equal_to<int>, StdAllocatorSysMem<int>>        IntHashMultiSet;
+//     typedef deque<int, StdAllocatorSysMem<int>>                                               IntDequeue;
+//     typedef queue<int, deque<int, StdAllocatorSysMem<int>> >                                  IntQueue;
+//     typedef priority_queue<int, vector<int, StdAllocatorSysMem<int>> >                        IntPriorityQueue;
+//     typedef stack<int, deque<int, StdAllocatorSysMem<int>> >                                  IntStack;
+// 
+template <class T>
+class StdAllocatorSysMem
 {
-    friend class System;
-
 public:
-    virtual ~Allocator()
+    typedef StdAllocatorSysMem<T> this_type;
+    typedef T                     value_type;
+    typedef value_type*           pointer;
+    typedef const value_type*     const_pointer;
+    typedef void*                 void_pointer;
+    typedef const void*           const_void_pointer;
+    typedef value_type&           reference;
+    typedef const value_type&     const_reference;
+    typedef size_t                size_type;
+    typedef ptrdiff_t             difference_type;
+
+    typedef std::false_type propagate_on_container_copy_assignment;
+    typedef std::false_type propagate_on_container_move_assignment;
+    typedef std::false_type propagate_on_container_swap;
+
+    this_type select_on_container_copy_construction() const
+    {
+        return *this;
+    }
+
+    template <class Other>
+    struct rebind
+    {
+        typedef StdAllocatorSysMem<Other> other;
+    };
+
+    pointer address(reference ref) const
+    {
+        return std::addressof(ref);
+    }
+
+    const_pointer address(const_reference ref) const
+    {
+        return std::addressof(ref);
+    }
+
+    StdAllocatorSysMem()
     {
     }
 
-    // Returns the pointer to the current globally installed Allocator instance.
+    StdAllocatorSysMem(const this_type&)
+    {
+    }
+
+    template <class Other>
+    StdAllocatorSysMem(const StdAllocatorSysMem<Other>&)
+    {
+    }
+
+    template <class Other>
+    this_type& operator=(const StdAllocatorSysMem<Other>&)
+    {
+        return *this;
+    }
+
+    bool operator==(const this_type&) const
+    {
+        return true;
+    }
+
+    void deallocate(pointer p, size_type n) const
+    {
+        if(p)
+            SysMemFree(p, n);
+    }
+
+    pointer allocate(size_type n) const
+    {
+        void* pVoid = SysMemAlloc(n * sizeof(T));
+        if(!pVoid)
+            throw ::std::bad_alloc();
+        return (pointer)pVoid;
+    }
+
+    pointer allocate(size_type n, const void*) const
+    {
+        return allocate(n);
+    }
+
+    void construct(T* p) const
+    {
+        ::new ((void*)p) T();
+    }
+
+    void construct(T* p, const T& value) const
+    {
+        ::new ((void*)p) T(value);
+    }
+
+    template <class U, class... Types>
+    void construct(U* pU, Types&&... args) const
+    {
+        ::new ((void*)pU) U(std::forward<Types>(args)...);
+    }
+
+    template <class U>
+    void destroy(U* pU) const
+    {
+        pU->~U();
+        OVR_UNUSED(pU); // VC++ mistakenly claims it's unused unless we do this.
+    }
+
+    size_t max_size() const
+    {
+        return ((size_t)(-1) / sizeof(T));
+    }
+};
+
+
+//------------------------------------------------------------------------
+// ***** Heap
+//
+// Declares a minimal interface for a memory heap.
+// Implementations of this Heap interface are expected to handle thread safety
+// themselves.
+//
+class Heap
+{
+public:
+    virtual ~Heap(){}
+
+    virtual bool  Init() = 0;
+    virtual void  Shutdown() = 0;
+
+    virtual void*  Alloc(size_t size) = 0;
+    virtual void*  AllocAligned(size_t size, size_t align) = 0;
+    virtual size_t GetAllocSize(const void* p) const = 0;
+    virtual size_t GetAllocAlignedSize(const void* p, size_t align) const = 0;
+    virtual void   Free(void* p) = 0;
+    virtual void   FreeAligned(void* p) = 0;
+    virtual void*  Realloc(void* p, size_t newSize) = 0;
+    virtual void*  ReallocAligned(void* p, size_t newSize, size_t newAlign) = 0;
+};
+
+
+class InterceptCRTMalloc;
+
+
+//------------------------------------------------------------------------
+// ***** SysAllocatedPointerVector, etc.
+//
+// We use these in our allocator functionality here.
+//
+typedef std::vector<void*, StdAllocatorSysMem<void*>> SysAllocatedPointerVector;
+typedef std::basic_string<char, std::char_traits<char>, StdAllocatorSysMem<char>> SysAllocatedString;
+typedef std::vector<SysAllocatedString, StdAllocatorSysMem<SysAllocatedString>> SysAllocatedStringVector;
+
+
+//-----------------------------------------------------------------------------------
+// ***** AllocMetadata
+//
+// Stores info about an allocation.
+//
+struct AllocMetadata
+{
+    const void*               Alloc;            // The allocation itself.
+    SysAllocatedPointerVector Backtrace;        // Array of void*
+    SysAllocatedStringVector  BacktraceSymbols; // Array of string.
+    const char*               File;             // __FILE__ of application allocation site.
+    int                       Line;             // __LINE__ of application allocation site.
+    uint64_t                  TimeNs;           // Allocator time in Nanoseconds. See GetCurrentHeapTimeNs.
+    uint64_t                  Count;            // Nth allocation in this heap. Ever increasing. Starts with 0, so the first allocation is the 0th allocation.
+    uint64_t                  AllocSize;        // Size the user requested.
+    uint64_t                  BlockSize;        // Size that was actually needed from the underlying memory.
+    const char*               Tag;              // Should this instead be a char array?
+    uint32_t                  ThreadId;         // ThreadId at the time of the allocation. May potentially be stale if the thread has exited.
+    char                      ThreadName[32];   // Thread name at the time of the allocation.
+
+    AllocMetadata()
+      : Alloc(nullptr), Backtrace(), File(nullptr), Line(0), TimeNs(0), 
+        AllocSize(0), BlockSize(0), Tag(nullptr), ThreadId(0)
+    {
+        ThreadName[0] = '\0';
+    }
+};
+
+// This is used to identify fields from AllocMetadata. For example, when printing out  
+// AllocMetadata you can use these flags to specify which fields you are interested in.
+enum AllocMetadataFlags
+{
+    AMFNone             = 0x0000,
+    AMFAlloc            = 0x0001,
+    AMFBacktrace        = 0x0002,
+    AMFBacktraceSymbols = 0x0004,
+    AMFFile             = 0x0008,
+    AMFLine             = 0x0010,
+    AMFTime             = 0x0020,   
+    AMFCount            = 0x0040,
+    AMFAllocSize        = 0x0080,
+    AMFBlockSize        = 0x0100,
+    AMFTag              = 0x0200,
+    AMFThreadId         = 0x0400,
+    AMFThreadName       = 0x0800
+};
+
+
+//-----------------------------------------------------------------------------------
+// ***** Allocator
+//
+class Allocator
+{
+public:
+    // Returns the pointer to the default Allocator instance.
     // This pointer is used for most of the memory allocations.
-    static Allocator* GetInstance();
+    // If the instance is not yet created, this function isn't thread safe 
+    // about creating it.
+    static Allocator* GetInstance(bool create = true);
 
+    // Explicitly destroys the default Allocator instance.
+    static void DestroyInstance();
 
-    // *** Standard Alignment Alloc/Free
+public:
+    Allocator(const char* allocatorName = nullptr);
+    ~Allocator();
+
+    bool Init();
+    void Shutdown();
 
     // Allocate memory of specified size with default alignment.
     // Alloc of size==0 will allocate a tiny block & return a valid pointer;
     // this makes it suitable for new operator.
-    virtual void*   Alloc(size_t size) = 0;
-    
-    // Same as Alloc, but provides an option of passing debug data.
-    virtual void*   AllocDebug(size_t size, const char* /*file*/, unsigned /*line*/)
-    { return Alloc(size); }
+    void* Alloc(size_t size, const char* tag);
 
-    // Reallocate memory block to a new size, copying data if necessary. Returns the pointer to
-    // new memory block, which may be the same as original pointer. Will return 0 if reallocation
-    // failed, in which case previous memory is still valid.
-    // Realloc to decrease size will never fail.
-    // Realloc of pointer == 0 is equivalent to Alloc
-    // Realloc to size == 0, shrinks to the minimal size, pointer remains valid and requires Free().
-    virtual void*   Realloc(void* p, size_t newSize) = 0;
-
-    // Frees memory allocated by Alloc/Realloc.
-    // Free of null pointer is valid and will do nothing.
-    virtual void    Free(void *p) = 0;
-
-
-    // *** Standard Alignment Alloc/Free
+    // Allocate zero-initialized memory of specified count and size with default alignment.
+    // Alloc of size==0 will allocate a tiny block & return a valid pointer;
+    // this makes it suitable for new operator.
+    void* Calloc(size_t count, size_t size, const char* tag);
 
     // Allocate memory of specified alignment.
     // Memory allocated with AllocAligned MUST be freed with FreeAligned.
-    // Default implementation will delegate to Alloc/Free after doing rounding.
-    virtual void*   AllocAligned(size_t size, size_t align);    
+    void* AllocAligned(size_t size, size_t align, const char* tag);
+
+    // Same as Alloc, but provides an option of passing file/line data.
+    void* AllocDebug(size_t size, const char* tag, const char* file, unsigned line);
+
+    // Same as Calloc, but provides an option of passing file/line data.
+    void* CallocDebug(size_t count, size_t size, const char* tag, const char* file, unsigned line);
+
+    // Same as Alloc, but provides an option of passing file/line data.
+    void* AllocAlignedDebug(size_t size, size_t align, const char* tag, const char* file, unsigned line);
+
+    // Returns the size of the allocation.
+    size_t GetAllocSize(const void* p) const;
+
+    // Returns the size of the aligned allocation.
+    size_t GetAllocAlignedSize(const void* p, size_t align) const;
+
+    // Frees memory allocated by Alloc/Realloc.
+    // Free of null pointer is valid and will do nothing.
+    void  Free(void *p);
+    
     // Frees memory allocated with AllocAligned.
-    virtual void    FreeAligned(void* p);
+    void  FreeAligned(void* p);
 
-protected:
-    // *** Tracking of allocations w/ callstacks for debug builds.
+    // Reallocate memory block to a new size, copying data if necessary. Returns the pointer to
+    // new memory block, which may be the same as original pointer. Will return 0 if reallocation
+    // failed, in which case previous memory is still valid (as per the C99 Standard).
+    // Realloc to decrease size will never fail.
+    // Realloc of pointer == NULL is equivalent to Alloc
+    // Realloc to size == 0, shrinks to the minimal size, pointer remains valid and requires Free.
+    void* Realloc(void* p, size_t newSize);
 
-    // Add the allocation & the callstack to the tracking database
-    void            trackAlloc(void* p, size_t size);
-    // Remove the allocation from the tracking database
-    void            untrackAlloc(void* p);
+    // Like realloc but also zero-initializes the newly added space.
+    void* Recalloc(void* p, size_t count, size_t size);
 
-    // Lock used during LibOVR execution to guard the tracked allocation list.
-    Lock TrackLock;
+    // Reallocates memory allocated with AllocAligned.
+    void* ReallocAligned(void* p, size_t newSize, size_t newAlign);
 
-protected:
-    Allocator() {}
+    void* RecallocAligned(void* p, size_t count, size_t newSize, size_t newAlign);
+
+    // Same as Realloc, but provides an option of passing file/line data.
+    void* ReallocDebug(void* p, size_t newSize, const char* file, unsigned line);
+
+    // Like ReallocDebug but also zero-initializes the newly added space.
+    void* RecallocDebug(void* p, size_t count, size_t newSize, const char* file, unsigned line);
+
+    // Same as ReallocAligned, but provides an option of passing file/line data.
+    void* ReallocAlignedDebug(void* p, size_t newSize, size_t newAlign, const char* file, unsigned line);
+
+    void* RecallocAlignedDebug(void* p, size_t count, size_t newSize, size_t newAlign, const char* file, unsigned line);
+
+    // Returns the underlying Heap implementation. 
+    const Heap* GetHeap() const
+        { return Heap; }
 
 public:
-    //------------------------------------------------------------------------
-    // ***** DumpMemory
+    // Names the Allocator. Useful for identifying one of multiple Allocators within a process.
+    // The name is copied from the allocatorName argument.
+    void SetAllocatorName(const char* allocatorName);
 
-    // Enable/disable leak tracking mode and check if currently tracking.
-    static void     SetLeakTracking(bool enabled);
-    static bool     IsTrackingLeaks();
+    const char* GetAllocatorName() const;
+
+    // If enabled then allocation tracking is done, which enables leak reports, double-free detection, etc.
+    // Must be called before the Init function.
+    bool EnableTracking(bool enable);
+
+    bool IsTrackingEnabled() const
+        { return TrackingEnabled; }
+
+    // If enabled then the debug page is used. 
+    // Must be called before the Init function.
+    bool EnableDebugPageHeap(bool enable);
+
+    bool IsDebugPageHeapEnabled() const
+        { return DebugPageHeapEnabled; }
+
+    bool IsOSHeapEnabled() const
+        { return OSHeapEnabled; }
+
+    // If enabled then a debug trace of existing allocations occurs on destruction of this Allocator.
+    bool EnableAllocationTraceOnShutdown(bool enable)
+        { TraceAllocationsOnShutdown = enable; return true; }
+
+    bool IsAllocationTraceOnShutdownEnabled() const
+        { return TraceAllocationsOnShutdown; }
+
+    bool EnableMallocRedirect();
+
+    bool IsMallocRedirectEnabled() const
+        { return MallocRedirectEnabled; }
+
+    // IterateHeapBegin succeeds only if tracking is enabled.
+    // Once IterateHeapBegin is called, the heap is thread-locked until IterateHeapEnd is called.
+    // If the heap has no allocations, IterateHeapBegin returns nullptr.
+    // You must always call IterateHeapEnd if you call IterateHeapBegin, regardless of the return value of IterateHeapBegin.
+    // For a given thread, IterataHeapBegin must be followed by IterateHeapEnd before any new call to IterateHeapBegin.
+    //
+    // Example usage:
+    //     for(const OVR::AllocMetadata* amd = allocator->IterateHeapBegin(); amd; amd = allocator->IterateHeapNext())
+    //         { ... }
+    //     allocator->IterateHeapEnd();
+    const AllocMetadata* IterateHeapBegin();
+    const AllocMetadata* IterateHeapNext();
+    void                 IterateHeapEnd();
+
+    // Given an AllocationMetaData, this function writes it to a string description.
+    // For amdFlags, see AllocMetadataFlags. 
+    // Returns the required strlen of the description (like the strlcpy function, etc.)
+    size_t DescribeAllocation(const AllocMetadata* amd, int amdFlags, char* description, size_t descriptionCapacity, size_t appendedNewlineCount);
 
     // Displays information about outstanding allocations, typically for the 
     // purpose of reporting leaked memory on application or module shutdown.
     // This should be used instead of, for example, VC++ _CrtDumpMemoryLeaks 
     // because it allows us to dump additional information about our allocations.
     // Returns the number of currently outstanding heap allocations.
-    static int      DumpMemory();
+    // If the callback is valid, this function iteratively calls the callback with 
+    // output. If the callback is nullptr then this function debug-traces the output.
+    // The callback context is an arbitrary user-supplied value.
+    //
+    // Example usage:
+    //     void AllocationTraceCallback(uintptr_t context, const char* text)
+    //         { printf("%s", text); }
+    //     allocator->TraceTrackedAllocations(AllocationTraceCallback, 0);
+    //
+    typedef void (*AllocationTraceCallback)(uintptr_t context, const char* text);
+    size_t TraceTrackedAllocations(AllocationTraceCallback callback, uintptr_t context);
+
+public:
+    // Returns the current heap time in nanoseconds. The returned time is with respect 
+    // to first heap startup, which in practice equates to the application start time.
+    static uint64_t GetCurrentHeapTimeNs();
+
+    // Returns the allocation counter, which indicates the historical count of calls 
+    // to allocation functions. This is an ever-increasing number and not the count 
+    // of outstanding allocations. To get the count of outstanding allocations, use the 
+    // heap iteration functionality.
+    uint64_t GetCounter() const
+        { return CurrentCounter; }
+
+    uint64_t GetAndUpdateCounter()
+        { return CurrentCounter++; } // Post-increment here is by design.
+
+protected:
+    void SetNewBlockMetadata(Allocator* allocator, AllocMetadata& amd, const void* alloc, uint64_t allocSize, uint64_t blockSize, 
+                                const char* file, int line, const char* tag, void** backtraceArray, size_t backtraceArraySize);
+
+    // Add the allocation & the callstack to the tracking database.
+    void TrackAlloc(const void* p, size_t size, const char* tag, const char* file, int line);
+
+    // Remove the allocation from the tracking database (if tracking is enabled).
+    // Returns true if p appears to be valid or if tracking is disabled.
+    // Returns false for NULL and for values not found in our tracking map.
+    bool UntrackAlloc(const void* p);
+
+    // Returns true if the allocation is being tracked.
+    // Returns true if p appears to be valid or if tracking is disabled.
+    // Returns false for NULL and for values not found in our tracking map.
+    bool IsAllocTracked(const void* p);
+
+    // Returns a copy of the AllocMetadata. 
+    bool GetAllocMetadata(const void* p, AllocMetadata& metadata);
+
+public:
+    // Tag push/pop API
+
+    // Every PushTag must be matched by a PopTag. It's easiest to do this via the AllocatorTagScope utility class.
+    void PushTag(const char* tag);
+
+    // Matches a PushTag. 
+    void PopTag();
+
+    // Gets the current tag for the current thread. 
+    // Returns a default string if there is no current tag set for the current thread.
+    const char* GetTag(const char* defaultTag = nullptr);
+
+protected:
+    // This is called periodically to purge the map of elements that correspond to threads that no longer exist.
+    void PurgeTagMap();
+
+protected:
+    // Tracked allocations
+    #if defined(OVR_BUILD_DEBUG)
+        typedef std::map<const void*, AllocMetadata, std::less<const void*>, // map is slower but in debug builds we can read its sorted contents easier.
+                          StdAllocatorSysMem<std::pair<const void*, AllocMetadata> > > TrackedAllocMap; 
+    #else
+        typedef std::unordered_map<const void*, AllocMetadata, std::hash<const void*>, std::equal_to<const void*>, 
+                          StdAllocatorSysMem<std::pair<const void*, AllocMetadata> > > TrackedAllocMap; 
+    #endif
+
+    // Per-thread tag stack
+    typedef std::vector<const char*, StdAllocatorSysMem<const char*>> ConstCharVector;
+    #if defined(OVR_BUILD_DEBUG)
+        typedef std::map<uint32_t, ConstCharVector, std::less<uint32_t>, 
+                          StdAllocatorSysMem<ConstCharVector>> ThreadIdToTagVectorMap; 
+    #else
+        typedef std::unordered_map<uint32_t, ConstCharVector, std::hash<uint32_t>, std::equal_to<uint32_t>, 
+                          StdAllocatorSysMem<ConstCharVector>> ThreadIdToTagVectorMap; 
+    #endif
+
+    char                            AllocatorName[64];           // The name of this allocator. Useful because we could have multiple instances within a process.
+    Heap*                           Heap;                        // The underlying heap we are using.
+    bool                            DebugPageHeapEnabled;        // If enabled then we use our DebugPageHeap instead of DefaultHeap or OSheap.
+    bool                            OSHeapEnabled;               // If enabled then we use our OSHeap instead of DebugPageHeap or DefaultHeap.
+    bool                            MallocRedirectEnabled;       // If enabled then we redirect CRT malloc to ourself (only if we are the default global allocator).
+    InterceptCRTMalloc*             MallocRedirect;              // 
+    bool                            TrackingEnabled;             // 
+    bool                            TraceAllocationsOnShutdown;  // If true then we do a debug trace of allocations on our shutdown.
+    OVR::Lock                       TrackLock;                   // Thread-exclusive access to AllocationMap.
+    TrackedAllocMap::const_iterator TrackIterator;               // Valid only between IterateHeapBegin and IterateHeapEnd.
+    TrackedAllocMap                 AllocationMap;               // 
+    SysAllocatedPointerVector       DelayedFreeList;             // Used when we are overriding CRT malloc and need to call CRT free on some pointers after we've restored it.
+    SysAllocatedPointerVector       DelayedAlignedFreeList;      // "
+    std::atomic_ullong              CurrentCounter;              // Ever-increasing count of allocation requests.
+    bool                            SymbolLookupEnabled;         //
+    ThreadIdToTagVectorMap          TagMap;                      // 
+    OVR::Lock                       TagMapLock;                  // Thread-exclusive access to TagMap.
+    static Allocator*               DefaultAllocator;            // Default instance.
+    static uint64_t                 ReferenceHeapTimeNs;         // The time that GetCurrentHeapTimeNs reports relative to. In practice this is the time of application startup.
+
+public:
+    // The following functions are deprecated and will be removed in the future. Use the member functions instead.
+    static void SetLeakTracking(bool enabled)
+        { GetInstance()->EnableTracking(enabled); }
+
+    static bool IsTrackingLeaks()
+        { return GetInstance()->IsTrackingEnabled(); }
+
+    static int DumpMemory()
+        { return (int)GetInstance()->TraceTrackedAllocations(nullptr, 0); }
 };
 
 
+
+// This allows for providing an intelligent filter for heap iteration.
+// It provides an RPN (a.k.a. postfix) language for executing a filter of ORs and ANDs.
+// We have this RPN language because implementing a string parsing system 
+// is currently outside the complexity scope of this module. An RPN scheme
+// can be implemented in just 100 lines or code or so.
+//
+// An RPN language works by having a list of instructions which cause pushes
+// and pops of data on a stack. In our case the stack consists only of bools.
+// We want to evaluate expressions such as the following:
+//     (Size > 10)
+//     (Size > 10) && (Size < 32)
+//     ((Size > 10) && (Size < 32)) || (Time > 100)
+//     ((Size > 10) && (Size < 32)) || ((Time > 100) && (Time < 200))
+// 
+// The user specifies the instructions via newline-delimited strings. Here are
+// examples for each of the above.
+// Example 1:
+//    (Size > 10)
+//        ->
+//    "Size > 10"                   Push the result of this on the stack.
+//
+// Example 2:
+//    (Size > 10) && (Size < 32)
+//        ->
+//    "Size > 10\n                  Push the result of this on the stack.
+//     Size < 32\n                  Push the result of this on the stack.
+//     and"                         Pop the two (AllocSize results), push the result the the AND of the two.
+//
+// Example 3:
+//    ((Size > 10) && (Size < 32)) || (Time > 100)
+//        ->
+//    "Size > 10\n                  Push the result of this on the stack.
+//     Size < 32\n                  Push the result of this on the stack.
+//     and\n                        Pop the two (AllocSize results), push the result the the AND of the two.
+//     Time > 100s\n                Push the result of this on the stack.
+//     or"                          Pop the two (AllocSize AND result and Time result), push the result of the OR of the two.
+//
+// Example 4:
+//    ((Size > 10) && (Size < 32)) || ((Time > 100) && (Time < 200))
+//        ->
+//    "Size > 10\n                  Push the result of this on the stack.
+//     Size < 32\n                  Push the result of this on the stack.
+//     and\n                        Pop the two (AllocSize results), push the result the the AND of the two.
+//     Time > 100s\n                Push the result of this on the stack.
+//     Time < 200s\n                Push the result of this on the stack.
+//     and\n                        Pop the two (Time results), push the result the the AND of the two.
+//     or"                          Pop the two (AllocSize AND result and Time AND result), push the result of the OR of the two.
+// 
+// The operands available and their forms are:
+//      Operand                  Compare         Comparand       Notes
+//      ------------------------------------------------------------------------
+//      File                     ==,has          <string>        case-insensitive. has means substring check.
+//      Line                     ==,<,<=,>,>=    <integer>
+//      Time                     ==,<,<=,>,>=    <integer>[s]    time in nanoseconds (or seconds if followed by s). A negative time means relative to now.
+//      Count                    ==,<,<=,>,>=    <integer>       A negative count means to return the last nth allocation(s).
+//      AllocSize (or just Size) ==,<,<=,>,>=    <integer>       
+//      BlockSize                ==,<,<=,>,>=    <integer>
+//      Tag                      ==,has          <string>        case insensitive. has means substring check.
+//      ThreadId                 ==,<,<=,>,>=    <integer>       <,<=,>,>= are usually useless but provided for consistency with other integer types.
+//      ThreadName               ==,has          <string>        case insensitive. has means substring check.
+//
+struct HeapIterationFilterRPN
+{
+    HeapIterationFilterRPN();
+
+    bool SetFilter(Allocator* allocator, const char* filter);
+
+    // This is the same as Allocator::IterateHeapBegin, except it returns only 
+    // values that match the filter specification.
+    const AllocMetadata* IterateHeapBegin();
+    const AllocMetadata* IterateHeapNext();
+    void                 IterateHeapEnd();
+
+    // This is a one-shot filtered tracing function. 
+    // Example usage:
+    //     auto printfCallback = [](uintptr_t, const char* text)->void{ printf("%s\n", text); };
+    //     HeapIterationFilterRPN::TraceTrackedAllocations(&allocator, "Count < 400", printfCallback, 0);
+    static void TraceTrackedAllocations(Allocator* allocator, const char* filter, Allocator::AllocationTraceCallback callback, uintptr_t context);
+
+protected:
+    enum Operation{ OpNone, OpAnd, OpOr };
+    enum Comparison{ CmpNone, CmpE, CmpL, CmpLE, CmpG, CmpGE, CmpHas };
+
+    struct Operand
+    {
+        AllocMetadataFlags metadataType;  // e.g. AMFAllocSize
+        Comparison         comparison;    // e.g. CmpLE
+        int64_t            numValue;      // Applies to numeric AllocMetadataFlags types.
+        char               strValue[256]; // Applies to string AllocMetadataFlags types.
+
+        Operand() : metadataType(AMFNone), comparison(CmpNone), numValue(0), strValue{} {}
+    };
+
+    // An instruction is either an operation or an operand. We could use a union to represent
+    // that but it would complicate our declarations here. Instead we declare both types one
+    // after the other. If the operation type is none, then this entry is an operand instead 
+    // of an operation.
+    struct Instruction
+    {
+        Operation operation;
+        Operand   operand; 
+    };
+
+    bool Compile(const char* filter);           // Returns false upon syntax error.
+    bool Evaluate(const AllocMetadata* amd);    // Returns true if amd matches the filter.
+    bool EvaluateOperand(const Operand& operand, const AllocMetadata* amd) const;
+
+protected:
+    Allocator*  AllocatorInstance;      // The Allocator we execute the filter against.
+    const char* Filter;                 // The string-based filter gets converted into the Instructions, which can be executed per alloc.
+    Instruction Instructions[32];       // Array of instructions to execute. 0-terminated.
+    uint64_t    CurrentHeapTimeNs;      // The time at the start of evaluation. Used for time comparisons.
+};
+
+
+
+
+
 //------------------------------------------------------------------------
-// ***** DefaultAllocator
-
-// This allocator is created and used if no other allocator is installed.
-// Default allocator delegates to system malloc.
-
-class DefaultAllocator : public Allocator
+// ***** DefaultHeap
+//
+// Delegates to malloc.
+// This heap is created and used if no other heap is installed.
+//
+class DefaultHeap : public Heap
 {
 public:
-    virtual void*   Alloc(size_t size);
-    virtual void*   AllocDebug(size_t size, const char* file, unsigned line);
-    virtual void*   Realloc(void* p, size_t newSize);
-    virtual void    Free(void *p);
+    virtual bool  Init();
+    virtual void  Shutdown();
+
+    virtual void*  Alloc(size_t size);
+    virtual void*  AllocAligned(size_t size, size_t align);
+    virtual size_t GetAllocSize(const void* p) const;
+    virtual size_t GetAllocAlignedSize(const void* p, size_t align) const;
+    virtual void   Free(void* p);
+    virtual void   FreeAligned(void* p);
+    virtual void*  Realloc(void* p, size_t newSize);
+    virtual void*  ReallocAligned(void* p, size_t newSize, size_t newAlign);
 };
 
 
+
 //------------------------------------------------------------------------
-// ***** DebugPageAllocator
+// ***** OSHeap
+//
+// Delegates to OS heap functions instead of malloc/free/new/delete.
+//
+class OSHeap : public Heap
+{
+public:
+    OSHeap();
+   ~OSHeap();
+
+    virtual bool  Init();
+    virtual void  Shutdown();
+
+    virtual void*  Alloc(size_t size);
+    virtual void*  AllocAligned(size_t size, size_t align);
+    virtual size_t GetAllocSize(const void* p) const;
+    virtual size_t GetAllocAlignedSize(const void* p, size_t align) const;
+    virtual void   Free(void* p);
+    virtual void   FreeAligned(void* p);
+    virtual void*  Realloc(void* p, size_t newSize);
+    virtual void*  ReallocAligned(void* p, size_t newSize, size_t newAlign);
+
+protected:
+    #if defined(_WIN32)
+        HANDLE Heap;    // Windows heap handle.
+    #endif
+};
+
+
+
+//------------------------------------------------------------------------
+// ***** DebugPageHeap
 // 
-// Implements a page-protected allocator:
+// Implements a page-protected heap:
 //   Detects use-after-free and memory overrun bugs immediately at the time of usage via an exception.
 //   Can detect a memory read or write beyond the valid memory immediately at the 
 //       time of usage via an exception (if EnableOverrunDetection is enabled). 
@@ -409,7 +972,7 @@ public:
 //
 // Technical design for Mac and Linux platforms:
 //   Apple's XCode malloc functionality includes something called MallocGuardEdges which is similar
-//       to DebugPageAllocator, though it protects only larger sized allocations and not smaller ones.
+//       to DebugPageHeap, though it protects only larger sized allocations and not smaller ones.
 //   Our approach for this on Mac and Linux is to use mmap and mprotect in a way similar to VirtualAlloc and 
 //       VirtualProtect. Unix doesn't have the concept of Windows MEM_RESERVE vs. MEM_COMMIT, but we can 
 //       simulate MEM_RESERVE by having an extra page that's PROT_NONE instead of MEM_RESERVE. Since Unix  
@@ -420,7 +983,7 @@ public:
 //   Alloc sizes can be any size_t >= 0.
 //   An alloc size of 0 returns a non-nullptr.
 //   Alloc functions may fail (usually due to insufficent memory), in which case they return nullptr.
-//   All returned allocations are aligned on a power-of-two boundary of at least DebugPageAllocator::DefaultAlignment.
+//   All returned allocations are aligned on a power-of-two boundary of at least DebugPageHeap::DefaultAlignment.
 //   AllocAligned supports any alignment power-of-two value from 1 to 256. Other values result in undefined behavior.
 //   AllocAligned may return a pointer that's aligned greater than the requested alignment.
 //   Realloc acts as per the C99 Standard realloc.
@@ -430,13 +993,13 @@ public:
 //   Allocations made with AllocAligned or ReallocAligned must be Freed via FreeAligned, as per the base class requirement.
 //
 
-class DebugPageAllocator : public Allocator
+class DebugPageHeap : public Heap
 {
 public:
-    DebugPageAllocator();
-    virtual ~DebugPageAllocator();
+    DebugPageHeap();
+    virtual ~DebugPageHeap();
 
-    void  Init();
+    bool  Init();
     void  Shutdown();
 
     void   SetMaxDelayedFreeCount(size_t delayedFreeCount); // Sets how many freed blocks we should save before purging the oldest of them.
@@ -445,11 +1008,12 @@ public:
 
     void*  Alloc(size_t size);
     void*  AllocAligned(size_t size, size_t align);
+    size_t GetAllocSize(const void* p) const { return GetUserSize(p); }
+    size_t GetAllocAlignedSize(const void* p, size_t /*align*/) const { return GetUserSize(p); }
     void*  Realloc(void* p, size_t newSize);
     void*  ReallocAligned(void* p, size_t newSize, size_t newAlign);
     void   Free(void* p);
     void   FreeAligned(void* p);
-    size_t GetAllocSize(const void* p) const { return GetUserSize(p); }
     size_t GetPageSize() const { return PageSize; }
 
 protected:
@@ -500,6 +1064,102 @@ protected:
     void  DisablePageMemory(void* pPageMemory, size_t blockSize);
     void  FreePageMemory(void* pPageMemory, size_t blockSize);
 };
+
+
+
+///------------------------------------------------------------------------
+/// ***** AllocatorTagScope
+///
+/// Implements automated setting of a current tag for an allocator.
+/// This allows for easier tagging of memory by subsystem usage.
+///
+/// Example usage:
+///    void Geometry::GenerateGeometry()
+///    {
+///        AllocatorTagScope tagScope("geometry"); // Registers a tag with the default allocator. Will unregister it at function exit.
+///
+///        Indices.push_back(1234);         // The allocation that results from each of these
+///        MemberPtr = OVR_ALLOC(1234);     // calls will be tagged with "geometry".
+///    }
+///
+class AllocatorTagScope
+{
+public:
+    AllocatorTagScope(const char* tag = nullptr, Allocator* allocator = nullptr)
+    {
+        Tag = tag;
+
+        if (!allocator)
+            allocator = Allocator::GetInstance(false);
+
+        Allocator = allocator;
+
+        if (Allocator)
+            Allocator->PushTag(tag);
+    }
+
+    ~AllocatorTagScope()
+    {
+        if (Allocator)
+            Allocator->PopTag();
+    }
+
+    const char* GetTag() const
+    {
+        return Tag;
+    }
+
+protected:
+    const char* Tag;
+    Allocator*  Allocator;
+};
+
+
+
+
+
+// AllocatorTraceDbgCmd
+//
+// This is a debug command that lets you dump a heap trace into a file, with a given filter specification.
+//
+extern const char* allocatorTraceDbgCmdName;
+extern const char* allocatorTraceDbgCmdUsage;
+extern const char* allocatorTraceDbgCmdDesc;
+extern const char* allocatorTraceDbgCmdDoc;
+extern int AllocatorTraceDbgCmd(const std::vector<std::string>& args, std::string* output);
+
+
+// AllocatorEnableTrackingDbgCmd
+//
+// This is a debug command that lets you enable tracing in the Allocator.
+//
+extern const char* allocatorEnableTrackingDbgCmdName;
+extern const char* allocatorEnableTrackingDbgCmdUsage;
+extern const char* allocatorEnableTrackingDbgCmdDesc;
+extern const char* allocatorEnableTrackingDbgCmdDoc;
+extern int AllocatorEnableTrackingDbgCmd(const std::vector<std::string>&, std::string* output);
+
+
+// AllocatorDisableTrackingDbgCmd
+//
+// This is a debug command that lets you disable tracing in the Allocator.
+//
+extern const char* allocatorDisableTrackingDbgCmdName;
+extern const char* allocatorDisableTrackingDbgCmdUsage;
+extern const char* allocatorDisableTrackingDbgCmdDesc;
+extern const char* allocatorDisableTrackingDbgCmdDoc;
+extern int AllocatorDisableTrackingDbgCmd(const std::vector<std::string>&, std::string* output);
+
+
+// AllocatorReportStateDbgCmd
+//
+// This is a debug command that lets you report the current general state of the default allocator.
+//
+extern const char* allocatorReportStateDbgCmdName;
+extern const char* allocatorReportStateDbgCmdUsage;
+extern const char* allocatorReportStateDbgCmdDesc;
+extern const char* allocatorReportStateDbgCmdDoc;
+extern int AllocatorReportStateDbgCmd(const std::vector<std::string>&, std::string* output);
 
 
 
@@ -597,7 +1257,7 @@ protected:
 /// Implements a C++ array version of OVR_malloca/OVR_freea.
 /// Expresses failure via a nullptr return value and not via a C++ exception.
 /// If a handled C++ exception occurs midway during construction in OVR_newa, 
-//  there is no automatic destruction of the successfully constructed elements.
+/// there is no automatic destruction of the successfully constructed elements.
 ///
 /// Declarations:
 ///     T*   OVR_newa(T, size_t count);
@@ -615,7 +1275,6 @@ protected:
 ///         }
 ///     }
 ///
-
 #if !defined(OVR_newa)
     #define OVR_newa(T, count) OVR::newa_Impl<T>(static_cast<char*>(OVR_malloca(count * sizeof(T))), count)
 #endif
@@ -651,37 +1310,61 @@ void deletea_Impl(T* pTArray)
 
 
 
-
-
 //------------------------------------------------------------------------
-// ***** Memory Allocation Macros
-
-// These macros should be used for global allocation. In the future, these
-// macros will allows allocation to be extended with debug file/line information
-// if necessary.
-
-#define OVR_REALLOC(p,s)        OVR::Allocator::GetInstance()->Realloc((p),(s))
-#define OVR_FREE(p)             OVR::Allocator::GetInstance()->Free((p))
-#define OVR_ALLOC_ALIGNED(s,a)  OVR::Allocator::GetInstance()->AllocAligned((s),(a))
-#define OVR_FREE_ALIGNED(p)     OVR::Allocator::GetInstance()->FreeAligned((p))
-
-#ifdef OVR_BUILD_DEBUG
-#define OVR_ALLOC(s)            OVR::Allocator::GetInstance()->AllocDebug((s), __FILE__, __LINE__)
-#define OVR_ALLOC_DEBUG(s,f,l)  OVR::Allocator::GetInstance()->AllocDebug((s), f, l)
-#else
-#define OVR_ALLOC(s)            OVR::Allocator::GetInstance()->Alloc((s))
-#define OVR_ALLOC_DEBUG(s,f,l)  OVR::Allocator::GetInstance()->Alloc((s))
+// ***** OVR_DEBUG_HEAP_FILE_LINE_ENABLED
+//
+// Defined as 0 or 1.
+// This is controlled by a #define because if we always compiled this code 
+// then release builds would have lots of file names in the binaries.
+//
+#ifndef OVR_DEBUG_HEAP_FILE_LINE_ENABLED
+    #if defined(OVR_BUILD_DEBUG)
+        #define OVR_DEBUG_HEAP_FILE_LINE_ENABLED 1
+    #else
+        #define OVR_DEBUG_HEAP_FILE_LINE_ENABLED 0
+    #endif
 #endif
 
 
 //------------------------------------------------------------------------
+// ***** Memory Allocation Macros
+//
+// These macros should be used for global allocation. In the future, these
+// macros will allows allocation to be extended with debug file/line information
+// if necessary.
 
+#define OVR_REALLOC(p, size)            OVR::Allocator::GetInstance()->Realloc((p), (size))
+#define OVR_FREE(p)                     OVR::Allocator::GetInstance()->Free((p))
+#define OVR_FREE_ALIGNED(p)             OVR::Allocator::GetInstance()->FreeAligned((p))
+
+#if OVR_DEBUG_HEAP_FILE_LINE_ENABLED
+    #define OVR_ALLOC_TAGGED(size, tag)                     OVR::Allocator::GetInstance()->AllocDebug((size), (tag), __FILE__, __LINE__)
+    #define OVR_ALLOC(size)                                 OVR::Allocator::GetInstance()->AllocDebug((size), nullptr, __FILE__, __LINE__)
+    #define OVR_ALLOC_ALIGNED_TAGGED(size, align, tag)      OVR::Allocator::GetInstance()->AllocAlignedDebug((size), (align), (tag), __FILE__, __LINE__)
+    #define OVR_ALLOC_ALIGNED(size, align)                  OVR::Allocator::GetInstance()->AllocAlignedDebug((size), (align), nullptr, __FILE__, __LINE__)
+    #define OVR_ALLOC_DEBUG(size, file, line)               OVR::Allocator::GetInstance()->AllocDebug((size), nullptr, (file), (line))
+    #define OVR_ALLOC_DEBUG_TAGGED(size, tag, file, line)   OVR::Allocator::GetInstance()->AllocDebug((size), (tag), (file), (line))
+#else
+    #define OVR_ALLOC_TAGGED(size, tag)                     OVR::Allocator::GetInstance()->Alloc((size), (tag))
+    #define OVR_ALLOC(size)                                 OVR::Allocator::GetInstance()->Alloc((size), nullptr)
+    #define OVR_ALLOC_ALIGNED_TAGGED(size, align, tag)      OVR::Allocator::GetInstance()->AllocAligned((size), (align), (tag))
+    #define OVR_ALLOC_ALIGNED(size, align)                  OVR::Allocator::GetInstance()->AllocAligned((size), (align), nullptr)
+    #define OVR_ALLOC_DEBUG(size, file, line)               OVR::Allocator::GetInstance()->Alloc((size), nullptr)
+    #define OVR_ALLOC_DEBUG_TAGGED(size, tag, file, line)   OVR::Allocator::GetInstance()->Alloc((size), (tag))
+#endif
+
+
+
+
+
+//------------------------------------------------------------------------
+// ***** NewOverrideBase
+//
 // Base class that overrides the new and delete operators.
 // Deriving from this class, even as a multiple base, incurs no space overhead.
 class NewOverrideBase
 {
 public:
-
     // Redefine all new & delete operators.
     OVR_MEMORY_REDEFINE_NEW(NewOverrideBase)
 };
@@ -702,13 +1385,19 @@ void  SafeMMapFree (const void* memory, size_t size);
 } // OVR
 
 
+//------------------------------------------------------------------------
+// ***** OVR_DEFINE_NEW
+//
 // Redefine operator 'new' if necessary.
+// This allows us to remap all usage of new to something different.
+//
 #if defined(OVR_DEFINE_NEW)
-#define new OVR_DEFINE_NEW
+    #define new OVR_DEFINE_NEW
 #endif
 
-#if defined(OVR_CC_MSVC)
-#pragma warning(pop)
+
+#if defined(_MSC_VER)
+    #pragma warning(pop)
 #endif
 
 #endif // OVR_Allocator_h

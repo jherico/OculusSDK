@@ -37,6 +37,7 @@ limitations under the License.
 
 namespace ovrlog {
 
+
 //-----------------------------------------------------------------------------
 // Channel
 
@@ -135,8 +136,13 @@ extern "C"
 // Shutdown the logging system and release memory
 void ShutdownLogging()
 {
-    ovrlog::OutputWorker::GetInstance()->Stop();
+    // This function needs to be robust to multiple calls in a row
+    if (OutputWorkerInstValid)
+    {
+        ovrlog::OutputWorker::GetInstance()->Stop();
+    }
 }
+
 
 //-----------------------------------------------------------------------------
 // Log Output Worker Thread
@@ -145,6 +151,12 @@ OutputWorker* OutputWorker::GetInstance()
 {
     static OutputWorker worker;
     return &worker;
+}
+
+void OutputWorkerAtExit()
+{
+    // This function needs to be robust to multiple calls in a row
+    ShutdownLogging();
 }
 
 OutputWorker::OutputWorker() :
@@ -263,7 +275,10 @@ void OutputWorker::Start()
         return; // Nothing to do!
     }
 
-    Configurator::GetInstance()->RestoreAllChannelLogLevels();
+    // RestoreAllChannelLogLevelsNoLock is used to address http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2008/n2660.htm
+    // Section 6.7
+    // RestoreAllChannelLogLevelsNoLock otherwise invokes OutputWorker::GetInstance() whose constructor hasn't finished yet
+    Configurator::GetInstance()->RestoreAllChannelLogLevelsNoLock();
 
     if (!WorkerTerminator.Initialize())
     {
@@ -286,10 +301,16 @@ void OutputWorker::Start()
         LOGGING_DEBUG_BREAK();
         return;
     }
+
+    // Note this may queue more than one OutputWorkerAtExit() call.
+    // This function needs to be robust to multiple calls in a row
+    std::atexit(&OutputWorkerAtExit);
 }
 
 void OutputWorker::Stop()
 {
+    // This function needs to be robust to multiple calls in a row
+
     // Hold start-stop lock to prevent Start() and Stop() from being called at the same time.
     Locker startStopLocker(StartStopLock);
 
@@ -869,7 +890,11 @@ void Configurator::RestoreChannelLogLevel(const char* channelName)
 void Configurator::RestoreAllChannelLogLevels()
 {
     Locker locker(OutputWorker::GetInstance()->GetChannelsLock());
+    RestoreAllChannelLogLevelsNoLock();
+}
 
+void Configurator::RestoreAllChannelLogLevelsNoLock()
+{
     for (ChannelNode* channelNode = ChannelNodeHead; channelNode; channelNode = channelNode->Next)
     {
         RestoreChannelLogLevel(channelNode->SubsystemName);

@@ -1029,12 +1029,15 @@ namespace OVR { namespace Render {
         {
         case Texture_R:            return w*h;
         case Texture_RGBA:         return w*h*4;
-        case Texture_DXT1: {
+        case Texture_BC1: {
             int bw = (w+3)/4, bh = (h+3)/4;
             return bw * bh * 8;
                            }
-        case Texture_DXT3:
-        case Texture_DXT5: {
+        case Texture_BC2:
+        case Texture_BC3:
+        case Texture_BC6U:
+        case Texture_BC6S:
+        case Texture_BC7: {      
             int bw = (w+3)/4, bh = (h+3)/4;
             return bw * bh * 16;
                            }

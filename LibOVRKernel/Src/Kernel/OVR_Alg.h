@@ -145,6 +145,13 @@ template <typename T> OVR_FORCE_INLINE int     Chop(T f)
 template <typename T> OVR_FORCE_INLINE T       Lerp(T a, T b, T f) 
 { return (b - a) * f + a; }
 
+// Smooth transition between 0..1 that has 0 first derivative at 0 and 1.
+template<typename T> OVR_FORCE_INLINE const T SmoothStep(const T s)
+{ return s*s*(s*T(-2) + T(3)); }
+
+// Same as SmoothStep but with 0 first and second derivatives at 0 and 1
+template<typename T> OVR_FORCE_INLINE const T SmootherStep(const T s)
+{ return s*s*s*(s*(s * T(6) - T(15)) + T(10)); }
 
 // These functions stand to fix a stupid VC++ warning (with /Wp64 on):
 // "warning C4267: 'argument' : conversion from 'size_t' to 'const unsigned', possible loss of data"
@@ -533,10 +540,10 @@ typename Array::ValueType& Median(Array& arr)
     size_t mid = (count - 1) / 2;
     OVR_ASSERT(count > 0);
 
-	for (size_t j = 0; j <= mid; j++)
+    for (size_t j = 0; j <= mid; j++)
     {
-		size_t min = j;
-		for (size_t k = j + 1; k < count; k++)
+        size_t min = j;
+        for (size_t k = j + 1; k < count; k++)
             if (arr[k] < arr[min]) 
                 min = k;
         Swap(arr[j], arr[min]);
@@ -719,7 +726,7 @@ public:
     ArrayAdaptor() : Data(0), Size(0) {}
     ArrayAdaptor(T* ptr, size_t size) : Data(ptr), Size(size) {}
     size_t GetSize() const { return Size; }
-	int GetSizeI() const { return (int)GetSize(); }
+    int GetSizeI() const { return (int)GetSize(); }
     const T& operator [] (size_t i) const { return Data[i]; }
           T& operator [] (size_t i)       { return Data[i]; }
 private:
@@ -740,8 +747,8 @@ public:
     ConstArrayAdaptor() : Data(0), Size(0) {}
     ConstArrayAdaptor(const T* ptr, size_t size) : Data(ptr), Size(size) {}
     size_t GetSize() const { return Size; }
-	int GetSizeI() const { return (int)GetSize(); }
-	const T& operator [] (size_t i) const { return Data[i]; }
+    int GetSizeI() const { return (int)GetSize(); }
+    const T& operator [] (size_t i) const { return Data[i]; }
 private:
     const T* Data;
     size_t   Size;

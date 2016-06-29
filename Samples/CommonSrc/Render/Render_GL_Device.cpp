@@ -1205,9 +1205,12 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
     case Texture_Depth16:           OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH_COMPONENT16;   gltype = GL_UNSIGNED_SHORT; break;
     case Texture_Depth24Stencil8:   OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH24_STENCIL8;    gltype = GL_UNSIGNED_INT; break;
     case Texture_Depth32fStencil8:  OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH32F_STENCIL8;   gltype = GL_FLOAT; break;
-    case Texture_DXT1:              glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
-    case Texture_DXT3:              glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
-    case Texture_DXT5:              glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
+    case Texture_BC1:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
+    case Texture_BC2:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
+    case Texture_BC3:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
+    case Texture_BC6U:              glformat = GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB; break;
+    case Texture_BC6S:              glformat = GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB; break;
+    case Texture_BC7:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB : GL_COMPRESSED_RGBA_BPTC_UNORM_ARB; break;
     default: OVR_FAIL();            return NULL;
     }
     int samples = format & Texture_SamplesMask;

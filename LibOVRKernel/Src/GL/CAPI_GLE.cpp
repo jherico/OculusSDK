@@ -948,7 +948,7 @@ limitations under the License.
             // These need to be loaded via LoadLibrary instead of wglLoadLibrary.
 
             #if 0
-        	HINSTANCE hOpenGL = LoadLibraryW(L"Opengl32.dll");
+            HINSTANCE hOpenGL = LoadLibraryW(L"Opengl32.dll");
             if(hOpenGL)
             {
                 wglCopyContext_Impl            = (OVRTypeof(wglCopyContext_Impl)) GetProcAddress(hOpenGL, "wglCopyContext");
@@ -7016,965 +7016,965 @@ limitations under the License.
 
 
         #if defined(GLE_WGL_ENABLED)
-			// WGL
-			void OVR::GLEContext::PostWGLHook(const char* /*function*/)
-			{
-				// Empty for now. WGL functions don't have a function like glGetError().
-			}
+            // WGL
+            void OVR::GLEContext::PostWGLHook(const char* /*function*/)
+            {
+                // Empty for now. WGL functions don't have a function like glGetError().
+            }
 
             /* We currently don't hook these
-			#undef wglCopyContext
-			extern "C" { GLAPI BOOL GLAPIENTRY wglCopyContext(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask); }
-			BOOL OVR::GLEContext::wglCopyContext_Hook(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask)
-			{
-				BOOL b = wglCopyContext(hglrcSrc, hglrcDst, mask);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglCopyContext
+            extern "C" { GLAPI BOOL GLAPIENTRY wglCopyContext(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask); }
+            BOOL OVR::GLEContext::wglCopyContext_Hook(HGLRC hglrcSrc, HGLRC hglrcDst, UINT mask)
+            {
+                BOOL b = wglCopyContext(hglrcSrc, hglrcDst, mask);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglCreateContext
-			extern "C" { GLAPI HGLRC GLAPIENTRY wglCreateContext(HDC hdc); }
-			HGLRC OVR::GLEContext::wglCreateContext_Hook(HDC hdc)
-			{
-				HGLRC h = wglCreateContext(hdc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            #undef wglCreateContext
+            extern "C" { GLAPI HGLRC GLAPIENTRY wglCreateContext(HDC hdc); }
+            HGLRC OVR::GLEContext::wglCreateContext_Hook(HDC hdc)
+            {
+                HGLRC h = wglCreateContext(hdc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			#undef wglCreateLayerContext
-			extern "C" { GLAPI HGLRC GLAPIENTRY wglCreateLayerContext(HDC hdc, int iLayerPlane); }
-			HGLRC OVR::GLEContext::wglCreateLayerContext_Hook(HDC hdc, int iLayerPlane)
-			{
-				HGLRC h = wglCreateLayerContext(hdc, iLayerPlane);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            #undef wglCreateLayerContext
+            extern "C" { GLAPI HGLRC GLAPIENTRY wglCreateLayerContext(HDC hdc, int iLayerPlane); }
+            HGLRC OVR::GLEContext::wglCreateLayerContext_Hook(HDC hdc, int iLayerPlane)
+            {
+                HGLRC h = wglCreateLayerContext(hdc, iLayerPlane);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			#undef wglDeleteContext
-			extern "C" { GLAPI BOOL GLAPIENTRY wglDeleteContext(HGLRC hglrc); }
-			BOOL OVR::GLEContext::wglDeleteContext_Hook(HGLRC hglrc)
-			{
-				BOOL b = wglDeleteContext(hglrc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglDeleteContext
+            extern "C" { GLAPI BOOL GLAPIENTRY wglDeleteContext(HGLRC hglrc); }
+            BOOL OVR::GLEContext::wglDeleteContext_Hook(HGLRC hglrc)
+            {
+                BOOL b = wglDeleteContext(hglrc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglGetCurrentContext
-			extern "C" { GLAPI HGLRC GLAPIENTRY wglGetCurrentContext(); }
-			HGLRC OVR::GLEContext::wglGetCurrentContext_Hook()
-			{
-				HGLRC h = wglGetCurrentContext();
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            #undef wglGetCurrentContext
+            extern "C" { GLAPI HGLRC GLAPIENTRY wglGetCurrentContext(); }
+            HGLRC OVR::GLEContext::wglGetCurrentContext_Hook()
+            {
+                HGLRC h = wglGetCurrentContext();
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			#undef wglGetCurrentDC
-			extern "C" { GLAPI HDC GLAPIENTRY wglGetCurrentDC(); }
-			HDC OVR::GLEContext::wglGetCurrentDC_Hook()
-			{
-				HDC h = wglGetCurrentDC();
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            #undef wglGetCurrentDC
+            extern "C" { GLAPI HDC GLAPIENTRY wglGetCurrentDC(); }
+            HDC OVR::GLEContext::wglGetCurrentDC_Hook()
+            {
+                HDC h = wglGetCurrentDC();
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			//#undef wglGetProcAddress Not needed because we happen to do it above already.
-			//extern "C" { GLAPI PROC GLAPIENTRY wglGetProcAddress(LPCSTR lpszProc); }
-			PROC OVR::GLEContext::wglGetProcAddress_Hook(LPCSTR lpszProc)
-			{
-				PROC p = wglGetProcAddress(lpszProc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return p;
-			}
+            //#undef wglGetProcAddress Not needed because we happen to do it above already.
+            //extern "C" { GLAPI PROC GLAPIENTRY wglGetProcAddress(LPCSTR lpszProc); }
+            PROC OVR::GLEContext::wglGetProcAddress_Hook(LPCSTR lpszProc)
+            {
+                PROC p = wglGetProcAddress(lpszProc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-			#undef wglMakeCurrent
-			extern "C" { GLAPI BOOL GLAPIENTRY wglMakeCurrent(HDC hdc, HGLRC hglrc); }
-			BOOL OVR::GLEContext::wglMakeCurrent_Hook(HDC hdc, HGLRC hglrc)
-			{
-				BOOL b = wglMakeCurrent(hdc, hglrc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglMakeCurrent
+            extern "C" { GLAPI BOOL GLAPIENTRY wglMakeCurrent(HDC hdc, HGLRC hglrc); }
+            BOOL OVR::GLEContext::wglMakeCurrent_Hook(HDC hdc, HGLRC hglrc)
+            {
+                BOOL b = wglMakeCurrent(hdc, hglrc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglShareLists
-			extern "C" { GLAPI BOOL GLAPIENTRY wglShareLists(HGLRC hglrc1, HGLRC hglrc2); }
-			BOOL OVR::GLEContext::wglShareLists_Hook(HGLRC hglrc1, HGLRC hglrc2)
-			{
-				BOOL b = wglShareLists(hglrc1, hglrc2);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglShareLists
+            extern "C" { GLAPI BOOL GLAPIENTRY wglShareLists(HGLRC hglrc1, HGLRC hglrc2); }
+            BOOL OVR::GLEContext::wglShareLists_Hook(HGLRC hglrc1, HGLRC hglrc2)
+            {
+                BOOL b = wglShareLists(hglrc1, hglrc2);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglUseFontBitmapsA
-			extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontBitmapsA(HDC hdc, DWORD first, DWORD count, DWORD listBase); }
-			BOOL OVR::GLEContext::wglUseFontBitmapsA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
-			{
-				BOOL b = wglUseFontBitmapsA(hdc, first, count, listBase);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglUseFontBitmapsA
+            extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontBitmapsA(HDC hdc, DWORD first, DWORD count, DWORD listBase); }
+            BOOL OVR::GLEContext::wglUseFontBitmapsA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
+            {
+                BOOL b = wglUseFontBitmapsA(hdc, first, count, listBase);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglUseFontBitmapsW
-			extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontBitmapsW(HDC hdc, DWORD first, DWORD count, DWORD listBase); }
-			BOOL OVR::GLEContext::wglUseFontBitmapsW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
-			{
-				BOOL b = wglUseFontBitmapsW(hdc, first, count, listBase);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglUseFontBitmapsW
+            extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontBitmapsW(HDC hdc, DWORD first, DWORD count, DWORD listBase); }
+            BOOL OVR::GLEContext::wglUseFontBitmapsW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase)
+            {
+                BOOL b = wglUseFontBitmapsW(hdc, first, count, listBase);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglUseFontOutlinesA
-			extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontOutlinesA(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf); }
-			BOOL OVR::GLEContext::wglUseFontOutlinesA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
-			{
-				BOOL b = wglUseFontOutlinesA(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglUseFontOutlinesA
+            extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontOutlinesA(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf); }
+            BOOL OVR::GLEContext::wglUseFontOutlinesA_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
+            {
+                BOOL b = wglUseFontOutlinesA(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglUseFontOutlinesW
-			extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontOutlinesW(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf); }
-			BOOL OVR::GLEContext::wglUseFontOutlinesW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
-			{
-				BOOL b = wglUseFontOutlinesW(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglUseFontOutlinesW
+            extern "C" { GLAPI BOOL GLAPIENTRY wglUseFontOutlinesW(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf); }
+            BOOL OVR::GLEContext::wglUseFontOutlinesW_Hook(HDC hdc, DWORD first, DWORD count, DWORD listBase, FLOAT deviation, FLOAT extrusion, int format, LPGLYPHMETRICSFLOAT lpgmf)
+            {
+                BOOL b = wglUseFontOutlinesW(hdc, first, count, listBase, deviation, extrusion, format, lpgmf);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglDescribeLayerPlane
-			extern "C" { GLAPI BOOL GLAPIENTRY wglDescribeLayerPlane(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nBytes, LPLAYERPLANEDESCRIPTOR plpd); }
-			BOOL OVR::GLEContext::wglDescribeLayerPlane_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nBytes, LPLAYERPLANEDESCRIPTOR plpd)
-			{
-				BOOL b = wglDescribeLayerPlane(hdc, iPixelFormat, iLayerPlane, nBytes, plpd);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglDescribeLayerPlane
+            extern "C" { GLAPI BOOL GLAPIENTRY wglDescribeLayerPlane(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nBytes, LPLAYERPLANEDESCRIPTOR plpd); }
+            BOOL OVR::GLEContext::wglDescribeLayerPlane_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nBytes, LPLAYERPLANEDESCRIPTOR plpd)
+            {
+                BOOL b = wglDescribeLayerPlane(hdc, iPixelFormat, iLayerPlane, nBytes, plpd);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglSetLayerPaletteEntries
-			extern "C" { GLAPI int GLAPIENTRY wglSetLayerPaletteEntries(HDC hdc, int iLayerPlane, int iStart, int cEntries, const COLORREF *pcr); }
-			int OVR::GLEContext::wglSetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, const COLORREF *pcr)
-			{
-				int i = wglSetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            #undef wglSetLayerPaletteEntries
+            extern "C" { GLAPI int GLAPIENTRY wglSetLayerPaletteEntries(HDC hdc, int iLayerPlane, int iStart, int cEntries, const COLORREF *pcr); }
+            int OVR::GLEContext::wglSetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, const COLORREF *pcr)
+            {
+                int i = wglSetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			#undef wglGetLayerPaletteEntries
-			extern "C" { GLAPI int GLAPIENTRY wglGetLayerPaletteEntries(HDC hdc, int iLayerPlane, int iStart, int cEntries, COLORREF *pcr); }
-			int OVR::GLEContext::wglGetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, COLORREF *pcr)
-			{
-				int i = wglGetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            #undef wglGetLayerPaletteEntries
+            extern "C" { GLAPI int GLAPIENTRY wglGetLayerPaletteEntries(HDC hdc, int iLayerPlane, int iStart, int cEntries, COLORREF *pcr); }
+            int OVR::GLEContext::wglGetLayerPaletteEntries_Hook(HDC hdc, int iLayerPlane, int iStart, int cEntries, COLORREF *pcr)
+            {
+                int i = wglGetLayerPaletteEntries(hdc, iLayerPlane, iStart, cEntries, pcr);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			#undef wglRealizeLayerPalette
-			extern "C" { GLAPI BOOL GLAPIENTRY wglRealizeLayerPalette(HDC hdc, int iLayerPlane, BOOL bRealize); }
-			BOOL OVR::GLEContext::wglRealizeLayerPalette_Hook(HDC hdc, int iLayerPlane, BOOL bRealize)
-			{
-				BOOL b = wglRealizeLayerPalette(hdc, iLayerPlane, bRealize);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglRealizeLayerPalette
+            extern "C" { GLAPI BOOL GLAPIENTRY wglRealizeLayerPalette(HDC hdc, int iLayerPlane, BOOL bRealize); }
+            BOOL OVR::GLEContext::wglRealizeLayerPalette_Hook(HDC hdc, int iLayerPlane, BOOL bRealize)
+            {
+                BOOL b = wglRealizeLayerPalette(hdc, iLayerPlane, bRealize);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglSwapLayerBuffers
-			extern "C" { GLAPI BOOL GLAPIENTRY wglSwapLayerBuffers(HDC hdc, UINT fuPlanes); }
-			BOOL OVR::GLEContext::wglSwapLayerBuffers_Hook(HDC hdc, UINT fuPlanes)
-			{
-				BOOL b = wglSwapLayerBuffers(hdc, fuPlanes);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            #undef wglSwapLayerBuffers
+            extern "C" { GLAPI BOOL GLAPIENTRY wglSwapLayerBuffers(HDC hdc, UINT fuPlanes); }
+            BOOL OVR::GLEContext::wglSwapLayerBuffers_Hook(HDC hdc, UINT fuPlanes)
+            {
+                BOOL b = wglSwapLayerBuffers(hdc, fuPlanes);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			#undef wglSwapMultipleBuffers
-			extern "C" { GLAPI DWORD GLAPIENTRY wglSwapMultipleBuffers(UINT i, CONST WGLSWAP* p); }
-			DWORD OVR::GLEContext::wglSwapMultipleBuffers_Hook(UINT i, CONST WGLSWAP* p)
-			{
-				DWORD dw = wglSwapMultipleBuffers(i, p);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return dw;
-			}
+            #undef wglSwapMultipleBuffers
+            extern "C" { GLAPI DWORD GLAPIENTRY wglSwapMultipleBuffers(UINT i, CONST WGLSWAP* p); }
+            DWORD OVR::GLEContext::wglSwapMultipleBuffers_Hook(UINT i, CONST WGLSWAP* p)
+            {
+                DWORD dw = wglSwapMultipleBuffers(i, p);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return dw;
+            }
             */
 
-			// The rest of the functions are pointer-based.
+            // The rest of the functions are pointer-based.
 
-			// WGL_ARB_buffer_region
-			HANDLE OVR::GLEContext::wglCreateBufferRegionARB_Hook(HDC hDC, int iLayerPlane, UINT uType)
-			{
-				HANDLE h = NULL;
-				if(wglCreateBufferRegionARB_Impl)
-					h = wglCreateBufferRegionARB_Impl(hDC, iLayerPlane, uType);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            // WGL_ARB_buffer_region
+            HANDLE OVR::GLEContext::wglCreateBufferRegionARB_Hook(HDC hDC, int iLayerPlane, UINT uType)
+            {
+                HANDLE h = NULL;
+                if(wglCreateBufferRegionARB_Impl)
+                    h = wglCreateBufferRegionARB_Impl(hDC, iLayerPlane, uType);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			VOID OVR::GLEContext::wglDeleteBufferRegionARB_Hook(HANDLE hRegion)
-			{
-				if(wglDeleteBufferRegionARB_Impl)
-					wglDeleteBufferRegionARB_Impl(hRegion);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-			}
+            VOID OVR::GLEContext::wglDeleteBufferRegionARB_Hook(HANDLE hRegion)
+            {
+                if(wglDeleteBufferRegionARB_Impl)
+                    wglDeleteBufferRegionARB_Impl(hRegion);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+            }
 
-			BOOL OVR::GLEContext::wglSaveBufferRegionARB_Hook(HANDLE hRegion, int x, int y, int width, int height)
-			{
-				BOOL b = FALSE;
-				if(wglSaveBufferRegionARB_Impl)
-					b = wglSaveBufferRegionARB_Impl(hRegion, x, y, width, height);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglSaveBufferRegionARB_Hook(HANDLE hRegion, int x, int y, int width, int height)
+            {
+                BOOL b = FALSE;
+                if(wglSaveBufferRegionARB_Impl)
+                    b = wglSaveBufferRegionARB_Impl(hRegion, x, y, width, height);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglRestoreBufferRegionARB_Hook(HANDLE hRegion, int x, int y, int width, int height, int xSrc, int ySrc)
-			{
-				BOOL b = FALSE;
-				if(wglRestoreBufferRegionARB_Impl)
-					b = wglRestoreBufferRegionARB_Impl(hRegion, x, y, width, height, xSrc, ySrc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglRestoreBufferRegionARB_Hook(HANDLE hRegion, int x, int y, int width, int height, int xSrc, int ySrc)
+            {
+                BOOL b = FALSE;
+                if(wglRestoreBufferRegionARB_Impl)
+                    b = wglRestoreBufferRegionARB_Impl(hRegion, x, y, width, height, xSrc, ySrc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_ARB_extensions_string
-			const char * OVR::GLEContext::wglGetExtensionsStringARB_Hook(HDC hdc)
-			{
-				const char * p = NULL;
-				if(wglGetExtensionsStringARB_Impl)
-					p = wglGetExtensionsStringARB_Impl(hdc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return p;
-			}
+            // WGL_ARB_extensions_string
+            const char * OVR::GLEContext::wglGetExtensionsStringARB_Hook(HDC hdc)
+            {
+                const char * p = NULL;
+                if(wglGetExtensionsStringARB_Impl)
+                    p = wglGetExtensionsStringARB_Impl(hdc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-			// WGL_ARB_pixel_format
-			BOOL OVR::GLEContext::wglGetPixelFormatAttribivARB_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues)
-			{
-				BOOL b = FALSE;
-				if(wglGetPixelFormatAttribivARB_Impl)
-					b = wglGetPixelFormatAttribivARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_ARB_pixel_format
+            BOOL OVR::GLEContext::wglGetPixelFormatAttribivARB_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues)
+            {
+                BOOL b = FALSE;
+                if(wglGetPixelFormatAttribivARB_Impl)
+                    b = wglGetPixelFormatAttribivARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, piValues);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglGetPixelFormatAttribfvARB_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, FLOAT *pfValues)
-			{
-				BOOL b = FALSE;
-				if(wglGetPixelFormatAttribfvARB_Impl)
-					b = wglGetPixelFormatAttribfvARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, pfValues);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglGetPixelFormatAttribfvARB_Hook(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, FLOAT *pfValues)
+            {
+                BOOL b = FALSE;
+                if(wglGetPixelFormatAttribfvARB_Impl)
+                    b = wglGetPixelFormatAttribfvARB_Impl(hdc, iPixelFormat, iLayerPlane, nAttributes, piAttributes, pfValues);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglChoosePixelFormatARB_Hook(HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats)
-			{
-				BOOL b = FALSE;
-				if(wglChoosePixelFormatARB_Impl)
-					b = wglChoosePixelFormatARB_Impl(hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglChoosePixelFormatARB_Hook(HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats)
+            {
+                BOOL b = FALSE;
+                if(wglChoosePixelFormatARB_Impl)
+                    b = wglChoosePixelFormatARB_Impl(hdc, piAttribIList, pfAttribFList, nMaxFormats, piFormats, nNumFormats);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_ARB_make_current_read
-			BOOL OVR::GLEContext::wglMakeContextCurrentARB_Hook(HDC hDrawDC, HDC hReadDC, HGLRC hglrc)
-			{
-				BOOL b = FALSE;
-				if(wglMakeContextCurrentARB_Impl)
-					b = wglMakeContextCurrentARB_Impl(hDrawDC, hReadDC, hglrc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_ARB_make_current_read
+            BOOL OVR::GLEContext::wglMakeContextCurrentARB_Hook(HDC hDrawDC, HDC hReadDC, HGLRC hglrc)
+            {
+                BOOL b = FALSE;
+                if(wglMakeContextCurrentARB_Impl)
+                    b = wglMakeContextCurrentARB_Impl(hDrawDC, hReadDC, hglrc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			HDC OVR::GLEContext::wglGetCurrentReadDCARB_Hook()
-			{
-				HDC h = NULL;
-				if(wglGetCurrentReadDCARB_Impl)
-					h = wglGetCurrentReadDCARB_Impl();
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            HDC OVR::GLEContext::wglGetCurrentReadDCARB_Hook()
+            {
+                HDC h = NULL;
+                if(wglGetCurrentReadDCARB_Impl)
+                    h = wglGetCurrentReadDCARB_Impl();
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			// WGL_ARB_pbuffer
-			HPBUFFERARB OVR::GLEContext::wglCreatePbufferARB_Hook(HDC hDC, int iPixelFormat, int iWidth, int iHeight, const int *piAttribList)
-			{
-				HPBUFFERARB h = NULL;
-				if(wglCreatePbufferARB_Impl)
-					h = wglCreatePbufferARB_Impl(hDC, iPixelFormat, iWidth, iHeight, piAttribList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            // WGL_ARB_pbuffer
+            HPBUFFERARB OVR::GLEContext::wglCreatePbufferARB_Hook(HDC hDC, int iPixelFormat, int iWidth, int iHeight, const int *piAttribList)
+            {
+                HPBUFFERARB h = NULL;
+                if(wglCreatePbufferARB_Impl)
+                    h = wglCreatePbufferARB_Impl(hDC, iPixelFormat, iWidth, iHeight, piAttribList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			HDC OVR::GLEContext::wglGetPbufferDCARB_Hook(HPBUFFERARB hPbuffer)
-			{
-				HDC h = NULL;
-				if(wglGetPbufferDCARB_Impl)
-					h = wglGetPbufferDCARB_Impl(hPbuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            HDC OVR::GLEContext::wglGetPbufferDCARB_Hook(HPBUFFERARB hPbuffer)
+            {
+                HDC h = NULL;
+                if(wglGetPbufferDCARB_Impl)
+                    h = wglGetPbufferDCARB_Impl(hPbuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			int OVR::GLEContext::wglReleasePbufferDCARB_Hook(HPBUFFERARB hPbuffer, HDC hDC)
-			{
-				int i = 0;
-				if(wglReleasePbufferDCARB_Impl)
-					i = wglReleasePbufferDCARB_Impl(hPbuffer, hDC);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            int OVR::GLEContext::wglReleasePbufferDCARB_Hook(HPBUFFERARB hPbuffer, HDC hDC)
+            {
+                int i = 0;
+                if(wglReleasePbufferDCARB_Impl)
+                    i = wglReleasePbufferDCARB_Impl(hPbuffer, hDC);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			BOOL OVR::GLEContext::wglDestroyPbufferARB_Hook(HPBUFFERARB hPbuffer)
-			{
-				BOOL b = FALSE;
-				if(wglDestroyPbufferARB_Impl)
-					b = wglDestroyPbufferARB_Impl(hPbuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDestroyPbufferARB_Hook(HPBUFFERARB hPbuffer)
+            {
+                BOOL b = FALSE;
+                if(wglDestroyPbufferARB_Impl)
+                    b = wglDestroyPbufferARB_Impl(hPbuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglQueryPbufferARB_Hook(HPBUFFERARB hPbuffer, int iAttribute, int *piValue)
-			{
-				BOOL b = FALSE;
-				if(wglQueryPbufferARB_Impl)
-					b = wglQueryPbufferARB_Impl(hPbuffer, iAttribute, piValue);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglQueryPbufferARB_Hook(HPBUFFERARB hPbuffer, int iAttribute, int *piValue)
+            {
+                BOOL b = FALSE;
+                if(wglQueryPbufferARB_Impl)
+                    b = wglQueryPbufferARB_Impl(hPbuffer, iAttribute, piValue);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_ARB_render_texture
-			BOOL OVR::GLEContext::wglBindTexImageARB_Hook(HPBUFFERARB hPbuffer, int iBuffer)
-			{
-				BOOL b = FALSE;
-				if(wglBindTexImageARB_Impl)
-					b = wglBindTexImageARB_Impl(hPbuffer, iBuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_ARB_render_texture
+            BOOL OVR::GLEContext::wglBindTexImageARB_Hook(HPBUFFERARB hPbuffer, int iBuffer)
+            {
+                BOOL b = FALSE;
+                if(wglBindTexImageARB_Impl)
+                    b = wglBindTexImageARB_Impl(hPbuffer, iBuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglReleaseTexImageARB_Hook(HPBUFFERARB hPbuffer, int iBuffer)
-			{
-				BOOL b = FALSE;
-				if(wglReleaseTexImageARB_Impl)
-					b = wglReleaseTexImageARB_Impl(hPbuffer, iBuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglReleaseTexImageARB_Hook(HPBUFFERARB hPbuffer, int iBuffer)
+            {
+                BOOL b = FALSE;
+                if(wglReleaseTexImageARB_Impl)
+                    b = wglReleaseTexImageARB_Impl(hPbuffer, iBuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglSetPbufferAttribARB_Hook(HPBUFFERARB hPbuffer, const int *piAttribList)
-			{
-				BOOL b = FALSE;
-				if(wglSetPbufferAttribARB_Impl)
-					b = wglSetPbufferAttribARB_Impl(hPbuffer, piAttribList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglSetPbufferAttribARB_Hook(HPBUFFERARB hPbuffer, const int *piAttribList)
+            {
+                BOOL b = FALSE;
+                if(wglSetPbufferAttribARB_Impl)
+                    b = wglSetPbufferAttribARB_Impl(hPbuffer, piAttribList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_NV_present_video
-			int OVR::GLEContext::wglEnumerateVideoDevicesNV_Hook(HDC hDC, HVIDEOOUTPUTDEVICENV *phDeviceList)
-			{
-				int i = 0;
-				if(wglEnumerateVideoDevicesNV_Impl)
-					i = wglEnumerateVideoDevicesNV_Impl(hDC, phDeviceList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            // WGL_NV_present_video
+            int OVR::GLEContext::wglEnumerateVideoDevicesNV_Hook(HDC hDC, HVIDEOOUTPUTDEVICENV *phDeviceList)
+            {
+                int i = 0;
+                if(wglEnumerateVideoDevicesNV_Impl)
+                    i = wglEnumerateVideoDevicesNV_Impl(hDC, phDeviceList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			BOOL OVR::GLEContext::wglBindVideoDeviceNV_Hook(HDC hDC, unsigned int uVideoSlot, HVIDEOOUTPUTDEVICENV hVideoDevice, const int *piAttribList)
-			{
-				BOOL b = FALSE;
-				if(wglBindVideoDeviceNV_Impl)
-					b = wglBindVideoDeviceNV_Impl(hDC, uVideoSlot, hVideoDevice, piAttribList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglBindVideoDeviceNV_Hook(HDC hDC, unsigned int uVideoSlot, HVIDEOOUTPUTDEVICENV hVideoDevice, const int *piAttribList)
+            {
+                BOOL b = FALSE;
+                if(wglBindVideoDeviceNV_Impl)
+                    b = wglBindVideoDeviceNV_Impl(hDC, uVideoSlot, hVideoDevice, piAttribList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglQueryCurrentContextNV_Hook(int iAttribute, int *piValue)
-			{
-				BOOL b = FALSE;
-				if(wglQueryCurrentContextNV_Impl)
-					b = wglQueryCurrentContextNV_Impl(iAttribute, piValue);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglQueryCurrentContextNV_Hook(int iAttribute, int *piValue)
+            {
+                BOOL b = FALSE;
+                if(wglQueryCurrentContextNV_Impl)
+                    b = wglQueryCurrentContextNV_Impl(iAttribute, piValue);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_ARB_create_context
-			HGLRC OVR::GLEContext::wglCreateContextAttribsARB_Hook(HDC hDC, HGLRC hShareContext, const int *attribList)
-			{
-				HGLRC h = NULL;
-				if(wglCreateContextAttribsARB_Impl)
-					h = wglCreateContextAttribsARB_Impl(hDC, hShareContext, attribList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            // WGL_ARB_create_context
+            HGLRC OVR::GLEContext::wglCreateContextAttribsARB_Hook(HDC hDC, HGLRC hShareContext, const int *attribList)
+            {
+                HGLRC h = NULL;
+                if(wglCreateContextAttribsARB_Impl)
+                    h = wglCreateContextAttribsARB_Impl(hDC, hShareContext, attribList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			// WGL_EXT_extensions_string
-			const char * OVR::GLEContext::wglGetExtensionsStringEXT_Hook()
-			{
-				const char * p = NULL;
-				if(wglGetExtensionsStringEXT_Impl)
-					p = wglGetExtensionsStringEXT_Impl();
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return p;
-			}
+            // WGL_EXT_extensions_string
+            const char * OVR::GLEContext::wglGetExtensionsStringEXT_Hook()
+            {
+                const char * p = NULL;
+                if(wglGetExtensionsStringEXT_Impl)
+                    p = wglGetExtensionsStringEXT_Impl();
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-			// WGL_EXT_swap_control
-			BOOL OVR::GLEContext::wglSwapIntervalEXT_Hook(int interval)
-			{
-				BOOL b = FALSE;
-				if(wglSwapIntervalEXT_Impl)
-					b = wglSwapIntervalEXT_Impl(interval);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_EXT_swap_control
+            BOOL OVR::GLEContext::wglSwapIntervalEXT_Hook(int interval)
+            {
+                BOOL b = FALSE;
+                if(wglSwapIntervalEXT_Impl)
+                    b = wglSwapIntervalEXT_Impl(interval);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			int OVR::GLEContext::wglGetSwapIntervalEXT_Hook()
-			{
-				int i = 0;
-				if(wglGetSwapIntervalEXT_Impl)
-					i = wglGetSwapIntervalEXT_Impl();
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            int OVR::GLEContext::wglGetSwapIntervalEXT_Hook()
+            {
+                int i = 0;
+                if(wglGetSwapIntervalEXT_Impl)
+                    i = wglGetSwapIntervalEXT_Impl();
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			// WGL_OML_sync_control
-			BOOL  OVR::GLEContext::wglGetSyncValuesOML_Hook(HDC hdc, INT64 *ust, INT64 *msc, INT64 *sbc)
-			{
-				BOOL b = FALSE;
-				if(wglGetSyncValuesOML_Impl)
-					b = wglGetSyncValuesOML_Impl(hdc, ust, msc, sbc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_OML_sync_control
+            BOOL  OVR::GLEContext::wglGetSyncValuesOML_Hook(HDC hdc, INT64 *ust, INT64 *msc, INT64 *sbc)
+            {
+                BOOL b = FALSE;
+                if(wglGetSyncValuesOML_Impl)
+                    b = wglGetSyncValuesOML_Impl(hdc, ust, msc, sbc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL  OVR::GLEContext::wglGetMscRateOML_Hook(HDC hdc, INT32 *numerator, INT32 *denominator)
-			{
-				BOOL b = FALSE;
-				if(wglGetMscRateOML_Impl)
-					b = wglGetMscRateOML_Impl(hdc, numerator, denominator);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL  OVR::GLEContext::wglGetMscRateOML_Hook(HDC hdc, INT32 *numerator, INT32 *denominator)
+            {
+                BOOL b = FALSE;
+                if(wglGetMscRateOML_Impl)
+                    b = wglGetMscRateOML_Impl(hdc, numerator, denominator);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			INT64 OVR::GLEContext::wglSwapBuffersMscOML_Hook(HDC hdc, INT64 target_msc, INT64 divisor, INT64 remainder)
-			{
-				INT64 i = 0;
-				if(wglSwapBuffersMscOML_Impl)
-					i = wglSwapBuffersMscOML_Impl(hdc, target_msc, divisor, remainder);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            INT64 OVR::GLEContext::wglSwapBuffersMscOML_Hook(HDC hdc, INT64 target_msc, INT64 divisor, INT64 remainder)
+            {
+                INT64 i = 0;
+                if(wglSwapBuffersMscOML_Impl)
+                    i = wglSwapBuffersMscOML_Impl(hdc, target_msc, divisor, remainder);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			INT64 OVR::GLEContext::wglSwapLayerBuffersMscOML_Hook(HDC hdc, int fuPlanes, INT64 target_msc, INT64 divisor, INT64 remainder)
-			{
-				INT64 i = 0;
-				if(wglSwapLayerBuffersMscOML_Impl)
-					i = wglSwapLayerBuffersMscOML_Impl(hdc, fuPlanes, target_msc, divisor, remainder);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return i;
-			}
+            INT64 OVR::GLEContext::wglSwapLayerBuffersMscOML_Hook(HDC hdc, int fuPlanes, INT64 target_msc, INT64 divisor, INT64 remainder)
+            {
+                INT64 i = 0;
+                if(wglSwapLayerBuffersMscOML_Impl)
+                    i = wglSwapLayerBuffersMscOML_Impl(hdc, fuPlanes, target_msc, divisor, remainder);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-			BOOL  OVR::GLEContext::wglWaitForMscOML_Hook(HDC hdc, INT64 target_msc, INT64 divisor, INT64 remainder, INT64 *ust, INT64 *msc, INT64 *sbc)
-			{
-				BOOL b = FALSE;
-				if(wglWaitForMscOML_Impl)
-					b = wglWaitForMscOML_Impl(hdc, target_msc, divisor, remainder, ust, msc, sbc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL  OVR::GLEContext::wglWaitForMscOML_Hook(HDC hdc, INT64 target_msc, INT64 divisor, INT64 remainder, INT64 *ust, INT64 *msc, INT64 *sbc)
+            {
+                BOOL b = FALSE;
+                if(wglWaitForMscOML_Impl)
+                    b = wglWaitForMscOML_Impl(hdc, target_msc, divisor, remainder, ust, msc, sbc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL  OVR::GLEContext::wglWaitForSbcOML_Hook(HDC hdc, INT64 target_sbc, INT64 *ust, INT64 *msc, INT64 *sbc)
-			{
-				BOOL b = FALSE;
-				if(wglWaitForSbcOML_Impl)
-					b = wglWaitForSbcOML_Impl(hdc, target_sbc, ust, msc, sbc);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL  OVR::GLEContext::wglWaitForSbcOML_Hook(HDC hdc, INT64 target_sbc, INT64 *ust, INT64 *msc, INT64 *sbc)
+            {
+                BOOL b = FALSE;
+                if(wglWaitForSbcOML_Impl)
+                    b = wglWaitForSbcOML_Impl(hdc, target_sbc, ust, msc, sbc);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_NV_video_output
-			BOOL OVR::GLEContext::wglGetVideoDeviceNV_Hook(HDC hDC, int numDevices, HPVIDEODEV *hVideoDevice)
-			{
-				BOOL b = FALSE;
-				if(wglGetVideoDeviceNV_Impl)
-					b = wglGetVideoDeviceNV_Impl(hDC, numDevices, hVideoDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_NV_video_output
+            BOOL OVR::GLEContext::wglGetVideoDeviceNV_Hook(HDC hDC, int numDevices, HPVIDEODEV *hVideoDevice)
+            {
+                BOOL b = FALSE;
+                if(wglGetVideoDeviceNV_Impl)
+                    b = wglGetVideoDeviceNV_Impl(hDC, numDevices, hVideoDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglReleaseVideoDeviceNV_Hook(HPVIDEODEV hVideoDevice)
-			{
-				BOOL b = FALSE;
-				if(wglReleaseVideoDeviceNV_Impl)
-					b = wglReleaseVideoDeviceNV_Impl(hVideoDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglReleaseVideoDeviceNV_Hook(HPVIDEODEV hVideoDevice)
+            {
+                BOOL b = FALSE;
+                if(wglReleaseVideoDeviceNV_Impl)
+                    b = wglReleaseVideoDeviceNV_Impl(hVideoDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglBindVideoImageNV_Hook(HPVIDEODEV hVideoDevice, HPBUFFERARB hPbuffer, int iVideoBuffer)
-			{
-				BOOL b = FALSE;
-				if(wglBindVideoImageNV_Impl)
-					b = wglBindVideoImageNV_Impl(hVideoDevice, hPbuffer, iVideoBuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglBindVideoImageNV_Hook(HPVIDEODEV hVideoDevice, HPBUFFERARB hPbuffer, int iVideoBuffer)
+            {
+                BOOL b = FALSE;
+                if(wglBindVideoImageNV_Impl)
+                    b = wglBindVideoImageNV_Impl(hVideoDevice, hPbuffer, iVideoBuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglReleaseVideoImageNV_Hook(HPBUFFERARB hPbuffer, int iVideoBuffer)
-			{
-				BOOL b = FALSE;
-				if(wglReleaseVideoImageNV_Impl)
-					b = wglReleaseVideoImageNV_Impl(hPbuffer, iVideoBuffer);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglReleaseVideoImageNV_Hook(HPBUFFERARB hPbuffer, int iVideoBuffer)
+            {
+                BOOL b = FALSE;
+                if(wglReleaseVideoImageNV_Impl)
+                    b = wglReleaseVideoImageNV_Impl(hPbuffer, iVideoBuffer);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglSendPbufferToVideoNV_Hook(HPBUFFERARB hPbuffer, int iBufferType, unsigned long *pulCounterPbuffer, BOOL bBlock)
-			{
-				BOOL b = FALSE;
-				if(wglSendPbufferToVideoNV_Impl)
-					b = wglSendPbufferToVideoNV_Impl(hPbuffer, iBufferType, pulCounterPbuffer, bBlock);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglSendPbufferToVideoNV_Hook(HPBUFFERARB hPbuffer, int iBufferType, unsigned long *pulCounterPbuffer, BOOL bBlock)
+            {
+                BOOL b = FALSE;
+                if(wglSendPbufferToVideoNV_Impl)
+                    b = wglSendPbufferToVideoNV_Impl(hPbuffer, iBufferType, pulCounterPbuffer, bBlock);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglGetVideoInfoNV_Hook(HPVIDEODEV hpVideoDevice, unsigned long *pulCounterOutputPbuffer, unsigned long *pulCounterOutputVideo)
-			{
-				BOOL b = FALSE;
-				if(wglGetVideoInfoNV_Impl)
-					b = wglGetVideoInfoNV_Impl(hpVideoDevice, pulCounterOutputPbuffer, pulCounterOutputVideo);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglGetVideoInfoNV_Hook(HPVIDEODEV hpVideoDevice, unsigned long *pulCounterOutputPbuffer, unsigned long *pulCounterOutputVideo)
+            {
+                BOOL b = FALSE;
+                if(wglGetVideoInfoNV_Impl)
+                    b = wglGetVideoInfoNV_Impl(hpVideoDevice, pulCounterOutputPbuffer, pulCounterOutputVideo);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_NV_swap_group
-			BOOL OVR::GLEContext::wglJoinSwapGroupNV_Hook(HDC hDC, GLuint group)
-			{
-				BOOL b = FALSE;
-				if(wglJoinSwapGroupNV_Impl)
-					b = wglJoinSwapGroupNV_Impl(hDC, group);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_NV_swap_group
+            BOOL OVR::GLEContext::wglJoinSwapGroupNV_Hook(HDC hDC, GLuint group)
+            {
+                BOOL b = FALSE;
+                if(wglJoinSwapGroupNV_Impl)
+                    b = wglJoinSwapGroupNV_Impl(hDC, group);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglBindSwapBarrierNV_Hook(GLuint group, GLuint barrier)
-			{
-				BOOL b = FALSE;
-				if(wglBindSwapBarrierNV_Impl)
-					b = wglBindSwapBarrierNV_Impl(group, barrier);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglBindSwapBarrierNV_Hook(GLuint group, GLuint barrier)
+            {
+                BOOL b = FALSE;
+                if(wglBindSwapBarrierNV_Impl)
+                    b = wglBindSwapBarrierNV_Impl(group, barrier);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglQuerySwapGroupNV_Hook(HDC hDC, GLuint *group, GLuint *barrier)
-			{
-				BOOL b = FALSE;
-				if(wglQuerySwapGroupNV_Impl)
-					b = wglQuerySwapGroupNV_Impl(hDC, group, barrier);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-		   }
+            BOOL OVR::GLEContext::wglQuerySwapGroupNV_Hook(HDC hDC, GLuint *group, GLuint *barrier)
+            {
+                BOOL b = FALSE;
+                if(wglQuerySwapGroupNV_Impl)
+                    b = wglQuerySwapGroupNV_Impl(hDC, group, barrier);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+           }
 
-			BOOL OVR::GLEContext::wglQueryMaxSwapGroupsNV_Hook(HDC hDC, GLuint *maxGroups, GLuint *maxBarriers)
-			{
-				BOOL b = FALSE;
-				if(wglQueryMaxSwapGroupsNV_Impl)
-					b = wglQueryMaxSwapGroupsNV_Impl(hDC, maxGroups, maxBarriers);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglQueryMaxSwapGroupsNV_Hook(HDC hDC, GLuint *maxGroups, GLuint *maxBarriers)
+            {
+                BOOL b = FALSE;
+                if(wglQueryMaxSwapGroupsNV_Impl)
+                    b = wglQueryMaxSwapGroupsNV_Impl(hDC, maxGroups, maxBarriers);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglQueryFrameCountNV_Hook(HDC hDC, GLuint *count)
-			{
-				BOOL b = FALSE;
-				if(wglQueryFrameCountNV_Impl)
-					b = wglQueryFrameCountNV_Impl(hDC, count);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglQueryFrameCountNV_Hook(HDC hDC, GLuint *count)
+            {
+                BOOL b = FALSE;
+                if(wglQueryFrameCountNV_Impl)
+                    b = wglQueryFrameCountNV_Impl(hDC, count);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglResetFrameCountNV_Hook(HDC hDC)
-			{
-				BOOL b = FALSE;
-				if(wglResetFrameCountNV_Impl)
-					b = wglResetFrameCountNV_Impl(hDC);
-				PostHook(GLE_CURRENT_FUNCTION);
-				return b;
-		   }
+            BOOL OVR::GLEContext::wglResetFrameCountNV_Hook(HDC hDC)
+            {
+                BOOL b = FALSE;
+                if(wglResetFrameCountNV_Impl)
+                    b = wglResetFrameCountNV_Impl(hDC);
+                PostHook(GLE_CURRENT_FUNCTION);
+                return b;
+           }
 
-			// WGL_NV_video_capture
-			BOOL OVR::GLEContext::wglBindVideoCaptureDeviceNV_Hook(UINT uVideoSlot, HVIDEOINPUTDEVICENV hDevice)
-			{
-				BOOL b = FALSE;
-				if(wglBindVideoCaptureDeviceNV_Impl)
-					b = wglBindVideoCaptureDeviceNV_Impl(uVideoSlot, hDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_NV_video_capture
+            BOOL OVR::GLEContext::wglBindVideoCaptureDeviceNV_Hook(UINT uVideoSlot, HVIDEOINPUTDEVICENV hDevice)
+            {
+                BOOL b = FALSE;
+                if(wglBindVideoCaptureDeviceNV_Impl)
+                    b = wglBindVideoCaptureDeviceNV_Impl(uVideoSlot, hDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			UINT OVR::GLEContext::wglEnumerateVideoCaptureDevicesNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV *phDeviceList)
-			{
-				UINT u = 0;
-				if(wglEnumerateVideoCaptureDevicesNV_Impl)
-					u = wglEnumerateVideoCaptureDevicesNV_Impl(hDc, phDeviceList);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return u;
-			}
+            UINT OVR::GLEContext::wglEnumerateVideoCaptureDevicesNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV *phDeviceList)
+            {
+                UINT u = 0;
+                if(wglEnumerateVideoCaptureDevicesNV_Impl)
+                    u = wglEnumerateVideoCaptureDevicesNV_Impl(hDc, phDeviceList);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return u;
+            }
 
-			BOOL OVR::GLEContext::wglLockVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice)
-			{
-				BOOL b = FALSE;
-				if(wglLockVideoCaptureDeviceNV_Impl)
-					b = wglLockVideoCaptureDeviceNV_Impl(hDc, hDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglLockVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice)
+            {
+                BOOL b = FALSE;
+                if(wglLockVideoCaptureDeviceNV_Impl)
+                    b = wglLockVideoCaptureDeviceNV_Impl(hDc, hDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglQueryVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice, int iAttribute, int *piValue)
-			{
-				BOOL b = FALSE;
-				if(wglQueryVideoCaptureDeviceNV_Impl)
-					b = wglQueryVideoCaptureDeviceNV_Impl(hDc, hDevice, iAttribute, piValue);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglQueryVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice, int iAttribute, int *piValue)
+            {
+                BOOL b = FALSE;
+                if(wglQueryVideoCaptureDeviceNV_Impl)
+                    b = wglQueryVideoCaptureDeviceNV_Impl(hDc, hDevice, iAttribute, piValue);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglReleaseVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice)
-			{
-				BOOL b = FALSE;
-				if(wglReleaseVideoCaptureDeviceNV_Impl)
-					b = wglReleaseVideoCaptureDeviceNV_Impl(hDc, hDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglReleaseVideoCaptureDeviceNV_Hook(HDC hDc, HVIDEOINPUTDEVICENV hDevice)
+            {
+                BOOL b = FALSE;
+                if(wglReleaseVideoCaptureDeviceNV_Impl)
+                    b = wglReleaseVideoCaptureDeviceNV_Impl(hDc, hDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_NV_copy_image
-			BOOL OVR::GLEContext::wglCopyImageSubDataNV_Hook(HGLRC hSrcRC, GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ, HGLRC hDstRC,
-															 GLuint dstName, GLenum dstTarget, GLint dstLevel, GLint dstX, GLint dstY, GLint dstZ, GLsizei width, GLsizei height, GLsizei depth)
-			{
-				BOOL b = FALSE;
-				if(wglCopyImageSubDataNV_Impl)
-					b = wglCopyImageSubDataNV_Impl(hSrcRC, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, hDstRC, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_NV_copy_image
+            BOOL OVR::GLEContext::wglCopyImageSubDataNV_Hook(HGLRC hSrcRC, GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ, HGLRC hDstRC,
+                                                             GLuint dstName, GLenum dstTarget, GLint dstLevel, GLint dstX, GLint dstY, GLint dstZ, GLsizei width, GLsizei height, GLsizei depth)
+            {
+                BOOL b = FALSE;
+                if(wglCopyImageSubDataNV_Impl)
+                    b = wglCopyImageSubDataNV_Impl(hSrcRC, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, hDstRC, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			// WGL_NV_DX_interop
-			BOOL OVR::GLEContext::wglDXSetResourceShareHandleNV_Hook(void *dxObject, HANDLE shareHandle)
-			{
-				BOOL b = FALSE;
-				if(wglDXSetResourceShareHandleNV_Impl)
-					b = wglDXSetResourceShareHandleNV_Impl(dxObject, shareHandle);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            // WGL_NV_DX_interop
+            BOOL OVR::GLEContext::wglDXSetResourceShareHandleNV_Hook(void *dxObject, HANDLE shareHandle)
+            {
+                BOOL b = FALSE;
+                if(wglDXSetResourceShareHandleNV_Impl)
+                    b = wglDXSetResourceShareHandleNV_Impl(dxObject, shareHandle);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			HANDLE OVR::GLEContext::wglDXOpenDeviceNV_Hook(void *dxDevice)
-			{
-				HANDLE h = NULL;
-				if(wglDXOpenDeviceNV_Impl)
-					h = wglDXOpenDeviceNV_Impl(dxDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            HANDLE OVR::GLEContext::wglDXOpenDeviceNV_Hook(void *dxDevice)
+            {
+                HANDLE h = NULL;
+                if(wglDXOpenDeviceNV_Impl)
+                    h = wglDXOpenDeviceNV_Impl(dxDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			BOOL OVR::GLEContext::wglDXCloseDeviceNV_Hook(HANDLE hDevice)
-			{
-				BOOL b = FALSE;
-				if(wglDXCloseDeviceNV_Impl)
-					b = wglDXCloseDeviceNV_Impl(hDevice);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDXCloseDeviceNV_Hook(HANDLE hDevice)
+            {
+                BOOL b = FALSE;
+                if(wglDXCloseDeviceNV_Impl)
+                    b = wglDXCloseDeviceNV_Impl(hDevice);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			HANDLE OVR::GLEContext::wglDXRegisterObjectNV_Hook(HANDLE hDevice, void *dxObject, GLuint name, GLenum type, GLenum access)
-			{
-				HANDLE h = NULL;
-				if(wglDXRegisterObjectNV_Impl)
-					h = wglDXRegisterObjectNV_Impl(hDevice, dxObject, name, type, access);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return h;
-			}
+            HANDLE OVR::GLEContext::wglDXRegisterObjectNV_Hook(HANDLE hDevice, void *dxObject, GLuint name, GLenum type, GLenum access)
+            {
+                HANDLE h = NULL;
+                if(wglDXRegisterObjectNV_Impl)
+                    h = wglDXRegisterObjectNV_Impl(hDevice, dxObject, name, type, access);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return h;
+            }
 
-			BOOL OVR::GLEContext::wglDXUnregisterObjectNV_Hook(HANDLE hDevice, HANDLE hObject)
-			{
-				BOOL b = FALSE;
-				if(wglDXUnregisterObjectNV_Impl)
-					b = wglDXUnregisterObjectNV_Impl(hDevice, hObject);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDXUnregisterObjectNV_Hook(HANDLE hDevice, HANDLE hObject)
+            {
+                BOOL b = FALSE;
+                if(wglDXUnregisterObjectNV_Impl)
+                    b = wglDXUnregisterObjectNV_Impl(hDevice, hObject);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglDXObjectAccessNV_Hook(HANDLE hObject, GLenum access)
-			{
-				BOOL b = FALSE;
-				if(wglDXObjectAccessNV_Impl)
-					b = wglDXObjectAccessNV_Impl(hObject, access);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDXObjectAccessNV_Hook(HANDLE hObject, GLenum access)
+            {
+                BOOL b = FALSE;
+                if(wglDXObjectAccessNV_Impl)
+                    b = wglDXObjectAccessNV_Impl(hObject, access);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglDXLockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects)
-			{
-				BOOL b = FALSE;
-				if(wglDXLockObjectsNV_Impl)
-					b = wglDXLockObjectsNV_Impl(hDevice, count, hObjects);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDXLockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects)
+            {
+                BOOL b = FALSE;
+                if(wglDXLockObjectsNV_Impl)
+                    b = wglDXLockObjectsNV_Impl(hDevice, count, hObjects);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-			BOOL OVR::GLEContext::wglDXUnlockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects)
-			{
-				BOOL b = FALSE;
-				if(wglDXUnlockObjectsNV_Impl)
-					b = wglDXUnlockObjectsNV_Impl(hDevice, count, hObjects);
-				PostWGLHook(GLE_CURRENT_FUNCTION);
-				return b;
-			}
+            BOOL OVR::GLEContext::wglDXUnlockObjectsNV_Hook(HANDLE hDevice, GLint count, HANDLE *hObjects)
+            {
+                BOOL b = FALSE;
+                if(wglDXUnlockObjectsNV_Impl)
+                    b = wglDXUnlockObjectsNV_Impl(hDevice, count, hObjects);
+                PostWGLHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
         #endif // defined(GLE_WGL_ENABLED)
 
         #if defined(GLE_GLX_ENABLED)
-			void OVR::GLEContext::PostGLXHook(const char* /*function*/)
-			{
-				// Empty for now. GLX functions don't have a function like glGetError().
-			}
+            void OVR::GLEContext::PostGLXHook(const char* /*function*/)
+            {
+                // Empty for now. GLX functions don't have a function like glGetError().
+            }
 
-			// GLX_VERSION_1_0
-			// GLX_VERSION_1_1
-			// We don't currently implement hooking of these.
+            // GLX_VERSION_1_0
+            // GLX_VERSION_1_1
+            // We don't currently implement hooking of these.
 
-			// GLX_VERSION_1_2
-			::Display* OVR::GLEContext::glXGetCurrentDisplay_Hook(void)
-			{
-				::Display* p = NULL;
-				if(glXGetCurrentDisplay_Impl)
-	                p = glXGetCurrentDisplay_Impl();
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return p;
-			}
+            // GLX_VERSION_1_2
+            ::Display* OVR::GLEContext::glXGetCurrentDisplay_Hook(void)
+            {
+                ::Display* p = NULL;
+                if(glXGetCurrentDisplay_Impl)
+                    p = glXGetCurrentDisplay_Impl();
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-			// GLX_VERSION_1_3
-		    GLXFBConfig* OVR::GLEContext::glXChooseFBConfig_Hook(Display *dpy, int screen, const int *attrib_list, int *nelements)
-			{
-				GLXFBConfig* p = NULL;
-				if(glXChooseFBConfig_Impl)
-	                p = glXChooseFBConfig_Impl(dpy, screen, attrib_list, nelements);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return p;
-			}
+            // GLX_VERSION_1_3
+            GLXFBConfig* OVR::GLEContext::glXChooseFBConfig_Hook(Display *dpy, int screen, const int *attrib_list, int *nelements)
+            {
+                GLXFBConfig* p = NULL;
+                if(glXChooseFBConfig_Impl)
+                    p = glXChooseFBConfig_Impl(dpy, screen, attrib_list, nelements);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-		    GLXContext OVR::GLEContext::glXCreateNewContext_Hook(Display *dpy, GLXFBConfig config, int render_type, GLXContext share_list, Bool direct)
-			{
-		    	GLXContext c = 0;
-				if(glXCreateNewContext_Impl)
-	                c = glXCreateNewContext_Impl(dpy, config, render_type, share_list, direct);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return c;
-			}
+            GLXContext OVR::GLEContext::glXCreateNewContext_Hook(Display *dpy, GLXFBConfig config, int render_type, GLXContext share_list, Bool direct)
+            {
+                GLXContext c = 0;
+                if(glXCreateNewContext_Impl)
+                    c = glXCreateNewContext_Impl(dpy, config, render_type, share_list, direct);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return c;
+            }
 
-		    GLXPbuffer OVR::GLEContext::glXCreatePbuffer_Hook(Display *dpy, GLXFBConfig config, const int *attrib_list)
-			{
-		    	GLXPbuffer b = 0;
-	            if(glXCreatePbuffer_Impl)
-	            	b = glXCreatePbuffer_Impl(dpy, config, attrib_list);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+            GLXPbuffer OVR::GLEContext::glXCreatePbuffer_Hook(Display *dpy, GLXFBConfig config, const int *attrib_list)
+            {
+                GLXPbuffer b = 0;
+                if(glXCreatePbuffer_Impl)
+                    b = glXCreatePbuffer_Impl(dpy, config, attrib_list);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-		    GLXPixmap OVR::GLEContext::glXCreatePixmap_Hook(Display *dpy, GLXFBConfig config, Pixmap pixmap, const int *attrib_list)
-			{
-		    	GLXPixmap m = 0;
-	            if(glXCreatePixmap_Impl)
-	            	m = glXCreatePixmap_Impl(dpy, config, pixmap, attrib_list);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return m;
-			}
+            GLXPixmap OVR::GLEContext::glXCreatePixmap_Hook(Display *dpy, GLXFBConfig config, Pixmap pixmap, const int *attrib_list)
+            {
+                GLXPixmap m = 0;
+                if(glXCreatePixmap_Impl)
+                    m = glXCreatePixmap_Impl(dpy, config, pixmap, attrib_list);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return m;
+            }
 
-		    GLXWindow OVR::GLEContext::glXCreateWindow_Hook(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list)
-			{
-		    	GLXWindow w = 0;
-	            if(glXCreateWindow_Impl)
-	            	w = glXCreateWindow_Impl(dpy, config, win, attrib_list);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return w;
-			}
+            GLXWindow OVR::GLEContext::glXCreateWindow_Hook(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list)
+            {
+                GLXWindow w = 0;
+                if(glXCreateWindow_Impl)
+                    w = glXCreateWindow_Impl(dpy, config, win, attrib_list);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return w;
+            }
 
-		    void OVR::GLEContext::glXDestroyPbuffer_Hook(Display *dpy, GLXPbuffer pbuf)
-		    {
-	            if(glXDestroyPbuffer_Impl)
-	                glXDestroyPbuffer_Impl(dpy, pbuf);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-		    }
+            void OVR::GLEContext::glXDestroyPbuffer_Hook(Display *dpy, GLXPbuffer pbuf)
+            {
+                if(glXDestroyPbuffer_Impl)
+                    glXDestroyPbuffer_Impl(dpy, pbuf);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    void OVR::GLEContext::glXDestroyPixmap_Hook(Display *dpy, GLXPixmap pixmap)
-			{
-	            if(glXDestroyPixmap_Impl)
-	            	glXDestroyPixmap_Impl(dpy, pixmap);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-			}
+            void OVR::GLEContext::glXDestroyPixmap_Hook(Display *dpy, GLXPixmap pixmap)
+            {
+                if(glXDestroyPixmap_Impl)
+                    glXDestroyPixmap_Impl(dpy, pixmap);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    void OVR::GLEContext::glXDestroyWindow_Hook(Display *dpy, GLXWindow win)
-			{
-	            if(glXDestroyWindow_Impl)
-	            	glXDestroyWindow_Impl(dpy, win);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-			}
+            void OVR::GLEContext::glXDestroyWindow_Hook(Display *dpy, GLXWindow win)
+            {
+                if(glXDestroyWindow_Impl)
+                    glXDestroyWindow_Impl(dpy, win);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    GLXDrawable OVR::GLEContext::glXGetCurrentReadDrawable_Hook(void)
-			{
-		    	GLXDrawable d;
-	            if(glXGetCurrentReadDrawable_Impl)
-	            	d = glXGetCurrentReadDrawable_Impl();
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return d;
-			}
+            GLXDrawable OVR::GLEContext::glXGetCurrentReadDrawable_Hook(void)
+            {
+                GLXDrawable d;
+                if(glXGetCurrentReadDrawable_Impl)
+                    d = glXGetCurrentReadDrawable_Impl();
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return d;
+            }
 
-		    int OVR::GLEContext::glXGetFBConfigAttrib_Hook(Display *dpy, GLXFBConfig config, int attribute, int *value)
-			{
-	            int i = -1;
-	            if(glXGetFBConfigAttrib_Impl)
-	            	i = glXGetFBConfigAttrib_Impl(dpy, config, attribute, value);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return i;
-			}
+            int OVR::GLEContext::glXGetFBConfigAttrib_Hook(Display *dpy, GLXFBConfig config, int attribute, int *value)
+            {
+                int i = -1;
+                if(glXGetFBConfigAttrib_Impl)
+                    i = glXGetFBConfigAttrib_Impl(dpy, config, attribute, value);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-		    GLXFBConfig* OVR::GLEContext::glXGetFBConfigs_Hook(Display *dpy, int screen, int *nelements)
-		    {
-		    	GLXFBConfig* p = NULL;
-	            if(glXGetFBConfigs_Impl)
-	            	p = glXGetFBConfigs_Impl(dpy, screen, nelements);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return p;
-		    }
+            GLXFBConfig* OVR::GLEContext::glXGetFBConfigs_Hook(Display *dpy, int screen, int *nelements)
+            {
+                GLXFBConfig* p = NULL;
+                if(glXGetFBConfigs_Impl)
+                    p = glXGetFBConfigs_Impl(dpy, screen, nelements);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-		    void OVR::GLEContext::glXGetSelectedEvent_Hook(Display *dpy, GLXDrawable draw, unsigned long *event_mask)
-			{
-	            if(glXGetSelectedEvent_Impl)
-	            	glXGetSelectedEvent_Impl(dpy, draw, event_mask);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-			}
+            void OVR::GLEContext::glXGetSelectedEvent_Hook(Display *dpy, GLXDrawable draw, unsigned long *event_mask)
+            {
+                if(glXGetSelectedEvent_Impl)
+                    glXGetSelectedEvent_Impl(dpy, draw, event_mask);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    XVisualInfo* OVR::GLEContext::glXGetVisualFromFBConfig_Hook(Display *dpy, GLXFBConfig config)
-			{
-		    	XVisualInfo* p = NULL;
-	            if(glXGetVisualFromFBConfig_Impl)
-	            	p = glXGetVisualFromFBConfig_Impl(dpy, config);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return p;
-			}
+            XVisualInfo* OVR::GLEContext::glXGetVisualFromFBConfig_Hook(Display *dpy, GLXFBConfig config)
+            {
+                XVisualInfo* p = NULL;
+                if(glXGetVisualFromFBConfig_Impl)
+                    p = glXGetVisualFromFBConfig_Impl(dpy, config);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return p;
+            }
 
-		    Bool OVR::GLEContext::glXMakeContextCurrent_Hook(Display *dpy, GLXDrawable draw, GLXDrawable read, GLXContext ctx)
-			{
-	            Bool b = False;
-	            if(glXMakeContextCurrent_Impl)
-	            	b = glXMakeContextCurrent_Impl(dpy, draw, read, ctx);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+            Bool OVR::GLEContext::glXMakeContextCurrent_Hook(Display *dpy, GLXDrawable draw, GLXDrawable read, GLXContext ctx)
+            {
+                Bool b = False;
+                if(glXMakeContextCurrent_Impl)
+                    b = glXMakeContextCurrent_Impl(dpy, draw, read, ctx);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-		    int OVR::GLEContext::glXQueryContext_Hook(Display *dpy, GLXContext ctx, int attribute, int *value)
-		    {
-	            int i = GLX_BAD_ATTRIBUTE;
-	            if(glXQueryContext_Impl)
-	            	i = glXQueryContext_Impl(dpy, ctx, attribute, value);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return i;
-		    }
+            int OVR::GLEContext::glXQueryContext_Hook(Display *dpy, GLXContext ctx, int attribute, int *value)
+            {
+                int i = GLX_BAD_ATTRIBUTE;
+                if(glXQueryContext_Impl)
+                    i = glXQueryContext_Impl(dpy, ctx, attribute, value);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-		    void OVR::GLEContext::glXQueryDrawable_Hook(Display *dpy, GLXDrawable draw, int attribute, unsigned int *value)
-			{
-	            if(glXQueryDrawable_Impl)
-	            	glXQueryDrawable_Impl(dpy, draw, attribute, value);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-			}
+            void OVR::GLEContext::glXQueryDrawable_Hook(Display *dpy, GLXDrawable draw, int attribute, unsigned int *value)
+            {
+                if(glXQueryDrawable_Impl)
+                    glXQueryDrawable_Impl(dpy, draw, attribute, value);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    void OVR::GLEContext::glXSelectEvent_Hook(Display *dpy, GLXDrawable draw, unsigned long event_mask)
-			{
-	            if(glXSelectEvent_Impl)
-	            	glXSelectEvent_Impl(dpy, draw, event_mask);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-			}
+            void OVR::GLEContext::glXSelectEvent_Hook(Display *dpy, GLXDrawable draw, unsigned long event_mask)
+            {
+                if(glXSelectEvent_Impl)
+                    glXSelectEvent_Impl(dpy, draw, event_mask);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
-		    // GLX_VERSION_1_4
-		    // We don't do hooking of this.
+            // GLX_VERSION_1_4
+            // We don't do hooking of this.
 
-		    // GLX_ARB_create_context
-	        GLXContext OVR::GLEContext::glXCreateContextAttribsARB_Hook(Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list)
-			{
-	        	GLXContext c = 0;
-	            if(glXCreateContextAttribsARB_Impl)
-	            	c = glXCreateContextAttribsARB_Impl(dpy,  config, share_context, direct, attrib_list);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return c;
-			}
+            // GLX_ARB_create_context
+            GLXContext OVR::GLEContext::glXCreateContextAttribsARB_Hook(Display* dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list)
+            {
+                GLXContext c = 0;
+                if(glXCreateContextAttribsARB_Impl)
+                    c = glXCreateContextAttribsARB_Impl(dpy,  config, share_context, direct, attrib_list);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return c;
+            }
 
-		    // GLX_EXT_swap_control
-		    void OVR::GLEContext::glXSwapIntervalEXT_Hook(Display* dpy, GLXDrawable drawable, int interval)
-		    {
-	            if(glXSwapIntervalEXT_Impl)
-	            	glXSwapIntervalEXT_Impl(dpy, drawable, interval);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-		    }
+            // GLX_EXT_swap_control
+            void OVR::GLEContext::glXSwapIntervalEXT_Hook(Display* dpy, GLXDrawable drawable, int interval)
+            {
+                if(glXSwapIntervalEXT_Impl)
+                    glXSwapIntervalEXT_Impl(dpy, drawable, interval);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+            }
 
             // GLX_OML_sync_control
-   			Bool OVR::GLEContext::glXGetMscRateOML_Hook(Display* dpy, GLXDrawable drawable, int32_t* numerator, int32_t* denominator)
-			{
-	            Bool b = False;
-	            if(glXGetMscRateOML_Impl)
-	            	b = glXGetMscRateOML_Impl(dpy, drawable, numerator, denominator);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+               Bool OVR::GLEContext::glXGetMscRateOML_Hook(Display* dpy, GLXDrawable drawable, int32_t* numerator, int32_t* denominator)
+            {
+                Bool b = False;
+                if(glXGetMscRateOML_Impl)
+                    b = glXGetMscRateOML_Impl(dpy, drawable, numerator, denominator);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-   			Bool OVR::GLEContext::glXGetSyncValuesOML_Hook(Display* dpy, GLXDrawable drawable, int64_t* ust, int64_t* msc, int64_t* sbc)
-			{
-	            Bool b = False;
-	            if(glXGetSyncValuesOML_Impl)
-	            	b = glXGetSyncValuesOML_Impl(dpy, drawable, ust, msc, sbc);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+               Bool OVR::GLEContext::glXGetSyncValuesOML_Hook(Display* dpy, GLXDrawable drawable, int64_t* ust, int64_t* msc, int64_t* sbc)
+            {
+                Bool b = False;
+                if(glXGetSyncValuesOML_Impl)
+                    b = glXGetSyncValuesOML_Impl(dpy, drawable, ust, msc, sbc);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-   			int64_t OVR::GLEContext::glXSwapBuffersMscOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor, int64_t remainder)
-			{
-   				int64_t i = 0;
-	            if(glXSwapBuffersMscOML_Impl)
-	            	i = glXSwapBuffersMscOML_Impl(dpy, drawable, target_msc, divisor, remainder);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return i;
-			}
+               int64_t OVR::GLEContext::glXSwapBuffersMscOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor, int64_t remainder)
+            {
+                   int64_t i = 0;
+                if(glXSwapBuffersMscOML_Impl)
+                    i = glXSwapBuffersMscOML_Impl(dpy, drawable, target_msc, divisor, remainder);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return i;
+            }
 
-   			Bool OVR::GLEContext::glXWaitForMscOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor, int64_t remainder, int64_t* ust, int64_t* msc, int64_t* sbc)
-			{
-	            Bool b = False;
-	            if(glXWaitForMscOML_Impl)
-	            	b = glXWaitForMscOML_Impl(dpy, drawable, target_msc, divisor, remainder, ust, msc, sbc);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+               Bool OVR::GLEContext::glXWaitForMscOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_msc, int64_t divisor, int64_t remainder, int64_t* ust, int64_t* msc, int64_t* sbc)
+            {
+                Bool b = False;
+                if(glXWaitForMscOML_Impl)
+                    b = glXWaitForMscOML_Impl(dpy, drawable, target_msc, divisor, remainder, ust, msc, sbc);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
-   			Bool OVR::GLEContext::glXWaitForSbcOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_sbc, int64_t* ust, int64_t* msc, int64_t* sbc)
-			{
-	            Bool b = False;
-	            if(glXWaitForSbcOML_Impl)
-	            	b = glXWaitForSbcOML_Impl(dpy, drawable, target_sbc, ust, msc, sbc);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
-	            return b;
-			}
+               Bool OVR::GLEContext::glXWaitForSbcOML_Hook(Display* dpy, GLXDrawable drawable, int64_t target_sbc, int64_t* ust, int64_t* msc, int64_t* sbc)
+            {
+                Bool b = False;
+                if(glXWaitForSbcOML_Impl)
+                    b = glXWaitForSbcOML_Impl(dpy, drawable, target_sbc, ust, msc, sbc);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
+                return b;
+            }
 
             // GLX_MESA_swap_control
             int OVR::GLEContext::glXGetSwapIntervalMESA_Hook()
-		    {
-	            int i = 0;
+            {
+                int i = 0;
                 if(glXGetSwapIntervalMESA_Impl)
-	            	i = glXGetSwapIntervalMESA_Impl();
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
+                    i = glXGetSwapIntervalMESA_Impl();
+                PostGLXHook(GLE_CURRENT_FUNCTION);
                 return i;
-		    }
+            }
 
 
             int OVR::GLEContext::glXSwapIntervalMESA_Hook(unsigned int interval)
-		    {
-	            int i = 0;
+            {
+                int i = 0;
                 if(glXSwapIntervalMESA_Impl)
-	            	i = glXSwapIntervalMESA_Impl(interval);
-	            PostGLXHook(GLE_CURRENT_FUNCTION);
+                    i = glXSwapIntervalMESA_Impl(interval);
+                PostGLXHook(GLE_CURRENT_FUNCTION);
                 return i;
-		    }
+            }
 
         #endif // defined(GLE_GLX_ENABLED)
 

@@ -145,18 +145,18 @@ void CircularBuffer::ReadEnd(size_t size)
 
 ThreadCommand::PopBuffer::~PopBuffer()
 {
-	if (Size) {
-		Destruct<ThreadCommand>(toCommand());
-	}
+    if (Size) {
+        Destruct<ThreadCommand>(toCommand());
+    }
 }
 
 void ThreadCommand::PopBuffer::InitFromBuffer(void* data)
 {
     ThreadCommand* cmd = (ThreadCommand*)data;
 
-	if (Size) {
-		Destruct<ThreadCommand>(toCommand());
-	}
+    if (Size) {
+        Destruct<ThreadCommand>(toCommand());
+    }
     Size = cmd->Size;
     if (Size > MaxSize)
         Size = MaxSize;
@@ -171,9 +171,9 @@ void ThreadCommand::PopBuffer::Execute()
     {
         command->Execute();
     }
-	if (NeedsWait()) {
-		GetEvent()->PulseEvent();
-	}
+    if (NeedsWait()) {
+        GetEvent()->PulseEvent();
+    }
 }
 
 //-------------------------------------------------------------------------------------
@@ -186,11 +186,11 @@ class ThreadCommandQueueImpl : public NewOverrideBase
 public:
 
     ThreadCommandQueueImpl(ThreadCommandQueue* queue) :
-		pQueue(queue),
-		ExitEnqueued(false),
-		ExitProcessed(false),
-		CommandBuffer(2048),
-		PullThreadId(0)
+        pQueue(queue),
+        ExitEnqueued(false),
+        ExitProcessed(false),
+        CommandBuffer(2048),
+        PullThreadId(0)
     {
     }
     ~ThreadCommandQueueImpl();
@@ -252,12 +252,12 @@ public:
     List<NotifyEvent>   BlockedProducers;
     CircularBuffer      CommandBuffer;
 
-	// The pull thread id is set to the last thread that pulled commands.
-	// Since this thread command queue is designed for a single thread,
-	// reentrant behavior that would cause a dead-lock for messages that
-	// wait for completion can be avoided by simply comparing the
-	// thread id of the last pull.
-	OVR::ThreadId		PullThreadId;
+    // The pull thread id is set to the last thread that pulled commands.
+    // Since this thread command queue is designed for a single thread,
+    // reentrant behavior that would cause a dead-lock for messages that
+    // wait for completion can be avoided by simply comparing the
+    // thread id of the last pull.
+    OVR::ThreadId        PullThreadId;
 };
 
 ThreadCommandQueueImpl::~ThreadCommandQueueImpl()
@@ -269,17 +269,17 @@ ThreadCommandQueueImpl::~ThreadCommandQueueImpl()
 
 bool ThreadCommandQueueImpl::PushCommand(const ThreadCommand& command)
 {
-	if (command.NeedsWait() && PullThreadId == OVR::GetCurrentThreadId())
-	{
-		command.Execute();
-		return true;
-	}
+    if (command.NeedsWait() && PullThreadId == OVR::GetCurrentThreadId())
+    {
+        command.Execute();
+        return true;
+    }
 
     ThreadCommand::NotifyEvent* completeEvent = 0;
     ThreadCommand::NotifyEvent* queueAvailableEvent = 0;
 
     // Repeat  writing command into buffer until it is available.    
-	for (;;) {
+    for (;;) {
         { // Lock Scope
             Lock::Locker lock(&QueueLock);
 
@@ -289,26 +289,26 @@ bool ThreadCommandQueueImpl::PushCommand(const ThreadCommand& command)
             }
 
             // Don't allow any commands after PushExitCommand() is called.
-			if (ExitEnqueued && !command.ExitFlag) {
-				return false;
-			}
+            if (ExitEnqueued && !command.ExitFlag) {
+                return false;
+            }
 
             bool bufferWasEmpty = CommandBuffer.IsEmpty();
             uint8_t* buffer = CommandBuffer.Write(command.GetSize());
 
-			if (buffer) {
+            if (buffer) {
                 ThreadCommand* c = command.CopyConstruct(buffer);
 
-				if (c->NeedsWait()) {
-					completeEvent = c->pEvent = AllocNotifyEvent_NTS();
-				}
+                if (c->NeedsWait()) {
+                    completeEvent = c->pEvent = AllocNotifyEvent_NTS();
+                }
 
-				// Signal-waker consumer when we add data to buffer.
-				if (bufferWasEmpty) {
-					pQueue->OnPushNonEmpty_Locked();
-				}
+                // Signal-waker consumer when we add data to buffer.
+                if (bufferWasEmpty) {
+                    pQueue->OnPushNonEmpty_Locked();
+                }
 
-				break;
+                break;
             }
 
             queueAvailableEvent = AllocNotifyEvent_NTS();

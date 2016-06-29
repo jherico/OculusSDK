@@ -147,9 +147,12 @@ enum TextureFormat
     Texture_BGRA            = Texture_BGRA8,
     Texture_R               = 0x100,
     Texture_A               = 0x110,
-    Texture_DXT1            = 0x210,
-    Texture_DXT3            = 0x220,
-    Texture_DXT5            = 0x230,
+    Texture_BC1             = 0x210,
+    Texture_BC2             = 0x220,
+    Texture_BC3             = 0x230,
+    Texture_BC6S            = 0x240,
+    Texture_BC6U            = 0x241,
+    Texture_BC7             = 0x250,
     
     Texture_Depth32f        = 0x10000,   // aliased as default Texture_Depth
     Texture_Depth24Stencil8 = 0x20000,
@@ -1002,6 +1005,7 @@ enum TextureLoadFlags
     TextureLoad_Anisotropic         = 0x0002,
     TextureLoad_MakePremultAlpha    = 0x0004,
     TextureLoad_SwapTextureSet      = 0x0008,
+    TextureLoad_StoreCompressed     = 0x0010,
 };
 
 Texture* LoadTextureTgaTopDown (RenderDevice* ren, File* f, int textureLoadFlags, unsigned char alpha = 255);

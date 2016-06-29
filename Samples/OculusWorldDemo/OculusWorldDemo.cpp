@@ -1822,7 +1822,7 @@ void OculusWorldDemoApp::OnIdle()
     ConnectedTrackerCount = ovr_GetTrackerCount(Session);
     
     HasInputState      = (ovr_GetInputState(Session, ovrControllerType_Touch, &InputState ) == ovrSuccess);
-    
+
     // TODO: This is a workaround for not being able to query multiple controllers at once. This
     //       should be pushed into CAPI if it's really desired functionality.
     ovrInputState sidInput = {};
@@ -1846,17 +1846,13 @@ void OculusWorldDemoApp::OnIdle()
         for ( size_t t = 0; t < 2; ++t )
         {
             float middle = InputState.HandTrigger[t];
-
             middle *= middle;
 
             float freq = fabs( InputState.Thumbstick[t].x ) + fabs( InputState.Thumbstick[t].y );
-
             freq /= 2.0f;
 
             Alg::Clamp( freq, 0.0f, 1.0f );
-
             freq = 1.0f - freq;
-
             freq *= freq;
 
             if ( t == 0 )
@@ -2668,19 +2664,12 @@ void OculusWorldDemoApp::OnIdle()
     viewScaleDesc.HmdSpaceToWorldScaleInMeters = localPositionTrackingScale;
     viewScaleDesc.HmdToEyeOffset[0] = HmdToEyeOffset[0];
     viewScaleDesc.HmdToEyeOffset[1] = HmdToEyeOffset[1];
-
-    error = ovr_SubmitFrame(Session, 0, &viewScaleDesc, LayerList, numLayers);
-    if (HandleOvrError(error))
-        return;
-
-    // Result could have been ovrSuccess_NotVisible
-    if (error == ovrSuccess_NotVisible)
-    {
-         // Don't pound on the CPU if not visible.
-         Sleep(100);
-    }
-
-    // Post ovr_SubmitFrame() draw on client window
+    
+    // Draw the mirror window contents using the previous frame's HMD mirror buffer
+    // We do this before calling ovr_SubmitFrame() to avoid the GPU from doing tiny
+    // amounts of render work before starting to process the next frame. This will
+    // in turn allow the GPU timing values to be more accurate as it won't be affected
+    // as much by queue ahead logic.
     {
         // Reset the back buffer format in case the sRGB flag was flipped
         if (RenderParams.SrgbBackBuffer != SrgbRequested)
@@ -2745,6 +2734,17 @@ void OculusWorldDemoApp::OnIdle()
         }
 
         pRender->Present(false);
+
+        error = ovr_SubmitFrame(Session, 0, &viewScaleDesc, LayerList, numLayers);
+        if (HandleOvrError(error))
+            return;
+
+        // Result could have been ovrSuccess_NotVisible
+        if (error == ovrSuccess_NotVisible)
+        {
+            // Don't pound on the CPU if not visible.
+            Sleep(100);
+        }
     }
 
     Profiler.RecordSample(RenderProfiler::Sample_AfterPresent);
@@ -3375,8 +3375,8 @@ Recti OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
 
     case Text_TouchState:
         bounds = Recti(0, 0, 0, 0);
-            bounds = RenderControllerStateHud(centerX, centerY, textHeight, InputState,
-                                              ovrControllerType_Remote | ovrControllerType_Touch);
+        bounds = RenderControllerStateHud(centerX, centerY, textHeight, InputState,
+                                          ovrControllerType_Remote | ovrControllerType_Touch);
         break;
 
     case Text_GamepadState:
@@ -3388,7 +3388,7 @@ Recti OculusWorldDemoApp::RenderTextInfoHud(float textHeight)
         bounds = Recti(0, 0, 0, 0);
         bounds = RenderControllerStateHud(centerX, centerY, textHeight, ActiveControllerState, ActiveControllerState.ControllerType);
         break;
-
+        
     case Text_Help1:
         bounds = DrawTextBox(pRender, centerX, centerY, textHeight, HelpText1, DrawText_Center);
         break;
@@ -3453,10 +3453,12 @@ Recti OculusWorldDemoApp::RenderControllerStateHud(float cx, float cy, float tex
         if (is.Touches & ovrTouch_B)         s += "B ";
         if (is.Touches & ovrTouch_LThumb)    s += "LThumb ";
         if (is.Touches & ovrTouch_LIndexTrigger)  s += "LIndexTrigger ";
+        if (is.Touches & ovrTouch_LThumbRest)     s += "LThumbRest ";
         if (is.Touches & ovrTouch_X)         s += "X ";
         if (is.Touches & ovrTouch_Y)         s += "Y ";
         if (is.Touches & ovrTouch_RThumb)    s += "RThumb ";
         if (is.Touches & ovrTouch_RIndexTrigger)  s += "RIndexTrigger ";
+        if (is.Touches & ovrTouch_RThumbRest)     s += "RThumbRest ";
         s += "] \n";
         // Do gestures on a separate line for readability
         s += "Gesture [";

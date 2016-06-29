@@ -25,10 +25,6 @@ limitations under the License.
 
 ************************************************************************************/
 
-
-#ifndef OVR_Compiler_h
-#define OVR_Compiler_h
-
 #pragma once
 
 
@@ -287,6 +283,24 @@ limitations under the License.
 
 
 // -----------------------------------------------------------------------------------
+// ***** OVR_SUPPRESS_MSVC_WARNING
+//
+// Portable wrapper for disabling a single warning on the next source code line.
+//
+// Example usage:
+//     OVR_SUPPRESS_MSVC_WARNING(4556)
+//     <code>
+//
+#if !defined(OVR_SUPPRESS_MSVC_WARNING)
+    #if defined(OVR_CC_MSVC)
+        #define OVR_SUPPRESS_MSVC_WARNING(w) __pragma(warning(suppress:w))
+    #else
+        #define OVR_SUPPRESS_MSVC_WARNING(w)
+    #endif
+#endif
+
+
+// -----------------------------------------------------------------------------------
 // ***** OVR_DISABLE_ALL_MSVC_WARNINGS / OVR_RESTORE_ALL_MSVC_WARNINGS
 //
 // Portable wrapper for disabling all VC++ compiler warnings.
@@ -471,7 +485,7 @@ limitations under the License.
         !(defined(__clang__) && defined(__cplusplus) && OVR_CC_HAS_FEATURE(cxx_static_assert)) &&                              \
         !(defined(_MSC_VER) && (_MSC_VER >= 1600) && defined(__cplusplus)) &&                 /* VS2010+  */                   \
         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 401) && defined(OVR_CPP11_ENABLED)) /* EDG 4.1+ */
-	    #define OVR_CPP_NO_STATIC_ASSERT 1
+        #define OVR_CPP_NO_STATIC_ASSERT 1
     #endif
 #endif
 
@@ -1561,6 +1575,3 @@ inline int OVR_popcnt(unsigned int x)
     x = (x + (x >> 4)) & 0x0F0F0F0F;
     return (int)((x * 0x01010101) >> 24);
 }
-
-
-#endif  // header include guard

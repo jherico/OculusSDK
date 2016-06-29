@@ -40,56 +40,58 @@ struct ControlCombination : BasicVR
 
 	    while (HandleMessages())
 	    {
-            // Take out manual yaw rotation (leaving button move for now)
-            ActionFromInput(1, false);
-            ovrTrackingState trackingState = Layer[0]->GetEyePoses();
-
-            // Set various control methods into camera
 			//Need to check we're visible, before proceeding with velocity changes, 
 			//otherwise it does this a lot of times, and we
 			//end up miles away from our start point from the sheer number of iterations.
 			ovrSessionStatus sessionStatus;
 			ovr_GetSessionStatus(Session, &sessionStatus);
 			if (sessionStatus.IsVisible)
-			    MainCam->Pos = XMVectorAdd(MainCam->Pos, FindVelocityFromTilt(this, Layer[0], &trackingState));
+			{
+				// Take out manual yaw rotation (leaving button move for now)
+				ActionFromInput(1, false);
+				ovrTrackingState trackingState = Layer[0]->GetEyePoses();
 
-		    MainCam->Pos = XMVectorSet(XMVectorGetX(MainCam->Pos),
-			                           GetAccelJumpPosY(this, &trackingState),
-			                           XMVectorGetZ(MainCam->Pos), 0);
+				// Set various control methods into camera
+				MainCam->Pos = XMVectorAdd(MainCam->Pos, FindVelocityFromTilt(this, Layer[0], &trackingState));
 
-            MainCam->Rot = GetAutoYawRotation(Layer[0]);
- 
-            // If tap side of Rift, then fire a bullet
-            bool singleTap = WasItTapped(trackingState.HeadPose.LinearAcceleration);
+				MainCam->Pos = XMVectorSet(XMVectorGetX(MainCam->Pos),
+					GetAccelJumpPosY(this, &trackingState),
+					XMVectorGetZ(MainCam->Pos), 0);
 
-            static XMVECTOR bulletPos = XMVectorZero();
-            static XMVECTOR bulletVel = XMVectorZero();
-            if (singleTap)
-            {
-                XMVECTOR eye0 = ConvertToXM(Layer[0]->EyeRenderPose[0].Position);
-                XMVECTOR eye1 = ConvertToXM(Layer[0]->EyeRenderPose[1].Position);
-                XMVECTOR midEyePos = XMVectorScale(XMVectorAdd(eye0, eye1), 0.5f);
+				MainCam->Rot = GetAutoYawRotation(Layer[0]);
 
-			    XMVECTOR totalRot = XMQuaternionMultiply(ConvertToXM(Layer[0]->EyeRenderPose[0].Orientation), MainCam->Rot);
-			    XMVECTOR posOfOrigin = XMVectorAdd(MainCam->Pos, XMVector3Rotate(midEyePos, MainCam->Rot));
+				// If tap side of Rift, then fire a bullet
+				bool singleTap = WasItTapped(trackingState.HeadPose.LinearAcceleration);
 
-                XMVECTOR unitDirOfMainCamera = XMVector3Rotate(XMVectorSet(0, 0, -1, 0), totalRot);
+				static XMVECTOR bulletPos = XMVectorZero();
+				static XMVECTOR bulletVel = XMVectorZero();
+				if (singleTap)
+				{
+					XMVECTOR eye0 = ConvertToXM(Layer[0]->EyeRenderPose[0].Position);
+					XMVECTOR eye1 = ConvertToXM(Layer[0]->EyeRenderPose[1].Position);
+					XMVECTOR midEyePos = XMVectorScale(XMVectorAdd(eye0, eye1), 0.5f);
 
-                bulletPos = XMVectorAdd(posOfOrigin, XMVectorScale(unitDirOfMainCamera, 2.0f));
-                bulletVel = XMVectorScale(unitDirOfMainCamera, 0.3f);
-            }
+					XMVECTOR totalRot = XMQuaternionMultiply(ConvertToXM(Layer[0]->EyeRenderPose[0].Orientation), MainCam->Rot);
+					XMVECTOR posOfOrigin = XMVectorAdd(MainCam->Pos, XMVector3Rotate(midEyePos, MainCam->Rot));
 
-            // Move missile on, and set its position
-            bulletPos = XMVectorAdd(bulletPos, bulletVel);
-            XMStoreFloat3(&RoomScene->Models[1]->Pos, bulletPos); 
+					XMVECTOR unitDirOfMainCamera = XMVector3Rotate(XMVectorSet(0, 0, -1, 0), totalRot);
 
-		    for (int eye = 0; eye < 2; ++eye)
-		    {
-			    Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
-		    }
+					bulletPos = XMVectorAdd(posOfOrigin, XMVectorScale(unitDirOfMainCamera, 2.0f));
+					bulletVel = XMVectorScale(unitDirOfMainCamera, 0.3f);
+				}
 
-		    Layer[0]->PrepareLayerHeader();
-		    DistortAndPresent(1);
+				// Move missile on, and set its position
+				bulletPos = XMVectorAdd(bulletPos, bulletVel);
+				XMStoreFloat3(&RoomScene->Models[1]->Pos, bulletPos);
+
+				for (int eye = 0; eye < 2; ++eye)
+				{
+					Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
+				}
+
+				Layer[0]->PrepareLayerHeader();
+				DistortAndPresent(1);
+			}
 	    }
     }
 };

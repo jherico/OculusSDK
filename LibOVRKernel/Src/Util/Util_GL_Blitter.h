@@ -28,11 +28,11 @@ limitations under the License.
 #define OVR_Util_GL_Blitter_h
 
 #include "Kernel/OVR_RefCount.h"
+#include "Kernel/OVR_Win32_IncludeWindows.h"
 
 #include "GL/CAPI_GLE.h"
 
 #if defined(OVR_OS_WIN32)
-#include <Windows.h>
 #include <gl/GL.h>
 #elif defined(__APPLE__)
 #include <OpenGL/gl.h>

@@ -202,7 +202,6 @@ void Tracker::Init(ovrSession Session,String mainFilePathNoExtension, RenderDevi
 	textureLoadFlags |= SrgbRequested ? TextureLoad_SrgbAware : 0;
 	textureLoadFlags |= AnisotropicSample ? TextureLoad_Anisotropic : 0;
 	textureLoadFlags |= TextureLoad_MakePremultAlpha;
-	textureLoadFlags |= TextureLoad_SwapTextureSet;
 
 	Ptr<File>	 whiteFile = *new SysFile(mainFilePathNoExtension + "_White.dds");
 	Ptr<File>	 gridFile = *new SysFile(mainFilePathNoExtension + "_Grid.dds"); 

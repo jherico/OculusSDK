@@ -611,7 +611,7 @@ void StringBuffer::SetGrowSize(size_t growSize)
     else
     {
         uint8_t bits = Alg::UpperBit(uint32_t(growSize - 1));
-		size_t size = (size_t)1 << bits;
+        size_t size = (size_t)1 << bits;
         GrowSize = size == growSize ? growSize : size;
     }
 }
@@ -733,8 +733,8 @@ void      StringBuffer::operator = (const String& src)
 
 void      StringBuffer::operator = (const StringBuffer& src)
 {
-	Clear();
-	AppendString(src.ToCStr(), src.GetSize());
+    Clear();
+    AppendString(src.ToCStr(), src.GetSize());
 }
 
 

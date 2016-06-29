@@ -1,5 +1,5 @@
-#ifndef	_mach_exc_user_
-#define	_mach_exc_user_
+#ifndef    _mach_exc_user_
+#define    _mach_exc_user_
 
 /* Module mach_exc */
 
@@ -25,9 +25,9 @@ typedef function_table_entry   *function_table_t;
 #endif /* FUNCTION_PTR_T */
 #endif /* AUTOTEST */
 
-#ifndef	mach_exc_MSG_COUNT
-#define	mach_exc_MSG_COUNT	3
-#endif	/* mach_exc_MSG_COUNT */
+#ifndef    mach_exc_MSG_COUNT
+#define    mach_exc_MSG_COUNT    3
+#endif    /* mach_exc_MSG_COUNT */
 
 #include <mach/std_types.h>
 #include <mach/mig.h>
@@ -46,59 +46,59 @@ __BEGIN_DECLS
 #endif
 
 /* Routine mach_exception_raise_OVR */
-#ifdef	mig_external
+#ifdef    mig_external
 mig_external
 #else
 extern
-#endif	/* mig_external */
+#endif    /* mig_external */
 kern_return_t mach_exception_raise_OVR
 (
-	mach_port_t exception_port,
-	mach_port_t thread,
-	mach_port_t task,
-	exception_type_t exception,
-	mach_exception_data_t code,
-	mach_msg_type_number_t codeCnt
+    mach_port_t exception_port,
+    mach_port_t thread,
+    mach_port_t task,
+    exception_type_t exception,
+    mach_exception_data_t code,
+    mach_msg_type_number_t codeCnt
 );
 
 /* Routine mach_exception_raise_state_OVR */
-#ifdef	mig_external
+#ifdef    mig_external
 mig_external
 #else
 extern
-#endif	/* mig_external */
+#endif    /* mig_external */
 kern_return_t mach_exception_raise_state_OVR
 (
-	mach_port_t exception_port,
-	exception_type_t exception,
-	const mach_exception_data_t code,
-	mach_msg_type_number_t codeCnt,
-	int *flavor,
-	const thread_state_t old_state,
-	mach_msg_type_number_t old_stateCnt,
-	thread_state_t new_state,
-	mach_msg_type_number_t *new_stateCnt
+    mach_port_t exception_port,
+    exception_type_t exception,
+    const mach_exception_data_t code,
+    mach_msg_type_number_t codeCnt,
+    int *flavor,
+    const thread_state_t old_state,
+    mach_msg_type_number_t old_stateCnt,
+    thread_state_t new_state,
+    mach_msg_type_number_t *new_stateCnt
 );
 
 /* Routine mach_exception_raise_state_identity_OVR */
-#ifdef	mig_external
+#ifdef    mig_external
 mig_external
 #else
 extern
-#endif	/* mig_external */
+#endif    /* mig_external */
 kern_return_t mach_exception_raise_state_identity_OVR
 (
-	mach_port_t exception_port,
-	mach_port_t thread,
-	mach_port_t task,
-	exception_type_t exception,
-	mach_exception_data_t code,
-	mach_msg_type_number_t codeCnt,
-	int *flavor,
-	thread_state_t old_state,
-	mach_msg_type_number_t old_stateCnt,
-	thread_state_t new_state,
-	mach_msg_type_number_t *new_stateCnt
+    mach_port_t exception_port,
+    mach_port_t thread,
+    mach_port_t task,
+    exception_type_t exception,
+    mach_exception_data_t code,
+    mach_msg_type_number_t codeCnt,
+    int *flavor,
+    thread_state_t old_state,
+    mach_msg_type_number_t old_stateCnt,
+    thread_state_t new_state,
+    mach_msg_type_number_t *new_stateCnt
 );
 
 __END_DECLS
@@ -122,18 +122,18 @@ __END_DECLS
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		/* start of the kernel processed data */
-		mach_msg_body_t msgh_body;
-		mach_msg_port_descriptor_t thread;
-		mach_msg_port_descriptor_t task;
-		/* end of the kernel processed data */
-		NDR_record_t NDR;
-		exception_type_t exception;
-		mach_msg_type_number_t codeCnt;
-		int64_t code[2];
-	} __Request__mach_exception_raise_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        /* start of the kernel processed data */
+        mach_msg_body_t msgh_body;
+        mach_msg_port_descriptor_t thread;
+        mach_msg_port_descriptor_t task;
+        /* end of the kernel processed data */
+        NDR_record_t NDR;
+        exception_type_t exception;
+        mach_msg_type_number_t codeCnt;
+        int64_t code[2];
+    } __Request__mach_exception_raise_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -141,16 +141,16 @@ __END_DECLS
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		NDR_record_t NDR;
-		exception_type_t exception;
-		mach_msg_type_number_t codeCnt;
-		int64_t code[2];
-		int flavor;
-		mach_msg_type_number_t old_stateCnt;
-		natural_t old_state[144];
-	} __Request__mach_exception_raise_state_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        NDR_record_t NDR;
+        exception_type_t exception;
+        mach_msg_type_number_t codeCnt;
+        int64_t code[2];
+        int flavor;
+        mach_msg_type_number_t old_stateCnt;
+        natural_t old_state[144];
+    } __Request__mach_exception_raise_state_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -158,21 +158,21 @@ __END_DECLS
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		/* start of the kernel processed data */
-		mach_msg_body_t msgh_body;
-		mach_msg_port_descriptor_t thread;
-		mach_msg_port_descriptor_t task;
-		/* end of the kernel processed data */
-		NDR_record_t NDR;
-		exception_type_t exception;
-		mach_msg_type_number_t codeCnt;
-		int64_t code[2];
-		int flavor;
-		mach_msg_type_number_t old_stateCnt;
-		natural_t old_state[144];
-	} __Request__mach_exception_raise_state_identity_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        /* start of the kernel processed data */
+        mach_msg_body_t msgh_body;
+        mach_msg_port_descriptor_t thread;
+        mach_msg_port_descriptor_t task;
+        /* end of the kernel processed data */
+        NDR_record_t NDR;
+        exception_type_t exception;
+        mach_msg_type_number_t codeCnt;
+        int64_t code[2];
+        int flavor;
+        mach_msg_type_number_t old_stateCnt;
+        natural_t old_state[144];
+    } __Request__mach_exception_raise_state_identity_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -183,9 +183,9 @@ __END_DECLS
 #ifndef __RequestUnion__mach_exc_subsystem__defined
 #define __RequestUnion__mach_exc_subsystem__defined
 union __RequestUnion__mach_exc_subsystem {
-	__Request__mach_exception_raise_t Request_mach_exception_raise;
-	__Request__mach_exception_raise_state_t Request_mach_exception_raise_state;
-	__Request__mach_exception_raise_state_identity_t Request_mach_exception_raise_state_identity;
+    __Request__mach_exception_raise_t Request_mach_exception_raise;
+    __Request__mach_exception_raise_state_t Request_mach_exception_raise_state;
+    __Request__mach_exception_raise_state_identity_t Request_mach_exception_raise_state_identity;
 };
 #endif /* !__RequestUnion__mach_exc_subsystem__defined */
 /* typedefs for all replies */
@@ -196,11 +196,11 @@ union __RequestUnion__mach_exc_subsystem {
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		NDR_record_t NDR;
-		kern_return_t RetCode;
-	} __Reply__mach_exception_raise_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        NDR_record_t NDR;
+        kern_return_t RetCode;
+    } __Reply__mach_exception_raise_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -208,14 +208,14 @@ union __RequestUnion__mach_exc_subsystem {
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		NDR_record_t NDR;
-		kern_return_t RetCode;
-		int flavor;
-		mach_msg_type_number_t new_stateCnt;
-		natural_t new_state[144];
-	} __Reply__mach_exception_raise_state_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        NDR_record_t NDR;
+        kern_return_t RetCode;
+        int flavor;
+        mach_msg_type_number_t new_stateCnt;
+        natural_t new_state[144];
+    } __Reply__mach_exception_raise_state_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -223,14 +223,14 @@ union __RequestUnion__mach_exc_subsystem {
 #ifdef  __MigPackStructs
 #pragma pack(4)
 #endif
-	typedef struct {
-		mach_msg_header_t Head;
-		NDR_record_t NDR;
-		kern_return_t RetCode;
-		int flavor;
-		mach_msg_type_number_t new_stateCnt;
-		natural_t new_state[144];
-	} __Reply__mach_exception_raise_state_identity_t;
+    typedef struct {
+        mach_msg_header_t Head;
+        NDR_record_t NDR;
+        kern_return_t RetCode;
+        int flavor;
+        mach_msg_type_number_t new_stateCnt;
+        natural_t new_state[144];
+    } __Reply__mach_exception_raise_state_identity_t;
 #ifdef  __MigPackStructs
 #pragma pack()
 #endif
@@ -241,9 +241,9 @@ union __RequestUnion__mach_exc_subsystem {
 #ifndef __ReplyUnion__mach_exc_subsystem__defined
 #define __ReplyUnion__mach_exc_subsystem__defined
 union __ReplyUnion__mach_exc_subsystem {
-	__Reply__mach_exception_raise_t Reply_mach_exception_raise;
-	__Reply__mach_exception_raise_state_t Reply_mach_exception_raise_state;
-	__Reply__mach_exception_raise_state_identity_t Reply_mach_exception_raise_state_identity;
+    __Reply__mach_exception_raise_t Reply_mach_exception_raise;
+    __Reply__mach_exception_raise_state_t Reply_mach_exception_raise_state;
+    __Reply__mach_exception_raise_state_identity_t Reply_mach_exception_raise_state_identity;
 };
 #endif /* !__RequestUnion__mach_exc_subsystem__defined */
 
@@ -259,14 +259,14 @@ __AfterMigUserHeader
 #endif /* __AfterMigUserHeader */
 
 
-#ifdef	mig_external
+#ifdef    mig_external
 mig_external
 #else
 extern
-#endif	/* mig_external */
+#endif    /* mig_external */
 boolean_t mach_exc_server_OVR(
-		mach_msg_header_t *InHeadP,
-		mach_msg_header_t *OutHeadP);
+        mach_msg_header_t *InHeadP,
+        mach_msg_header_t *OutHeadP);
 
 
 #if defined(__cplusplus)
@@ -274,4 +274,4 @@ boolean_t mach_exc_server_OVR(
 #endif
 
 
-#endif	 /* _mach_exc_user_ */
+#endif     /* _mach_exc_user_ */

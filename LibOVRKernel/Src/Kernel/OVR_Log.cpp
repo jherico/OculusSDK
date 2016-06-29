@@ -32,7 +32,7 @@ limitations under the License.
 namespace OVR {
 
 
-ovrlog::Channel DefaultChannel("Log");
+ovrlog::Channel DefaultChannel("Kernel:Default");
 
 static OVRAssertionHandler sOVRAssertionHandler = OVR::DefaultAssertionHandler;
 static intptr_t sOVRAssertionHandlerUserParameter = 0;

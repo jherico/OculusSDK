@@ -28,11 +28,13 @@ limitations under the License.
 #include "OVR_Log.h"
 #include "Util/Util_SystemGUI.h"
 
+
 #include <stdlib.h>
 #include <time.h>
 
 #if defined(OVR_OS_WIN32) || defined(OVR_OS_WIN64)
     #pragma warning(push, 0)
+    OVR_DISABLE_MSVC_WARNING(4091) // 'keyword' : ignored on left of 'type' when no variable is declared
     #include "OVR_Win32_IncludeWindows.h"
     #include <ShlObj.h>
     #include <WinNT.h>
@@ -217,21 +219,12 @@ static size_t SprintfAddress(char* addressStr, size_t addressStrCapacity, const 
 
 
 
-enum MemoryAccess
-{
-    kMANone    = 0x00,
-    kMARead    = 0x01,
-    kMAWrite   = 0x02,
-    kMAExecute = 0x04
-};
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // GetMemoryAccess
 //
 // Returns MemoryAccess flags. Returns kMAUnknown for unknown access.
 //
-static int GetMemoryAccess(const void* p)
+int GetMemoryAccess(const void* p)
 {
     int memoryAccessFlags = 0;
     
@@ -265,6 +258,62 @@ static int GetMemoryAccess(const void* p)
     return memoryAccessFlags;
 }
 
+/* Disabled until we can complete this, but leaving as a placeholder.
+
+/// Adds the given memory access flags to the existing access.
+/// Size doesn't have to be in page-sized increments.
+///
+bool AugmentMemoryAccess(const void* p, size_t size, int memoryAccessFlags)
+{
+    bool success = false;
+
+    #ifdef _WIN32
+        // This is tedious on Windows because it doesn't implement the memory access types as simple flags.
+        // We have to deal with each of the types individually:
+        //     0, PAGE_NOACCESS, PAGE_READONLY, PAGE_READWRITE, PAGE_EXECUTE, PAGE_EXECUTE_READ, 
+        //     PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY, PAGE_WRITECOPY
+
+        MEMORY_BASIC_INFORMATION mbi;
+
+        if(VirtualQuery(p, &mbi, sizeof(mbi)))
+        {
+            DWORD dwOldProtect = 0;
+            DWORD dwNewProtect = 0;
+
+            (void)memoryAccessFlags;
+
+            switch (mbi.Protect)
+            {
+                case 0:
+                    break;
+                case PAGE_NOACCESS:
+                    break;
+                case PAGE_READONLY:
+                    break;
+                case PAGE_READWRITE:
+                    break;
+                case PAGE_EXECUTE:
+                    break;
+                case PAGE_EXECUTE_READ: 
+                    break;
+                case PAGE_EXECUTE_READWRITE:
+                    break;
+                case PAGE_EXECUTE_WRITECOPY:
+                    break;
+                case PAGE_WRITECOPY:
+                    break;
+            }
+
+            if(VirtualProtect(const_cast<void*>(p), size, dwNewProtect, &dwOldProtect))
+            {
+                success = true;
+            }
+        }
+    #endif
+
+    return success;
+}
+*/
 
 
 // threadHandleStrCapacity should be at least 2+16+1 = 19 characters.
@@ -408,7 +457,7 @@ bool KillCdeclFunction(void* pFunction, int32_t functionReturnValue, SavedFuncti
     #if defined(OVR_OS_MS)
         // The same implementation works for both 32 bit x86 and 64 bit x64.
         DWORD dwOldProtect;
-        const uint8_t size = ((functionReturnValue == 0) ? 3 : 6);
+        const uint8_t size = ((functionReturnValue == 0) ? 3 : ((functionReturnValue == 1) ? 5 : 6)); // This is the number of instruction bytes we overwrite below.
     
         if(VirtualProtect(pFunction, size, PAGE_EXECUTE_READWRITE, &dwOldProtect))
         {
@@ -417,14 +466,29 @@ bool KillCdeclFunction(void* pFunction, int32_t functionReturnValue, SavedFuncti
                 pSavedFunction->Function = pFunction;
                 pSavedFunction->Size = size;
                 memcpy(pSavedFunction->Data, pFunction, pSavedFunction->Size);
+
+                const uint8_t opCode = *reinterpret_cast<uint8_t*>(pFunction);
+                if(opCode == 0xe9) // If the function was a 32 bit relative jump to the real function (which is a common thing)...
+                {
+                    int32_t jumpOffset;
+                    memcpy(&jumpOffset, reinterpret_cast<uint8_t*>(pFunction) + 1, sizeof(int32_t));
+                    pSavedFunction->FunctionImplementation = reinterpret_cast<uint8_t*>(pFunction) + 5 + jumpOffset;
+                }
+                else
+                    pSavedFunction->FunctionImplementation = nullptr;
             }
 
-            if(functionReturnValue == 0)
+            if(functionReturnValue == 0) // We write 3 bytes.
             {
                 const uint8_t instructionBytes[] = { 0x33, 0xc0, 0xc3 };              // xor eax, eax; ret
                 memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
             }
-            else
+            else if(functionReturnValue == 1) // We write 5 bytes.
+            {
+                uint8_t instructionBytes[] = { 0x33, 0xc0, 0xff, 0xc0, 0xc3 };        // xor eax, eax; inc eax; ret      -- note that this is smaller than (mov eax 0x00000001; ret), which takes 6 bytes.
+                memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
+            }
+            else // We write 6 bytes.
             {
                 uint8_t instructionBytes[] = { 0xb8, 0x00, 0x00, 0x00, 0x00, 0xc3 };  // mov eax, 0x00000000; ret
                 memcpy(instructionBytes + 1, &functionReturnValue, sizeof(int32_t));  // mov eax, functionReturnValue; ret
@@ -456,6 +520,16 @@ bool KillCdeclFunction(void* pFunction, SavedFunction* pSavedFunction)
                 pSavedFunction->Function = pFunction;
                 pSavedFunction->Size = size;
                 memcpy(pSavedFunction->Data, pFunction, pSavedFunction->Size);
+
+                const uint8_t opCode = *reinterpret_cast<uint8_t*>(pFunction);
+                if(opCode == 0xe9) // If the function was a 32 bit relative jump to the real function (which is a common thing)...
+                {
+                    int32_t jumpOffset;
+                    memcpy(&jumpOffset, reinterpret_cast<uint8_t*>(pFunction) + 1, sizeof(int32_t));
+                    pSavedFunction->FunctionImplementation = reinterpret_cast<uint8_t*>(pFunction) + 5 + jumpOffset;
+                }
+                else
+                    pSavedFunction->FunctionImplementation = nullptr;
             }
 
             const uint8_t instructionBytes[] = { 0xc3 };                        // asm ret
@@ -472,9 +546,75 @@ bool KillCdeclFunction(void* pFunction, SavedFunction* pSavedFunction)
 }
 
 
+bool RedirectCdeclFunction(void* pFunction, const void* pDestFunction, OVR::SavedFunction* pSavedFunction)
+{
+    #if defined(_WIN32)
+        // The same implementation works for both 32 bit x86 and 64 bit x64.
+        // We implement this as a 32 bit relative jump from pFunction to pDestFunction.
+        // This takes five bytes and is of the form:
+        //    E9 <32bit offset> 
+        // This can work only when the pDestFunction is within 32 bits of pFunction. That will always be
+        // the case when redirecting to a new location within the same module. But on 64 bit Windows, it 
+        // may be that pFunction is in one module and pDestFunction is in another module (e.g. DLL) with an 
+        // address that is farther than 32 bits away. In that case we need to instead do a 64 bit absolute 
+        // jump or if there isn't enough space for those instruction bytes then we need to do a near jump to  
+        // some nearby location where we can have a full 64 bit absolute jump. It turns out that in the case
+        // of calling DLL functions the absolute-jump-through-64bit-data 0xff instruction is used. We could
+        // change that 64 bit data.
+
+        #if defined(_WIN64)
+            if (abs((intptr_t)pDestFunction - (intptr_t)pFunction) >= ((intptr_t)1 << 31))
+            {
+                // A 64 bit jump would be required in this case, which we currently don't support, but could with some effort.
+                return false;
+            }
+        #endif
+
+        DWORD dwOldProtect;
+        const uint8_t size = 5;
+
+        if(VirtualProtect(pFunction, size, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+        {
+            if(pSavedFunction) // If the user wants to save the implementation for later restoration...
+            {
+                pSavedFunction->Function = pFunction;
+                pSavedFunction->Size = size;
+                memcpy(pSavedFunction->Data, pFunction, pSavedFunction->Size);
+
+                const uint8_t opCode = *reinterpret_cast<uint8_t*>(pFunction);
+                if(opCode == 0xe9) // If the function was a 32 bit relative jump to the real function (which is a common thing)...
+                {
+                    int32_t jumpOffset;
+                    memcpy(&jumpOffset, reinterpret_cast<uint8_t*>(pFunction) + 1, sizeof(int32_t));
+                    pSavedFunction->FunctionImplementation = reinterpret_cast<uint8_t*>(pFunction) + 5 + jumpOffset;
+                }
+                else
+                    pSavedFunction->FunctionImplementation = nullptr;
+            }
+
+            union Rel32Bytes
+            {
+                int32_t rel32;
+                uint8_t bytes[4];
+            } rel32Bytes = { ((int32_t)pDestFunction - (int32_t)pFunction) - size }; // -size because the offset is relative to after the 5 byte opcode sequence.
+
+            uint8_t instructionBytes[] = { 0xe9, rel32Bytes.bytes[0], rel32Bytes.bytes[1], rel32Bytes.bytes[2], rel32Bytes.bytes[3] };  // asm jmp <rel32>
+            memcpy(pFunction, instructionBytes, sizeof(instructionBytes));
+            VirtualProtect(pFunction, size, dwOldProtect, &dwOldProtect);
+            return true;
+        }
+
+    #else
+        OVR_UNUSED2(pFunction, pSavedFunction);
+    #endif
+
+    return false;
+}
+
+
 bool RestoreCdeclFunction(SavedFunction* pSavedFunction)
 {
-    if(pSavedFunction->Size)
+    if(pSavedFunction && pSavedFunction->Size)
     {
         #if defined(OVR_OS_MS)
             DWORD dwOldProtect;
@@ -492,6 +632,105 @@ bool RestoreCdeclFunction(SavedFunction* pSavedFunction)
 
     return false;
 }
+
+
+
+
+CopiedFunction::CopiedFunction(const void* pFunction, size_t size)
+  : Function(nullptr)
+{
+    if (pFunction)
+        Copy(pFunction, size);
+}
+
+
+CopiedFunction::~CopiedFunction()
+{
+    // To consider: We may have use cases in which we want to intentionally not free the 
+    // memory and instead let it live beyond our lifetime so that it can still be called.
+    Free();
+}
+
+
+const void* CopiedFunction::GetRealFunctionLocation(const void* pFunction)
+{
+    // It turns out that many functions are really jumps to the actual function code.
+    // These jumps are typically implemented with the E9 machine opcode, followed by 
+    // an int32 relative jump distance. We need to handle that case.
+
+    // If the code is executable but not readable, we'll need to make it readable.
+    bool readable = (pFunction && (GetMemoryAccess(pFunction) & OVR::kMARead) != 0);
+
+    if (!readable)
+    {
+        return nullptr;
+
+        // To do: Implement this:
+        // readable = AugmentMemoryAccess(opCode, 1, OVR::kMARead);
+    }
+
+    const uint8_t* opCode = static_cast<const uint8_t*>(pFunction);
+
+    if(*opCode == 0xE9) // If this is the E9 relative jmp instuction (which happens to be always used for local-module trampolining by VC++)...
+    {
+        int32_t jumpDistance;
+        memcpy(&jumpDistance, opCode + 1, sizeof(jumpDistance));
+
+        pFunction = (opCode + 5 + jumpDistance); // +5 because the jmp is relative to the end of the five byte 0xE9 instruction.
+        // Is it possible that pFunction points to another trampoline? I haven't seen such a thing, 
+        // but it could be handled by a loop here or simply goto the opCode assignment line above.
+    }
+
+    return pFunction;
+}
+
+
+const void* CopiedFunction::Copy(const void* pFunction, size_t size)
+{
+    Free();
+
+    #if defined(_WIN32)
+        if (size == 0) // If we don't know the size...
+        {
+            // When debug symbols are present, we could look up the function size.
+            // On x64 we can possibly look up the size via the stack unwind data.
+            // On x86 and x64 we could possibly look for return statements while
+            // also checking if pFunction is simply a short trampoline.
+            size = 4096; // For our current uses this is good enough. But it's not general.
+        }
+
+        void* pNewFunction = VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+        if (pNewFunction)
+        {
+            // It turns out that (especially in debug builds), pFunction may be a 
+            // trampoline (unilateral jump) to the real function implementation elsewhere.
+            // We need to copy the real implementation and not the jump, at least if the 
+            // jump is a relative jump (usually the case) and not an absolute jump.
+            const void* pRealFunction = GetRealFunctionLocation(pFunction);
+
+            memcpy(pNewFunction, pRealFunction, size);
+            Function = pNewFunction;
+        }
+    #endif
+
+    return Function;
+}
+
+
+void CopiedFunction::Free()
+{
+    if (Function)
+    {
+        #if defined(_WIN32)
+            VirtualFree(Function, 0, MEM_RELEASE);
+        #endif
+
+        Function = nullptr;
+    }
+}
+
+
 
 
 bool OVRIsDebuggerPresent()
@@ -1238,6 +1477,7 @@ void CreateException(CreateExceptionType exceptionType)
             }
         }
 
+        --sSymUsageCount;
         return false;
     }
 

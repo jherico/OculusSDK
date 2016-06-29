@@ -38,35 +38,37 @@ struct AutoLinearVelocity : BasicVR
 
 	    while (HandleMessages())
 	    {
-            // We turn off yaw to keep the case simple
-		    ActionFromInput(1, false);
-		    Layer[0]->GetEyePoses();
-
-            // Find perturbation of position from point 1m in front of camera
-            XMVECTOR eye0 = ConvertToXM(Layer[0]->EyeRenderPose[0].Position);
-            XMVECTOR eye1 = ConvertToXM(Layer[0]->EyeRenderPose[1].Position);
-            XMVECTOR perturb = XMVectorScale(XMVectorAdd(eye0, eye1), 0.5f);
-
-            // Calculate velocity from this
-            const float sensitivity = 0.2f;
-		    XMVECTOR vel = XMVectorScale(XMVectorSet(XMVectorGetX(perturb), 0, XMVectorGetZ(perturb), 0), sensitivity);
-
-              // Add velocity to camera
 			//Need to check we're visible, before proceeding with velocity changes, 
 			//otherwise it does this a lot of times, and we
 			//end up miles away from our start point from the sheer number of iterations.
 			ovrSessionStatus sessionStatus;
 			ovr_GetSessionStatus(Session, &sessionStatus);
 			if (sessionStatus.IsVisible)
+			{
+				// We turn off yaw to keep the case simple
+				ActionFromInput(1, false);
+				Layer[0]->GetEyePoses();
+
+				// Find perturbation of position from point 1m in front of camera
+				XMVECTOR eye0 = ConvertToXM(Layer[0]->EyeRenderPose[0].Position);
+				XMVECTOR eye1 = ConvertToXM(Layer[0]->EyeRenderPose[1].Position);
+				XMVECTOR perturb = XMVectorScale(XMVectorAdd(eye0, eye1), 0.5f);
+
+				// Calculate velocity from this
+				const float sensitivity = 0.2f;
+				XMVECTOR vel = XMVectorScale(XMVectorSet(XMVectorGetX(perturb), 0, XMVectorGetZ(perturb), 0), sensitivity);
+
+				// Add velocity to camera
 				MainCam->Pos = XMVectorAdd(MainCam->Pos, vel);
 
-            for (int eye = 0; eye < 2; ++eye)
-		    {
-			    Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
-		    }
+				for (int eye = 0; eye < 2; ++eye)
+				{
+					Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
+				}
 
-		    Layer[0]->PrepareLayerHeader();
-		    DistortAndPresent(1);
+				Layer[0]->PrepareLayerHeader();
+				DistortAndPresent(1);
+			}
 	    }
     }
 };

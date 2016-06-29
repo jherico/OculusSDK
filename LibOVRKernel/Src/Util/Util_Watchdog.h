@@ -55,8 +55,8 @@ public:
     void Feed(int threshold);
 
 protected:
-	// Use 32 bit int so assignment and comparison is atomic
-	AtomicInt<uint32_t> WhenLastFedMilliseconds;
+    // Use 32 bit int so assignment and comparison is atomic
+    AtomicInt<uint32_t> WhenLastFedMilliseconds;
     AtomicInt<int>      ThreshholdMilliseconds;
 
     String              ThreadName;

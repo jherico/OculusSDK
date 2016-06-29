@@ -30,13 +30,10 @@
     <ClInclude Include="..\..\..\Include\Extras\OVR_StereoProjection.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Include\OVR_CAPI_Audio.h">
-      <Filter>Include</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\Src\OVR_CAPIShim.c" />
     <ClCompile Include="..\..\..\Src\OVR_StereoProjection.cpp" />
+    <ClCompile Include="..\..\..\Src\OVR_CAPIShim.c" />
     <ClCompile Include="..\..\..\Src\OVR_CAPI_Util.cpp" />
   </ItemGroup>
 </Project>

@@ -24,8 +24,7 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef Logging_h
-#define Logging_h
+#pragma once
 
 #pragma warning(push)
 #pragma warning(disable: 4530) // C++ exception handler used, but unwind semantics are not enabled
@@ -729,6 +728,7 @@ public:
 class Configurator
 {
     friend class Channel;
+    friend class OutputWorker;
     Configurator(); // Call GetInstance() to get the singleton instance.
 
 public:
@@ -766,6 +766,8 @@ public:
     void RestoreAllChannelLogLevels();
 private:
 
+    void RestoreAllChannelLogLevelsNoLock();
+
     uint32_t GlobalMinimumLogLevel;
     std::shared_ptr<ConfiguratorPlugin> Plugin;
 
@@ -774,5 +776,3 @@ private:
 
 
 } // namespace ovrlog
-
-#endif // Logging_h

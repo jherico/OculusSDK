@@ -62,7 +62,7 @@ static uint32_t GetFastMsTime()
 //-----------------------------------------------------------------------------
 // WatchDogObserver
 
-static ovrlog::Channel Logger("Watchdog");
+static ovrlog::Channel Logger("Kernel:Watchdog");
 
 WatchDogObserver::WatchDogObserver() :
     ListLock(),
@@ -76,8 +76,8 @@ WatchDogObserver::WatchDogObserver() :
 {
     Start();
 
-	// Must be at end of function
-	PushDestroyCallbacks();
+    // Must be at end of function
+    PushDestroyCallbacks();
 }
 
 WatchDogObserver::~WatchDogObserver()

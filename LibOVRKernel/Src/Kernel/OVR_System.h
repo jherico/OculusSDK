@@ -161,7 +161,7 @@ public:
     // a different Allocator here.
     static void OVR_CDECL Init();
 
-	// De-initializes System more, finalizing the threading system and destroying
+    // De-initializes System more, finalizing the threading system and destroying
     // the global memory allocator.
     static void OVR_CDECL Destroy();
 

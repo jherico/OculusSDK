@@ -111,6 +111,17 @@ namespace OVR {
     // Some platforms (e.g. Microsoft) have dynamically resizing stacks, in which case the stack limit reflects the current limit.
     void GetThreadStackBounds(void*& pStackBase, void*& pStackLimit, ThreadHandle threadHandle = OVR_THREADHANDLE_INVALID);
 
+    enum MemoryAccess
+    {
+        kMANone    = 0x00,
+        kMARead    = 0x01,
+        kMAWrite   = 0x02,
+        kMAExecute = 0x04
+    };
+
+    // Returns MemoryAccess flags. Returns kMAUnknown for unknown access.
+    int  GetMemoryAccess(const void* p);
+
 
     /// Used by KillCdeclFunction and RestoreCdeclFunction
     ///
@@ -119,9 +130,13 @@ namespace OVR {
         void*   Function;
         uint8_t Size;
         uint8_t Data[15];
+        void*   FunctionImplementation;  // Points to the original function, if possible to use it. 
 
-        SavedFunction() : Function(nullptr), Size(0){}
+        SavedFunction() : Function(nullptr), Size(0), FunctionImplementation(nullptr) {}
+
+        SavedFunction(int){} // Intentionally uninitialized
     };
+
 
     /// Overwrites the implementation of a statically linked function with an implementation
     /// that unilaterally returns the given int32_t value. Works regardless of the arguments
@@ -154,6 +169,20 @@ namespace OVR {
     ///    }
     ///
     bool KillCdeclFunction(void* pFunction, SavedFunction* pSavedFunction = nullptr);
+
+
+    /// RedirectCdeclFunction
+    ///
+    /// Upon success, pSavedFunction is modified to contain a saved copy of the modified bytes.
+    /// Upon failure, pSavedFunction is not modified.
+    /// RestoreCdeclFunction can be used to restore the bytes saved by pSavedFunction.
+    ///
+    /// Example usage:
+    ///     void* MyMalloc(size_t n)
+    ///        { ... }
+    ///     RedirectCdeclFunction(malloc, MyMalloc);
+    ///
+    bool RedirectCdeclFunction(void* pFunction, const void* pDestFunction, OVR::SavedFunction* pSavedFunction = nullptr);
 
 
     /// Restores a function which was previously killed by KillCdeclFunction.
@@ -191,6 +220,35 @@ namespace OVR {
         bool          Success;
         void*         FunctionPtr;
         SavedFunction SavedFunctionData;
+    };
+
+
+    /// Class which implements copying the executable bytes of a function to a newly allocated page.
+    /// This is useful for when doing some kinds of function interception and overriding at runtime.
+    ///
+    /// Example usage:
+    ///    void main(int, char*[]){
+    ///        CopiedFunction strlenCopy(strlen);
+    ///        size_t n = strlen("test"); // Will execute through the newly allocated version of strlen.
+    ///    }
+    ///
+    class CopiedFunction
+    {
+    public:
+        CopiedFunction(const void* pFunction = nullptr, size_t size = 0);
+       ~CopiedFunction();
+
+        const void* Copy(const void* pFunction, size_t size);
+
+        void Free();
+
+        const void* GetFunction() const
+            { return Function; }
+
+    protected:
+        const void* CopiedFunction::GetRealFunctionLocation(const void* pFunction);
+
+        void* Function;
     };
 
 
@@ -248,7 +306,7 @@ namespace OVR {
         const ModuleInfo* pModuleInfo;
         char              filePath[OVR_MAX_PATH];
         int32_t           fileLineNumber;
-        char              function[128];            // This is a fixed size because we need to use it during application exceptions.
+        char              function[384];            // This is a fixed size because we need to use it during application exceptions.
         int32_t           functionOffset;
         char              sourceCode[1024];         // This is a string representing the code itself and not a file path to the code.
 
@@ -264,8 +322,12 @@ namespace OVR {
         SymbolLookup();
         ~SymbolLookup();
 
+        // Every successful call to Initialize must be eventually matched by a call to Shutdown.
+        // Shutdown should be called if and only if Initialize returns true.
         static bool Initialize();
+
         static bool IsInitialized();
+
         static void Shutdown();
 
         void AddSourceCodeDirectory(const char* pDirectory);

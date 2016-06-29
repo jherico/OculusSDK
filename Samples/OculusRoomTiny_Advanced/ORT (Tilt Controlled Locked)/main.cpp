@@ -45,52 +45,54 @@ struct TiltControlledLockedRift : BasicVR
 
 	    while (HandleMessages())
 	    {
-		    ActionFromInput();
-            ovrTrackingState trackingState = Layer[0]->GetEyePoses();
-
-            // Add velocity to camera
 			//Need to check we're visible, before proceeding with velocity changes, 
 			//otherwise it does this a lot of times, and we
 			//end up miles away from our start point from the sheer number of iterations.
 			ovrSessionStatus sessionStatus;
 			ovr_GetSessionStatus(Session, &sessionStatus);
 			if (sessionStatus.IsVisible)
+			{
+				ActionFromInput();
+				ovrTrackingState trackingState = Layer[0]->GetEyePoses();
+
+				// Add velocity to camera
 				MainCam->Pos = XMVectorAdd(MainCam->Pos, FindVelocityFromTilt(this, Layer[0], &trackingState));
 
-            // And lets freeze the reorientation, to not overcomplicate the 
-            // effects contained in the sample.
-            MainCam->Rot = XMQuaternionIdentity();
+				// And lets freeze the reorientation, to not overcomplicate the 
+				// effects contained in the sample.
+				MainCam->Rot = XMQuaternionIdentity();
 
-		    for (int eye = 0; eye < 2; ++eye)
-		    {
-                XMVECTOR storedOrientation;
-                if (!DIRECTX.Key['1'])
-                {
-                    storedOrientation = ConvertToXM(Layer[0]->EyeRenderPose[eye].Orientation);
-                    float proportionOfNormal = 0.5f; // 50:50 of normal tilt/roll/yaw, and only yaw;
-	                XMFLOAT3 rot = GetEulerAngles(storedOrientation);
-                    XMVECTOR baseOne = XMQuaternionRotationRollPitchYaw(0, rot.y, 0);
-	                XMVECTOR lerpedQuat = XMQuaternionSlerp(baseOne, storedOrientation, proportionOfNormal);
-	                Layer[0]->EyeRenderPose[eye].Orientation.x = XMVectorGetX(lerpedQuat);
-	                Layer[0]->EyeRenderPose[eye].Orientation.y = XMVectorGetY(lerpedQuat);
-	                Layer[0]->EyeRenderPose[eye].Orientation.z = XMVectorGetZ(lerpedQuat);
-	                Layer[0]->EyeRenderPose[eye].Orientation.w = XMVectorGetW(lerpedQuat);
-                }
+				for (int eye = 0; eye < 2; ++eye)
+				{
+					XMVECTOR storedOrientation;
+					if (!DIRECTX.Key['1'])
+					{
+						storedOrientation = ConvertToXM(Layer[0]->EyeRenderPose[eye].Orientation);
+						float proportionOfNormal = 0.5f; // 50:50 of normal tilt/roll/yaw, and only yaw;
+						XMFLOAT3 rot = GetEulerAngles(storedOrientation);
+						XMVECTOR baseOne = XMQuaternionRotationRollPitchYaw(0, rot.y, 0);
+						XMVECTOR lerpedQuat = XMQuaternionSlerp(baseOne, storedOrientation, proportionOfNormal);
+						Layer[0]->EyeRenderPose[eye].Orientation.x = XMVectorGetX(lerpedQuat);
+						Layer[0]->EyeRenderPose[eye].Orientation.y = XMVectorGetY(lerpedQuat);
+						Layer[0]->EyeRenderPose[eye].Orientation.z = XMVectorGetZ(lerpedQuat);
+						Layer[0]->EyeRenderPose[eye].Orientation.w = XMVectorGetW(lerpedQuat);
+					}
 
-                Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
+					Layer[0]->RenderSceneToEyeBuffer(MainCam, RoomScene, eye);
 
-                if (!DIRECTX.Key['1'])
-                {
-                    // Now put it back
-	                Layer[0]->EyeRenderPose[eye].Orientation.x = XMVectorGetX(storedOrientation);
-	                Layer[0]->EyeRenderPose[eye].Orientation.y = XMVectorGetY(storedOrientation);
-	                Layer[0]->EyeRenderPose[eye].Orientation.z = XMVectorGetZ(storedOrientation);
-	                Layer[0]->EyeRenderPose[eye].Orientation.w = XMVectorGetW(storedOrientation);
-                }
-		    }
+					if (!DIRECTX.Key['1'])
+					{
+						// Now put it back
+						Layer[0]->EyeRenderPose[eye].Orientation.x = XMVectorGetX(storedOrientation);
+						Layer[0]->EyeRenderPose[eye].Orientation.y = XMVectorGetY(storedOrientation);
+						Layer[0]->EyeRenderPose[eye].Orientation.z = XMVectorGetZ(storedOrientation);
+						Layer[0]->EyeRenderPose[eye].Orientation.w = XMVectorGetW(storedOrientation);
+					}
+				}
 
-		    Layer[0]->PrepareLayerHeader();
-		    DistortAndPresent(1);
+				Layer[0]->PrepareLayerHeader();
+				DistortAndPresent(1);
+			}
 	    }
     }
 };

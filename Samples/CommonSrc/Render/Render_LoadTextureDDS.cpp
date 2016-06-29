@@ -22,6 +22,8 @@ limitations under the License.
 ************************************************************************************/
 #include "Render_Device.h"
 
+#include <dxgi.h>
+
 namespace OVR { namespace Render {
 
 static const size_t   OVR_DDS_PF_FOURCC = 0x4;
@@ -30,6 +32,7 @@ static const uint32_t OVR_DXT2_MAGIC_NUMBER = 0x32545844; // "DXT2"
 static const uint32_t OVR_DXT3_MAGIC_NUMBER = 0x33545844; // "DXT3"
 static const uint32_t OVR_DXT4_MAGIC_NUMBER = 0x34545844; // "DXT4"
 static const uint32_t OVR_DXT5_MAGIC_NUMBER = 0x35545844; // "DXT5"
+static const uint32_t OVR_DX10_MAGIC_NUMBER = 0x30315844; // "DX10" - Means use the extended header
 
 struct OVR_DDS_PIXELFORMAT
 {
@@ -61,14 +64,30 @@ struct OVR_DDS_HEADER
     uint32_t				Reserved2;
 };
 
+struct OVR_DDS_HEADER_DXT10
+{
+    DXGI_FORMAT dxgiFormat;
+    uint32_t    resourceDimension;
+    uint32_t    miscFlag; // see DDS_RESOURCE_MISC_FLAG
+    uint32_t    arraySize;
+    uint32_t    miscFlags2; // see DDS_MISC_FLAGS2
+};
+
+struct OVR_FULL_DDS_HEADER
+{
+    OVR_DDS_HEADER          DX9Header;
+    OVR_DDS_HEADER_DXT10    DX10Header;
+};
+
+
 // Returns -1 on failure, or a valid TextureFormat value on success
 static inline int InterpretPixelFormatFourCC(uint32_t fourCC) {
 	switch (fourCC) {
-	case OVR_DXT1_MAGIC_NUMBER: return Texture_DXT1;
-	case OVR_DXT2_MAGIC_NUMBER: return Texture_DXT3;
-	case OVR_DXT3_MAGIC_NUMBER: return Texture_DXT3;
-	case OVR_DXT4_MAGIC_NUMBER: return Texture_DXT5;
-	case OVR_DXT5_MAGIC_NUMBER: return Texture_DXT5;
+	case OVR_DXT1_MAGIC_NUMBER: return Texture_BC1;
+	case OVR_DXT2_MAGIC_NUMBER: return Texture_BC2;
+	case OVR_DXT3_MAGIC_NUMBER: return Texture_BC2;
+	case OVR_DXT4_MAGIC_NUMBER: return Texture_BC3;
+	case OVR_DXT5_MAGIC_NUMBER: return Texture_BC3;
 	}
 
 	// Unrecognized FourCC
@@ -101,12 +120,50 @@ Texture* LoadTextureDDSTopDown(RenderDevice* ren, File* f, int textureLoadFlags)
     {
         mipCount = 1;
     }
-    if(header.PixelFormat.Flags & OVR_DDS_PF_FOURCC)
+    if (header.PixelFormat.Flags & OVR_DDS_PF_FOURCC)
     {
-		format = InterpretPixelFormatFourCC(header.PixelFormat.FourCC);
-		if (format == -1) {
-			return NULL;
-		}
+        if (header.PixelFormat.FourCC == OVR_DX10_MAGIC_NUMBER)
+        {
+            OVR_DDS_HEADER_DXT10 dx10Header;
+            f->Read((unsigned char*)(&dx10Header), sizeof(dx10Header));
+
+            switch (dx10Header.dxgiFormat)
+            {
+                case DXGI_FORMAT_BC1_UNORM:
+                case DXGI_FORMAT_BC1_UNORM_SRGB:
+                    format = Texture_BC1;
+                    break;
+                case DXGI_FORMAT_BC2_UNORM:
+                case DXGI_FORMAT_BC2_UNORM_SRGB:
+                    format = Texture_BC2;
+                    break;
+                case DXGI_FORMAT_BC3_UNORM:
+                case DXGI_FORMAT_BC3_UNORM_SRGB:
+                    format = Texture_BC3;
+                    break;
+                case DXGI_FORMAT_BC6H_SF16:
+                    format = Texture_BC6S;
+                    break;
+                case DXGI_FORMAT_BC6H_UF16:
+                    format = Texture_BC6U;
+                    break;
+                case DXGI_FORMAT_BC7_UNORM:
+                case DXGI_FORMAT_BC7_UNORM_SRGB:
+                    format = Texture_BC7;
+                    break;
+                default:
+                    OVR_ASSERT(false);
+                    // Add more formats and you encounter dds files that need them
+                    break;
+            }
+        }
+        else
+        {
+            format = InterpretPixelFormatFourCC(header.PixelFormat.FourCC);
+            if (format == -1) {
+                return NULL;
+            }
+        }
     }
 
     // TODO: Should not blindly add srgb as a format flag, and instead should rely on some data driver flag per-texture
@@ -114,6 +171,11 @@ Texture* LoadTextureDDSTopDown(RenderDevice* ren, File* f, int textureLoadFlags)
     if (srgbAware)
     {
         format |= Texture_SRGB;
+    }
+
+    if (textureLoadFlags & TextureLoad_SwapTextureSet)
+    {
+        format |= Texture_SwapTextureSetStatic;
     }
 
     int            byteLen = f->BytesAvailable();

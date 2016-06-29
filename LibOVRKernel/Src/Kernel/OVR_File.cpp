@@ -545,7 +545,7 @@ int     BufferedFile::CopyFromStream(File *pstream, int byteSize)
             break;
     }
 
-	delete[] buff;
+    delete[] buff;
 
     return count;
 }

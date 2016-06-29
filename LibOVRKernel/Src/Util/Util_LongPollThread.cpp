@@ -42,7 +42,7 @@ LongPollThread::LongPollThread() :
 {
     Start();
 
-	// Must be at end of function
+    // Must be at end of function
     PushDestroyCallbacks();
 }
 

@@ -3764,22 +3764,26 @@ extern "C" {
 #ifndef GL_EXT_texture_sRGB
     #define GL_EXT_texture_sRGB 1
 
-    #define GL_SRGB_EXT                            0x8C40
-    #define GL_SRGB8_EXT                           0x8C41
-    #define GL_SRGB_ALPHA_EXT                      0x8C42
-    #define GL_SRGB8_ALPHA8_EXT                    0x8C43
-    #define GL_SLUMINANCE_ALPHA_EXT                0x8C44
-    #define GL_SLUMINANCE8_ALPHA8_EXT              0x8C45
-    #define GL_SLUMINANCE_EXT                      0x8C46
-    #define GL_SLUMINANCE8_EXT                     0x8C47
-    #define GL_COMPRESSED_SRGB_EXT                 0x8C48
-    #define GL_COMPRESSED_SRGB_ALPHA_EXT           0x8C49
-    #define GL_COMPRESSED_SLUMINANCE_EXT           0x8C4A
-    #define GL_COMPRESSED_SLUMINANCE_ALPHA_EXT     0x8C4B
-    #define GL_COMPRESSED_SRGB_S3TC_DXT1_EXT       0x8C4C
-    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT 0x8C4D
-    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT 0x8C4E
-    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT 0x8C4F
+    #define GL_SRGB_EXT                               0x8C40
+    #define GL_SRGB8_EXT                              0x8C41
+    #define GL_SRGB_ALPHA_EXT                         0x8C42
+    #define GL_SRGB8_ALPHA8_EXT                       0x8C43
+    #define GL_SLUMINANCE_ALPHA_EXT                   0x8C44
+    #define GL_SLUMINANCE8_ALPHA8_EXT                 0x8C45
+    #define GL_SLUMINANCE_EXT                         0x8C46
+    #define GL_SLUMINANCE8_EXT                        0x8C47
+    #define GL_COMPRESSED_SRGB_EXT                    0x8C48
+    #define GL_COMPRESSED_SRGB_ALPHA_EXT              0x8C49
+    #define GL_COMPRESSED_SLUMINANCE_EXT              0x8C4A
+    #define GL_COMPRESSED_SLUMINANCE_ALPHA_EXT        0x8C4B
+    #define GL_COMPRESSED_SRGB_S3TC_DXT1_EXT          0x8C4C
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT    0x8C4D
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT    0x8C4E
+    #define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT    0x8C4F
+    #define GL_COMPRESSED_RGBA_BPTC_UNORM_ARB         0x8E8C
+    #define GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB   0x8E8D
+    #define GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB   0x8E8E
+    #define GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB 0x8E8F
 
     #define GLE_EXT_texture_sRGB GLEGetCurrentVariable(gle_EXT_texture_sRGB)
 #endif
@@ -4728,7 +4732,7 @@ extern "C" {
 
 
 
-	#ifndef GLX_ARB_create_context
+    #ifndef GLX_ARB_create_context
         #define GLX_ARB_create_context 1
 
         #define GLX_CONTEXT_DEBUG_BIT_ARB              0x0001
@@ -4748,9 +4752,9 @@ extern "C" {
     #ifndef GLX_ARB_create_context_profile
         #define GLX_ARB_create_context_profile 1
 
-        #define GLX_CONTEXT_CORE_PROFILE_BIT_ARB 		  0x00000001
+        #define GLX_CONTEXT_CORE_PROFILE_BIT_ARB           0x00000001
         #define GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
-        #define GLX_CONTEXT_PROFILE_MASK_ARB 		0x9126
+        #define GLX_CONTEXT_PROFILE_MASK_ARB         0x9126
 
         #define GLE_GLX_ARB_create_context_profile GLEGetCurrentVariable(gle_GLX_ARB_create_context_profile)
     #endif
@@ -4759,10 +4763,10 @@ extern "C" {
     #ifndef GLX_ARB_create_context_robustness
         #define GLX_ARB_create_context_robustness 1
 
-        #define GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB 		0x00000004
+        #define GLX_CONTEXT_ROBUST_ACCESS_BIT_ARB         0x00000004
         #define GLX_LOSE_CONTEXT_ON_RESET_ARB               0x8252
         #define GLX_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB 0x8256
-        #define GLX_NO_RESET_NOTIFICATION_ARB       		0x8261
+        #define GLX_NO_RESET_NOTIFICATION_ARB               0x8261
 
         #define GLE_GLX_ARB_create_context_robustness GLEGetCurrentVariable(gle_GLX_ARB_create_context_robustness)
     #endif

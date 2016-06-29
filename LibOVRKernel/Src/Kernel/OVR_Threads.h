@@ -437,6 +437,31 @@ ThreadId GetCurrentThreadId();
 
 
 
+//-----------------------------------------------------------------------------------
+// ***** OVR_THREAD_LOCAL
+// 
+// Example usage:
+//    #if defined(OVR_THREAD_LOCAL)
+//        OVR_THREAD_LOCAL int n = 0;                       // OK
+//        extern OVR_THREAD_LOCAL struct Data s;            // OK
+//        static OVR_THREAD_LOCAL char* p;                  // OK
+//        OVR_THREAD_LOCAL int i = sizeof(i);               // OK.
+//        OVR_THREAD_LOCAL std::string s("hello");          // Can't be used for initialized objects.
+//        OVR_THREAD_LOCAL int Function();                  // Can't be used as return value.
+//        void Function(){ OVR_THREAD_LOCAL int i = 0; }    // Can't be used in function.
+//        void Function(OVR_THREAD_LOCAL int i){ }          // can't be used as argument.
+//        extern int i; OVR_THREAD_LOCAL int i;             // Declarations differ.
+//        int OVR_THREAD_LOCAL i;                           // Can't be used as a type modifier.
+//        OVR_THREAD_LOCAL int i = i;                       // Can't reference self before initialization.
+//    #endif
+
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900) // VC++ doesn't support C++11 thread_local storage until VS2015.
+    #define OVR_THREAD_LOCAL thread_local
+#else
+    #define OVR_THREAD_LOCAL __declspec(thread)
+#endif
+
+
 } // OVR
 
 #endif // OVR_ENABLE_THREADS

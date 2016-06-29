@@ -53,6 +53,29 @@ const char* OVR_CDECL OVR_strrchr(const char* pString, int c)
     return nullptr;
 }
 
+char* OVR_CDECL OVR_stristr(const char* s1, const char* s2)
+{
+    const char* cp = s1;
+
+    if(!*s2)
+        return (char*)s1;
+
+    while(*cp)
+    {
+        const char* s = cp;
+        const char* t = s2;
+
+        while(*s && *t && (tolower((uint8_t)*s) == tolower((uint8_t)*t)))
+            ++s, ++t;
+
+        if(*t == 0)
+            return const_cast<char*>(cp);
+        ++cp;
+    }
+
+    return 0;
+}
+
 size_t OVR_CDECL OVR_strlcpy(char* dest, const char* src, size_t destsize)
 {
     const char* s = src;

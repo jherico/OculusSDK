@@ -79,8 +79,8 @@ double Timer::VirtualSeconds    = 0.0;
 // Returns global high-resolution application timer in seconds.
 double Timer::GetSeconds()
 {
-	if(useVirtualSeconds)
-		return VirtualSeconds;
+    if(useVirtualSeconds)
+        return VirtualSeconds;
 
     // Choreographer vsync timestamp is based on.
     struct timespec tp;
@@ -219,17 +219,17 @@ void PerformanceTimer::Initialize()
     getFrequency();
 
     #if defined(OVR_OS_WIN32) // Desktop Windows only
-	    // Set Vista flag.  On Vista, we can just use QPC() without all the extra work
+        // Set Vista flag.  On Vista, we can just use QPC() without all the extra work
         OSVERSIONINFOEXW ver;
-	    ZeroMemory(&ver, sizeof(OSVERSIONINFOEXW));
-	    ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
-	    ver.dwMajorVersion = 6; // Vista+
+        ZeroMemory(&ver, sizeof(OSVERSIONINFOEXW));
+        ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+        ver.dwMajorVersion = 6; // Vista+
 
         DWORDLONG condMask = 0;
         VER_SET_CONDITION(condMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
 
-	    // VerifyVersionInfo returns true if the OS meets the conditions set above
-	    UsingVistaOrLater = ::VerifyVersionInfoW(&ver, VER_MAJORVERSION, condMask) != 0;
+        // VerifyVersionInfo returns true if the OS meets the conditions set above
+        UsingVistaOrLater = ::VerifyVersionInfoW(&ver, VER_MAJORVERSION, condMask) != 0;
     #else
         UsingVistaOrLater = true;
     #endif
@@ -282,8 +282,8 @@ void PerformanceTimer::Shutdown()
 
 uint64_t PerformanceTimer::GetTimeSeconds()
 {
-	if (UsingVistaOrLater)
-	{
+    if (UsingVistaOrLater)
+    {
         LARGE_INTEGER li;
         ::QueryPerformanceCounter(&li);
         OVR_ASSERT(PerfFrequencyInverse != 0); // Initialize should have been called earlier.
@@ -296,8 +296,8 @@ uint64_t PerformanceTimer::GetTimeSeconds()
 
 double PerformanceTimer::GetTimeSecondsDouble()
 {
-	if (UsingVistaOrLater)
-	{
+    if (UsingVistaOrLater)
+    {
         LARGE_INTEGER li;
         ::QueryPerformanceCounter(&li);
         OVR_ASSERT(PerfFrequencyInverse != 0);

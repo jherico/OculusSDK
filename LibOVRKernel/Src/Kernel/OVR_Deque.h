@@ -50,13 +50,13 @@ public:
     virtual const Elem&  PeekBack   (int count = 0) const; // Returns count-th Item from the end
     virtual const Elem&  PeekFront  (int count = 0) const; // Returns count-th Item from the beginning
 
-	virtual inline size_t GetSize    (void)          const; // Returns Number of Elements
-	OVR_FORCE_INLINE int GetSizeI   (void)          const
-	{
-		return (int)GetSize();
-	}
+    virtual inline size_t GetSize    (void)          const; // Returns Number of Elements
+    OVR_FORCE_INLINE int GetSizeI   (void)          const
+    {
+        return (int)GetSize();
+    }
     virtual inline size_t GetCapacity(void)          const; // Returns the maximum possible number of elements
-    virtual void         Clear      (void);				   // Remove all elements
+    virtual void         Clear      (void);                   // Remove all elements
     virtual inline bool  IsEmpty    ()              const;
     virtual inline bool  IsFull     ()              const;
 
@@ -81,12 +81,12 @@ class InPlaceMutableDeque : public Deque<Elem, Allocator>
 
 public:
     InPlaceMutableDeque( int capacity = BaseType::DefaultCapacity ) : BaseType( capacity ) {}
-	virtual ~InPlaceMutableDeque() {};
+    virtual ~InPlaceMutableDeque() {};
 
     using BaseType::PeekBack;
     using BaseType::PeekFront;
-	virtual Elem& PeekBack  (int count = 0); // Returns count-th Item from the end
-	virtual Elem& PeekFront (int count = 0); // Returns count-th Item from the beginning
+    virtual Elem& PeekBack  (int count = 0); // Returns count-th Item from the end
+    virtual Elem& PeekFront (int count = 0); // Returns count-th Item from the beginning
 };
 
 // Same as Deque, but allows to write more elements than maximum capacity
@@ -187,10 +187,10 @@ Elem Deque<Elem, Allocator>::PopFront(void)
     // Error Check: Make sure we aren't reading from an empty Deque
     OVR_ASSERT( ElemCount > 0 );
 
-	Elem ReturnValue = Data[ Beginning ];
+    Elem ReturnValue = Data[ Beginning ];
     Allocator::Destruct(Data + Beginning);
 
-	++Beginning;
+    ++Beginning;
     --ElemCount;
 
     // Check for wrap-around

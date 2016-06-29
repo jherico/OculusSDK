@@ -332,8 +332,13 @@ static SharedMemoryInternal* AttemptCreateSharedMemory(const char* fileName, int
     // + Grant All (GA) to System (SY)
     // + Grant All (GA) to Built-in Administrators (BA)
     // + Grant Read-Only (GR) or Read-Write (GWGR) to Interactive Users (IU) - ie. games
-    static const wchar_t* DACLString_ReadOnly = L"D:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GR;;;IU)";
-    static const wchar_t* DACLString_ReadWrite = L"D:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GWGR;;;IU)";
+    static const wchar_t* DACLString_ReadOnly = L"D:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GR;;;IU)" \
+        L"(A;OICI;GR;;;S-1-15-3-191680118-1275207936-1426169489-1705429854)";
+    static const wchar_t* DACLString_ReadWrite = L"D:P(A;OICI;GA;;;SY)(A;OICI;GA;;;BA)(A;OICI;GWGR;;;IU)" \
+        L"(A;OICI;GWGR;;;S-1-15-3-191680118-1275207936-1426169489-1705429854)";
+
+    // HACK: https://our.intern.facebook.com/intern/tasks/?t=10698852
+    // The extra SIDs above give access to our named pipe to UWP apps
 
     // Select the remote process access mode
     const wchar_t* remoteAccessString =

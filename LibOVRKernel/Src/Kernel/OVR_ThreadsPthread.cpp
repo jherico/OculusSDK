@@ -909,13 +909,13 @@ bool    Thread::MSleep(unsigned msecs)
 /* static */
 void    Thread::YieldCurrentThread()
 {
-	#if defined(OVR_OS_MAC) || defined(OVR_OS_BSD)
-		pthread_yield_np();
+    #if defined(OVR_OS_MAC) || defined(OVR_OS_BSD)
+        pthread_yield_np();
   #elif defined(OVR_OS_ANDROID)
     sched_yield();
-	#else // Linux
-		pthread_yield();
-	#endif
+    #else // Linux
+        pthread_yield();
+    #endif
 }
 
 /* static */

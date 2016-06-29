@@ -46,7 +46,7 @@ struct OculusTexture
     {
     }
 
-    bool Init(ovrSession session, int sizeW, int sizeH)
+    bool Init(ovrSession session, int sizeW, int sizeH, bool isItProtectedContent = false)
 	{
         Session = session;
         SizeW = sizeW;
@@ -62,6 +62,7 @@ struct OculusTexture
         desc.SampleCount = 1;
         desc.StaticImage = ovrFalse;
         desc.MiscFlags = ovrTextureMisc_DX_Typeless;
+		if (isItProtectedContent) desc.MiscFlags |= ovrTextureMisc_ProtectedContent;
         desc.BindFlags = ovrTextureBind_DX_RenderTarget;
 
         ovrResult result = ovr_CreateTextureSwapChainDX(Session, DIRECTX.Device, &desc, &TextureChain);
@@ -140,10 +141,10 @@ struct VRLayer
     ovrLayerEyeFov              ovrLayer;
 
     //---------------------------------------------------------------
-    VRLayer(ovrSession session, const ovrFovPort * fov = 0, float pixelsPerDisplayPixel = 1.0f)
+    VRLayer(ovrSession session, const ovrFovPort * fov = 0, float pixelsPerDisplayPixel = 1.0f, bool isItProtectedContent = false)
     {
         Session = session;
-        MakeEyeBuffers(pixelsPerDisplayPixel);
+        MakeEyeBuffers(pixelsPerDisplayPixel,isItProtectedContent);
         ConfigureRendering(fov);
     }
     ~VRLayer()
@@ -158,13 +159,13 @@ struct VRLayer
     }
 
     //-----------------------------------------------------------------------
-    void MakeEyeBuffers(float pixelsPerDisplayPixel = 1.0f)
+    void MakeEyeBuffers(float pixelsPerDisplayPixel = 1.0f, bool isItProtectedContent = false)
     {
         for (int eye = 0; eye < 2; ++eye)
         {
             ovrSizei idealSize = ovr_GetFovTextureSize(Session, (ovrEyeType)eye, ovr_GetHmdDesc(Session).DefaultEyeFov[eye], pixelsPerDisplayPixel);
             pEyeRenderTexture[eye] = new OculusTexture();
-            if (!pEyeRenderTexture[eye]->Init(Session, idealSize.w, idealSize.h))
+            if (!pEyeRenderTexture[eye]->Init(Session, idealSize.w, idealSize.h, isItProtectedContent))
                 return;
             pEyeDepthBuffer[eye] = new DepthBuffer(DIRECTX.Device, idealSize.w, idealSize.h);
             EyeRenderViewport[eye].Pos.x = 0;
@@ -479,7 +480,7 @@ struct BasicVR
     }
 
     //------------------------------------------------------------
-    void DistortAndPresent(int numLayersToRender, D3D11_BOX * optionalBoxForMirrorWindow = 0, bool mirror = true)
+    ovrResult DistortAndPresent(int numLayersToRender, D3D11_BOX * optionalBoxForMirrorWindow = 0, bool mirror = true)
     {
         ovrLayerHeader* layerHeaders[ovrMaxLayerCount];
         for (int i = 0; i < ovrMaxLayerCount; i++)
@@ -490,7 +491,7 @@ struct BasicVR
 
         presentResult = ovr_SubmitFrame(Session, 0, nullptr, layerHeaders, numLayersToRender);
         if (!OVR_SUCCESS(presentResult))
-            return;
+            return (presentResult);
 
         if (mirror && mirrorTexture)
         {
@@ -501,6 +502,7 @@ struct BasicVR
             res->Release();
             DIRECTX.SwapChain->Present(0, 0);
         }
+		return(presentResult);
     }
 
     //------------------------------------------------------------

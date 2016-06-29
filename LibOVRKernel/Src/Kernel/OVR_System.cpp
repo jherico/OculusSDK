@@ -44,9 +44,9 @@ limitations under the License.
     #pragma warning(pop)
 #endif
 
-namespace OVR {
+static ovrlog::Channel Logger("Kernel:System");
 
-ovrlog::Channel SystemLog("System");
+namespace OVR {
 
 
 //-----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ void System::Destroy()
 
     if (--System_Init_Count == 0)
     {
-        SystemLog.LogInfo("Graceful shutdown: OnThreadDestroy");
+        Logger.LogInfo("Graceful shutdown: OnThreadDestroy");
 
         // Invoke all of the post-finish callbacks (normal case)
         for (SystemSingletonInternal *listener = SystemShutdownListenerList; listener; listener = listener->NextShutdownSingleton)
@@ -157,7 +157,7 @@ void System::Destroy()
             listener->OnThreadDestroy();
         }
 
-        SystemLog.LogInfo("Graceful shutdown: FinishAllThreads");
+        Logger.LogInfo("Graceful shutdown: FinishAllThreads");
 
         #ifdef OVR_ENABLE_THREADS
             // Wait for all threads to finish; this must be done so that memory
@@ -165,7 +165,7 @@ void System::Destroy()
             Thread::FinishAllThreads();
         #endif
 
-        SystemLog.LogInfo("Graceful shutdown: OnSystemDestroy");
+        Logger.LogInfo("Graceful shutdown: OnSystemDestroy");
 
         // Invoke all of the post-finish callbacks (normal case)
         for (SystemSingletonInternal* next, *listener = SystemShutdownListenerList; listener; listener = next)
@@ -181,14 +181,14 @@ void System::Destroy()
     }
     else
     {
-        SystemLog.LogDebug("Destroy recursively called; depth = ", System_Init_Count);
+        Logger.LogDebug("Destroy recursively called; depth = ", System_Init_Count);
     }
 
     GetSSILock().DoLock();
     ShuttingDown = false;
     GetSSILock().Unlock();
 
-    SystemLog.LogInfo("Graceful shutdown: Stopping logger");
+    Logger.LogInfo("Graceful shutdown: Stopping logger");
 
     // Prevent memory leak reports
     ovrlog::ShutdownLogging();

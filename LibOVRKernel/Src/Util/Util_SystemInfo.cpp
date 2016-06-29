@@ -153,7 +153,7 @@ String GetGuidString()
 
 const char * GetProcessInfo()
 {
-#if defined (OVR_CPU_X86_64	)
+#if defined (OVR_CPU_X86_64    )
     return "64 bit";
 #elif defined (OVR_CPU_X86)
     return "32 bit";

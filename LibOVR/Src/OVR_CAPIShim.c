@@ -1093,6 +1093,7 @@ OVR_DECLARE_IMPORT(ovrBool,          ovr_SetFloatArray, (ovrSession session, con
 OVR_DECLARE_IMPORT(const char*,      ovr_GetString, (ovrSession session, const char* propertyName, const char* defaultVal))
 OVR_DECLARE_IMPORT(ovrBool,          ovr_SetString, (ovrSession session, const char* propertyName, const char* value))
 OVR_DECLARE_IMPORT(int,              ovr_TraceMessage, (int level, const char* message))
+OVR_DECLARE_IMPORT(ovrResult,        ovr_IdentifyClient, (const char* identity))
 
 #if defined (_WIN32)
 OVR_DECLARE_IMPORT(ovrResult, ovr_CreateTextureSwapChainDX, (ovrSession session, IUnknown* d3dPtr, const ovrTextureSwapChainDesc* desc, ovrTextureSwapChain* outTextureChain))
@@ -1170,6 +1171,7 @@ static ovrResult OVR_LoadSharedLibrary(int requestedProductVersion, int requeste
     OVR_GETFUNCTION(ovr_GetString)
     OVR_GETFUNCTION(ovr_SetString)
     OVR_GETFUNCTION(ovr_TraceMessage)
+    OVR_GETFUNCTION(ovr_IdentifyClient)
 #if defined (_WIN32)
     OVR_GETFUNCTION(ovr_CreateTextureSwapChainDX)
     OVR_GETFUNCTION(ovr_CreateMirrorTextureDX)
@@ -1237,6 +1239,7 @@ static void OVR_UnloadSharedLibrary()
     ovr_GetStringPtr = NULL;
     ovr_SetStringPtr = NULL;
     ovr_TraceMessagePtr = NULL;
+    ovr_IdentifyClientPtr = NULL;
 #if defined (_WIN32)
     ovr_CreateTextureSwapChainDXPtr = NULL;
     ovr_CreateMirrorTextureDXPtr = NULL;
@@ -1572,6 +1575,7 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_SetControllerVibration(ovrSession session, ov
     return ovr_SetControllerVibrationPtr(session, controllerType, frequency, amplitude);
 }
 
+
 OVR_PUBLIC_FUNCTION(ovrSizei) ovr_GetFovTextureSize(ovrSession session, ovrEyeType eye, ovrFovPort fov,
                                              float pixelsPerDisplayPixel)
 {
@@ -1804,6 +1808,7 @@ OVR_PUBLIC_FUNCTION(ovrEyeRenderDesc) ovr_GetRenderDesc(ovrSession session, ovrE
     return ovr_GetRenderDescPtr(session, eyeType, fov);
 }
 
+
 OVR_PUBLIC_FUNCTION(double) ovr_GetPredictedDisplayTime(ovrSession session, long long frameIndex)
 {
     if (!ovr_GetPredictedDisplayTimePtr)
@@ -1899,6 +1904,14 @@ OVR_PUBLIC_FUNCTION(int) ovr_TraceMessage(int level, const char* message)
         return -1;
 
     return ovr_TraceMessagePtr(level, message);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_IdentifyClient(const char* identity)
+{
+    if (!ovr_IdentifyClientPtr)
+        return ovrError_NotInitialized;
+
+    return ovr_IdentifyClientPtr(identity);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_Lookup(const char* name, void** data)

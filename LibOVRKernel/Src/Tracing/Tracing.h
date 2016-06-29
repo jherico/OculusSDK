@@ -58,10 +58,10 @@ limitations under the License.
         )
     #endif
 
-	#if !defined(_In_reads_)
-		// get VS2010 working
-		#define _In_reads_(x)
-	#endif
+    #if !defined(_In_reads_)
+        // get VS2010 working
+        #define _In_reads_(x)
+    #endif
 
     #include "LibOVREvents.h"
 
@@ -214,8 +214,8 @@ limitations under the License.
                 count = max_blobs; \
             for (int i = 0; i < count; ++i) \
             { \
-                x[i] = (frame).Blobs[i].Position.x; \
-                y[i] = (frame).Blobs[i].Position.y; \
+                x[i] = (frame).Blobs[i].DistortedPosition.x; \
+                y[i] = (frame).Blobs[i].DistortedPosition.y; \
                 size[i] = (frame).Blobs[i].BlobSize; \
             } \
             EventWriteCameraBlobs( \
@@ -302,17 +302,17 @@ limitations under the License.
           RenderCount \
       )
 
-#define VirtualDisplayPacketTrace_Begin			0
-#define VirtualDisplayPacketTrace_End			1
-#define VirtualDisplayPacketTrace_Queue			2
+#define VirtualDisplayPacketTrace_Begin            0
+#define VirtualDisplayPacketTrace_End            1
+#define VirtualDisplayPacketTrace_Queue            2
 #define VirtualDisplayPacketTrace_QueueRelease  3
-#define VirtualDisplayPacketTrace_Result		5
+#define VirtualDisplayPacketTrace_Result        5
 
 
-	#define TraceVirtualDisplayPacket(PacketType, Stage, SubmittingProcessID, ActiveProcessID) EventWriteVirtualDisplayPacketTrace(PacketType, Stage, SubmittingProcessID, ActiveProcessID)
-	#define TraceClientFrameMissed(FrameIndex, ProcessID) EventWriteClientFrameMissed(FrameIndex, ProcessID)
+    #define TraceVirtualDisplayPacket(PacketType, Stage, SubmittingProcessID, ActiveProcessID) EventWriteVirtualDisplayPacketTrace(PacketType, Stage, SubmittingProcessID, ActiveProcessID)
+    #define TraceClientFrameMissed(FrameIndex, ProcessID) EventWriteClientFrameMissed(FrameIndex, ProcessID)
     #define TraceCompositionBegin(ExpectedCPUStartTimeInSeconds, ActualCPUStartTimeInSeconds) EventWriteCompositionBegin(ExpectedCPUStartTimeInSeconds, ActualCPUStartTimeInSeconds)
-	#define TraceCompositionEnd() EventWriteCompositionEnd()
+    #define TraceCompositionEnd() EventWriteCompositionEnd()
     #define TraceCompositionEndSpinWait() EventWriteCompositionEndSpinWait()
     #define TraceCompositionFlushingToGPU() EventWriteCompositionFlushingToGPU()
     #define TraceRenderPacketProcessEvent(Stage, ProcessID) EventWriteRenderPacketProcessEvent(Stage, ProcessID)
@@ -373,10 +373,10 @@ limitations under the License.
     #define TraceAppNoOp(Pid) ((void)0)
     #define TraceLatencyTiming(LatencyTiming) ((void)0)
     #define TraceEndFrameAppTiming(AppTiming, RenderCount) ((void)0)
-	#define TraceVirtualDisplayPacket(PacketType, Stage, SubmittingProcessID, ActiveProcessID) ((void)0)
-	#define TraceClientFrameMissed(FrameIndex, ProcessID) ((void)0)
+    #define TraceVirtualDisplayPacket(PacketType, Stage, SubmittingProcessID, ActiveProcessID) ((void)0)
+    #define TraceClientFrameMissed(FrameIndex, ProcessID) ((void)0)
     #define TraceCompositionBegin(ExpectedCPUStartTimeInSeconds, ActualCPUStartTimeInSeconds) ((void)0)
-	#define TraceCompositionEnd() ((void)0)
+    #define TraceCompositionEnd() ((void)0)
     #define TraceCompositionEndSpinWait() ((void)0)
     #define TraceCompositionFlushingToGPU() ((void)0)
     #define TraceRenderPacketProcessEvent(Stage, ProcessID) ((void)0)
