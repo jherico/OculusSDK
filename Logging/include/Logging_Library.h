@@ -265,6 +265,7 @@ public:
     // Plugin management
     void AddPlugin(std::shared_ptr<OutputPlugin> plugin);
     void RemovePlugin(std::shared_ptr<OutputPlugin> plugin);
+    std::shared_ptr<OutputPlugin> GetPlugin(const char* const pluginName);
 
     // Disable all output
     void DisableAllPlugins();
@@ -323,7 +324,7 @@ private:
         WorkQueueTail = msg;
         ++WorkQueueSize;
     }
-    
+
     static DWORD WINAPI WorkerThreadEntrypoint_(void* worker);
     void WorkerThreadEntrypoint();
 
@@ -351,28 +352,35 @@ private:
 class ErrorSilencer
 {
 public:
-    // Returns true if errors are currently squelched and should not be loud.
-    // This can be called from anywhere, even outside of an ErrorSquelch block.
-    static bool IsSilenced();
+    // Returns a bitfield of SilenceOptions that are currently in effect
+    static int GetSilenceOptions();
 
     // Start silencing errors.
-    ErrorSilencer(bool initiallySilenced = true);
+    ErrorSilencer(int options = DemoteErrorsToWarnings);
+
+    enum SilenceOptions
+    {
+        // Error logs will be demoted to the warning log level
+        DemoteErrorsToWarnings = 1,
+
+        // All Log* methods will be silenced
+        CompletelySilenceLogs = 2,
+
+        // OVR::MakeError will not assert when errors are set
+        PreventErrorAsserts = 4
+    };
 
     // Stop silencing errors.
     ~ErrorSilencer();
 
-public:
+private:
     // Start silencing errors.  This is done automatically be the constructor.
-    // This function is provided to manually control the silencing behavior.
     void Silence();
 
     // Stop silencing errors.  This is done automatically be the deconstructor.
-    // This function is provided to manually control the silencing behavior.
     void Unsilence();
 
-private:
-    // Haas this object requested silencing errors?
-    bool ThisObjectCurrentlySilenced = false;
+    int Options = 0;
 };
 
 
@@ -406,7 +414,7 @@ public:
 
     const char* GetName() const;
     Level GetMinimumOutputLevel() const;
-    
+
     LOGGING_INLINE bool Active(Level level) const
     {
         return MinimumOutputLevel <= (uint32_t)level;
@@ -417,12 +425,6 @@ public:
     {
         if (Active(level))
         {
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
-            {
-                // Demote to warning
-                level = Level::Warning;
-            }
             doLog(level, std::forward<Args>(args)...);
         }
     }
@@ -432,11 +434,7 @@ public:
     {
         if (Active(Level::Error))
         {
-            // Demote to warning if errors are silenced
-            const Level level = ErrorSilencer::IsSilenced() ?
-                Level::Warning : Level::Error;
-
-            doLog(level, std::forward<Args>(args)...);
+            doLog(Level::Error, std::forward<Args>(args)...);
         }
     }
 
@@ -482,12 +480,6 @@ public:
     {
         if (Active(level))
         {
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
-            {
-                // Demote to warning
-                level = Level::Warning;
-            }
             doLogF(level, std::forward<Args>(args)...);
         }
     }
@@ -497,11 +489,7 @@ public:
     {
         if (Active(Level::Error))
         {
-            // Demote to warning if errors are silenced
-            const Level level = ErrorSilencer::IsSilenced() ?
-                Level::Warning : Level::Error;
-
-            doLogF(level, std::forward<Args>(args)...);
+            doLogF(Level::Error, std::forward<Args>(args)...);
         }
     }
 
@@ -551,8 +539,14 @@ public:
     {
         if (Active(level))
         {
+            int silenceOptions = ErrorSilencer::GetSilenceOptions();
+            if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+            {
+                return;
+            }
+
             // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
+            if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
             {
                 // Demote to warning
                 level = Level::Warning;
@@ -568,7 +562,7 @@ public:
         }
     }
     // DANGER DANGER DANGER
-    
+
 private:
     //-------------------------------------------------------------------------
     // Internal Implementation
@@ -580,15 +574,18 @@ private:
     // Used to iterate through a linked list of Channel objects
     // A linked list is used to avoid CRT new / delete during startup as this is called from the constructor
     ChannelNode Node;
-    
+
     // Level at which this channel will log.
     Log_Level_t MinimumOutputLevel;
 
     // Channel name string
     const char* SubsystemName;
-
+    
     // Optional prefix
     std::string Prefix;
+
+    // So changing Prefix is threadsafe
+    mutable Lock PrefixLock;
 
     // Target of doLog function
     static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;
@@ -621,6 +618,19 @@ private:
     template<typename... Args>
     LOGGING_INLINE void doLog(Level level, Args&&... args) const
     {
+        int silenceOptions = ErrorSilencer::GetSilenceOptions();
+        if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+        {
+            return;
+        }
+
+        // If the log message is at error level and errors are silenced,
+        if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        {
+            // Demote to warning
+            level = Level::Warning;
+        }
+
         LogStringBuffer buffer(SubsystemName, level);
 
         writeLogBuffer(buffer, Prefix, args...);
@@ -664,6 +674,19 @@ private:
     template<typename... Args>
     LOGGING_INLINE void doLogF(Level level, Args&&... args) const
     {
+        int silenceOptions = ErrorSilencer::GetSilenceOptions();
+        if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+        {
+            return;
+        }
+
+        // If the log message is at error level and errors are silenced,
+        if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        {
+            // Demote to warning
+            level = Level::Warning;
+        }
+
         LogStringBuffer buffer(SubsystemName, level);
 
         char  logCharsLocal[1024];
@@ -676,7 +699,7 @@ private:
         int result = snprintf(logCharsLocal, sizeof(logCharsLocal), args...);
 #endif
 
-        if ((result < 0) || (result >= sizeof(logCharsLocal)))
+        if ((result < 0) || ((size_t)result >= sizeof(logCharsLocal)))
         {
             int requiredSize = GetPrintfLength(args...);
 
@@ -747,9 +770,6 @@ public:
 
     void SetPlugin(std::shared_ptr<ConfiguratorPlugin> plugin);
 
-    // Free internal memory to avoid memory leak reports
-    void UnregisterAll();
-
     // Get all channels - note channels do not necessarily have unique names
     void GetChannels(std::vector< std::pair<std::string, Level> > &channels);
 
@@ -758,9 +778,12 @@ public:
 
     // Internal: Invoked through callbacks
     void OnChannelLevelChange(const char* channelName, Log_Level_t level);
-    
-    // Internal: Load log level for a channel from disk
+
+    // Internal: Load log level for a channel from disk, set all channels with this name to this level
     void RestoreChannelLogLevel(const char* channelName);
+
+    // Internal: Load log level for a channel from disk, set this channel to this level
+    void RestoreChannelLogLevel(ChannelNode* channelNode);
 
     // Internal: Iterate through all channels and store them
     void RestoreAllChannelLogLevels();

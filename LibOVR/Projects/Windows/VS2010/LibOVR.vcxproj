@@ -26,6 +26,7 @@
     <ClInclude Include="..\..\..\Include\OVR_CAPI_Util.h" />
     <ClInclude Include="..\..\..\Include\OVR_ErrorCode.h" />
     <ClInclude Include="..\..\..\Include\OVR_Version.h" />
+    <ClInclude Include="..\..\..\Src\OVR_CAPI_Prototypes.h" />
     <ClInclude Include="..\..\..\Src\OVR_StereoProjection.h" />
   </ItemGroup>
   <ItemGroup>

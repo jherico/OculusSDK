@@ -27,16 +27,14 @@ limitations under the License.
 /// move and rotate with the player.
 
 #define   OVR_D3D_VERSION 11
-#include "Kernel/OVR_Threads.h"
 #include "../Common/Win32_DirectXAppUtil.h" // DirectX
 #include "../Common/Win32_BasicVR.h"        // Basic VR
 
+#include <thread>
 #include <array>
 #include <random>
 
 // note: run Test_Samples with --gtest_filter=Test_Samples.WinMain_Threading to run just this test
-
-using namespace OVR;
 
 typedef struct ThreadTestState *ThreadTestStatePtr;
 
@@ -84,6 +82,7 @@ struct ThreadTestState
     ovrSession      session;
     std::mt19937    rand;
     TestList        tests;
+    int             failures;
 };
 
 // invoke a named test
@@ -401,30 +400,29 @@ ThreadTest(FloatArrayProperties)
 // TestThread - thread function which runs a random selection of tests from state's list
 //
 
-static int TestThread(Thread *pThread, void *pData)
+static void TestThread(ThreadTestState *state)
 {
-    ThreadTestState *state = static_cast<ThreadTestState *>(pData);
     std::uniform_int_distribution<> randtest(0, int(state->tests.size() - 1));
     std::uniform_int_distribution<> randms(-10, 30);
 
-    int failures = 0;
+    state->failures = 0;
 
     while (running)
     {
         if (state->tests[randtest(state->rand)](state))
         {
-            ++failures;
+            ++state->failures;
         }
 
         // sleep some of the time
         #if 0
-        int ms = randms(state->rand);
-        if (ms > 0)
-            Thread::MSleep(ms);
+            int ms = randms(state->rand);
+            if (ms > 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
         #endif
     }
 
-    return failures;
+    
 }
 
 struct Threading : BasicVR
@@ -460,7 +458,7 @@ struct Threading : BasicVR
         extraRenderTexture.Commit();
 
         ThreadTestState state[numThreads] = {};
-        Thread thread[numThreads];
+        std::thread thread[numThreads];
 
         // use an RNG to seed each thread's RNG
         int seed = 0xfeedface; // XXX should be settable from command-line
@@ -474,19 +472,16 @@ struct Threading : BasicVR
             // for now just randomly run all tests from each thread
             state[i].tests = TestInstance::list;
 
-            thread[i].UserHandle = &state[i];
-            thread[i].ThreadFunction = TestThread;
+            thread[i] = std::thread(TestThread, &state[i]);
+            // XXX make some generic library routine for this?
+            // Name the thread for easier debugging
+            //char buff[256];
+            //sprintf_s(buff, "TestThread%03d", i);
+            //thread[i].SetThreadName(buff);
         }
 
         // start threads
         running = true;
-        for (int i = 0; i < numThreads; ++i)
-        {
-            thread[i].Start();
-            char buff[256];
-            sprintf_s(buff, "TestThread%03d", i);
-            thread[i].SetThreadName(buff);
-        }
 
         // main rendering loop
         for (frameIndex = 0; frameIndex < maxFrames; ++frameIndex)
@@ -541,14 +536,15 @@ struct Threading : BasicVR
         running = false;
         // can't use Thread::FinishAllThreads() here since single process creates extra threads which don't terminate
         // can't move this below Release since threads need to stop calling APIs first
+        int totalFailures = 0;
         for (int i = 0; i < numThreads; ++i)
         {
-            if (thread[i].Join(1000))
-            {
-                threadCode = threadCode || thread[i].GetExitCode();
-            }
-            else threadCode = -1;
+            thread[i].join();
+            totalFailures += state[i].failures;
         }
+
+        if (totalFailures > 0)
+            throw totalFailures;
     }
 };
 

@@ -107,15 +107,7 @@ public:
     void Enter();
     void Leave();
 
-#if defined(LOGGING_DEBUG)
-    void SetLimit(double limit) { LimitTime = limit; }
-#endif
-
 private:
-#if defined(LOGGING_DEBUG)
-    double LockStartTime;
-    double LimitTime;
-#endif
     CRITICAL_SECTION cs;
 };
 

@@ -41,6 +41,10 @@ using namespace DirectX;
     #define VALIDATE(x, msg) if (!(x)) { MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK); exit(-1); }
 #endif
 
+#ifndef FATALERROR
+#define FATALERROR(msg) { MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK); exit(-1); }
+#endif
+
 // clean up member COM pointers
 template<typename T> void Release(T *&obj)
 {
@@ -318,8 +322,6 @@ struct DirectX11
 
     void Run(bool (*MainLoop)(bool retryCreate))
     {
-        // false => just fail on any error
-        VALIDATE(MainLoop(false), "Oculus Rift not detected.");
         while (HandleMessages())
         {
             // true => we'll attempt to retry for ovrError_DisplayLost
@@ -631,7 +633,7 @@ struct TriangleSet
     void AddTriangle(Vertex v0, Vertex v1, Vertex v2)
     {
         VALIDATE(numVertices <= (maxBuffer - 3), "Insufficient triangle set");
-        for (int i = 0; i < 3; i++) Indices[numIndices++] = numVertices + i;
+        for (int i = 0; i < 3; i++) Indices[numIndices++] = short(numVertices + i);
         Vertices[numVertices++] = v0;
         Vertices[numVertices++] = v1;
         Vertices[numVertices++] = v2;
@@ -748,6 +750,11 @@ struct Model
         DIRECTX.Context->PSSetShaderResources(0, 1, &Fill->Tex->TexSv);
 
         DIRECTX.Context->DrawIndexed((UINT)NumIndices, 0, 0);
+    }
+
+    void Render(XMMATRIX&& projView, float R, float G, float B, float A, bool standardUniforms)
+    {
+        Render(&projView, R, G, B, A, standardUniforms);
     }
 
     // render using stereo instancing
@@ -935,7 +942,8 @@ struct Camera
     XMVECTOR Pos;
     XMVECTOR Rot;
     Camera() {};
-    Camera(XMVECTOR * pos, XMVECTOR * rot) : Pos(*pos), Rot(*rot)	{};
+    Camera(XMVECTOR * pos, XMVECTOR * rot) : Pos(*pos), Rot(*rot) {};
+    Camera(const XMVECTOR & pos, const XMVECTOR & rot) : Pos(pos), Rot(rot) {};
     XMMATRIX GetViewMatrix()
     {
         XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, -1, 0), Rot);
@@ -944,6 +952,7 @@ struct Camera
 
     static void* operator new(std::size_t size)
     {
+		UNREFERENCED_PARAMETER(size);
         return _aligned_malloc(sizeof(Camera), __alignof(Camera));
     }
 

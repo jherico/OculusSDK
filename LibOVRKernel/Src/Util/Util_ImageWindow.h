@@ -111,7 +111,7 @@ class ImageWindow
     ID2D1RenderTarget* pRT;
     D2D1_SIZE_U resolution;
 
-    Mutex*                        frontBufferMutex;
+    std::unique_ptr<Mutex>      frontBufferMutex;
 
     InPlaceMutableDeque< Ptr<Frame> >    frames;
 

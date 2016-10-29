@@ -204,15 +204,15 @@ static size_t SprintfAddress(char* addressStr, size_t addressStrCapacity, const 
 {
     #if defined(OVR_CC_MSVC)
         #if (OVR_PTR_SIZE >= 8)
-            return OVR_snprintf(addressStr, addressStrCapacity, "0x%016I64x", pAddress);  // e.g. 0x0123456789abcdef
+            return snprintf(addressStr, addressStrCapacity, "0x%016I64x", pAddress);  // e.g. 0x0123456789abcdef
         #else
-            return OVR_snprintf(addressStr, addressStrCapacity, "0x%08x", pAddress);      // e.g. 0x89abcdef
+            return snprintf(addressStr, addressStrCapacity, "0x%08x", pAddress);      // e.g. 0x89abcdef
         #endif
     #else
         #if (OVR_PTR_SIZE >= 8)
-            return OVR_snprintf(addressStr, addressStrCapacity, "%016llx", pAddress);     // e.g. 0x0123456789abcdef
+            return snprintf(addressStr, addressStrCapacity, "%016llx", pAddress);     // e.g. 0x0123456789abcdef
         #else
-            return OVR_snprintf(addressStr, addressStrCapacity, "%08x", pAddress);        // e.g. 0x89abcdef
+            return snprintf(addressStr, addressStrCapacity, "%08x", pAddress);        // e.g. 0x89abcdef
         #endif
     #endif
 }
@@ -327,9 +327,9 @@ static size_t SprintfThreadHandle(char* threadHandleStr, size_t threadHandleStrC
 static size_t SprintfThreadSysId(char* threadSysIdStr, size_t threadSysIdStrCapacity, const ThreadSysId& threadSysId)
 {
     #if defined(OVR_CC_MSVC) // Somebody could conceivably use VC++ with a different standard library that supports %ll. And VS2012+ also support %ll.
-        return OVR_snprintf(threadSysIdStr, threadSysIdStrCapacity, "%I64u (0x%I64x)", (uint64_t)threadSysId, (uint64_t)threadSysId); // e.g. 5642 (0x160a)
+        return snprintf(threadSysIdStr, threadSysIdStrCapacity, "%I64u (0x%I64x)", (uint64_t)threadSysId, (uint64_t)threadSysId); // e.g. 5642 (0x160a)
     #else
-        return OVR_snprintf(threadSysIdStr, threadSysIdStrCapacity, "%llu (0x%llx)", (uint64_t)threadSysId, (uint64_t)threadSysId);
+        return snprintf(threadSysIdStr, threadSysIdStrCapacity, "%llu (0x%llx)", (uint64_t)threadSysId, (uint64_t)threadSysId);
     #endif
 }
 
@@ -1280,9 +1280,9 @@ void GetOSVersionName(char* versionName, size_t versionNameCapacity)
         memset(&utsName, 0, sizeof(utsName));
 
         if(uname(&utsName) == 0)
-            OVR_snprintf(versionName, versionNameCapacity, "%s %s %s %s", utsName.sysname, utsName.release, utsName.version, utsName.machine);
+            snprintf(versionName, versionNameCapacity, "%s %s %s %s", utsName.sysname, utsName.release, utsName.version, utsName.machine);
         else
-            OVR_snprintf(versionName, versionNameCapacity, "Unix");
+            snprintf(versionName, versionNameCapacity, "Unix");
     #endif
 }
 
@@ -2203,7 +2203,6 @@ bool SymbolLookup::ReportThreadCallstack(OVR::String& sOutput, size_t skipCount,
 
     // Print the header
     char         headerBuffer[256];
-    char         threadName[32];
     char         threadSysIdStr[48];
     char         stackBaseStr[24];
     char         stackLimitStr[24];
@@ -2213,15 +2212,11 @@ bool SymbolLookup::ReportThreadCallstack(OVR::String& sOutput, size_t skipCount,
     ThreadHandle threadHandle = ConvertThreadSysIdToThreadHandle(threadSysId);
     OVR::GetThreadStackBounds(pStackBase, pStackLimit, threadHandle);
 
-    Thread::GetThreadName(threadName, OVR_ARRAY_COUNT(threadName), threadName);
     SprintfThreadSysId(threadSysIdStr, OVR_ARRAY_COUNT(threadSysIdStr), threadSysId);
     SprintfAddress(stackBaseStr, OVR_ARRAY_COUNT(stackBaseStr), pStackBase);
     SprintfAddress(stackLimitStr, OVR_ARRAY_COUNT(stackLimitStr), pStackLimit);
 
-    if(threadName[0])
-        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread \"%s\" id: %s, stack base: %s, stack limit: %s\n", threadName, threadSysIdStr, stackBaseStr, stackLimitStr);
-    else
-        OVR_snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread id: %s, stack base: %s, stack limit: %s\n", threadSysIdStr, stackBaseStr, stackLimitStr);
+    snprintf(headerBuffer, OVR_ARRAY_COUNT(headerBuffer), "Thread id: %s, stack base: %s, stack limit: %s\n", threadSysIdStr, stackBaseStr, stackLimitStr);
 
     sOutput += headerBuffer;
 
@@ -2249,9 +2244,9 @@ bool SymbolLookup::ReportThreadCallstack(OVR::String& sOutput, size_t skipCount,
             SprintfAddress(addressStr, OVR_ARRAY_COUNT(addressStr), addressArray[i]);
 
             if(symbolInfo.filePath[0])
-                OVR_snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "%-2u %-24s %s %s+%d %s:%d\n", (unsigned)i, pModuleName, addressStr, symbolInfo.function, symbolInfo.functionOffset, symbolInfo.filePath, symbolInfo.fileLineNumber);
+                snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "%-2u %-24s %s %s+%d %s:%d\n", (unsigned)i, pModuleName, addressStr, symbolInfo.function, symbolInfo.functionOffset, symbolInfo.filePath, symbolInfo.fileLineNumber);
             else
-                OVR_snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "%-2u %-24s %s %s+%d\n", (unsigned)i, pModuleName, addressStr, symbolInfo.function, symbolInfo.functionOffset);
+                snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "%-2u %-24s %s %s+%d\n", (unsigned)i, pModuleName, addressStr, symbolInfo.function, symbolInfo.functionOffset);
 
             sOutput += backtraceBuffer;
         }
@@ -2297,7 +2292,7 @@ bool SymbolLookup::ReportModuleInformation(OVR::String& sOutput)
 
     for (size_t i = 0; i < ModuleInfoArraySize; ++i)
     {
-        OVR_snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "Base: 0x%llx Size: 0x%llx Name: '%s' Path: '%s'\n",
+        snprintf(backtraceBuffer, OVR_ARRAY_COUNT(backtraceBuffer), "Base: 0x%llx Size: 0x%llx Name: '%s' Path: '%s'\n",
                      ModuleInfoArray[i].baseAddress, ModuleInfoArray[i].size, ModuleInfoArray[i].name, ModuleInfoArray[i].filePath);
         sOutput += backtraceBuffer;
     }
@@ -2492,7 +2487,7 @@ bool SymbolLookup::LookupSymbols(uint64_t* addressArray, SymbolInfo* pSymbolInfo
             {
                 char command[PATH_MAX * 2];   // Problem: We can't unilaterally use pSymbolInfoArray[0] for all addresses. We need to match addresses to the corresponding modules.
                 // FIXME: atos is moving. Should start with 'xcrun atos'.
-                OVR_snprintf(command, OVR_ARRAY_COUNT(command), "atos -o %s -l 0x%llx 0x%llx",
+                snprintf(command, OVR_ARRAY_COUNT(command), "atos -o %s -l 0x%llx 0x%llx",
                             pSymbolInfoArray[i].pModuleInfo->filePath, (int64_t)pSymbolInfoArray[i].pModuleInfo->baseAddress, (int64_t)pSymbolInfoArray[i].address);
 
                 char output[512];
@@ -2571,7 +2566,6 @@ ExceptionInfo::ExceptionInfo()
 
 ExceptionHandler::ExceptionHandler()
   : enabled(false)
-  , pauseCount(0)
   , reportPrivacyEnabled(true)
   , exceptionResponse(kERHandle)
   , exceptionListener(nullptr)
@@ -2584,7 +2578,6 @@ ExceptionHandler::ExceptionHandler()
   , LogFile(nullptr)
   , scratchBuffer()
   , exceptionOccurred(false)
-  , handlingBusy(0)
   , reportFilePathActual()
   , minidumpFilePathActual()
   , terminateReturnValue(0)
@@ -2687,13 +2680,13 @@ size_t ExceptionHandler::GetCrashDumpDirectory(char* directoryPath, size_t direc
     #elif defined(OVR_OS_MAC)
         // This is the same location that Apple puts its OS-generated .crash files.
         const char* home = getenv("HOME");
-        size_t requiredStrlen = OVR::OVR_snprintf(directoryPath, directoryPathCapacity, "%s/Library/Logs/DiagnosticReports/", home ? home : "/Users/Shared/Logs/DiagnosticReports/");
+        size_t requiredStrlen = OVR::snprintf(directoryPath, directoryPathCapacity, "%s/Library/Logs/DiagnosticReports/", home ? home : "/Users/Shared/Logs/DiagnosticReports/");
         // To do: create the directory if it doesn't already exist.
         return requiredStrlen;
 
     #elif defined(OVR_OS_UNIX)
         const char* home = getenv("HOME");
-        size_t requiredStrlen = OVR::OVR_snprintf(directoryPath, directoryPathCapacity, "%s/Library/", home ? home : "/Users/Shared/");
+        size_t requiredStrlen = OVR::snprintf(directoryPath, directoryPathCapacity, "%s/Library/", home ? home : "/Users/Shared/");
         // To do: create the directory if it doesn't already exist.
         return requiredStrlen;
     #endif
@@ -2745,7 +2738,9 @@ static ExceptionHandler* sExceptionHandler = nullptr;
         if(pExceptionPointersArg->ExceptionRecord->ExceptionCode == 0xe06d7363)
             return EXCEPTION_CONTINUE_SEARCH;
 
-        if(handlingBusy.CompareAndSet_Acquire(0, 1)) // If we can successfully change it from 0 to 1.
+        unsigned int tmp_zero = 0;
+        // If we can successfully change it from 0 to 1.
+        if (handlingBusy.compare_exchange_strong(tmp_zero, 1, std::memory_order_acquire))
         {
             exceptionOccurred = true;
 
@@ -2794,11 +2789,11 @@ static ExceptionHandler* sExceptionHandler = nullptr;
             }
             else
             {
-                if (miniDumpFilePath[0])
-                    WriteMiniDump();
-
                 if (reportFilePath[0])
                     WriteReport("Exception");
+
+                if (miniDumpFilePath[0])
+                    WriteMiniDump();
 
                 if (exceptionListener)
                     exceptionListener->HandleException(exceptionListenerUserValue, this, &exceptionInfo, reportFilePathActual);
@@ -2814,7 +2809,7 @@ static ExceptionHandler* sExceptionHandler = nullptr;
             // Restore the handler that we temporarily disabled above.
             vectoredHandle = AddVectoredExceptionHandler(1, Win32ExceptionFilter);
 
-            handlingBusy.Store_Release(0);
+            handlingBusy.store(0, std::memory_order_release);
         }
 
         if(exceptionResponse == ExceptionHandler::kERContinue)
@@ -3220,7 +3215,7 @@ void ExceptionHandler::WriteExceptionDescription()
 
             char addressStr[24];
             SprintfAddress(addressStr, OVR_ARRAY_COUNT(addressStr), exceptionInfo.pExceptionMemoryAddress);
-            OVR::OVR_snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription), "ACCESS_VIOLATION %s address %s", error, addressStr);
+            snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription), "ACCESS_VIOLATION %s address %s", error, addressStr);
         }
         else
         {
@@ -3273,13 +3268,13 @@ void ExceptionHandler::WriteExceptionDescription()
                 const size_t length = (size_t)FormatMessageA(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_HMODULE,
                                                     GetModuleHandleW(L"NTDLL.DLL"), exceptionInfo.exceptionRecord.ExceptionCode, 0, buffer, capacity, nullptr);
                 if(length)
-                    OVR::OVR_snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
-                                        "%s at instruction %s", buffer, addressStr);
+                    snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
+                             "%s at instruction %s", buffer, addressStr);
 
                 // If everything else failed just show the hex code.
                 if(exceptionInfo.exceptionDescription[0] == 0)
-                    OVR::OVR_snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
-                                      "Unknown exception 0x%08x at instruction %s", exceptionInfo.exceptionRecord.ExceptionCode, addressStr);
+                    snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
+                             "Unknown exception 0x%08x at instruction %s", exceptionInfo.exceptionRecord.ExceptionCode, addressStr);
             }
         }
 
@@ -3378,15 +3373,15 @@ void ExceptionHandler::WriteExceptionDescription()
             }
         };
 
-        OVR::OVR_snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
+        OVR::snprintf(exceptionInfo.exceptionDescription, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription),
                             "Mach exception type: %llu (%s)\n", exceptionInfo.exceptionType, MachExceptionInfo::GetMachExceptionTypeString(exceptionInfo.exceptionType));
 
-        OVR::OVR_snprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), "CPU exception info: exception id: %u (%s), exception id error: %u, fault memory address: %p\n",
+        OVR::snprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), "CPU exception info: exception id: %u (%s), exception id error: %u, fault memory address: %p\n",
                             exceptionInfo.cpuExceptionId, MachExceptionInfo::GetCPUExceptionIdString(exceptionInfo.cpuExceptionId), exceptionInfo.cpuExceptionIdError, exceptionInfo.pExceptionMemoryAddress);
         OVR::OVR_strlcat(exceptionInfo.exceptionDescription, scratchBuffer, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription));
 
 
-        OVR::OVR_snprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), "Mach exception info: exception id: %llu (%s), 0x%llx (%llu)\n", (uint64_t)exceptionInfo.machExceptionData[0],
+        OVR::snprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), "Mach exception info: exception id: %llu (%s), 0x%llx (%llu)\n", (uint64_t)exceptionInfo.machExceptionData[0],
                            MachExceptionInfo::GetMachExceptionIdString(exceptionInfo.exceptionType, exceptionInfo.machExceptionData[0]),
                            (uint64_t)exceptionInfo.machExceptionData[1], (uint64_t)exceptionInfo.machExceptionData[1]);
         OVR::OVR_strlcat(exceptionInfo.exceptionDescription, scratchBuffer, OVR_ARRAY_COUNT(exceptionInfo.exceptionDescription));
@@ -3419,7 +3414,7 @@ void ExceptionHandler::WriteReportLineF(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
-    int length = OVR_vsnprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), format, args);
+    int length = vsnprintf(scratchBuffer, OVR_ARRAY_COUNT(scratchBuffer), format, args);
     if(length >= (int)OVR_ARRAY_COUNT(scratchBuffer))     // If we didn't have enough space...
         length = (OVR_ARRAY_COUNT(scratchBuffer) - 1);    // ... use what we have.
     va_end(args);
@@ -3439,7 +3434,6 @@ void ExceptionHandler::WriteThreadCallstack(ThreadHandle threadHandle, ThreadSys
     // which we cannot do due to possibly being within an exception handler.
 
     // Print the header
-    char    threadName[32];
     char    threadSysIdStr[32];
     char    stackBaseStr[24];
     char    stackLimitStr[24];
@@ -3462,16 +3456,12 @@ void ExceptionHandler::WriteThreadCallstack(ThreadHandle threadHandle, ThreadSys
 
     OVR::GetThreadStackBounds(pStackBase, pStackLimit, threadHandle);
 
-    OVR::Thread::GetThreadName(threadName, OVR_ARRAY_COUNT(threadName), threadName);
     SprintfThreadSysId(threadSysIdStr, OVR_ARRAY_COUNT(threadSysIdStr), threadSysId);
     SprintfAddress(stackBaseStr, OVR_ARRAY_COUNT(stackBaseStr), pStackBase);
     SprintfAddress(stackLimitStr, OVR_ARRAY_COUNT(stackLimitStr), pStackLimit);
     SprintfAddress(stackCurrentStr, OVR_ARRAY_COUNT(stackCurrentStr), pStackCurrent);
 
-    if(threadName[0])
-        WriteReportLineF("Thread \"%s\" id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadName, threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
-    else
-        WriteReportLineF("Thread id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
+     WriteReportLineF("Thread id: %s, stack base: %s, stack limit: %s, stack current: %s, %s\n", threadSysIdStr, stackBaseStr, stackLimitStr, stackCurrentStr, additionalInfo ? additionalInfo : "");
 
     // Print the backtrace info
     void*       addressArray[64];
@@ -3545,7 +3535,7 @@ void ExceptionHandler::WriteReport(const char* reportType)
     {
         char dateTimeBuffer[64];
         FormatDateTime(dateTimeBuffer, OVR_ARRAY_COUNT(dateTimeBuffer), exceptionInfo.timeVal, true, true, false, true);
-        OVR_snprintf(reportFilePathActual, OVR_ARRAY_COUNT(reportFilePathActual), reportFilePath, dateTimeBuffer);
+        snprintf(reportFilePathActual, OVR_ARRAY_COUNT(reportFilePathActual), reportFilePath, dateTimeBuffer);
     }
     else
     {
@@ -3793,7 +3783,7 @@ void ExceptionHandler::WriteReport(const char* reportType)
                     ::VariantClear(&var); // must clear after use to avoid leaks
                 }
 
-                const BSTR getBSTR() const // return a value or default empty string
+                BSTR getBSTR() const // return a value or default empty string
                 {
                     if ( ( var.vt == VT_BSTR ) && var.bstrVal )
                          return var.bstrVal;
@@ -3965,7 +3955,7 @@ void ExceptionHandler::WriteReport(const char* reportType)
                                 }
 
                                 char buffer[96]; // Can't use scratchBuffer, because it's used by WriteThreadCallstack.
-                                OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "base priority: %ld, delta priority: %ld", te32.tpBasePri, te32.tpDeltaPri);
+                                snprintf(buffer, OVR_ARRAY_COUNT(buffer), "base priority: %ld, delta priority: %ld", te32.tpBasePri, te32.tpDeltaPri);
 
                                 bool threadIsExceptionThread = (te32.th32ThreadID == (DWORD)exceptionInfo.threadSysId);
                                 if(threadIsExceptionThread)
@@ -4262,7 +4252,7 @@ void ExceptionHandler::WriteReport(const char* reportType)
                         default:                       state = "<unknown>";       break;
                     }
 
-                    OVR_snprintf(threadState, OVR_ARRAY_COUNT(threadState), "%s", state);
+                    snprintf(threadState, OVR_ARRAY_COUNT(threadState), "%s", state);
                     if(tbiUnion.tbi.flags & TH_FLAGS_IDLE)
                         OVR_strlcat(threadState, ", idle", sizeof(threadState));
                     if(tbiUnion.tbi.flags & TH_FLAGS_SWAPPED)
@@ -4281,7 +4271,7 @@ void ExceptionHandler::WriteReport(const char* reportType)
                 OVR_UNUSED(result);
 
                 char buffer[256]; // Can't use scratchBuffer, because it's used by WriteThreadCallstack.
-                OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "state: %s, suspend count: %d, kernel priority: %d", threadState, (int)tbiUnion.tbi.suspend_count, (int)procThreadInfo.pth_curpri);
+                snprintf(buffer, OVR_ARRAY_COUNT(buffer), "state: %s, suspend count: %d, kernel priority: %d", threadState, (int)tbiUnion.tbi.suspend_count, (int)procThreadInfo.pth_curpri);
 
                 bool threadIsExceptionThread = (thread == exceptionInfo.threadSysId);
                 if(threadIsExceptionThread)
@@ -4501,7 +4491,7 @@ void ExceptionHandler::WriteMiniDump()
     {
         char dateTimeBuffer[64];
         FormatDateTime(dateTimeBuffer, OVR_ARRAY_COUNT(dateTimeBuffer), exceptionInfo.timeVal, true, true, false, true);
-        OVR_snprintf(minidumpFilePathActual, OVR_ARRAY_COUNT(minidumpFilePathActual), miniDumpFilePath, dateTimeBuffer);
+        snprintf(minidumpFilePathActual, OVR_ARRAY_COUNT(minidumpFilePathActual), miniDumpFilePath, dateTimeBuffer);
     }
     else
     {
@@ -4569,7 +4559,10 @@ void ExceptionHandler::WriteMiniDump()
 
                     // We are about to write out a minidump due to a crash.  This minidump write can take a very long time.
                     // Look up the stack to see what went wrong.  This is a bug in the code somewhere.
-                    OVR_ASSERT(false);
+                    if (OVRIsDebuggerPresent())
+                    {
+                        OVR_ASSERT(false);
+                    }
 
                     BOOL result = pMiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile,
                                                         (MINIDUMP_TYPE)miniDumpFlags, pExceptionPointers ? &minidumpExceptionInfo : nullptr,
@@ -4718,12 +4711,12 @@ const char* ExceptionHandler::GetExceptionUIText(const char* exceptionReportPath
                     pExceptionThreadEnd = pExceptionThreadBegin;
                 *pExceptionThreadEnd = '\0';
 
-                size_t uiTextBriefLength = OVR_snprintf(nullptr, 0, "Full report:%s\n\nSummary report:\n%s\n\n%s", exceptionReportPath, pExceptionInfoBegin, pExceptionThreadBegin);
+                size_t uiTextBriefLength = snprintf(nullptr, 0, "Full report:%s\n\nSummary report:\n%s\n\n%s", exceptionReportPath, pExceptionInfoBegin, pExceptionThreadBegin);
                 char* uiTextBrief = (char*)OVR::SafeMMapAlloc(uiTextBriefLength + 1);
 
                 if(uiTextBrief)
                 {
-                    OVR_snprintf(uiTextBrief, uiTextBriefLength + 1, "Full report:%s\n\nSummary report:\n%s\n\n%s", exceptionReportPath, pExceptionInfoBegin, pExceptionThreadBegin);
+                    snprintf(uiTextBrief, uiTextBriefLength + 1, "Full report:%s\n\nSummary report:\n%s\n\n%s", exceptionReportPath, pExceptionInfoBegin, pExceptionThreadBegin);
                     OVR::SafeMMapFree(uiText, length);
                     uiText = uiTextBrief;
                 }
@@ -4752,7 +4745,7 @@ void ExceptionHandler::ReportDeadlock(const char* threadName,
 
     handler.SetPathsFromNames(organizationName, applicationName, "Deadlock Report (%s).txt", "Deadlock Minidump (%s).mdmp");
 
-    OVR_snprintf(handler.exceptionInfo.exceptionDescription,
+    snprintf(handler.exceptionInfo.exceptionDescription,
                  sizeof(handler.exceptionInfo.exceptionDescription),
                  "Deadlock in thread '%s'", threadName ? threadName : "(null)");
 

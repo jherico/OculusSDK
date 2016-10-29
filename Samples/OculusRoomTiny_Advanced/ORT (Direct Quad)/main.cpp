@@ -44,7 +44,7 @@ struct DirectQuad : BasicVR
         if (!extraRenderTexture.Init(Session, 1024, 1024))
             return;
 
-	    Camera zeroCam(&XMVectorSet(-9, 2.25f, 0, 0), &XMQuaternionRotationRollPitchYaw(0, 0.5f * 3.141f, 0));
+	    Camera zeroCam(XMVectorSet(-9, 2.25f, 0, 0), XMQuaternionRotationRollPitchYaw(0, 0.5f * 3.141f, 0));
 	    ovrPosef zeroPose;
 	    zeroPose.Position.x = 0;
 	    zeroPose.Position.y = 0;

@@ -27,11 +27,8 @@ limitations under the License.
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_Allocator.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Nullptr.h"
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_SysFile.h"
 #include "Extras/OVR_Math.h"
@@ -39,6 +36,9 @@ limitations under the License.
 #include "../Platform/Platform_Default.h"
 #include "../Render/Render_Device.h"
 #include "../Platform/Gamepad.h"
+
+#include <vector>
+#include <string>
 
 using namespace OVR;
 using namespace OVR::OvrPlatform;
@@ -108,16 +108,16 @@ struct ShortcutKey
 //-------------------------------------------------------------------------------------
 struct OptionShortcut
 {
-    Array<ShortcutKey>  Keys;
-    Array<uint32_t>     GamepadButtons;
+    std::vector<ShortcutKey>  Keys;
+    std::vector<uint32_t>     GamepadButtons;
     FunctionNotifyBase* pNotify;
 
     OptionShortcut() : pNotify(NULL) {}
     OptionShortcut(FunctionNotifyBase* pNotify) : pNotify(pNotify) {}
     ~OptionShortcut()  { delete pNotify; }
 
-    void AddShortcut(ShortcutKey key) { Keys.PushBack(key); }
-    void AddShortcut(uint32_t gamepadButton) { GamepadButtons.PushBack(gamepadButton); }
+    void AddShortcut(ShortcutKey key) { Keys.push_back(key); }
+    void AddShortcut(uint32_t gamepadButton) { GamepadButtons.push_back(gamepadButton); }
 
     bool MatchKey(OVR::KeyCode key, bool shift) const;
     bool MatchGamepadButton(uint32_t gamepadButtonMask) const;
@@ -133,24 +133,24 @@ class OptionMenuItem : public NewOverrideBase
 public:
     virtual ~OptionMenuItem() { }
 
-    virtual void    Select() { }
+    virtual void         Select() { }
         
-    virtual bool    SetValue(String newVal) { OVR_UNUSED1(newVal); return false; }
-    virtual void    NextValue(bool* pFastStep = NULL) { OVR_UNUSED1(pFastStep); }
-    virtual void    PrevValue(bool* pFastStep = NULL) { OVR_UNUSED1(pFastStep); }
+    virtual bool         SetValue(std::string newVal) { OVR_UNUSED1(newVal); return false; }
+    virtual void         NextValue(bool* pFastStep = NULL) { OVR_UNUSED1(pFastStep); }
+    virtual void         PrevValue(bool* pFastStep = NULL) { OVR_UNUSED1(pFastStep); }
 
-    virtual String  GetLabel() { return Label; }
-    virtual String  GetValue() { return ""; }
+    virtual std::string  GetLabel() { return Label; }
+    virtual std::string  GetValue() { return ""; }
 
     // Returns empty string if shortcut not handled
-    virtual String  ProcessShortcutKey(OVR::KeyCode key, bool shift) = 0;
-    virtual String  ProcessShortcutButton(uint32_t buttonMask) = 0;
+    virtual std::string  ProcessShortcutKey(OVR::KeyCode key, bool shift) = 0;
+    virtual std::string  ProcessShortcutButton(uint32_t buttonMask) = 0;
 
-    virtual bool    IsMenu() const { return false; }
+    virtual bool         IsMenu() const { return false; }
 
 //protected:
-    String          Label;
-    String          PopNamespaceFrom(OptionMenuItem* menuItem);
+    std::string          Label;
+    std::string          PopNamespaceFrom(OptionMenuItem* menuItem);
 };
 
 
@@ -171,15 +171,15 @@ public:
         Type_Trigger,
     };
 
-    typedef String (*FormatFunction)(OptionVar*);
+    typedef std::string (*FormatFunction)(OptionVar*);
     typedef void (*UpdateFunction)(OptionVar*);
     
-    static String FormatEnum(OptionVar* var);
-    static String FormatInt(OptionVar* var);
-    static String FormatFloat(OptionVar* var);
-    static String FormatTan(OptionVar* var);
-    static String FormatBool(OptionVar* var);
-    static String FormatTrigger(OptionVar* var);
+    static std::string FormatEnum(OptionVar* var);
+    static std::string FormatInt(OptionVar* var);
+    static std::string FormatFloat(OptionVar* var);
+    static std::string FormatTan(OptionVar* var);
+    static std::string FormatBool(OptionVar* var);
+    static std::string FormatTrigger(OptionVar* var);
 
     OptionVar(const char* name, void* pVar, VarType type,
               FormatFunction formatFunction,
@@ -213,14 +213,14 @@ public:
     virtual void NextValue(bool* pFastStep);
     virtual void PrevValue(bool* pFastStep);
     // Set value from a string. Returns true on success.
-    virtual bool SetValue(String newVal) OVR_OVERRIDE;
+    virtual bool SetValue(std::string newVal) override;
 
 
     // Executes shortcut message and returns notification string.
     // Returns empty string for no action.
-    String         HandleShortcutUpdate();
-    virtual String ProcessShortcutKey(OVR::KeyCode key, bool shift);
-    virtual String ProcessShortcutButton(uint32_t buttonMask);
+    std::string         HandleShortcutUpdate();
+    virtual std::string ProcessShortcutKey(OVR::KeyCode key, bool shift);
+    virtual std::string ProcessShortcutButton(uint32_t buttonMask);
 
     OptionVar& AddEnumValue(const char* displayName, int32_t value);
 
@@ -234,7 +234,7 @@ public:
 
 
     //String Format();
-    virtual String GetValue();
+    virtual std::string GetValue();
 
     OptionVar& AddShortcutUpKey(const ShortcutKey& shortcut)
     { ShortcutUp.AddShortcut(shortcut); return *this; }
@@ -271,18 +271,18 @@ private:
     struct EnumEntry
     {
         // Human readable name for enum.
-        String Name;
+        std::string Name;
         int32_t Value;
     };    
 
     // Array of possible enum values.
-    Array<EnumEntry>    EnumValues;
+    std::vector<EnumEntry>    EnumValues;
     // Gets the index of the current enum value.
-    uint32_t            GetEnumIndex();
+    uint32_t                  GetEnumIndex();
 
-    FormatFunction      fFormat;
-    UpdateFunction      fUpdate;
-    FunctionNotifyBase* pNotify; 
+    FormatFunction            fFormat;
+    UpdateFunction            fUpdate;
+    FunctionNotifyBase*       pNotify; 
 
     VarType         Type;
     void*           pVar;
@@ -327,7 +327,7 @@ public:
     bool OnGamepad(uint32_t buttonMask);
 
     // Returns rendered bounds.
-    Recti Render(RenderDevice* prender, String title, float textHeight, float centerX, float centerY);
+    Recti Render(RenderDevice* prender, std::string title, float textHeight, float centerX, float centerY);
     
     void AddItem(OptionMenuItem* menuItem);
 
@@ -390,10 +390,10 @@ public:
     }
 
     virtual void    Select();
-    virtual String  GetLabel() { return Label + " >"; }
+    virtual std::string  GetLabel() { return Label + " >"; }
 
-    virtual String  ProcessShortcutKey(OVR::KeyCode key, bool shift);
-    virtual String  ProcessShortcutButton(uint32_t buttonMask);
+    virtual std::string  ProcessShortcutKey(OVR::KeyCode key, bool shift);
+    virtual std::string  ProcessShortcutButton(uint32_t buttonMask);
     
     // Sets a message to display with a time-out. Default time-out is 4 seconds.
     // This uses the same overlay approach as used for shortcut notifications.
@@ -414,10 +414,10 @@ protected:
 
 public:
     OptionSelectionMenu* GetSubmenu();
-    OptionSelectionMenu* GetOrCreateSubmenu(String submenuName);
+    OptionSelectionMenu* GetOrCreateSubmenu(std::string submenuName);
 
     // Find a submenu of this menu. Returns nullptr if not found.
-    OptionMenuItem  *FindMenuItem(String menuItemLabel);
+    OptionMenuItem  *FindMenuItem(std::string menuItemLabel);
 
 
     enum DisplayStateType
@@ -427,18 +427,18 @@ public:
         Display_SingleItem
     };
 
-    DisplayStateType          DisplayState;
-    OptionSelectionMenu*      ParentMenu;
+    DisplayStateType             DisplayState;
+    OptionSelectionMenu*         ParentMenu;
    
-    ArrayPOD<OptionMenuItem*> Items;
-    int                       SelectedIndex;
-    bool                      SelectionActive;
+    std::vector<OptionMenuItem*> Items;
+    int                          SelectedIndex;
+    bool                         SelectionActive;
 
-    String                    PopupMessage;
-    double                    PopupMessageTimeout;
-    bool                      PopupMessageBorder;
+    std::string                  PopupMessage;
+    double                       PopupMessageTimeout;
+    bool                         PopupMessageBorder;
 
-    bool                      RenderShortcutChangeMessages;
+    bool                         RenderShortcutChangeMessages;
 
     // Possible menu navigation actions.
     enum NavigationActions

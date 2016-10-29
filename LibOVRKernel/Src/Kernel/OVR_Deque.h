@@ -24,12 +24,12 @@ limitations under the License.
 
 *************************************************************************************/
 
-#ifndef OVR_Deque_h
-#define OVR_Deque_h
+#pragma once
 
 #include "OVR_ContainerAllocator.h"
 
-namespace OVR{ 
+namespace OVR { 
+
 
 template <class Elem, class Allocator = ContainerAllocator<Elem> >
 class Deque
@@ -311,6 +311,5 @@ void CircularBuffer<Elem, Allocator>::PushFront(const Elem &Item)
     BaseType::PushFront(Item);
 }
 
-};   
 
-#endif
+} // namespace OVR

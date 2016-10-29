@@ -82,8 +82,8 @@ Posef Player::VirtualWorldTransformfromRealPose(const Posef &sensorHeadPose, ovr
                  bodyPosInOrigin + baseQ.Rotate(sensorHeadPose.Translation));
 }
 
-void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-	                        Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
+void Player::HandleMovement(double dt, std::vector<Ptr<CollisionModel> >* collisionModels,
+	                        std::vector<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown)
 {
     // Handle keyboard movement.
     // This translates BasePos based on the orientation and keys pressed.
@@ -132,11 +132,11 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
     Planef  collisionPlaneForward;
     bool    gotCollision = false;
 
-    for(unsigned int i = 0; i < collisionModels->GetSize(); ++i)
+    for(size_t i = 0; i < collisionModels->size(); ++i)
     {
         // Checks for collisions at model base level, which should prevent us from
 		// slipping under walls
-        if (collisionModels->At(i)->TestRay(BodyPos, orientationVector, checkLengthForward,
+        if (collisionModels->at(i)->TestRay(BodyPos, orientationVector, checkLengthForward,
 				                            &collisionPlaneForward))
         {
             gotCollision = true;
@@ -151,9 +151,9 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
 			* (orientationVector.Dot(collisionPlaneForward.N));
 
         // Make sure we aren't in a corner
-        for(unsigned int j = 0; j < collisionModels->GetSize(); ++j)
+        for(size_t j = 0; j < collisionModels->size(); ++j)
         {
-            if (collisionModels->At(j)->TestPoint(BodyPos - Vector3f(0.0f, RailHeight, 0.0f) +
+            if (collisionModels->at(j)->TestPoint(BodyPos - Vector3f(0.0f, RailHeight, 0.0f) +
 					                                (slideVector * (moveLength))) )
             {
                 moveLength = 0;
@@ -174,12 +174,12 @@ void Player::HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionMod
     float finalDistanceDown = adjustedUserEyeHeight + 10.0f;
 
     // Only apply down if there is collision model (otherwise we get jitter).
-    if (groundCollisionModels->GetSize())
+    if (groundCollisionModels->size())
     {
-        for(unsigned int i = 0; i < groundCollisionModels->GetSize(); ++i)
+        for(size_t i = 0; i < groundCollisionModels->size(); ++i)
         {
             float checkLengthDown = adjustedUserEyeHeight + 10;
-            if (groundCollisionModels->At(i)->TestRay(BodyPos, Vector3f(0.0f, -1.0f, 0.0f),
+            if (groundCollisionModels->at(i)->TestRay(BodyPos, Vector3f(0.0f, -1.0f, 0.0f),
                 checkLengthDown, &collisionPlaneDown))
             {
                 finalDistanceDown = Alg::Min(finalDistanceDown, checkLengthDown);

@@ -29,7 +29,7 @@ limitations under the License.
 #define OVR_Timer_h
 
 #include "OVR_Types.h"
-#include <ctime>
+#include <chrono>
 
 
 namespace OVR {
@@ -110,17 +110,18 @@ private:
 //-----------------------------------------------------------------------------
 // CountdownTimer
 //
-// Acts like a kitchen timer. Resolution is in milliseconds. 
+// Acts like a kitchen timer. Implemented using std::chrono::steady_clock.
+// Input resolution is in milliseconds.
+// Under the hood, it uses the native resolution of a std::chrono::steady_clock.
 // To consider: Move this elsewhere.
 //
 struct CountdownTimer
 {
-    size_t DoneTimeMs;
-    size_t CountdownTimeMs;
-
+    std::chrono::steady_clock::time_point DoneTime;
+    std::chrono::steady_clock::duration CountdownTime;
     CountdownTimer(size_t countdownTimeMs = 0, bool start = false);
 
-    size_t CurrentTimeMs() const;
+    std::chrono::steady_clock::time_point CurrentTime() const;
     bool IsTimeUp() const;
     void Restart();
     void Restart(size_t countdownTimeMs);

@@ -33,6 +33,7 @@
     <ClInclude Include="..\..\..\Include\OVR_CAPI_Audio.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\Src\OVR_CAPI_Prototypes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\OVR_CAPIShim.c" />

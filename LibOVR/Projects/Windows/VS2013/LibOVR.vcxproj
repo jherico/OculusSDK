@@ -44,6 +44,7 @@
     <ClInclude Include="..\..\..\Include\OVR_CAPI_Keys.h" />
     <ClInclude Include="..\..\..\Include\OVR_ErrorCode.h" />
     <ClInclude Include="..\..\..\Include\OVR_Version.h" />
+    <ClInclude Include="..\..\..\Src\OVR_CAPI_Prototypes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Src\OVR_CAPIShim.c" />

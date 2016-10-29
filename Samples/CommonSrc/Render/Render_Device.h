@@ -24,13 +24,13 @@ limitations under the License.
 #define OVR_Render_Device_h
 
 #include "Extras/OVR_Math.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_String.h"
 #include "Kernel/OVR_File.h"
 #include "Kernel/OVR_Color.h"
 #include "OVR_CAPI.h"
 
+#include <vector>
+#include <string>
 
 namespace OVR { namespace Render {
 
@@ -171,6 +171,7 @@ enum TextureFormat
     Texture_Mirror          = 0x1000000,
     Texture_SwapTextureSet  = 0x2000000,
     Texture_SwapTextureSetStatic  = 0x4000000,
+    Texture_Hdcp            = 0x8000000,
 };
 
 enum SampleMode
@@ -408,11 +409,11 @@ struct RenderTarget
 class CollisionModel : public RefCountBase<CollisionModel>
 {
 public:
-	Array<Planef > Planes;
+	std::vector<Planef > Planes;
 
 	void Add(const Planef& p)
 	{
-		Planes.PushBack(p);
+		Planes.push_back(p);
 	}
 
 	// Return whether p is inside this
@@ -555,13 +556,13 @@ class SwapChainCreationFailedException
 class Model : public Node
 {
 public:
-    String            AssetName;
-    Array<Vertex>     Vertices;
-    Array<uint16_t>   Indices;
-    PrimitiveType     Type;
-    Ptr<class Fill>   Fill;
-    bool              Visible;
-    bool              IsCollisionModel;
+    std::string             AssetName;
+    std::vector<Vertex>     Vertices;
+    std::vector<uint16_t>   Indices;
+    PrimitiveType           Type;
+    Ptr<class Fill>         Fill;
+    bool                    Visible;
+    bool                    IsCollisionModel;
 
     // Some renderers will create these if they didn't exist before rendering.
     // Currently they are not updated, so vertex data should not be changed after rendering.
@@ -572,7 +573,10 @@ public:
         : AssetName(), Type(t), Fill(NULL), Visible(true), IsCollisionModel(false)
     {
         AssetName = "Model: ";
-        AssetName.AppendString(assetName);
+        if (assetName)
+        {
+            AssetName.append(assetName);
+        }
     }
     ~Model() { }
 
@@ -594,16 +598,16 @@ public:
     // Returns the index next added vertex will have.
     uint16_t GetNextVertexIndex() const
     {
-        return (uint16_t)Vertices.GetSize();
+        return (uint16_t)Vertices.size();
     }
 
     uint16_t AddVertex(const Vertex& v)
     {
 		OVR_ASSERT(!VertexBuffer && !IndexBuffer);
-		size_t size = Vertices.GetSize();
+		size_t size = Vertices.size();
 		OVR_ASSERT(size <= USHRT_MAX);      // We only use a short to store vert indices.
 		uint16_t index = (uint16_t) size;
-		Vertices.PushBack(v);
+		Vertices.push_back(v);
 		return index;
     }
     uint16_t AddVertex(const Vector3f& v, const Color& c, float u_ = 0, float v_ = 0)
@@ -617,8 +621,8 @@ public:
 
     void AddLine(uint16_t a, uint16_t b)
     {
-        Indices.PushBack(a);
-        Indices.PushBack(b);
+        Indices.push_back(a);
+        Indices.push_back(b);
     }
 
 	void AddQuad(Vertex v0, Vertex v1, Vertex v2, Vertex v3)
@@ -652,9 +656,9 @@ public:
 
     void AddTriangle(uint16_t a, uint16_t b, uint16_t c)
     {
-        Indices.PushBack(a);
-        Indices.PushBack(b);
-        Indices.PushBack(c);
+        Indices.push_back(a);
+        Indices.push_back(b);
+        Indices.push_back(c);
     }
 
 
@@ -688,7 +692,7 @@ public:
 class Container : public Node
 {
 public:
-    Array<Ptr<Node> > Nodes;
+    std::vector<Ptr<Node> > Nodes;
 
     ~Container()
     {
@@ -697,7 +701,7 @@ public:
 
     void ClearRenderer()
     {
-        for (size_t i=0; i< Nodes.GetSize(); i++)
+        for (size_t i=0; i< Nodes.size(); i++)
             Nodes[i]->ClearRenderer();
     }
 
@@ -705,10 +709,10 @@ public:
 
     virtual void Render(const Matrix4f& ltw, RenderDevice* ren);
 
-    void Add(Node *n) { Nodes.PushBack(n); }
-	void Add(Model *n, class Fill *f) { n->Fill = f; Nodes.PushBack(n); }
-    void RemoveLast() { Nodes.PopBack(); }
-	void Clear() { Nodes.Clear(); }
+    void Add(Node *n) { Nodes.push_back(n); }
+    void Add(Model *n, class Fill *f) { n->Fill = f; Nodes.push_back(n); }
+    void RemoveLast() { Nodes.pop_back(); }
+    void Clear() { Nodes.clear(); }
 
 	bool               CollideChildren;
 
@@ -718,10 +722,10 @@ public:
 class Scene
 {
 public:
-    Container			World;
-    Vector3f			LightPos[8];
-    LightingParams		Lighting;
-	Array<Ptr<Model> >	Models;
+    Container                   World;
+    Vector3f                    LightPos[8];
+    LightingParams	            Lighting;
+    std::vector<Ptr<Model> >	Models;
 
 public:
     void Render(RenderDevice* ren, const Matrix4f& view);
@@ -742,7 +746,7 @@ public:
 	void Clear()
 	{
 		World.Clear();
-		Models.Clear();
+		Models.clear();
 		Lighting.Ambient = Color4f(0.0f, 0.0f, 0.0f, 0.0f);
 		Lighting.LightCount = 0;
 	}
@@ -1006,6 +1010,7 @@ enum TextureLoadFlags
     TextureLoad_MakePremultAlpha    = 0x0004,
     TextureLoad_SwapTextureSet      = 0x0008,
     TextureLoad_StoreCompressed     = 0x0010,
+    TextureLoad_Hdcp                = 0x0020,
 };
 
 Texture* LoadTextureTgaTopDown (RenderDevice* ren, File* f, int textureLoadFlags, unsigned char alpha = 255);

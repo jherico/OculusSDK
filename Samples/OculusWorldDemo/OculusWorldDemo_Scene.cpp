@@ -25,6 +25,8 @@ limitations under the License.
 
 #include "OculusWorldDemo.h"
 
+#include <string>
+
 
 //-------------------------------------------------------------------------------------
 // ***** Scene Creation / Loading
@@ -32,33 +34,33 @@ limitations under the License.
 void OculusWorldDemoApp::InitMainFilePath()
 {
     // We try alternative relative locations for the file.
-    const String contentBase = pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH;
+    const std::string contentBase = pPlatform->GetContentDirectory() + "/" + WORLDDEMO_ASSET_PATH;
     const char* baseDirectories[] = { "",
-                                      contentBase.ToCStr(),
+                                      contentBase.c_str(),
                                       #ifdef SHRDIR
                                           #define STR1(x) #x
                                           #define STR(x)  STR1(x)
                                           STR(SHRDIR) "/OculusWorldDemo/Assets/Tuscany/"
                                       #endif
                                       };
-    String newPath;
+    std::string newPath;
 
     for(size_t i = 0; i < OVR_ARRAY_COUNT(baseDirectories); ++i)
     {
         newPath  = baseDirectories[i];
         newPath += WORLDDEMO_ASSET_FILE;
 
-        OVR_DEBUG_LOG(("Trying to load the scene at: %s...", newPath.ToCStr()));
+        WriteLog("Trying to load the scene at: %s...", newPath.c_str());
 
-        if (SysFile(newPath).IsValid())
+        if (SysFile(newPath.c_str()).IsValid())
         {
-            OVR_DEBUG_LOG(("Success loading %s", newPath.ToCStr()));
+            WriteLog("Success loading %s", newPath.c_str());
             MainFilePath = newPath;
             return;
         }
     }
 
-    OVR_DEBUG_LOG(("Unable to find any version of %s. Do you have your working directory set right?", WORLDDEMO_ASSET_FILE));
+    WriteLog("Unable to find any version of %s. Do you have your working directory set right?", WORLDDEMO_ASSET_FILE);
 }
 
 // Creates a grid of cubes.
@@ -101,9 +103,9 @@ void PopulateCubeFieldScene(Scene* scene, Fill* fill,
     }
 }
 
-Fill* CreateTextureFill(RenderDevice* prender, const String& filename, unsigned int fillTextureLoadFlags)
+Fill* CreateTextureFill(RenderDevice* prender, const std::string& filename, unsigned int fillTextureLoadFlags)
 {
-    Ptr<File>    imageFile = *new SysFile(filename);
+    Ptr<File>    imageFile = *new SysFile(filename.c_str());
     Ptr<Texture> imageTex;
     if (imageFile->IsValid())
         imageTex = *LoadTextureTgaTopDown(prender, imageFile, fillTextureLoadFlags, 255);
@@ -202,8 +204,8 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
 
     MainScene.SetAmbient(Color4f(1.0f, 1.0f, 1.0f, 1.0f));
 
-    String mainFilePathNoExtension = MainFilePath;
-    mainFilePathNoExtension.StripExtension();
+    std::string mainFilePathNoExtension = MainFilePath;
+    StripExtension(mainFilePathNoExtension);
 
     unsigned int fillTextureLoadFlags = 0;
     fillTextureLoadFlags |= SrgbRequested ? TextureLoad_SrgbAware : 0;
@@ -247,17 +249,20 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
     textureLoadFlags |= TextureLoad_MakePremultAlpha;
     textureLoadFlags |= TextureLoad_SwapTextureSet;
 
-    Ptr<File> imageFile = *new SysFile(mainFilePathNoExtension + "_OculusCube.tga");
+    Ptr<File> imageFile = *new SysFile((mainFilePathNoExtension + "_OculusCube.tga").c_str());
     if (imageFile->IsValid())
         TextureOculusCube = *LoadTextureTgaTopDown(pRender, imageFile, textureLoadFlags, 255);
 
-    imageFile = *new SysFile(mainFilePathNoExtension + "_Cockpit_Panel.tga");
+    imageFile = *new SysFile((mainFilePathNoExtension + "_Cockpit_Panel.tga").c_str());
     if (imageFile->IsValid())
         CockpitPanelTexture = *LoadTextureTgaTopDown(pRender, imageFile, textureLoadFlags, 255);
 
+    if (imageFile->IsValid())
+        HdcpTexture = *LoadTextureTgaTopDown(pRender, imageFile, textureLoadFlags | TextureLoad_Hdcp, 255);
+
     XmlHandler xmlHandler2;
-    String controllerFilename = MainFilePath.GetPath() + "LeftController.xml";
-    if (!xmlHandler2.ReadFile(controllerFilename.ToCStr(), pRender, &ControllerScene, NULL, NULL))
+    std::string controllerFilename = GetPath(MainFilePath) + "LeftController.xml";
+    if (!xmlHandler2.ReadFile(controllerFilename.c_str(), pRender, &ControllerScene, NULL, NULL))
     {
         Menu.SetPopupMessage("CONTROLLER FILE LOAD FAILED");
         Menu.SetPopupTimeout(10.0f, true);
@@ -267,7 +272,7 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
 
 
     // Load "Floor Circle" models and textures - used to display floor for seated configuration.	
-    Ptr<File>	 floorImageFile    = *new SysFile(mainFilePathNoExtension + "_SitFloorConcrete.tga");
+    Ptr<File>	 floorImageFile    = *new SysFile((mainFilePathNoExtension + "_SitFloorConcrete.tga").c_str());
     Ptr<Texture> roundFloorTexture = *LoadTextureTgaTopDown(pRender, floorImageFile, textureLoadFlags, 220);
     if (roundFloorTexture)
         roundFloorTexture->SetSampleMode(Sample_Anisotropic | Sample_Repeat);
@@ -300,40 +305,17 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
 void OculusWorldDemoApp::PopulatePreloadScene()
 {
     // Load-screen screen shot image
-    String fileName = MainFilePath;
-    fileName.StripExtension();
+    std::string fileName = MainFilePath;
+    StripExtension(fileName);
 
-    Ptr<File>    imageFile = *new SysFile(fileName + "_LoadScreen.tga");
-    Ptr<Texture> imageTex;
+    Ptr<File>    imageFile = *new SysFile((fileName + "_LoadScreen.tga").c_str());
     if (imageFile->IsValid())
-        imageTex = *LoadTextureTgaTopDown(pRender, imageFile, TextureLoad_SrgbAware, 255);
-
-    // Image is rendered as a single quad.
-    if (imageTex)
-    {
-        imageTex->SetSampleMode(Sample_Anisotropic|Sample_Repeat);
-        Ptr<Model> m = *new Model(Prim_Triangles);
-        m->AddVertex(-0.5f,  0.5f,  0.0f, Color(255,255,255,255), 0.0f, 1.0f);
-        m->AddVertex( 0.5f,  0.5f,  0.0f, Color(255,255,255,255), 1.0f, 1.0f);
-        m->AddVertex( 0.5f, -0.5f,  0.0f, Color(255,255,255,255), 1.0f, 0.0f);
-        m->AddVertex(-0.5f, -0.5f,  0.0f, Color(255,255,255,255), 0.0f, 0.0f);
-        m->AddTriangle(2,1,0);
-        m->AddTriangle(0,3,2);
-
-        Ptr<ShaderFill> fill = *new ShaderFill(*pRender->CreateShaderSet());
-        fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Vertex, VShader_MVP));
-        fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Fragment, FShader_Texture));
-        fill->SetTexture(0, imageTex);
-        m->Fill = fill;
-
-        LoadingScene.World.Add(m);
-    }
+        LoadingTexture = *LoadTextureTgaTopDown(pRender, imageFile, TextureLoad_SrgbAware | TextureLoad_SwapTextureSet, 255);
 }
 
 void OculusWorldDemoApp::ClearScene()
 {
     MainScene.Clear();
-    LoadingScene.Clear();
     SmallGreenCube.Clear();
     SmallOculusCube.Clear();
     SmallOculusGreenCube.Clear();
@@ -342,6 +324,7 @@ void OculusWorldDemoApp::ClearScene()
     RedCubesScene.Clear();
     OculusCubesScene.Clear();
     ControllerScene.Clear();
+    BoundaryScene.Clear();
 }
 
 
@@ -628,5 +611,98 @@ void OculusWorldDemoApp::RenderControllers(ovrEyeType eye)
         Matrix4f playerPose(worldPose);
         ControllerScene.Render(pRender, ViewFromWorld[eye] * playerPose * scaleUp);
     }
+    pRender->SetCullMode(RenderDevice::Cull_Back);
+}
+
+void drawNormalsAndBoxesForTrackedObjects(Ptr<Model>& model, ovrBoundaryTestResult& result)
+{
+    float normalBoxWidth = 0.02f;
+    float normalWidth = 0.005f;
+    OVR::Color red(255, 0, 0);
+
+    model->AddBox(red, result.ClosestPoint, Vector3f(normalBoxWidth, normalBoxWidth, normalBoxWidth));
+
+    Vector3f normalStartpoint = result.ClosestPoint;
+    Vector3f normalVector = result.ClosestPointNormal;
+    Vector3f widthDirection = normalVector.Cross(Vector3f(0.0f, 1.0f, 0.0f));
+    Vector3f normalEndpoint;
+
+    // In or out facing
+    if (result.ClosestDistance < 0)
+    {
+        normalEndpoint = (Vector3f)result.ClosestPoint - normalVector * 0.1f;
+    }
+    else
+    {
+        normalEndpoint = (Vector3f)result.ClosestPoint + normalVector * 0.1f;
+    }
+
+    Vertex v[4];
+    v[0] = Vertex(normalStartpoint, red);
+    v[1] = Vertex(normalEndpoint, red);
+    v[2] = Vertex(normalEndpoint + widthDirection * normalWidth, red);
+    v[3] = Vertex(normalStartpoint + widthDirection * normalWidth, red);
+    model->AddQuad(v[0], v[3], v[1], v[2]);
+}
+
+void OculusWorldDemoApp::PopulateBoundaryScene(Scene* scene)
+{
+    scene->Clear();
+
+    Ptr<Model> model = *new Model();
+    scene->World.Add(model);
+
+    OVR::Color green(0, 255, 0);
+    OVR::Color red(255, 0, 0);
+    float lineWidth = 0.01f;
+    float boxWidth = 0.02f;
+
+    // Get boundary information
+    int numPoints = 0;
+    ovrVector3f* boundaryPointsOuter;
+    ovr_GetBoundaryGeometry(Session, ovrBoundary_Outer, nullptr, &numPoints);
+    boundaryPointsOuter = new ovrVector3f[numPoints];
+    ovr_GetBoundaryGeometry(Session, ovrBoundary_Outer, boundaryPointsOuter, nullptr);
+
+    for (int i = 0; i < numPoints; i++)
+    {
+        // Draw a box centered at the boundary point on top of the boundary
+        Vector3f drawPoint = boundaryPointsOuter[i];
+        drawPoint.y += 2.5f;
+        model->AddBox(green, drawPoint, Vector3f(boxWidth, boxWidth, boxWidth));
+
+        // Connect the dots
+        Vector3f nextPoint = boundaryPointsOuter[(i + 1) % numPoints];
+        nextPoint.y += 2.5f;
+        Vector3f toNextPoint = nextPoint - drawPoint;
+        Vector3f normal = toNextPoint.Cross(Vector3f(0.0f, 1.0f, 0.0f));
+
+        Vertex v[4];
+        v[0] = Vertex(drawPoint, green);
+        v[1] = Vertex(nextPoint, green);
+        v[2] = Vertex(nextPoint + normal * lineWidth, green);
+        v[3] = Vertex(drawPoint + normal * lineWidth, green);
+        model->AddQuad(v[0], v[3], v[1], v[2]);
+    }
+
+    // Track closest points and normals
+    ovrBoundaryTestResult resultHMD;
+    ovrBoundaryTestResult resultLeft;
+    ovrBoundaryTestResult resultRight;
+    ovr_TestBoundary(Session, ovrTrackedDevice_HMD, ovrBoundary_Outer, &resultHMD);
+    ovr_TestBoundary(Session, ovrTrackedDevice_LTouch, ovrBoundary_Outer, &resultLeft);
+    ovr_TestBoundary(Session, ovrTrackedDevice_RTouch, ovrBoundary_Outer, &resultRight);
+
+    drawNormalsAndBoxesForTrackedObjects(model, resultHMD);
+    drawNormalsAndBoxesForTrackedObjects(model, resultLeft);
+    drawNormalsAndBoxesForTrackedObjects(model, resultRight);
+}
+
+void OculusWorldDemoApp::RenderBoundaryScene(Matrix4f& view)
+{
+    BoundaryScene.Clear();
+    PopulateBoundaryScene(&BoundaryScene);
+    pRender->SetCullMode(RenderDevice::Cull_Off);
+    BoundaryScene.Render(pRender, view);
     pRender->SetCullMode(RenderDevice::Cull_Back);
 }

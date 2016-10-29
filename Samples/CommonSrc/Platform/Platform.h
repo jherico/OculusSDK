@@ -27,17 +27,16 @@ limitations under the License.
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_Allocator.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Nullptr.h"
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_SysFile.h"
 #include "Extras/OVR_Math.h"
 
 #include "Kernel/OVR_KeyCodes.h"
 
+#include <vector>
+#include <string>
 
 namespace OVR { namespace Render {
     class RenderDevice;
@@ -154,15 +153,15 @@ public:
 	virtual void		PlayMusicFile(const char *fileName) { OVR_UNUSED(fileName); }
     
     // Get time since start of application in seconds.
-    double				GetAppTime() const; 
+    double			    GetAppTime() const; 
     
-    virtual String		GetContentDirectory() const { return "."; }
+    virtual std::string GetContentDirectory() const { return "."; }
 
     // Creates notification overlay text box over the top of OS window. Multiple
     // messages can be created with different 'index' values. Pass null string
     // to remove the overlay.
     // Intended to be used with Oculus display driver only; may be unsupported on some platforms.
-    virtual void        SetNotificationOverlay(int index, int fontHeightPixels,
+    virtual void         SetNotificationOverlay(int index, int fontHeightPixels,
                                                int yoffset, const char* text)
     { OVR_UNUSED4(index, fontHeightPixels, yoffset, text); }
 };

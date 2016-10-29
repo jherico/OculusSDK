@@ -65,6 +65,12 @@ static ovrGraphicsLuid GetDefaultAdapterLuid()
 }
 
 
+static int Compare(const ovrGraphicsLuid& lhs, const ovrGraphicsLuid& rhs)
+{
+    return memcmp(&lhs, &rhs, sizeof(ovrGraphicsLuid));
+}
+
+
 // return true to retry later (e.g. after display lost)
 static bool MainLoop(bool retryCreate)
 {
@@ -73,16 +79,15 @@ static bool MainLoop(bool retryCreate)
     ovrMirrorTexture mirrorTexture = nullptr;
     GLuint          mirrorFBO = 0;
     Scene         * roomScene = nullptr; 
-    bool isVisible = true;
     long long frameIndex = 0;
 
     ovrSession session;
-	ovrGraphicsLuid luid;
+    ovrGraphicsLuid luid;
     ovrResult result = ovr_Create(&session, &luid);
     if (!OVR_SUCCESS(result))
         return retryCreate;
 
-    if (memcmp(&luid, &GetDefaultAdapterLuid(), sizeof(luid))) // If luid that the Rift is on is not the default adapter LUID...
+    if (Compare(luid, GetDefaultAdapterLuid())) // If luid that the Rift is on is not the default adapter LUID...
     {
         VALIDATE(false, "OpenGL supports only the default graphics adapter.");
     }
@@ -145,37 +150,49 @@ static bool MainLoop(bool retryCreate)
     // Main loop
     while (Platform.HandleMessages())
     {
-        // Keyboard inputs to adjust player orientation
-        static float Yaw(3.141592f);  
-        if (Platform.Key[VK_LEFT])  Yaw += 0.02f;
-        if (Platform.Key[VK_RIGHT]) Yaw -= 0.02f;
-
-        // Keyboard inputs to adjust player position
-        static Vector3f Pos2(0.0f,0.0f,-5.0f);
-        if (Platform.Key['W']||Platform.Key[VK_UP])     Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,-0.05f));
-        if (Platform.Key['S']||Platform.Key[VK_DOWN])   Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(0,0,+0.05f));
-        if (Platform.Key['D'])                          Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(+0.05f,0,0));
-        if (Platform.Key['A'])                          Pos2+=Matrix4f::RotationY(Yaw).Transform(Vector3f(-0.05f,0,0));
-
-		// Animate the cube
-        static float cubeClock = 0;
-        roomScene->Models[0]->Pos = Vector3f(9 * (float)sin(cubeClock), 3, 9 * (float)cos(cubeClock += 0.015f));
-
-	    // Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
-	    ovrEyeRenderDesc eyeRenderDesc[2];
-	    eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
-	    eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmdDesc.DefaultEyeFov[1]);
-
-        // Get eye poses, feeding in correct IPD offset
-        ovrPosef                  EyeRenderPose[2];
-        ovrVector3f               HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
-                                                        eyeRenderDesc[1].HmdToEyeOffset };
-
-        double sensorSampleTime;    // sensorSampleTime is fed into the layer later
-        ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
-
-        if (isVisible)
+        ovrSessionStatus sessionStatus;
+        ovr_GetSessionStatus(session, &sessionStatus);
+        if (sessionStatus.ShouldQuit)
         {
+            // Because the application is requested to quit, should not request retry
+            retryCreate = false;
+            break;
+        }
+        if (sessionStatus.ShouldRecenter)
+            ovr_RecenterTrackingOrigin(session);
+
+        if (sessionStatus.IsVisible)
+        {
+            // Keyboard inputs to adjust player orientation
+            static float Yaw(3.141592f);
+            if (Platform.Key[VK_LEFT])  Yaw += 0.02f;
+            if (Platform.Key[VK_RIGHT]) Yaw -= 0.02f;
+
+            // Keyboard inputs to adjust player position
+            static Vector3f Pos2(0.0f, 0.0f, -5.0f);
+            if (Platform.Key['W'] || Platform.Key[VK_UP])     Pos2 += Matrix4f::RotationY(Yaw).Transform(Vector3f(0, 0, -0.05f));
+            if (Platform.Key['S'] || Platform.Key[VK_DOWN])   Pos2 += Matrix4f::RotationY(Yaw).Transform(Vector3f(0, 0, +0.05f));
+            if (Platform.Key['D'])                            Pos2 += Matrix4f::RotationY(Yaw).Transform(Vector3f(+0.05f, 0, 0));
+            if (Platform.Key['A'])                            Pos2 += Matrix4f::RotationY(Yaw).Transform(Vector3f(-0.05f, 0, 0));
+
+            // Animate the cube
+            static float cubeClock = 0;
+            roomScene->Models[0]->Pos = Vector3f(9 * (float)sin(cubeClock), 3, 9 * (float)cos(cubeClock += 0.015f));
+
+            // Call ovr_GetRenderDesc each frame to get the ovrEyeRenderDesc, as the returned values (e.g. HmdToEyeOffset) may change at runtime.
+            ovrEyeRenderDesc eyeRenderDesc[2];
+            eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
+            eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmdDesc.DefaultEyeFov[1]);
+
+            // Get eye poses, feeding in correct IPD offset
+            ovrPosef                  EyeRenderPose[2];
+            ovrVector3f               HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
+                                                            eyeRenderDesc[1].HmdToEyeOffset };
+
+            double sensorSampleTime;    // sensorSampleTime is fed into the layer later
+            ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
+
+            // Render Scene to Eye Buffers
             for (int eye = 0; eye < 2; ++eye)
             {
                 // Switch to eye render target
@@ -203,37 +220,30 @@ static bool MainLoop(bool retryCreate)
                 // Commit changes to the textures so they get picked up frame
                 eyeRenderTexture[eye]->Commit();
             }
-        }
 
-        // Do distortion rendering, Present and flush/sync
+            // Do distortion rendering, Present and flush/sync
         
-        ovrLayerEyeFov ld;
-        ld.Header.Type  = ovrLayerType_EyeFov;
-        ld.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;   // Because OpenGL.
+            ovrLayerEyeFov ld;
+            ld.Header.Type  = ovrLayerType_EyeFov;
+            ld.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;   // Because OpenGL.
 
-        for (int eye = 0; eye < 2; ++eye)
-        {
-            ld.ColorTexture[eye] = eyeRenderTexture[eye]->TextureChain;
-            ld.Viewport[eye]     = Recti(eyeRenderTexture[eye]->GetSize());
-            ld.Fov[eye]          = hmdDesc.DefaultEyeFov[eye];
-            ld.RenderPose[eye]   = EyeRenderPose[eye];
-            ld.SensorSampleTime  = sensorSampleTime;
+            for (int eye = 0; eye < 2; ++eye)
+            {
+                ld.ColorTexture[eye] = eyeRenderTexture[eye]->TextureChain;
+                ld.Viewport[eye]     = Recti(eyeRenderTexture[eye]->GetSize());
+                ld.Fov[eye]          = hmdDesc.DefaultEyeFov[eye];
+                ld.RenderPose[eye]   = EyeRenderPose[eye];
+                ld.SensorSampleTime  = sensorSampleTime;
+            }
+
+            ovrLayerHeader* layers = &ld.Header;
+            result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
+            // exit the rendering loop if submit returns an error, will retry on ovrError_DisplayLost
+            if (!OVR_SUCCESS(result))
+                goto Done;
+
+            frameIndex++;
         }
-
-        ovrLayerHeader* layers = &ld.Header;
-        ovrResult result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
-        // exit the rendering loop if submit returns an error, will retry on ovrError_DisplayLost
-        if (!OVR_SUCCESS(result))
-            goto Done;
-
-        isVisible = (result == ovrSuccess);
-
-        ovrSessionStatus sessionStatus;
-        ovr_GetSessionStatus(session, &sessionStatus);
-        if (sessionStatus.ShouldQuit)
-            goto Done;
-        if (sessionStatus.ShouldRecenter)
-            ovr_RecenterTrackingOrigin(session);
 
         // Blit mirror texture to back buffer
         glBindFramebuffer(GL_READ_FRAMEBUFFER, mirrorFBO);
@@ -246,8 +256,6 @@ static bool MainLoop(bool retryCreate)
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 
         SwapBuffers(Platform.hDC);
-    
-        frameIndex++;
     }
 
 Done:
@@ -263,14 +271,15 @@ Done:
     ovr_Destroy(session);
 
     // Retry on ovrError_DisplayLost
-    return retryCreate || OVR_SUCCESS(result) || (result == ovrError_DisplayLost);
+    return retryCreate || (result == ovrError_DisplayLost);
 }
 
 //-------------------------------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
 {
     // Initializes LibOVR, and the Rift
-    ovrResult result = ovr_Initialize(nullptr);
+	ovrInitParams initParams = { ovrInit_RequestVersion, OVR_MINOR_VERSION, NULL, 0, 0 };
+	ovrResult result = ovr_Initialize(&initParams);
     VALIDATE(OVR_SUCCESS(result), "Failed to initialize libOVR.");
 
     VALIDATE(Platform.InitWindow(hinst, L"Oculus Room Tiny (GL)"), "Failed to open window.");

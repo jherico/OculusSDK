@@ -40,7 +40,7 @@ void StringBuffer::AppendFormatV(const char* format, va_list argList)
     va_list argListSaved;
     va_copy(argListSaved, argList);
 
-    int requiredStrlen = OVR_vsnprintf(bufferUsed, OVR_ARRAY_COUNT(buffer), format, argListSaved); // The large majority of the time this will succeed.
+    int requiredStrlen = vsnprintf(bufferUsed, OVR_ARRAY_COUNT(buffer), format, argListSaved); // The large majority of the time this will succeed.
 
     if(requiredStrlen >= (int)sizeof(buffer)) // If the initial capacity wasn't enough...
     {
@@ -50,7 +50,7 @@ void StringBuffer::AppendFormatV(const char* format, va_list argList)
         {
             va_end(argListSaved);
             va_copy(argListSaved, argList);
-            requiredStrlen = OVR_vsnprintf(bufferAllocated, (requiredStrlen + 1), format, argListSaved);
+            requiredStrlen = vsnprintf(bufferAllocated, (requiredStrlen + 1), format, argListSaved);
         }
     }
 

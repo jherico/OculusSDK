@@ -40,6 +40,10 @@ using namespace DirectX;
     #define VALIDATE(x, msg) if (!(x)) { MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK); exit(-1); }
 #endif
 
+#ifndef FATALERROR
+#define FATALERROR(msg) { MessageBoxA(NULL, (msg), "OculusRoomTiny", MB_ICONERROR | MB_OK); exit(-1); }
+#endif
+
 // clean up member COM pointers
 template<typename T> void Release(T *&obj)
 {
@@ -67,12 +71,15 @@ struct DepthBuffer
         dsDesc.SampleDesc.Quality = 0;
         dsDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
+        CD3DX12_HEAP_PROPERTIES heapProp(D3D12_HEAP_TYPE_DEFAULT);
+        CD3DX12_CLEAR_VALUE clearValue(DXGI_FORMAT_D32_FLOAT, 1.0f, 0);
+
         HRESULT hr = Device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            &heapProp,
             D3D12_HEAP_FLAG_NONE,
             &dsDesc,
             D3D12_RESOURCE_STATE_DEPTH_WRITE,
-            &CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0),
+            &clearValue,
             IID_PPV_ARGS(&TextureRes));
         VALIDATE((hr == ERROR_SUCCESS), "CreateCommittedResource failed");
 
@@ -97,10 +104,13 @@ struct DataBuffer
 
     DataBuffer(ID3D12Device * Device, const void* rawData, size_t bufferSize) : BufferSize(bufferSize)
     {
+        CD3DX12_HEAP_PROPERTIES heapProp(D3D12_HEAP_TYPE_UPLOAD);
+        CD3DX12_RESOURCE_DESC buf = CD3DX12_RESOURCE_DESC::Buffer(BufferSize);
+
         HRESULT hr = Device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+            &heapProp,
             D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(BufferSize),
+            &buf,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr,
             IID_PPV_ARGS(&D3DBuffer));
@@ -244,7 +254,7 @@ struct DirectX12
         MainDepthBuffer(nullptr),
         hInstance(nullptr),
         ActiveContext(DrawContext_Count),   // require init by app
-        ActiveEyeIndex(-1)                  // require init by app
+        ActiveEyeIndex(UINT(-1))            // require init by app
     {
 		// Clear input
 		for (int i = 0; i < _countof(Key); ++i)
@@ -441,7 +451,7 @@ struct DirectX12
             hr = Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frameRes.PresentFenceRes));
             VALIDATE((hr == ERROR_SUCCESS), "CreateFence failed");
 
-            frameRes.PresentFenceWaitValue = -1;
+            frameRes.PresentFenceWaitValue = UINT64(-1);
 
             // Create the command lists
             for (int contextIdx = 0; contextIdx < DrawContext_Count; contextIdx++)
@@ -486,6 +496,11 @@ struct DirectX12
             CurrentFrameResources().CommandLists[ActiveContext]->ClearDepthStencilView(*depthbuffer, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
 
+    void SetAndClearRenderTarget(const D3D12_CPU_DESCRIPTOR_HANDLE& rendertarget, const D3D12_CPU_DESCRIPTOR_HANDLE& depthbuffer, float R = 0, float G = 0, float B = 0, float A = 1)
+    {
+        SetAndClearRenderTarget(&rendertarget, &depthbuffer, R, G, B, A);
+    }
+
     void SetViewport(float vpX, float vpY, float vpW, float vpH)
     {
         D3D12_VIEWPORT D3Dvp;
@@ -525,8 +540,6 @@ struct DirectX12
 
     void Run(bool (*MainLoop)(bool retryCreate))
     {
-        // false => just fail on any error
-        VALIDATE(MainLoop(false), "Oculus Rift not detected.");
         while (HandleMessages())
         {
             // true => we'll attempt to retry for ovrError_DisplayLost
@@ -598,8 +611,10 @@ struct DirectX12
 
         if (finalContextUsed)
         {
-            currFrameRes.CommandLists[DrawContext_Final]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                currFrameRes.SwapChainBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+            CD3DX12_RESOURCE_BARRIER rb = CD3DX12_RESOURCE_BARRIER::Transition(currFrameRes.SwapChainBuffer,
+                                                                               D3D12_RESOURCE_STATE_PRESENT,
+                                                                               D3D12_RESOURCE_STATE_RENDER_TARGET);
+            currFrameRes.CommandLists[DrawContext_Final]->ResourceBarrier(1, &rb);
         }
     }
 
@@ -657,8 +672,10 @@ struct DirectX12
             VALIDATE(ActiveContext == DrawContext_Final, "Invalid context set before Present");
 
             // Indicate that the back buffer will now be used to present.
-            currFrameRes.CommandLists[ActiveContext]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                currFrameRes.SwapChainBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT));
+            CD3DX12_RESOURCE_BARRIER rb = CD3DX12_RESOURCE_BARRIER::Transition(currFrameRes.SwapChainBuffer,
+                                                                               D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                               D3D12_RESOURCE_STATE_PRESENT);
+            currFrameRes.CommandLists[ActiveContext]->ResourceBarrier(1, &rb);
 
             SubmitCommandList(DrawContext_Final);
 
@@ -683,21 +700,22 @@ struct Texture
     CD3DX12_CPU_DESCRIPTOR_HANDLE SrvHandle;
     CD3DX12_CPU_DESCRIPTOR_HANDLE RtvHandle;
 
-	int SizeW, SizeH, MipLevels;
+    int SizeW, SizeH;
+    UINT MipLevels;
 
 	enum { AUTO_WHITE = 1, AUTO_WALL, AUTO_FLOOR, AUTO_CEILING, AUTO_GRID, AUTO_GRADE_256 };
 
 private: Texture() {};
 
 public:
-    void Init(int sizeW, int sizeH, bool rendertarget, int mipLevels, int sampleCount)
+    void Init(int sizeW, int sizeH, bool rendertarget, UINT mipLevels, int sampleCount)
     {
         SizeW = sizeW;
         SizeH = sizeH;
         MipLevels = mipLevels;
 
         D3D12_RESOURCE_DESC textureDesc = {};
-        textureDesc.MipLevels = MipLevels;
+        textureDesc.MipLevels = UINT16(MipLevels);
         textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         textureDesc.Width = SizeW;
         textureDesc.Height = SizeH;
@@ -710,8 +728,9 @@ public:
 
         D3D12_CLEAR_VALUE clearVal = { DXGI_FORMAT_R8G8B8A8_UNORM,{ 0.0f, 0.0f, 0.0f, 1.0f } };
 
+        CD3DX12_HEAP_PROPERTIES heapProp(D3D12_HEAP_TYPE_DEFAULT);
         HRESULT hr = DIRECTX.Device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            &heapProp,
             D3D12_HEAP_FLAG_NONE,
             &textureDesc,
             rendertarget ? D3D12_RESOURCE_STATE_RENDER_TARGET : D3D12_RESOURCE_STATE_COPY_DEST,
@@ -719,8 +738,6 @@ public:
             IID_PPV_ARGS(&TextureRes));
         VALIDATE((hr == ERROR_SUCCESS), "CreateCommittedResource failed");
 
-        const UINT64 uploadBufferSize = GetRequiredIntermediateSize(TextureRes, 0, 1);
-        
         // Describe and create a SRV for the texture.
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
         srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -758,7 +775,7 @@ public:
 		//Make local ones, because will be reducing them
 		int sizeW = SizeW; 
 		int sizeH = SizeH;
-		for (int level = 0; level < MipLevels; level++)
+		for (UINT level = 0; level < MipLevels; level++)
 		{
             // Push data into the texture
             {
@@ -769,10 +786,12 @@ public:
                     const UINT64 uploadBufferSize = GetRequiredIntermediateSize(TextureRes, 0, 1);
 
                     // Create the GPU upload buffer.
+                    CD3DX12_HEAP_PROPERTIES heapProp(D3D12_HEAP_TYPE_UPLOAD);
+                    CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
                     hr = DIRECTX.Device->CreateCommittedResource(
-                        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                        &heapProp,
                         D3D12_HEAP_FLAG_NONE,
-                        &CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+                        &resDesc,
                         D3D12_RESOURCE_STATE_GENERIC_READ,
                         nullptr,
                         IID_PPV_ARGS(&textureUploadHeap));
@@ -791,8 +810,10 @@ public:
                     // transition resource on last mip-level
                     if (level == MipLevels - 1)
                     {
-                        currFrameRes.CommandLists[DrawContext_Final]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                            TextureRes, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+                        CD3DX12_RESOURCE_BARRIER resBar = CD3DX12_RESOURCE_BARRIER::Transition(TextureRes,
+                                                                                               D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                                               D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                        currFrameRes.CommandLists[DrawContext_Final]->ResourceBarrier(1, &resBar);
                     }
                 }
 
@@ -901,6 +922,8 @@ struct Material
         : Tex(t)
         , VertexSize(vSize)
     {
+        UNREFERENCED_PARAMETER(flags);
+
         {
             // Create the pipeline state, which includes compiling and loading shaders.
             {
@@ -972,7 +995,7 @@ struct Material
 
                     ID3DBlob* signature;
                     ID3DBlob* error;
-                    HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+                    hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
                     //{
                     //    char* errStr = (char*)error->GetBufferPointer();
                     //    SIZE_T len = error->GetBufferSize();
@@ -1051,7 +1074,7 @@ struct TriangleSet
 	void AddTriangle(Vertex v0, Vertex v1, Vertex v2)
 	{
 		VALIDATE(numVertices <= (maxBuffer - 3), "Insufficient triangle set");
-		for (int i = 0; i < 3; i++) Indices[numIndices++] = numVertices + i;
+		for (int i = 0; i < 3; i++) Indices[numIndices++] = short(numVertices + i);
 		Vertices[numVertices++] = v0;
 		Vertices[numVertices++] = v1;
 		Vertices[numVertices++] = v2;
@@ -1152,10 +1175,12 @@ struct Model
             {
                 FrameResources& frameRes = PerFrameRes[frameIdx][eye];
 
+                CD3DX12_HEAP_PROPERTIES heapProp(D3D12_HEAP_TYPE_UPLOAD);
+                CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(1024 * 64);
                 HRESULT hr = DIRECTX.Device->CreateCommittedResource(
-                    &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                    &heapProp,
                     D3D12_HEAP_FLAG_NONE,
-                    &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+                    &resDesc,
                     D3D12_RESOURCE_STATE_GENERIC_READ,
                     nullptr,
                     IID_PPV_ARGS(&frameRes.ConstantBuffer));

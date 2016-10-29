@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LibOVRKernel", "..\..\..\..\LibOVRKernel\Projects\Windows\VS2015\LibOVRKernel.vcxproj", "{29FA0962-DDC6-4F72-9D12-E150DF29E279}"
 EndProject
@@ -150,6 +150,18 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusRoomTiny (DX12)", "..\..\..\OculusRoomTiny\OculusRoomTiny (DX12)\Projects\Windows\VS2015\OculusRoomTiny (DX12).vcxproj", "{84BBA24E-FD8D-4A2D-84D3-45A23AD34B72}"
 	ProjectSection(ProjectDependencies) = postProject
 		{EA50E705-5113-49E5-B105-2512EDC8DDC6} = {EA50E705-5113-49E5-B105-2512EDC8DDC6}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OculusRoomTiny (UWP+DX11)", "..\..\..\OculusRoomTiny\OculusRoomTiny (UWP+DX11)\Projects\Windows\VS2015\OculusRoomTiny (UWP+DX11).vcxproj", "{4D6101BA-A0BE-48E6-992E-19BC74CA69F9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6} = {EA50E705-5113-49E5-B105-2512EDC8DDC6}
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279} = {29FA0962-DDC6-4F72-9D12-E150DF29E279}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Guardian System Demo", "..\..\..\GuardianSystemDemo\Projects\VS2015\GuardianSystemDemo.vcxproj", "{7BBB6BF5-9974-4A6A-A501-B92147DA8570}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EA50E705-5113-49E5-B105-2512EDC8DDC6} = {EA50E705-5113-49E5-B105-2512EDC8DDC6}
+		{29FA0962-DDC6-4F72-9D12-E150DF29E279} = {29FA0962-DDC6-4F72-9D12-E150DF29E279}
 	EndProjectSection
 EndProject
 Global
@@ -360,6 +372,18 @@ Global
 		{84BBA24E-FD8D-4A2D-84D3-45A23AD34B72}.Release|Win32.Build.0 = Release|Win32
 		{84BBA24E-FD8D-4A2D-84D3-45A23AD34B72}.Release|x64.ActiveCfg = Release|x64
 		{84BBA24E-FD8D-4A2D-84D3-45A23AD34B72}.Release|x64.Build.0 = Release|x64
+		{4D6101BA-A0BE-48E6-992E-19BC74CA69F9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4D6101BA-A0BE-48E6-992E-19BC74CA69F9}.Debug|x64.ActiveCfg = Debug|x64
+		{4D6101BA-A0BE-48E6-992E-19BC74CA69F9}.Release|Win32.ActiveCfg = Release|Win32
+		{4D6101BA-A0BE-48E6-992E-19BC74CA69F9}.Release|x64.ActiveCfg = Release|x64
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Debug|Win32.Build.0 = Debug|Win32
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Debug|x64.ActiveCfg = Debug|x64
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Debug|x64.Build.0 = Debug|x64
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Release|Win32.ActiveCfg = Release|Win32
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Release|Win32.Build.0 = Release|Win32
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Release|x64.ActiveCfg = Release|x64
+		{7BBB6BF5-9974-4A6A-A501-B92147DA8570}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -388,5 +412,6 @@ Global
 		{ADD6DFC8-C325-4E96-B4ED-F24DECA67083} = {57D100F8-647F-47CC-B98F-CAF68C271593}
 		{8797E00F-8060-41A6-9D14-C53AD17AEA6A} = {57D100F8-647F-47CC-B98F-CAF68C271593}
 		{84BBA24E-FD8D-4A2D-84D3-45A23AD34B72} = {15D7BB76-4D88-4844-80D3-36F187F3EF2C}
+		{4D6101BA-A0BE-48E6-992E-19BC74CA69F9} = {15D7BB76-4D88-4844-80D3-36F187F3EF2C}
 	EndGlobalSection
 EndGlobal

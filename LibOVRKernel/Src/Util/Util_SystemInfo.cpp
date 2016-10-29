@@ -41,9 +41,13 @@ limitations under the License.
     #include <Shlwapi.h>
     #include <wtsapi32.h>
     #include <Psapi.h>
+    #include <pdh.h>
+    #include <pdhMsg.h>
+    #include <perflib.h>
 
     #pragma comment(lib, "Shlwapi") // PathFileExistsW
     #pragma comment(lib, "Wtsapi32.lib") // WTSQuerySessionInformation
+    #pragma comment(lib, "pdh.lib") // PDH
 #elif defined(OVR_OS_MS) // Other Microsoft OSs
     // Nothing, thanks.
 #else
@@ -144,9 +148,9 @@ String GetGuidString()
 
     char buff[64];
 #if defined(OVR_CC_MSVC)
-    OVR_sprintf(buff, sizeof(buff), "%I64u", guid);
+    snprintf(buff, sizeof(buff), "%I64u", guid);
 #else
-    OVR_sprintf(buff, sizeof(buff), "%llu", (unsigned long long) guid);
+    snprintf(buff, sizeof(buff), "%llu", (unsigned long long) guid);
 #endif
     return String(buff);
 }
@@ -195,7 +199,7 @@ String GetFileVersionStringW(wchar_t filePath[MAX_PATH])
     }
     else
     {
-        BYTE* pVersionInfo = new BYTE[dwSize];
+        auto pVersionInfo = std::make_unique<BYTE[]>(dwSize);
         if (!pVersionInfo)
         {
             OVR_DEBUG_LOG(("Out of memory allocating %d bytes (for %s)", dwSize, filePath));
@@ -203,7 +207,7 @@ String GetFileVersionStringW(wchar_t filePath[MAX_PATH])
         }
         else
         {
-            if (!GetFileVersionInfoW(filePath, 0, dwSize, pVersionInfo))
+            if (!GetFileVersionInfoW(filePath, 0, dwSize, pVersionInfo.get()))
             {
                 OVR_DEBUG_LOG(("Error in GetFileVersionInfo: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
                 result = "Cannot get version info";
@@ -212,7 +216,7 @@ String GetFileVersionStringW(wchar_t filePath[MAX_PATH])
             {
                 VS_FIXEDFILEINFO* pFileInfo = NULL;
                 UINT              pLenFileInfo = 0;
-                if (!VerQueryValueW(pVersionInfo, L"\\", (LPVOID*)&pFileInfo, &pLenFileInfo))
+                if (!VerQueryValueW(pVersionInfo.get(), L"\\", (LPVOID*)&pFileInfo, &pLenFileInfo))
                 {
                     OVR_DEBUG_LOG(("Error in VerQueryValueW: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
                     result = "File has no version info";
@@ -225,13 +229,11 @@ String GetFileVersionStringW(wchar_t filePath[MAX_PATH])
                     int other = (pFileInfo->dwFileVersionLS) & 0xffff;
 
                     char str[128];
-                    OVR::OVR_sprintf(str, 128, "%d.%d.%d.%d", major, minor, hotfix, other);
+                    snprintf(str, 128, "%d.%d.%d.%d", major, minor, hotfix, other);
 
                     result = str;
                 }
             }
-
-            delete[] pVersionInfo;
         }
     }
 
@@ -1029,12 +1031,143 @@ ProcessMemoryInfo GetCurrentProcessMemoryInfo()
     // This call used nearly 1ms on a sampled computer, and so should be called infrequently.
     if (::GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmce), sizeof(pmce)))
     {
-        pmi.UsedMemory = (uint64_t)pmce.WorkingSetSize; // The set of pages in the virtual address space of the process that are currently resident in physical memory. 
+        pmi.UsedMemory = (uint64_t)pmce.WorkingSetSize; // The set of pages in the virtual address space of the process that are currently resident in physical memory.
     }
 
     return pmi;
 }
 
+
+//-----------------------------------------------------------------------------
+// PdhHelper is a helper class for querying perf counters using PDH.
+class PdhHelper
+{
+public:
+    // RateCounter encapsulates a single counter that represents rate information.
+    struct RateCounter
+    {
+        // Requires a query object and counter path.
+        RateCounter(PDH_HQUERY hQuery, LPCWSTR counterPath)
+            : Valid(false)
+            , HasLast(false)
+            , CounterHandle(0)
+        {
+            if (!hQuery)
+                return;
+
+            PDH_STATUS status = PdhAddCounterW(hQuery, counterPath, 0, &CounterHandle);
+            if (ERROR_SUCCESS != status)
+                return;
+
+            Valid = true;
+        }
+
+        ~RateCounter()
+        {
+            if (CounterHandle)
+                PdhRemoveCounter(CounterHandle);
+        }
+
+        bool Valid;                 // Whether this counter object was initialized properly
+        bool HasLast;               // Whether we have a previous snapshot. Need it to compute rate.
+        PDH_RAW_COUNTER Last;       // Previous counter values
+        PDH_HCOUNTER CounterHandle; // PDH handle
+
+        // Call this to obtain the latest counter value.
+        // Note that PdhHelper::Collect() must be called prior to this call.
+        double Query()
+        {
+            if (!Valid)
+                return 0.0;
+
+            PDH_RAW_COUNTER now;
+            DWORD counterType;
+            PDH_STATUS status = PdhGetRawCounterValue(CounterHandle, &counterType, &now);
+            if (ERROR_SUCCESS == status && PDH_CSTATUS_VALID_DATA == now.CStatus)
+            {
+                // Calculate the rate (since this is a rate counter).
+                // FirstValue is the instance count. SecondValue is the timestamp.
+                double result = HasLast ? double(now.FirstValue - Last.FirstValue) / (double(now.SecondValue - Last.SecondValue) * Timer::GetPerfFrequencyInverse()) : 0.0;
+
+                Last = now;
+                HasLast = true;
+
+                return result;
+            }
+
+            return 0.0;
+        }
+    };
+
+public:
+    PdhHelper()
+        : PdhQuery(0)
+    {
+        PDH_STATUS status = PdhOpenQueryW(NULL, 0, &PdhQuery);
+        if (ERROR_SUCCESS != status)
+        {
+            // If this fails, PdhQuery will be null, and subsequent query will
+            // check for this and return default data if we have no query object.
+            CleanUp();
+        }
+
+        return;
+    }
+
+    ~PdhHelper()
+    {
+        CleanUp();
+    }
+
+    void CleanUp()
+    {
+        if (PdhQuery)
+            PdhCloseQuery(PdhQuery);
+    }
+
+    // GetHandle() is used when creating new counter objects (RateCounter)
+    PDH_HQUERY GetHandle()
+    {
+        return PdhQuery;
+    }
+
+    // Collects raw counter values for all counters in this query.
+    bool Collect()
+    {
+        return ERROR_SUCCESS == PdhCollectQueryData(PdhQuery);
+    }
+
+private:
+    PDH_HQUERY PdhQuery;
+};
+
+static PdhHelper PdhHelperInstance; // This is our query instance. Only one is needed.
+
+// Declare all counters used here.
+static PdhHelper::RateCounter PdhPageFault(PdhHelperInstance.GetHandle(), L"\\Memory\\Page Reads/sec");
+
+SystemMemoryInfo GetSystemMemoryInfo()
+{
+    SystemMemoryInfo smi = {};
+
+    // A single Collect call is required for the query object regardless of how many counters
+    // we are interested in.
+    if (PdhHelperInstance.Collect())
+    {
+        smi.PageFault = PdhPageFault.Query();
+    }
+    else
+    {
+        // Can't get the counter for some reason. Use default.
+        smi.PageFault = 0.0;
+    }
+
+    PERFORMANCE_INFORMATION pi = { sizeof(pi) };
+    if (GetPerformanceInfo(&pi, sizeof(pi)))
+        smi.CommittedTotal = pi.CommitTotal;
+
+    return smi;
+}
 
 
 }} // namespace OVR::Util

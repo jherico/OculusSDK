@@ -32,6 +32,7 @@ limitations under the License.
 
 #include <time.h>
 #include <string.h>
+#include <assert.h>
 
 #pragma warning(push)
 
@@ -71,7 +72,7 @@ void ChannelRegister(ChannelNode* channelNode)
 {
     Locker locker(OutputWorker::GetInstance()->GetChannelsLock());
     ChannelRegisterNoLock(channelNode);
-    Configurator::GetInstance()->RestoreChannelLogLevel(channelNode->SubsystemName);
+    Configurator::GetInstance()->RestoreChannelLogLevel(channelNode);
 }
 
 void ChannelUnregisterNoLock(ChannelNode* channelNode)
@@ -252,6 +253,24 @@ void OutputWorker::RemovePlugin(std::shared_ptr<OutputPlugin> pluginToRemove)
     }
 }
 
+std::shared_ptr<OutputPlugin> OutputWorker::GetPlugin(const char* const pluginName)
+{
+    Locker locker(PluginsLock);
+
+    for (auto& existingPlugin : Plugins)
+    {
+        const char* const existingPluginName = existingPlugin->GetUniquePluginName();
+
+        // If the names match exactly,
+        if (0 == strcmp(pluginName, existingPluginName))
+        {
+            return existingPlugin;
+        }
+    }
+
+    return nullptr;
+}
+
 void OutputWorker::DisableAllPlugins()
 {
     Locker locker(PluginsLock);
@@ -340,7 +359,7 @@ void OutputWorker::Stop()
 
 static int GetTimestamp(char* buffer, int bufferBytes, SYSTEMTIME time)
 {
-    // GetDateFormat and GetTimeFormat returns the number of characters written to the  
+    // GetDateFormat and GetTimeFormat returns the number of characters written to the
     // buffer if successful, including the trailing '\0'; and return 0 on failure.
     char dateBuffer[16];
     int  dateBufferLength;
@@ -602,8 +621,41 @@ void OutputWorker::FlushDbgViewLogImmediately(const char* subsystemName, Level m
     ::OutputDebugStringA(ss.str().c_str());
 }
 
+static void SetThreadName(const char* name)
+{
+    DWORD threadId = ::GetCurrentThreadId();
+
+    // http://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
+#pragma pack(push,8)
+    struct THREADNAME_INFO {
+        DWORD  dwType;     // Must be 0x1000
+        LPCSTR szName;     // Pointer to name (in user address space)
+        DWORD  dwThreadID; // Thread ID (-1 for caller thread)
+        DWORD  dwFlags;    // Reserved for future use; must be zero
+    };
+    union TNIUnion
+    {
+        THREADNAME_INFO tni;
+        ULONG_PTR       upArray[4];
+    };
+#pragma pack(pop)
+
+    TNIUnion tniUnion = { { 0x1000, name, threadId, 0 } };
+
+    __try
+    {
+        RaiseException(0x406D1388, 0, ARRAYSIZE(tniUnion.upArray), tniUnion.upArray);
+    }
+    __except (GetExceptionCode() == 0x406D1388 ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER)
+    {
+        return;
+    }
+}
+
 void OutputWorker::WorkerThreadEntrypoint()
 {
+    SetThreadName("LoggingOutputWorker");
+
     // Lower the priority for logging.
     ::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_LOWEST);
 
@@ -704,8 +756,8 @@ void Channel::GetFunctionPointers()
 }
 
 Channel::Channel(const char* nameString) :
-    SubsystemName(nameString),
-    MinimumOutputLevel((Log_Level_t)Level::Info)
+    MinimumOutputLevel((Log_Level_t)Level::Info),
+    SubsystemName(nameString)
 {
     SubsystemName = nameString;
 
@@ -721,7 +773,11 @@ Channel::Channel(const Channel& other)
 {
     SubsystemName = other.SubsystemName;
     MinimumOutputLevel = other.MinimumOutputLevel;
-    Prefix = other.Prefix;
+
+    {
+        Locker locker(PrefixLock);
+        Prefix = other.Prefix;
+    }
 
     Node.SubsystemName = SubsystemName;
     Node.Level = &MinimumOutputLevel;
@@ -737,11 +793,13 @@ Channel::~Channel()
 
 std::string Channel::GetPrefix() const
 {
+    Locker locker(PrefixLock);
     return Prefix;
 }
 
 void Channel::SetPrefix(const std::string& prefix)
 {
+    Locker locker(PrefixLock);
     Prefix = prefix;
 }
 
@@ -887,6 +945,19 @@ void Configurator::RestoreChannelLogLevel(const char* channelName)
     SetChannelNoLock(stdChannelName, level);
 }
 
+void Configurator::RestoreChannelLogLevel(ChannelNode* channelNode)
+{
+    Level level = (Level)GlobalMinimumLogLevel;
+
+    // Look up the log level for this channel if we can
+    if (Plugin)
+    {
+        Plugin->RestoreChannelLevel(channelNode->SubsystemName, level);
+    }
+
+    *(channelNode->Level) = (Log_Level_t)level;
+}
+
 void Configurator::RestoreAllChannelLogLevels()
 {
     Locker locker(OutputWorker::GetInstance()->GetChannelsLock());
@@ -959,26 +1030,23 @@ void Configurator::OnChannelLevelChange(const char* channelName, Log_Level_t min
 // ErrorSilencer
 
 #if !defined(OVR_CC_MSVC) || (OVR_CC_MSVC < 1300)
-    __declspec(thread) int ThreadErrorSilenced = 0;
+    __declspec(thread) int ThreadErrorSilencedOptions = 0;
 #else
     #pragma data_seg(".tls$")
-    __declspec(thread) int ThreadErrorSilenced = 0;
+    __declspec(thread) int ThreadErrorSilencedOptions = 0;
     #pragma data_seg(".rwdata")
 #endif
 
-bool ErrorSilencer::IsSilenced()
+int ErrorSilencer::GetSilenceOptions()
 {
-    return ThreadErrorSilenced > 0;
+    return ThreadErrorSilencedOptions;
 }
 
-ErrorSilencer::ErrorSilencer(bool initiallySilenced) :
-    ThisObjectCurrentlySilenced(false)
-{
-    if (initiallySilenced)
+ErrorSilencer::ErrorSilencer(int options) :
+    Options(options)
     {
         Silence();
     }
-}
 
 ErrorSilencer::~ErrorSilencer()
 {
@@ -987,22 +1055,17 @@ ErrorSilencer::~ErrorSilencer()
 
 void ErrorSilencer::Silence()
 {
-    if (!ThisObjectCurrentlySilenced)
-    {
-        ThreadErrorSilenced++;
-        ThisObjectCurrentlySilenced = true;
-    }
+    // We do not currently support recursive silencers
+    assert(!GetSilenceOptions());
+    ThreadErrorSilencedOptions = Options;
 }
 
 void ErrorSilencer::Unsilence()
 {
-    if (ThisObjectCurrentlySilenced)
-    {
-        ThreadErrorSilenced--;
-        ThisObjectCurrentlySilenced = false;
-    }
+    // We do not currently support recursive silencers
+    assert(GetSilenceOptions());
+    ThreadErrorSilencedOptions = 0;
 }
-
 
 } // namespace ovrlog
 

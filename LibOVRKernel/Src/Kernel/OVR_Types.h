@@ -930,15 +930,23 @@ namespace OVR
         #define OVR_ARRAY_COUNT(x) (sizeof(x) / sizeof(x[0]))
     #endif
 #else
-    // Smarter C++11 version which knows the difference between arrays and pointers. 
-    template <typename T, size_t N>
-    char (&OVRArrayCountHelper(T (&x)[N]))[N];
-    #define OVR_ARRAY_COUNT(x) (sizeof(OVRArrayCountHelper(x)))
+    // Smarter C++11 version which knows the difference between arrays and pointers. ;
+    template <typename R>
+    struct OVRArrayCountOf_helper;
+
+    template <typename T, std::size_t N>
+    struct OVRArrayCountOf_helper<T[N]>
+    {
+        enum : std::size_t { size = N };
+    };
+
+    template <typename T>
+    constexpr std::size_t OVRArrayCountOf() {
+        return OVRArrayCountOf_helper<T>::size;
+    }
+
+    #define OVR_ARRAY_COUNT(x) OVRArrayCountOf<decltype(x)>()
 #endif
-
-// Workaround for https://connect.microsoft.com/VisualStudio/feedback/details/759407/can-not-get-size-of-static-array-defined-in-class-template
-#define OVR_STRUCT_MEMBER_ARRAY_COUNT(thestruct, themember) OVR_ARRAY_COUNT(((thestruct*)0)->themember)
-
 
 // ------------------------------------------------------------------------
 // ***** OVR_CURRENT_FUNCTION
@@ -1041,7 +1049,7 @@ namespace OVR
     #if defined(OVR_CC_GNU)
     #  define   OVR_UNUSED(a)   do {__typeof__ (&a) __attribute__ ((unused)) __tmp = &a; } while(0)
     #else
-    #  define   OVR_UNUSED(a)   (a)
+    #  define   OVR_UNUSED(a)   ((void)a)
     #endif
 
     #define     OVR_UNUSED1(a1) OVR_UNUSED(a1)

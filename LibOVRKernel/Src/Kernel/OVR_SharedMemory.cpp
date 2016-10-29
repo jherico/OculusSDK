@@ -70,23 +70,16 @@ public:
 class FakeMemoryBlock : public RefCountBase<FakeMemoryBlock>
 {
     String Name;
-    char*  Data;
+    std::unique_ptr<char[]>  Data;
     int    SizeBytes;
     int    References;
 
 public:
     FakeMemoryBlock(const String& name, int size) :
         Name(name),
-        Data(NULL),
+        Data(new char[size]),
         SizeBytes(size),
-        References(1)
-    {
-        Data = new char[SizeBytes];
-    }
-    ~FakeMemoryBlock()
-    {
-        delete[] Data;
-    }
+        References(1) { }
 
     bool IsNamed(const String& name)
     {
@@ -94,7 +87,7 @@ public:
     }
     void* GetData()
     {
-        return Data;
+        return Data.get();
     }
     int GetSizeI()
     {
@@ -119,7 +112,7 @@ public:
     FakeMemoryInternal(FakeMemoryBlock* block);
     ~FakeMemoryInternal();
 
-    virtual void* GetFileView() OVR_OVERRIDE
+    virtual void* GetFileView() override
     {
         return FileView;
     }
@@ -260,7 +253,7 @@ public:
         }
     }
 
-    virtual void* GetFileView() OVR_OVERRIDE
+    virtual void* GetFileView() override
     {
         return FileView;
     }
@@ -484,7 +477,7 @@ public:
         }
     }
 
-    virtual void* GetFileView() OVR_OVERRIDE
+    virtual void* GetFileView() override
     {
         return FileView;
     }
@@ -734,6 +727,8 @@ Ptr<SharedMemory> SharedMemoryFactory::Open(const SharedMemory::OpenParameters& 
 SharedMemoryFactory::SharedMemoryFactory()
 {
     OVR_DEBUG_LOG(("[SharedMemory] Creating factory"));
+
+    FakeMemoryManager::GetInstance(); // Make sure the fake memory manager is destroyed at the right time
 
     PushDestroyCallbacks();
 }

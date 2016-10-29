@@ -74,7 +74,7 @@ inline void LogText(Args&&... args)
     if (DefaultChannel.Active(ovrlog::Level::Info))
     {
         char buffer[512];
-        int written = OVR_snprintf(buffer, sizeof(buffer), args...);
+        int written = snprintf(buffer, sizeof(buffer), args...);
         if (written <= 0 || written >= (int)sizeof(buffer))
         {
             OVR_ASSERT(false); // This call should be converted to the new log system.
@@ -97,7 +97,7 @@ inline void LogError(Args&&... args)
     if (DefaultChannel.Active(ovrlog::Level::Error))
     {
         char buffer[512];
-        int written = OVR_snprintf(buffer, sizeof(buffer), args...);
+        int written = snprintf(buffer, sizeof(buffer), args...);
         if (written <= 0 || written >= (int)sizeof(buffer))
         {
             OVR_ASSERT(false); // This call should be converted to the new log system.
@@ -120,7 +120,7 @@ inline void LogDebug(Args&&... args)
     if (DefaultChannel.Active(ovrlog::Level::Debug))
     {
         char buffer[512];
-        int written = OVR_snprintf(buffer, sizeof(buffer), args...);
+        int written = snprintf(buffer, sizeof(buffer), args...);
         if (written <= 0 || written >= (int)sizeof(buffer))
         {
             OVR_ASSERT(false); // This call should be converted to the new log system.

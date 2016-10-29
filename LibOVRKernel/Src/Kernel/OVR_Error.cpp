@@ -33,6 +33,7 @@ limitations under the License.
 #include "OVR_UTF8Util.h"
 #include "OVR_Threads.h"
 #include "OVR_Win32_IncludeWindows.h"
+#include "Logging_Library.h"
 
 OVR_DISABLE_ALL_MSVC_WARNINGS()
 OVR_DISABLE_MSVC_WARNING(4265)
@@ -518,6 +519,16 @@ OVRError MakeError(ovrResult errorCode, ovrSysErrorCode sysCode, const char* pSo
     // Set the TLS last error.
     LastErrorTLS::GetInstance()->LastError() = ovrError;
 
+    int silencerOptions = ovrlog::ErrorSilencer::GetSilenceOptions();
+    if (silencerOptions & ovrlog::ErrorSilencer::CompletelySilenceLogs)
+    {
+        logError = false;
+    }
+    if (silencerOptions & ovrlog::ErrorSilencer::PreventErrorAsserts)
+    {
+        assertError = false;
+    }
+
     // If logging the error:
     if (logError)
     {
@@ -583,11 +594,11 @@ bool GetErrorCodeString(ovrResult resultIn, bool prefixErrorCode, OVR::String& s
 
     if (prefixErrorCode)
     {
-        OVR_snprintf(codeBuffer, OVR_ARRAY_COUNT(codeBuffer), "0x%llx (%lld) %s", (uint64_t)resultIn, (int64_t)resultIn, errorCodeName);
+        snprintf(codeBuffer, OVR_ARRAY_COUNT(codeBuffer), "0x%llx (%lld) %s", (uint64_t)resultIn, (int64_t)resultIn, errorCodeName);
     }
     else
     {
-        OVR_snprintf(codeBuffer, OVR_ARRAY_COUNT(codeBuffer), "%s", errorCodeName);
+        snprintf(codeBuffer, OVR_ARRAY_COUNT(codeBuffer), "%s", errorCodeName);
     }
 
     sResult = codeBuffer;
@@ -597,7 +608,7 @@ bool GetErrorCodeString(ovrResult resultIn, bool prefixErrorCode, OVR::String& s
 
 
 #if defined(OVR_OS_WIN32)
-    static const wchar_t* OVR_DXGetErrorStringW(DWORD dwDXGIErrorCode)
+    static const wchar_t* OVR_DXGetErrorStringW(HRESULT dwDXGIErrorCode)
     {
         switch (dwDXGIErrorCode)
         {
@@ -640,7 +651,7 @@ bool GetSysErrorCodeString(ovrSysErrorCode sysErrorCode, bool prefixErrorCode, O
     if (prefixErrorCode)
     {
         char prefixBuffer[64];
-        OVR_snprintf(prefixBuffer, OVR_ARRAY_COUNT(prefixBuffer), "0x%llx (%lld): ", (uint64_t)sysErrorCode, (int64_t)sysErrorCode);
+        snprintf(prefixBuffer, OVR_ARRAY_COUNT(prefixBuffer), "0x%llx (%lld): ", (uint64_t)sysErrorCode, (int64_t)sysErrorCode);
         sResult = prefixBuffer;
     }
     else
@@ -661,7 +672,7 @@ bool GetSysErrorCodeString(ovrSysErrorCode sysErrorCode, bool prefixErrorCode, O
             if (HRESULT_FACILITY(sysErrorCode) == _FACDXGI) // If it is a DXGI error...
             {
                 // This situation occurs on Windows 7. You can't use FORMAT_MESSAGE_FROM_HMODULE to solve it either. We can only use DXGetErrorString or manually handle it.
-                const wchar_t* pStr = OVR_DXGetErrorStringW((DWORD)sysErrorCode);
+                const wchar_t* pStr = OVR_DXGetErrorStringW(sysErrorCode);
 
                 if (pStr)
                 {

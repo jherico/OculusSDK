@@ -42,6 +42,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\3rdParty\TinyXml\tinyxml2.cpp" />
     <ClCompile Include="..\..\..\Tracker.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\StringHelper.cpp">
+      <Filter>CommonSrc\Util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\OculusWorldDemo.h" />
@@ -86,6 +89,9 @@
       <Filter>CommonSrc\Platform</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\Tracker.h" />
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\StringHelper.h">
+      <Filter>CommonSrc\Util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\..\OculusWorldDemo.rc" />

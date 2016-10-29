@@ -242,6 +242,7 @@ call "$(OVRSDKROOT)Tools\Scripts\SourceIndex.cmd" "$(OVRSDKROOT)" "$(TargetDir)"
     <ClCompile Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.cpp" />
     <ClCompile Include="..\..\..\..\CommonSrc\Util\OptionMenu.cpp" />
     <ClCompile Include="..\..\..\..\CommonSrc\Util\RenderProfiler.cpp" />
+    <ClCompile Include="..\..\..\..\CommonSrc\Util\StringHelper.cpp" />
     <ClCompile Include="..\..\..\OculusWorldDemo.cpp" />
     <ClCompile Include="..\..\..\OculusWorldDemo_Scene.cpp" />
     <ClCompile Include="..\..\..\Player.cpp" />
@@ -261,6 +262,7 @@ call "$(OVRSDKROOT)Tools\Scripts\SourceIndex.cmd" "$(OVRSDKROOT)" "$(TargetDir)"
     <ClInclude Include="..\..\..\..\CommonSrc\Util\OptionMenu.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Util\RenderProfiler.h" />
     <ClInclude Include="..\..\..\..\CommonSrc\Render\Render_XmlSceneLoader.h" />
+    <ClInclude Include="..\..\..\..\CommonSrc\Util\StringHelper.h" />
     <ClInclude Include="..\..\..\OculusWorldDemo.h" />
     <ClInclude Include="..\..\..\Player.h" />
     <ClInclude Include="..\..\..\Tracker.h" />

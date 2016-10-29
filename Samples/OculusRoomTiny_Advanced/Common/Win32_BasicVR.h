@@ -119,11 +119,11 @@ struct OculusTexture
 
 //------------------------------------------------------------------------------------
 //Helper functions to convert from Oculus types to XM types - consider to add to SDK
-static XMVECTOR ConvertToXM(ovrQuatf q)    { return(XMVectorSet(q.x, q.y, q.z, q.w)); }
-static XMFLOAT4 ConvertToXMF(ovrQuatf q)    { return(XMFLOAT4(q.x, q.y, q.z, q.w)); }
-static XMVECTOR ConvertToXM(ovrVector3f v) { return(XMVectorSet(v.x, v.y, v.z, 0)); }
-static XMFLOAT3 ConvertToXMF(ovrVector3f v) { return(XMFLOAT3(v.x, v.y, v.z)); }
-static XMMATRIX ConvertToXM(ovrMatrix4f p) {
+inline XMVECTOR ConvertToXM(ovrQuatf q)    { return(XMVectorSet(q.x, q.y, q.z, q.w)); }
+inline XMFLOAT4 ConvertToXMF(ovrQuatf q)    { return(XMFLOAT4(q.x, q.y, q.z, q.w)); }
+inline XMVECTOR ConvertToXM(ovrVector3f v) { return(XMVectorSet(v.x, v.y, v.z, 0)); }
+inline XMFLOAT3 ConvertToXMF(ovrVector3f v) { return(XMFLOAT3(v.x, v.y, v.z)); }
+inline XMMATRIX ConvertToXM(ovrMatrix4f p) {
     return(XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],
         p.M[0][1], p.M[1][1], p.M[2][1], p.M[3][1],
         p.M[0][2], p.M[1][2], p.M[2][2], p.M[3][2],
@@ -242,7 +242,7 @@ struct VRLayer
 
         // Get view and projection matrices for the Rift camera
         XMVECTOR CombinedPos = XMVectorAdd(player->Pos, XMVector3Rotate(ConvertToXM(eyeRenderPose->Position), player->Rot));
-        Camera finalCam(&CombinedPos, &(XMQuaternionMultiply(ConvertToXM(eyeRenderPose->Orientation), player->Rot)));
+        Camera finalCam(CombinedPos, XMQuaternionMultiply(ConvertToXM(eyeRenderPose->Orientation), player->Rot));
         XMMATRIX view = finalCam.GetViewMatrix();
         ovrMatrix4f p = ovrMatrix4f_Projection(EyeRenderDesc[eye].Fov, nearZ, farZ, ovrProjection_None);
         XMMATRIX prod = XMMatrixMultiply(view, ConvertToXM(p));
@@ -341,7 +341,8 @@ struct BasicVR
             Layer[i] = nullptr;
 
         // Initializes LibOVR, and the Rift
-        ovrResult result = ovr_Initialize(nullptr);
+		ovrInitParams initParams = { ovrInit_RequestVersion, OVR_MINOR_VERSION, NULL, 0, 0 };
+		ovrResult result = ovr_Initialize(&initParams);
         VALIDATE(OVR_SUCCESS(result), "Failed to initialize libOVR.");
 
         VALIDATE(DIRECTX.InitWindow(hinst, title), "Failed to open window.");
@@ -382,7 +383,7 @@ struct BasicVR
         {
             if (retryCreate) 
                 return true;
-            VALIDATE(false, "Failed to create mirror texture.");
+			FATALERROR("Failed to create mirror texture.");
         }
 
         // Create the room model in-place
@@ -391,7 +392,7 @@ struct BasicVR
         // Create camera in-place
         __pragma(warning(push))
         __pragma(warning(disable:4316)) // Win32: object allocated on the heap may not be aligned 16
-        MainCam = new Camera(&XMVectorSet(0.0f, 1.6f, +5.0f, 0), &XMQuaternionIdentity());
+        MainCam = new Camera(XMVectorSet(0.0f, 1.6f, +5.0f, 0), XMQuaternionIdentity());
         __pragma(warning(pop))
 
         initialized = true;

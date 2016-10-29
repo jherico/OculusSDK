@@ -74,27 +74,27 @@ WatchDogObserver::WatchDogObserver() :
     ApplicationName(),
     OrganizationName()
 {
-    Start();
-
+    WatchdogThreadHandle = std::make_unique<std::thread>([this] { this->Run(); });
     // Must be at end of function
     PushDestroyCallbacks();
 }
 
 WatchDogObserver::~WatchDogObserver()
 {
-    TerminationEvent.SetEvent();
-
-    Join();
+    OVR_ASSERT(!WatchdogThreadHandle->joinable());
 }
 
 void WatchDogObserver::OnThreadDestroy()
 {
     TerminationEvent.SetEvent();
+
+    WatchdogThreadHandle->join();
 }
 
 void WatchDogObserver::OnSystemDestroy()
 {
-    Release();
+    // NOTE: Explicitly allowed to do this by the top-level comment of OnSystemDestroy()
+    delete this;
 }
 
 void WatchDogObserver::OnDeadlock(const String& deadlockedThreadName)
@@ -115,14 +115,20 @@ void WatchDogObserver::OnDeadlock(const String& deadlockedThreadName)
         }
 
         ExceptionHandler::ReportDeadlock(deadlockedThreadName, OrganizationName, ApplicationName);
+
+        // Disable reporting after the first deadlock report
+        DisableReporting();
     }
 
-    // Disable reporting after the first deadlock report.
     DeadlockSeen = true;
 
     Logger.LogError("Deadlock detected in thread '", deadlockedThreadName.ToCStr(), "'");
 
-    if (AutoTerminateOnDeadlock)
+    if (::IsDebuggerPresent())
+    {
+        Logger.LogWarning("Aborting termination since debugger is present. Normally the app would terminate itself here");
+    }
+    else if (AutoTerminateOnDeadlock)
     {
         Logger.LogError("Waiting ", TerminationDelayMsec, " msec until deadlock termination");
 
@@ -137,7 +143,7 @@ void WatchDogObserver::OnDeadlock(const String& deadlockedThreadName)
 
 int WatchDogObserver::Run()
 {
-    SetThreadName("WatchDog");
+    Thread::SetCurrentThreadName("WatchDog");
 
     Logger.LogDebug("Starting watchdog thread");
 
@@ -175,7 +181,7 @@ int WatchDogObserver::Run()
                 int delta = static_cast<int>(t1 - t0);
 
                 // Include an upper bound in case the computer went to sleep
-                if (delta > threshold && delta < threshold * 3)
+                if (delta > threshold && (ConsecutiveLongCycles > 0 || delta < threshold * 5))
                 {
                     sawLongCycle = true;
 
@@ -289,5 +295,6 @@ void WatchDog::Feed(int threshold)
         Enable();
     }
 }
+
 
 }} // namespace OVR::Util

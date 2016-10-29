@@ -18,7 +18,7 @@
 	                                                      EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);								  \
                            XMVECTOR eyePos = XMVectorSet(EyeRenderPose[eye].Position.x, EyeRenderPose[eye].Position.y, EyeRenderPose[eye].Position.z, 0);	  \
                            XMVECTOR CombinedPos = XMVectorAdd(mainCam.Pos, XMVector3Rotate(eyePos, mainCam.Rot));											  \
-                           Camera finalCam(&CombinedPos, &(XMQuaternionMultiply(eyeQuat, mainCam.Rot)));													  \
+                           Camera finalCam(CombinedPos, (XMQuaternionMultiply(eyeQuat, mainCam.Rot)));													  \
                            XMMATRIX view = finalCam.GetViewMatrix();																						  \
                            ovrMatrix4f p = ovrMatrix4f_Projection(eyeRenderDesc[eye].Fov, 0.2f, 1000.0f, ovrProjection_None);						          \
                            XMMATRIX proj = XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],															  \

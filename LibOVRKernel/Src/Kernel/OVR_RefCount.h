@@ -62,11 +62,11 @@ class   RefCountNTSImpl;
 class RefCountImplCore
 {
 protected:
-   AtomicInt<int> RefCount;
+    std::atomic<int> RefCount = { 1 };
 
 public:
     // RefCountImpl constructor always initializes RefCount to 1 by default.
-    OVR_FORCE_INLINE RefCountImplCore() : RefCount(1) { }
+    OVR_FORCE_INLINE RefCountImplCore() { }
 
     // Need virtual destructor
     // This:    1. Makes sure the right destructor's called.

@@ -24,8 +24,6 @@ limitations under the License.
 #include "../Render/Render_Device.h"
 #include "../Render/Render_Font.h"
 
-#include "Kernel/OVR_Log.h"
-
 
 namespace OVR { namespace Render {
 
@@ -33,7 +31,7 @@ namespace OVR { namespace Render {
     {
         if(Visible)
         {
-            AutoGpuProf prof(ren, (AssetName.GetLength() > 0 ? AssetName.ToCStr() : "Model_Render"));
+            AutoGpuProf prof(ren, (AssetName.length() > 0 ? AssetName.c_str() : "Model_Render"));
             Matrix4f m = ltw * GetMatrix();
             ren->Render(m, this);
         }
@@ -42,7 +40,7 @@ namespace OVR { namespace Render {
     void Container::Render(const Matrix4f& ltw, RenderDevice* ren)
     {
         Matrix4f m = ltw * GetMatrix();
-        for(unsigned i = 0; i < Nodes.GetSize(); i++)
+        for(size_t i = 0; i < Nodes.size(); i++)
         {
             Nodes[i]->Render(m, ren);
         }
@@ -916,7 +914,7 @@ namespace OVR { namespace Render {
 
     bool CollisionModel::TestPoint(const Vector3f& p) const
     {
-        for(unsigned i = 0; i < Planes.GetSize(); i++)
+        for(size_t i = 0; i < Planes.size(); i++)
             if(Planes[i].TestSide(p) > 0)
             {
                 return 0;
@@ -938,7 +936,7 @@ namespace OVR { namespace Render {
         int crossing = -1;
         float cdot1 = 0, cdot2 = 0;
 
-        for(unsigned i = 0; i < Planes.GetSize(); ++i)
+        for(int i = 0; i < (int) Planes.size(); ++i)
         {
             float dot2 = Planes[i].TestSide(fullMove);
             if(dot2 > 0)

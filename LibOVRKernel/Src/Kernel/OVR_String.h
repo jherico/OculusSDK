@@ -75,14 +75,14 @@ protected:
         // Number of bytes. Will be the same as the number of chars if the characters
         // are ascii, may not be equal to number of chars in case string data is UTF8.
         size_t  Size;       
-        AtomicInt<int32_t> RefCount;
+        std::atomic<int32_t> RefCount;
         // Note: Data[] must be the last data element, and the [1] accounts for
         // null-termination in allocations
         char    Data[1];
 
         void    AddRef()
         {
-            RefCount.ExchangeAdd_NoSync(1);
+            RefCount.fetch_add(1, std::memory_order_relaxed);
         }
         // Decrement ref count. This needs to be thread-safe, since
         // a different thread could have also decremented the ref count.
@@ -96,7 +96,7 @@ protected:
         // checking against 0 needs to made an atomic operation.
         void    Release()
         {
-            if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
+            if (RefCount.fetch_add(-1, std::memory_order_relaxed) - 1 == 0)
                 OVR_FREE(this);
         }
 
@@ -227,8 +227,8 @@ public:
     // Removes the character(s) at posAt
     void        Remove(size_t posAt, size_t len = 1);
 
-    // Same as std::string::pop_back()
-    void        PopBack() { Remove(GetSize() - 1, 1); }
+    // Removes the last character.
+    void        PopBack() { Remove(GetLength() - 1, 1); }
 
     // Returns a String that's a substring of this.
     //  -start is the index of the first UTF8 character you want to include.

@@ -64,7 +64,7 @@ String GetWindowsErrorString(HRESULT hr)
         nullptr);   // arguments - see note 
 
     char formatStr[512];
-    OVR_snprintf(formatStr, sizeof(formatStr), "[Code=%x = %d]", hr, hr);
+    snprintf(formatStr, sizeof(formatStr), "[Code=%x = %d]", hr, hr);
 
     String retStr = formatStr;
 

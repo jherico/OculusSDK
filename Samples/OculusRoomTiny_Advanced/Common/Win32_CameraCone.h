@@ -138,8 +138,8 @@ struct CameraCone
         bool tracked = pTrackingState->StatusFlags & ovrStatus_PositionTracked ? true : false;
 
         // Now render camera volume, using its own static 'zero' camera, so purely rift components
-        Camera finalCam(&ConvertToXM(vrLayer->EyeRenderPose[eye].Position),
-                        &ConvertToXM(vrLayer->EyeRenderPose[eye].Orientation));
+        Camera finalCam(ConvertToXM(vrLayer->EyeRenderPose[eye].Position),
+                        ConvertToXM(vrLayer->EyeRenderPose[eye].Orientation));
         XMMATRIX view = finalCam.GetViewMatrix();
         ovrMatrix4f p = ovrMatrix4f_Projection(vrLayer->EyeRenderDesc[eye].Fov, 0.01f/*0.2f*/, 1000.0f, ovrProjection_None);
         XMMATRIX proj = XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],

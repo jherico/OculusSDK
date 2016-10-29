@@ -656,7 +656,7 @@ limitations under the License.
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400)) /* Apple clang 4.0+ */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                    /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1500))                         /* VS2008+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))           /* EDG 4.8+         */     
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))           /* EDG 4.8+         */
         #define OVR_CPP_NO_OVERRIDE 1
     #endif
 #endif
@@ -664,7 +664,7 @@ limitations under the License.
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_CPP_NO_FINAL
-// 
+//
 // Defined as 1 if the compiler doesn't support C++11 final attribute. Otherwise undefined.
 // See the OVR_FINAL and OVR_FINALOVERRIDE macros for a portable wrapper.
 
@@ -674,7 +674,7 @@ limitations under the License.
          !(defined(__clang__) &&  defined(__APPLE__) && (__clang__ >= 400))  /* Apple clang 4.0+ */ && \
          !(defined(__GNUC__) && (OVR_CC_VERSION >= 407))                     /* GCC 4.7+         */ && \
          !(defined(_MSC_VER) && (_MSC_VER >= 1500))                          /* VS2008+          */ && \
-         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */    
+         !(defined(__EDG_VERSION__) && (__EDG_VERSION__ >= 408)))            /* EDG 4.8+         */
         #define OVR_CPP_NO_FINAL 1
     #endif
 #endif

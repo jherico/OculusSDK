@@ -24,14 +24,15 @@ limitations under the License.
 #ifndef OVR_Render_D3D11_Device_h
 #define OVR_Render_D3D11_Device_h
 
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Util/Util_D3D11_Blitter.h"
 
 #include "Render_Device.h"
 
 #include "OVR_CAPI_D3D.h"
 #include "Util/Util_Direct3D.h"
+
+#include <vector>
+#include <string>
 
 namespace OVR { namespace Render { namespace D3D11 {
 
@@ -48,11 +49,11 @@ public:
 
     struct Uniform
     {
-        String Name;
-        int    Offset;
-        int    Size;
+        std::string Name;
+        int         Offset;
+        int         Size;
     };
-    Array<Uniform> UniformInfo;
+    std::vector<Uniform> UniformInfo;
 
     ShaderBase(RenderDevice* r, ShaderStage stage);
     ~ShaderBase();
@@ -141,19 +142,19 @@ public:
 class Texture : public Render::Texture
 {
 public:
-    ovrSession                      Session;
-    RenderDevice*                   Ren;
-    ovrTextureSwapChain             TextureChain;
-    ovrMirrorTexture                MirrorTex;
-    Ptr<ID3D11Texture2D>            Tex;
-    Array<Ptr<ID3D11ShaderResourceView>>    TexSv;
-    Array<Ptr<ID3D11RenderTargetView>>      TexRtv;
-    Array<Ptr<ID3D11DepthStencilView>>      TexDsv;
-    Array<Ptr<ID3D11Texture2D>>			    TexStaging;
-    mutable Ptr<ID3D11SamplerState> Sampler;
-    int                             Width, Height;
-    int                             Samples;
-    int                             Format;
+    ovrSession                                    Session;
+    RenderDevice*                                 Ren;
+    ovrTextureSwapChain                           TextureChain;
+    ovrMirrorTexture                              MirrorTex;
+    Ptr<ID3D11Texture2D>                          Tex;
+    std::vector<Ptr<ID3D11ShaderResourceView>>    TexSv;
+    std::vector<Ptr<ID3D11RenderTargetView>>      TexRtv;
+    std::vector<Ptr<ID3D11DepthStencilView>>      TexDsv;
+    std::vector<Ptr<ID3D11Texture2D>>             TexStaging;
+    mutable Ptr<ID3D11SamplerState>               Sampler;
+    int                                           Width, Height;
+    int                                           Samples;
+    int                                           Format;
 
     Texture(ovrSession session, RenderDevice* r, int fmt, int w, int h);
     ~Texture();
@@ -204,20 +205,20 @@ public:
         return TexDsv[currentIndex];
     }
 
-    virtual int GetWidth() const OVR_OVERRIDE { return Width; }
-    virtual int GetHeight() const OVR_OVERRIDE { return Height; }
-    virtual int GetSamples() const OVR_OVERRIDE { return Samples; }
-    virtual int GetFormat() const OVR_OVERRIDE { return Format; }
+    virtual int GetWidth() const override { return Width; }
+    virtual int GetHeight() const override { return Height; }
+    virtual int GetSamples() const override { return Samples; }
+    virtual int GetFormat() const override { return Format; }
 
-    virtual void SetSampleMode(int sm) OVR_OVERRIDE;
+    virtual void SetSampleMode(int sm) override;
 
-    virtual void Set(int slot, Render::ShaderStage stage = Render::Shader_Fragment) const OVR_OVERRIDE;
+    virtual void Set(int slot, Render::ShaderStage stage = Render::Shader_Fragment) const override;
 
-    virtual ovrTextureSwapChain Get_ovrTextureSet() OVR_OVERRIDE { return TextureChain; }
+    virtual ovrTextureSwapChain Get_ovrTextureSet() override { return TextureChain; }
 
-    virtual void GenerateMips() OVR_OVERRIDE;
+    virtual void GenerateMips() override;
     // Used to commit changes to the texture swap chain
-    virtual void Commit() OVR_OVERRIDE;
+    virtual void Commit() override;
 };
 
 
@@ -259,25 +260,25 @@ public:
         Matrix4f  Proj;
         Matrix4f  View;
         Vector4f  GlobalTint;
-    }                        StdUniforms;
-    Ptr<Buffer>              UniformBuffers[Shader_Count];
-    int                      MaxTextureSet[Shader_Count];
+    }                              StdUniforms;
+    Ptr<Buffer>                    UniformBuffers[Shader_Count];
+    int                            MaxTextureSet[Shader_Count];
 
-    Ptr<VertexShader>        VertexShaders[VShader_Count];
-    Ptr<PixelShader>         PixelShaders[FShader_Count];
-    Ptr<GeomShader>          pStereoShaders[Prim_Count];
-    Ptr<Buffer>              CommonUniforms[8];
-    Ptr<ShaderSet>           ExtraShaders;
+    Ptr<VertexShader>              VertexShaders[VShader_Count];
+    Ptr<PixelShader>               PixelShaders[FShader_Count];
+    Ptr<GeomShader>                pStereoShaders[Prim_Count];
+    Ptr<Buffer>                    CommonUniforms[8];
+    Ptr<ShaderSet>                 ExtraShaders;
 
-    Ptr<ShaderFill>          DefaultFill;
-    Ptr<Fill>                DefaultTextureFill;
-    Ptr<Fill>                DefaultTextureFillAlpha;
-    Ptr<Fill>                DefaultTextureFillPremult;
+    Ptr<ShaderFill>                DefaultFill;
+    Ptr<Fill>                      DefaultTextureFill;
+    Ptr<Fill>                      DefaultTextureFillAlpha;
+    Ptr<Fill>                      DefaultTextureFillPremult;
 
-    Ptr<Buffer>              QuadVertexBuffer;
+    Ptr<Buffer>                    QuadVertexBuffer;
 
-    Array<Ptr<Texture> >     DepthBuffers;
-    Ptr<D3DUtil::Blitter>    Blitter;
+    std::vector<Ptr<Texture> >     DepthBuffers;
+    Ptr<D3DUtil::Blitter>          Blitter;
 
     Ptr<ID3DUserDefinedAnnotation> UserAnnotation;  // for GPU profile markers
 
@@ -289,22 +290,22 @@ public:
     static Render::RenderDevice* CreateDevice(ovrSession session, const RendererParams& rp, void* oswnd, ovrGraphicsLuid luid);
 
     // Called to clear out texture fills by the app layer before it exits
-    virtual void DeleteFills() OVR_OVERRIDE;
+    virtual void DeleteFills() override;
 
-    virtual void SetViewport(const Recti& vp) OVR_OVERRIDE;
-    virtual bool SetParams(const RendererParams& newParams) OVR_OVERRIDE;
+    virtual void SetViewport(const Recti& vp) override;
+    virtual bool SetParams(const RendererParams& newParams) override;
 
-    virtual bool Present(bool withVsync) OVR_OVERRIDE;
-    virtual void Flush() OVR_OVERRIDE;
+    virtual bool Present(bool withVsync) override;
+    virtual void Flush() override;
 
     size_t QueryGPUMemorySize();
 
     virtual void Clear(float r = 0, float g = 0, float b = 0, float a = 1,
         float depth = 1,
-        bool clearColor = true, bool clearDepth = true) OVR_OVERRIDE;
+        bool clearColor = true, bool clearDepth = true) override;
 
-    virtual Buffer* CreateBuffer() OVR_OVERRIDE;
-    virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount = 1, ovrResult* error = nullptr) OVR_OVERRIDE;
+    virtual Buffer* CreateBuffer() override;
+    virtual Texture* CreateTexture(int format, int width, int height, const void* data, int mipcount = 1, ovrResult* error = nullptr) override;
 
     static void GenerateSubresourceData(
         unsigned imageWidth, unsigned imageHeight, int format, unsigned imageDimUpperLimit,
@@ -314,34 +315,34 @@ public:
 
     Texture* GetDepthBuffer(int w, int h, int ms, TextureFormat depthFormat);
     
-    virtual void ResolveMsaa(Render::Texture* msaaTex, Render::Texture* outputTex) OVR_OVERRIDE;
+    virtual void ResolveMsaa(Render::Texture* msaaTex, Render::Texture* outputTex) override;
 
-    virtual void SetCullMode(CullMode cullMode) OVR_OVERRIDE;
+    virtual void SetCullMode(CullMode cullMode) override;
 
-    virtual void BeginRendering() OVR_OVERRIDE;
+    virtual void BeginRendering() override;
     virtual void SetRenderTarget(Render::Texture* color,
-        Render::Texture* depth = NULL, Render::Texture* stencil = NULL) OVR_OVERRIDE;
-    virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less) OVR_OVERRIDE;
-    virtual void SetWorldUniforms(const Matrix4f& proj, const Vector4f& globalTint) OVR_OVERRIDE;
-    virtual void SetCommonUniformBuffer(int i, Render::Buffer* buffer) OVR_OVERRIDE;
+        Render::Texture* depth = NULL, Render::Texture* stencil = NULL) override;
+    virtual void SetDepthMode(bool enable, bool write, CompareFunc func = Compare_Less) override;
+    virtual void SetWorldUniforms(const Matrix4f& proj, const Vector4f& globalTint) override;
+    virtual void SetCommonUniformBuffer(int i, Render::Buffer* buffer) override;
 
-    virtual void Blt(Render::Texture* texture) OVR_OVERRIDE;
+    virtual void Blt(Render::Texture* texture) override;
 
     // Overridden to apply proper blend state.
-    virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view = NULL) OVR_OVERRIDE;
-    virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view = NULL) OVR_OVERRIDE;
-    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view) OVR_OVERRIDE;
-    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha = 255, const Matrix4f* view = NULL) OVR_OVERRIDE;
+    virtual void FillRect(float left, float top, float right, float bottom, Color c, const Matrix4f* view = NULL) override;
+    virtual void RenderText(const struct Font* font, const char* str, float x, float y, float size, Color c, const Matrix4f* view = NULL) override;
+    virtual void FillGradientRect(float left, float top, float right, float bottom, Color col_top, Color col_btm, const Matrix4f* view) override;
+    virtual void RenderImage(float left, float top, float right, float bottom, ShaderFill* image, unsigned char alpha = 255, const Matrix4f* view = NULL) override;
 
-    virtual void Render(const Matrix4f& matrix, Model* model) OVR_OVERRIDE;
+    virtual void Render(const Matrix4f& matrix, Model* model) override;
     virtual void Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) OVR_OVERRIDE;
+        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) override;
     virtual void RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
-        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) OVR_OVERRIDE;
-    virtual Fill *GetSimpleFill(int flags = Fill::F_Solid) OVR_OVERRIDE;
-    virtual Fill *GetTextureFill(Render::Texture* tex, bool useAlpha = false, bool usePremult = false) OVR_OVERRIDE;
+        const Matrix4f& matrix, int offset, int count, PrimitiveType prim = Prim_Triangles) override;
+    virtual Fill *GetSimpleFill(int flags = Fill::F_Solid) override;
+    virtual Fill *GetTextureFill(Render::Texture* tex, bool useAlpha = false, bool usePremult = false) override;
 
-    virtual Render::Shader *LoadBuiltinShader(ShaderStage stage, int shader) OVR_OVERRIDE;
+    virtual Render::Shader *LoadBuiltinShader(ShaderStage stage, int shader) override;
 
     bool RecreateSwapChain();
     virtual ID3D10Blob* CompileShader(const char* profile, const char* src, const char* mainName = "main");
@@ -351,8 +352,8 @@ public:
     void SetTexture(Render::ShaderStage stage, int slot, const Texture* t);
 
     // GPU Profiling
-    virtual void BeginGpuEvent(const char* markerText, uint32_t markerColor) OVR_OVERRIDE;
-    virtual void EndGpuEvent() OVR_OVERRIDE;
+    virtual void BeginGpuEvent(const char* markerText, uint32_t markerColor) override;
+    virtual void EndGpuEvent() override;
 };
 
 

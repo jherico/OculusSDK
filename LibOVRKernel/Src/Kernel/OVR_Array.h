@@ -674,10 +674,6 @@ public:
     Iterator End()   { return Iterator(this, (intptr_t)GetSize()); }
     Iterator Last()  { return Iterator(this, (intptr_t)GetSize() - 1); }
 
-    // C++11 ranged-based for loop support.
-    Iterator begin() { return Begin(); }
-    Iterator end() { return End(); }
-
     class ConstIterator
     {
         const SelfType* pArray;
@@ -744,6 +740,12 @@ public:
     ConstIterator Begin() const { return ConstIterator(this); }
     ConstIterator End() const   { return ConstIterator(this, (intptr_t)GetSize()); }
     ConstIterator Last() const  { return ConstIterator(this, (intptr_t)GetSize() - 1); }
+
+    // C++11 ranged-based for loop support.
+    Iterator begin() { return Begin(); }
+    Iterator end() { return End(); }
+    ConstIterator begin() const { return Begin(); }
+    ConstIterator end() const { return End(); }
 
 protected:
     ArrayData   Data;

@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 *************************************************************************************/
 
+#include <string>
+
 class Tracker
 {
 private :
@@ -29,7 +31,7 @@ private :
 
 public :
 
-	void Init(ovrSession Session, String mainFilePathNoExtension, RenderDevice* pRender, bool SrgbRequested, bool AnisotropicSample);
+	void Init(ovrSession Session, std::string mainFilePathNoExtension, RenderDevice* pRender, bool SrgbRequested, bool AnisotropicSample);
 	void Clear(void);
 	void Draw(ovrSession Session, RenderDevice*       pRender, Player ThePlayer, ovrTrackingOrigin TrackingOriginType,
 		bool Sitting, float ExtraSittingAltitude, Matrix4f * ViewFromWorld, int eye,ovrPosef * EyeRenderPose);

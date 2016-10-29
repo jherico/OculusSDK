@@ -81,7 +81,7 @@ HINSTANCE ImageWindow::hInstDwrite = NULL;
 ImageWindow* ImageWindow::globalWindow[ImageWindow::MaxWindows];
 int ImageWindow::windowCount = 0;
 
-LRESULT CALLBACK MainWndProc(
+LRESULT CALLBACK MainWndProcW(
     HWND hwnd,
     UINT uMsg,
     WPARAM wParam,
@@ -94,7 +94,7 @@ LRESULT CALLBACK MainWndProc(
 
     case WM_PAINT: 
         {
-            LONG_PTR ptr = GetWindowLongPtr( hwnd, GWLP_USERDATA );
+			LONG_PTR ptr = GetWindowLongPtrW( hwnd, GWLP_USERDATA );
             if( ptr )
             {
                 ImageWindow* iw = (ImageWindow*)ptr;
@@ -117,7 +117,7 @@ LRESULT CALLBACK MainWndProc(
         // 
 
     default: 
-        return DefWindowProc(hwnd, uMsg, wParam, lParam); 
+		return DefWindowProcW(hwnd, uMsg, wParam, lParam); 
     } 
     //return 0; 
 }
@@ -183,7 +183,7 @@ ImageWindow::ImageWindow( uint32_t width, uint32_t height ) :
 
     if (hWindow)
     {
-        SetWindowLongPtr( hWindow, GWLP_USERDATA, (LONG_PTR)this );
+        SetWindowLongPtrW( hWindow, GWLP_USERDATA, (LONG_PTR)this );
     }
 }
 
@@ -215,8 +215,6 @@ ImageWindow::~ImageWindow()
             Ptr<Frame> aFrame = frames.PopBack();
         }
     }
-
-    delete frontBufferMutex;
 
     if (hWindow)
     {

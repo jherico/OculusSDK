@@ -482,35 +482,33 @@ void Timer::shutdownTimerSystem()
 
 
 CountdownTimer::CountdownTimer(size_t countdownTimeMs, bool start)
-      : DoneTimeMs(0)
-      , CountdownTimeMs(countdownTimeMs)
+      : CountdownTime(std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(countdownTimeMs)))
     {
         if(start)
             Restart();
     }
 
-    size_t CountdownTimer::CurrentTimeMs() const
+    std::chrono::steady_clock::time_point CountdownTimer::CurrentTime() const
     {
-        return (std::clock() * 1000) / CLOCKS_PER_SEC;   
+        return std::chrono::steady_clock::now();
     }
 
     bool CountdownTimer::IsTimeUp() const
     {
-        return (CurrentTimeMs() > DoneTimeMs);
+        return (CurrentTime() > DoneTime);
     }
 
     void CountdownTimer::Restart()
     {
-        DoneTimeMs = (CurrentTimeMs() + CountdownTimeMs);
+        DoneTime = (CurrentTime() + CountdownTime);
     }
 
     void CountdownTimer::Restart(size_t countdownTimeMs)
     {
-        CountdownTimeMs = countdownTimeMs;
+        CountdownTime = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::milliseconds(countdownTimeMs));
         Restart();
 };
 
 
 
 } // OVR
-

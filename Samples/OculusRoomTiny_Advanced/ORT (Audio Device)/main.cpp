@@ -278,7 +278,6 @@ public:
 
 int AudioCreateRenderer(CWASAPIRenderer **renderer)
 {
-    int result = 0;
     AutoSafeRelease<IMMDevice> device;
 
     HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -605,7 +604,7 @@ DWORD CWASAPIRenderer::DoRenderThread()
     HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     CHECK_HRESULT(hr, hr);
 
-    mmcssHandle = AvSetMmThreadCharacteristics("Audio", &mmcssTaskIndex);
+    mmcssHandle = AvSetMmThreadCharacteristicsW(L"Audio", &mmcssTaskIndex);
     if (mmcssHandle == NULL)
     {
         // Unable to enable MMCSS on render thread
@@ -674,6 +673,8 @@ DWORD CWASAPIRenderer::DoRenderThread()
 //
 HRESULT CWASAPIRenderer::OnSessionDisconnected(AudioSessionDisconnectReason DisconnectReason)
 {
+    UNREFERENCED_PARAMETER(DisconnectReason);
+
     // TODO: test this, shut down renderer?
     return S_OK;
 }
@@ -729,5 +730,8 @@ ULONG CWASAPIRenderer::Release()
 
 HRESULT CWASAPIRenderer::OnDefaultDeviceChanged(EDataFlow Flow, ERole Role, LPCWSTR /*NewDefaultDeviceId*/)
 {
+    UNREFERENCED_PARAMETER(Flow);
+    UNREFERENCED_PARAMETER(Role);
+
     return S_OK;
 }

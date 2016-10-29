@@ -21,6 +21,8 @@ limitations under the License.
 
 #include "OculusWorldDemo.h"
 
+#include <algorithm>
+
 // If set, pyramid sides are filled in with a pattern; else the image
 // is minimized to just have lines.
 bool    drawWalls = false;
@@ -190,12 +192,12 @@ void LOCAL_RenderModelWithAlpha(RenderDevice* pRender, Model * m, Matrix4f mat)
 	// Need to call the regular function if needed to set up
 	if (!m->VertexBuffer) pRender->Render(Matrix4f(), m);
 	pRender->RenderWithAlpha(m->Fill, m->VertexBuffer, m->IndexBuffer,
-		mat * m->GetMatrix(), -1/*to trigger normal alpha blend*/, (unsigned)m->Indices.GetSize(),m->GetPrimType());
+		mat * m->GetMatrix(), -1/*to trigger normal alpha blend*/, (unsigned)m->Indices.size(),m->GetPrimType());
 }
 
 
 //----------------------------------------------------------------
-void Tracker::Init(ovrSession Session,String mainFilePathNoExtension, RenderDevice* pRender, bool SrgbRequested, bool AnisotropicSample)
+void Tracker::Init(ovrSession Session, std::string mainFilePathNoExtension, RenderDevice* pRender, bool SrgbRequested, bool AnisotropicSample)
 {
 	// Load textures - just have to call everything Tuscany_, and put in assets file.
 	int textureLoadFlags = 0;
@@ -203,8 +205,8 @@ void Tracker::Init(ovrSession Session,String mainFilePathNoExtension, RenderDevi
 	textureLoadFlags |= AnisotropicSample ? TextureLoad_Anisotropic : 0;
 	textureLoadFlags |= TextureLoad_MakePremultAlpha;
 
-	Ptr<File>	 whiteFile = *new SysFile(mainFilePathNoExtension + "_White.dds");
-	Ptr<File>	 gridFile = *new SysFile(mainFilePathNoExtension + "_Grid.dds"); 
+	Ptr<File>	 whiteFile = *new SysFile((mainFilePathNoExtension + "_White.dds").c_str());
+	Ptr<File>	 gridFile = *new SysFile((mainFilePathNoExtension + "_Grid.dds").c_str()); 
 	Ptr<Texture> whiteTexture = *LoadTextureDDSTopDown(pRender, whiteFile, textureLoadFlags);
 	Ptr<Texture> gridTexture = *LoadTextureDDSTopDown(pRender, gridFile, textureLoadFlags);
 	whiteTexture->SetSampleMode(Sample_Anisotropic | Sample_Repeat);

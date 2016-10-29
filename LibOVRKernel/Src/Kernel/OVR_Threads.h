@@ -32,6 +32,10 @@ limitations under the License.
 #include "OVR_RefCount.h"
 #include "OVR_Array.h"
 
+#include <memory>
+#include <mutex>
+#include <condition_variable>
+
 // Defines the infinite wait delay timeout
 #define OVR_WAIT_INFINITE 0xFFFFFFFF
 
@@ -46,11 +50,9 @@ namespace OVR {
 
 // Declared with thread support only
 class   Mutex;
-class   WaitCondition;
 class   Event;
 // Implementation forward declarations
 class MutexImpl;
-class WaitConditionImpl;
 
 
 
@@ -63,10 +65,9 @@ class WaitConditionImpl;
 
 class Mutex
 {
-    friend class WaitConditionImpl;    
     friend class MutexImpl;
 
-    MutexImpl  *pImpl; 
+    std::unique_ptr<MutexImpl>  pImpl;
 
 public:
     // Constructor/destructor
@@ -88,48 +89,14 @@ public:
     public:
         Mutex *pMutex;
         Locker(Mutex *pmutex)
-            { pMutex = pmutex; pMutex->DoLock(); }
+            : pMutex(pmutex)
+            { pMutex->DoLock(); }
+        Locker(const std::unique_ptr<Mutex> &pmutex)
+            : Locker(pmutex.get()) { }
         ~Locker()
             { pMutex->Unlock(); }
     };
 };
-
-
-//-----------------------------------------------------------------------------------
-// ***** WaitCondition
-
-/*
-    WaitCondition is a synchronization primitive that can be used to implement what is known as a monitor.
-    Dependent threads wait on a wait condition by calling Wait(), and get woken up by other threads that
-    call Notify() or NotifyAll().
-
-    The unique feature of this class is that it provides an atomic way of first releasing a Mutex, and then 
-    starting a wait on a wait condition. If both the mutex and the wait condition are associated with the same
-    resource, this ensures that any condition checked for while the mutex was locked does not change before
-    the wait on the condition is actually initiated.
-*/
-
-class WaitCondition
-{
-    friend class WaitConditionImpl;
-    // Internal implementation structure
-    WaitConditionImpl *pImpl;
-
-public:
-    // Constructor/destructor
-    WaitCondition();
-    ~WaitCondition();
-
-    // Release mutex and wait for condition. The mutex is re-aquired after the wait.
-    // Delay is specified in milliseconds (1/1000 of a second).
-    bool    Wait(Mutex *pmutex, unsigned delay = OVR_WAIT_INFINITE);
-
-    // Notify a condition, releasing at one object waiting
-    void    Notify();
-    // Notify a condition, releasing all objects waiting
-    void    NotifyAll();
-};
-
 
 //-----------------------------------------------------------------------------------
 // ***** Event
@@ -143,8 +110,8 @@ class Event
     // Event state, its mutex and the wait condition
     volatile bool   State;
     volatile bool   Temporary;  
-    mutable Mutex   StateMutex;
-    WaitCondition   StateWaitCondition;
+    mutable std::mutex       StateMutex;
+    std::condition_variable  StateWaitCondition;
 
     void updateState(bool newState, bool newTemp, bool mustNotify);
 
@@ -199,231 +166,16 @@ typedef void* ThreadId;
 #define OVR_THREAD_EXIT                  0x10
 
 
-class Thread : public RefCountBase<Thread>
-{ // NOTE: Waitable must be the first base since it implements RefCountImpl.    
-public:
-    // *** Callback functions, can be used instead of overriding Run
-
-    // Run function prototypes.    
-    // Thread function and user handle passed to it, executed by the default
-    // Thread::Run implementation if not null.
-    typedef int (*ThreadFn)(Thread *pthread, void* h);
-    
-    // Thread ThreadFunction1 is executed if not 0, otherwise ThreadFunction2 is tried
-    ThreadFn    ThreadFunction;    
-    // User handle passes to a thread
-    void*       UserHandle;
-
-    // Thread state to start a thread with
-    enum ThreadState
-    {
-        NotRunning  = 0,
-        Running     = 1,
-        Suspended   = 2
-    };
-
-    // Thread priority
-    enum ThreadPriority
-    {
-        CriticalPriority,
-        HighestPriority,
-        AboveNormalPriority,
-        NormalPriority,
-        BelowNormalPriority,
-        LowestPriority,
-        IdlePriority,
-    };
-
-    // Thread constructor parameters
-    struct CreateParams
-    {
-        CreateParams(ThreadFn func = 0, void* hand = 0, size_t ssize = 128 * 1024, 
-                     int proc = -1, ThreadState state = NotRunning, ThreadPriority prior = NormalPriority)
-                     : threadFunction(func), userHandle(hand), stackSize(ssize), 
-                       processor(proc), initialState(state), priority(prior) {}
-        ThreadFn       threadFunction;   // Thread function
-        void*          userHandle;       // User handle passes to a thread
-        size_t         stackSize;        // Thread stack size
-        int            processor;        // Thread hardware processor
-        ThreadState    initialState;     // 
-        ThreadPriority priority;         // Thread priority
-    };
-
-
-    // *** Constructors
-
-    // A default constructor always creates a thread in NotRunning state, because
-    // the derived class has not yet been initialized. The derived class can call Start explicitly.
-    // "processor" parameter specifies which hardware processor this thread will be run on. 
-    // -1 means OS decides this. Implemented only on Win32
-    Thread(size_t stackSize = 128 * 1024, int processor = -1);
-    // Constructors that initialize the thread with a pointer to function.
-    // An option to start a thread is available, but it should not be used if classes are derived from Thread.
-    // "processor" parameter specifies which hardware processor this thread will be run on. 
-    // -1 means OS decides this. Implemented only on Win32
-    Thread(ThreadFn threadFunction, void*  userHandle = 0, size_t stackSize = 128 * 1024,
-           int processor = -1, ThreadState initialState = NotRunning);
-    // Constructors that initialize the thread with a create parameters structure.
-    explicit Thread(const CreateParams& params);
-
-    // Destructor.
-    virtual ~Thread();
-
-    // Waits for all Threads to finish; should be called only from the root
-    // application thread. Once this function returns, we know that all other
-    // thread's references to Thread object have been released.
-    static  void OVR_CDECL FinishAllThreads();
-
-
-    // *** Overridable Run function for thread processing
-
-    // - returning from this method will end the execution of the thread
-    // - return value is usually 0 for success 
-    virtual int   Run();
-    // Called after return/exit function
-    virtual void  OnExit();
-
-
-    // *** Thread management
-
-    // Starts the thread if its not already running
-    // - internally sets up the threading and calls Run()
-    // - initial state can either be Running or Suspended, NotRunning will just fail and do nothing
-    // - returns the exit code
-    virtual bool  Start(ThreadState initialState = Running);
-
-    // Quits with an exit code
-    virtual void  Exit(int exitCode=0);
-
-    // Suspend the thread until resumed
-    // Returns 1 for success, 0 for failure.
-    bool  Suspend();
-    // Resumes currently suspended thread
-    // Returns 1 for success, 0 for failure.
-    bool  Resume();
-
-    // Static function to return a pointer to the current thread
-    //static Thread* GetThread();
-
-
-    // *** Thread status query functions
-
-    bool          GetExitFlag() const;
-    void          SetExitFlag(bool exitFlag);
-
-    // Determines whether the thread was running and is now finished
-    bool          IsFinished() const;
-    // Determines if the thread is currently suspended
-    bool          IsSuspended() const;
-    // Returns current thread state
-    ThreadState   GetThreadState() const;
-
-    // Wait for thread to finish for a maxmimum number of milliseconds
-    // For maxWaitMs = 0 it simply polls and then returns if the thread is not finished
-    // For maxWaitMs < 0 it will wait forever
-    bool          Join(int maxWaitMs = -1) const;
-
-    // Returns the number of available CPUs on the system 
-    static int    GetCPUCount();
-
-    // Returns the thread exit code. Exit code is initialized to 0,
-    // and set to the return value if Run function after the thread is finished.
-    inline int    GetExitCode() const { return ExitCode; }
-    // Returns an OS handle 
-#if defined(OVR_OS_MS)
-    void*          GetOSHandle() const { return ThreadHandle; }
-#else
-    pthread_t      GetOSHandle() const { return ThreadHandle; }
-#endif
-
-#if defined(OVR_OS_MS)
-    ThreadId       GetThreadId() const { return IdValue; }
-#else
-    ThreadId       GetThreadId() const { return (ThreadId)GetOSHandle(); }
-#endif
-
-    // Returns the platform-specific equivalent const that corresponds to the given ThreadPriority. 
-    static int            GetOSPriority(ThreadPriority);
-    static ThreadPriority GetOVRPriority(int osPriority); // May return a value outside the ThreadPriority enum range in unusual cases.
-
-    // Gets this instance's priority.
-    ThreadPriority GetPriority();
-
-    // Gets the current thread's priority.
-    static ThreadPriority GetCurrentPriority();
-
-    // Sets this instance's thread's priority.
-    // Some platforms (e.g. Unix) don't let you set thread priorities unless you have root privileges/
-    bool SetPriority(ThreadPriority);
-
-    // Sets the current thread's priority.
-    static bool SetCurrentPriority(ThreadPriority);
-
+namespace Thread
+{
     // *** Sleep
 
-    // Sleep secs seconds
-    static bool    Sleep(unsigned secs);
     // Sleep msecs milliseconds
-    static bool    MSleep(unsigned msecs);
-
-    // Notifies the scheduler that this thread is willing to release its processor
-    // to other threads of equal or higher priority.
-    static void    YieldCurrentThread();
+    bool    MSleep(unsigned msecs);
 
     // *** Debugging functionality
-    virtual void    SetThreadName(const char* name);
-    static void     SetThreadName(const char* name, ThreadId threadId);
-    static void     SetCurrentThreadName(const char* name);
-
-    static void     GetThreadName(char* name, size_t nameCapacity, ThreadId threadId);
-    static void     GetCurrentThreadName(char* name, size_t nameCapacity);
-
-private:
-#if defined(OVR_OS_WIN32)
-    friend unsigned WINAPI Thread_Win32StartFn(void *phandle);
-#elif defined(OVR_OS_MS) // Any other Microsoft OS...
-    friend DWORD WINAPI Thread_Win32StartFn(void *phandle);
-#else
-    friend void *Thread_PthreadStartFn(void * phandle);
-
-    static int            InitAttr;
-    static pthread_attr_t Attr;
-#endif
-
-protected:    
-    // Thread state flags
-    AtomicInt<uint32_t>   ThreadFlags;
-    AtomicInt<int32_t>   SuspendCount;
-    size_t              StackSize;
-
-    // Hardware processor which this thread is running on.
-    int            Processor;
-    ThreadPriority Priority;
-
-#if defined(OVR_OS_MS)
-    void*               ThreadHandle;
-    volatile ThreadId   IdValue;
-
-    // System-specific cleanup function called from destructor
-    void                CleanupSystemThread();
-
-#else
-    pthread_t           ThreadHandle;
-#endif
-
-    // Exit code of the thread, as returned by Run.
-    int                 ExitCode;
-
-    // Internal run function.
-    int                 PRun();    
-    // Finishes the thread and releases internal reference to it.
-    void                FinishAndRelease();
-
-    void                Init(const CreateParams& params);
-
-    // Protected copy constructor
-    Thread(const Thread &source) : RefCountBase<Thread>() { OVR_UNUSED(source); }
-
+    void     SetCurrentThreadName(const char* name);
+    void     GetCurrentThreadName(char* name, size_t nameCapacity);
 };
 
 // Returns the unique Id of a thread it is called on, intended for

@@ -167,43 +167,43 @@ static bool MainLoop(bool retryCreate)
     Camera*                     mainCam = nullptr;
     ovrMirrorTextureDesc        mirrorDesc = {};
 
-	ovrSession session;
-	ovrGraphicsLuid luid;
+    ovrSession session;
+    ovrGraphicsLuid luid;
     ovrResult result = ovr_Create(&session, &luid);
     if (!OVR_SUCCESS(result))
         return retryCreate;
 
     ovrHmdDesc hmdDesc = ovr_GetHmdDesc(session);
 
-	// Setup Device and Graphics
-	// Note: the mirror window can be any size, for this sample we use 1/2 the HMD resolution
+    // Setup Device and Graphics
+    // Note: the mirror window can be any size, for this sample we use 1/2 the HMD resolution
     if (!DIRECTX.InitDevice(hmdDesc.Resolution.w / 2, hmdDesc.Resolution.h / 2, reinterpret_cast<LUID*>(&luid)))
         goto Done;
 
-	// Make the eye render buffers (caution if actual size < requested due to HW limits). 
-	ovrRecti eyeRenderViewport[2];
+    // Make the eye render buffers (caution if actual size < requested due to HW limits). 
+    ovrRecti eyeRenderViewport[2];
 
-	for (int eye = 0; eye < 2; ++eye)
-	{
+    for (int eye = 0; eye < 2; ++eye)
+    {
         ovrSizei idealSize = ovr_GetFovTextureSize(session, (ovrEyeType)eye, hmdDesc.DefaultEyeFov[eye], 1.0f);
         pEyeRenderTexture[eye] = new OculusEyeTexture();
         if (!pEyeRenderTexture[eye]->Init(session, idealSize.w, idealSize.h, true))
         {
             if (retryCreate) goto Done;
-	        VALIDATE(false, "Failed to create eye texture.");
+            FATALERROR("Failed to create eye texture.");
         }
 
         eyeRenderViewport[eye].Pos.x = 0;
-		eyeRenderViewport[eye].Pos.y = 0;
-		eyeRenderViewport[eye].Size = idealSize;
+        eyeRenderViewport[eye].Pos.y = 0;
+        eyeRenderViewport[eye].Size = idealSize;
         if (!pEyeRenderTexture[eye]->TextureChain)
         {
             if (retryCreate) goto Done;
-            VALIDATE(false, "Failed to create texture.");
+            FATALERROR("Failed to create texture.");
         }
-	}
+    }
 
-	// Create a mirror to see on the monitor.
+    // Create a mirror to see on the monitor.
     mirrorDesc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
     mirrorDesc.Width = DIRECTX.WinSizeW;
     mirrorDesc.Height = DIRECTX.WinSizeH;
@@ -211,17 +211,17 @@ static bool MainLoop(bool retryCreate)
     if (!OVR_SUCCESS(result))
     {
         if (retryCreate) goto Done;
-        VALIDATE(false, "Failed to create mirror texture.");
+        FATALERROR("Failed to create mirror texture.");
     }
 
-	// Create the room model
+    // Create the room model
     roomScene = new Scene(false);
 
-	// Create camera
+    // Create camera
     mainCam = new Camera(XMVectorSet(0.0f, 1.6f, 5.0f, 0), XMQuaternionIdentity());
 
-	// Setup VR components, filling out description
-	ovrEyeRenderDesc eyeRenderDesc[2];
+    // Setup VR components, filling out description
+    ovrEyeRenderDesc eyeRenderDesc[2];
     eyeRenderDesc[0] = ovr_GetRenderDesc(session, ovrEye_Left, hmdDesc.DefaultEyeFov[0]);
     eyeRenderDesc[1] = ovr_GetRenderDesc(session, ovrEye_Right, hmdDesc.DefaultEyeFov[1]);
 
@@ -231,102 +231,116 @@ static bool MainLoop(bool retryCreate)
 
     DIRECTX.InitFrame(drawMirror);
 
-	// Main loop
-	while (DIRECTX.HandleMessages())
-	{
-		XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, -0.05f, 0), mainCam->GetRotVec());
-		XMVECTOR right   = XMVector3Rotate(XMVectorSet(0.05f, 0, 0, 0),  mainCam->GetRotVec());
-        XMVECTOR mainCamPos = mainCam->GetPosVec();
-        XMVECTOR mainCamRot = mainCam->GetRotVec();
-        if (DIRECTX.Key['W'] || DIRECTX.Key[VK_UP])	  mainCamPos = XMVectorAdd(     mainCamPos, forward);
-        if (DIRECTX.Key['S'] || DIRECTX.Key[VK_DOWN]) mainCamPos = XMVectorSubtract(mainCamPos, forward);
-        if (DIRECTX.Key['D'])                         mainCamPos = XMVectorAdd(     mainCamPos, right);
-        if (DIRECTX.Key['A'])                         mainCamPos = XMVectorSubtract(mainCamPos, right);
-		static float Yaw = 0;
-		if (DIRECTX.Key[VK_LEFT])  mainCamRot = XMQuaternionRotationRollPitchYaw(0, Yaw += 0.02f, 0);
-		if (DIRECTX.Key[VK_RIGHT]) mainCamRot = XMQuaternionRotationRollPitchYaw(0, Yaw -= 0.02f, 0);
-
-        mainCam->SetPosVec(mainCamPos);
-        mainCam->SetRotVec(mainCamRot);
-
-		// Animate the cube
-		static float cubeClock = 0;
-		roomScene->Models[0]->Pos = XMFLOAT3(9 * sin(cubeClock), 3, 9 * cos(cubeClock += 0.015f));
-
-		// Get both eye poses simultaneously, with IPD offset already included. 
-		ovrPosef    EyeRenderPose[2];
-		ovrVector3f HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
-			                              eyeRenderDesc[1].HmdToEyeOffset };
-
-        double sensorSampleTime;    // sensorSampleTime is fed into the layer later
-        ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
-
-        ovrSessionStatus sessionStatus = {};
+    // Main loop
+    while (DIRECTX.HandleMessages())
+    {
+        ovrSessionStatus sessionStatus;
         ovr_GetSessionStatus(session, &sessionStatus);
+        if (sessionStatus.ShouldQuit)
+        {
+            // Because the application is requested to quit, should not request retry
+            retryCreate = false;
+            break;
+        }
+        if (sessionStatus.ShouldRecenter)
+            ovr_RecenterTrackingOrigin(session);
 
-		// Render Scene to Eye Buffers
         if (sessionStatus.IsVisible)
         {
+            XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, -0.05f, 0), mainCam->GetRotVec());
+            XMVECTOR right   = XMVector3Rotate(XMVectorSet(0.05f, 0, 0, 0),  mainCam->GetRotVec());
+            XMVECTOR mainCamPos = mainCam->GetPosVec();
+            XMVECTOR mainCamRot = mainCam->GetRotVec();
+            if (DIRECTX.Key['W'] || DIRECTX.Key[VK_UP])      mainCamPos = XMVectorAdd(     mainCamPos, forward);
+            if (DIRECTX.Key['S'] || DIRECTX.Key[VK_DOWN])    mainCamPos = XMVectorSubtract(mainCamPos, forward);
+            if (DIRECTX.Key['D'])                            mainCamPos = XMVectorAdd(     mainCamPos, right);
+            if (DIRECTX.Key['A'])                            mainCamPos = XMVectorSubtract(mainCamPos, right);
+            static float Yaw = 0;
+            if (DIRECTX.Key[VK_LEFT])  mainCamRot = XMQuaternionRotationRollPitchYaw(0, Yaw += 0.02f, 0);
+            if (DIRECTX.Key[VK_RIGHT]) mainCamRot = XMQuaternionRotationRollPitchYaw(0, Yaw -= 0.02f, 0);
+
+            mainCam->SetPosVec(mainCamPos);
+            mainCam->SetRotVec(mainCamRot);
+
+            // Animate the cube
+            static float cubeClock = 0;
+            roomScene->Models[0]->Pos = XMFLOAT3(9 * sin(cubeClock), 3, 9 * cos(cubeClock += 0.015f));
+
+            // Get both eye poses simultaneously, with IPD offset already included. 
+            ovrPosef    EyeRenderPose[2];
+            ovrVector3f HmdToEyeOffset[2] = { eyeRenderDesc[0].HmdToEyeOffset,
+                                              eyeRenderDesc[1].HmdToEyeOffset };
+
+            double sensorSampleTime;    // sensorSampleTime is fed into the layer later
+            ovr_GetEyePoses(session, frameIndex, ovrTrue, HmdToEyeOffset, EyeRenderPose, &sensorSampleTime);
+
+            // Render Scene to Eye Buffers
             for (int eye = 0; eye < 2; ++eye)
-		    {
+            {
                 DIRECTX.SetActiveContext(eye == 0 ? DrawContext_EyeRenderLeft : DrawContext_EyeRenderRight);
 
                 DIRECTX.SetActiveEye(eye);
 
-                DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1,
-                    &CD3DX12_RESOURCE_BARRIER::Transition(pEyeRenderTexture[eye]->GetD3DResource(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+                CD3DX12_RESOURCE_BARRIER resBar = CD3DX12_RESOURCE_BARRIER::Transition(pEyeRenderTexture[eye]->GetD3DResource(),
+                                                                                       D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                                                                                       D3D12_RESOURCE_STATE_RENDER_TARGET);
+                DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1, &resBar);
 
-                DIRECTX.SetAndClearRenderTarget(&pEyeRenderTexture[eye]->GetRtv(), &pEyeRenderTexture[eye]->GetDsv());
-			    DIRECTX.SetViewport((float)eyeRenderViewport[eye].Pos.x, (float)eyeRenderViewport[eye].Pos.y,
-				                    (float)eyeRenderViewport[eye].Size.w, (float)eyeRenderViewport[eye].Size.h);
+                DIRECTX.SetAndClearRenderTarget(pEyeRenderTexture[eye]->GetRtv(), pEyeRenderTexture[eye]->GetDsv());
+                DIRECTX.SetViewport((float)eyeRenderViewport[eye].Pos.x, (float)eyeRenderViewport[eye].Pos.y,
+                                    (float)eyeRenderViewport[eye].Size.w, (float)eyeRenderViewport[eye].Size.h);
                                 
-			    //Get the pose information in XM format
-			    XMVECTOR eyeQuat = XMVectorSet(EyeRenderPose[eye].Orientation.x, EyeRenderPose[eye].Orientation.y,
-				                               EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
-			    XMVECTOR eyePos = XMVectorSet(EyeRenderPose[eye].Position.x, EyeRenderPose[eye].Position.y, EyeRenderPose[eye].Position.z, 0);
+                //Get the pose information in XM format
+                XMVECTOR eyeQuat = XMVectorSet(EyeRenderPose[eye].Orientation.x, EyeRenderPose[eye].Orientation.y,
+                                               EyeRenderPose[eye].Orientation.z, EyeRenderPose[eye].Orientation.w);
+                XMVECTOR eyePos = XMVectorSet(EyeRenderPose[eye].Position.x, EyeRenderPose[eye].Position.y, EyeRenderPose[eye].Position.z, 0);
 
-			    // Get view and projection matrices for the Rift camera
+                // Get view and projection matrices for the Rift camera
                 Camera finalCam(XMVectorAdd(mainCamPos, XMVector3Rotate(eyePos, mainCamRot)), XMQuaternionMultiply(eyeQuat, mainCamRot));
-			    XMMATRIX view = finalCam.GetViewMatrix();
+                XMMATRIX view = finalCam.GetViewMatrix();
                 ovrMatrix4f p = ovrMatrix4f_Projection(eyeRenderDesc[eye].Fov, 0.2f, 1000.0f, ovrProjection_None);
-			    XMMATRIX proj = XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],
-				                            p.M[0][1], p.M[1][1], p.M[2][1], p.M[3][1],
-				                            p.M[0][2], p.M[1][2], p.M[2][2], p.M[3][2],
-				                            p.M[0][3], p.M[1][3], p.M[2][3], p.M[3][3]);
-			    XMMATRIX prod = XMMatrixMultiply(view, proj);
+                XMMATRIX proj = XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],
+                                            p.M[0][1], p.M[1][1], p.M[2][1], p.M[3][1],
+                                            p.M[0][2], p.M[1][2], p.M[2][2], p.M[3][2],
+                                            p.M[0][3], p.M[1][3], p.M[2][3], p.M[3][3]);
+                XMMATRIX prod = XMMatrixMultiply(view, proj);
 
-			    roomScene->Render(&prod, 1, 1, 1, 1, true);
+                roomScene->Render(&prod, 1, 1, 1, 1, true);
 
-                DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1,
-                    &CD3DX12_RESOURCE_BARRIER::Transition(pEyeRenderTexture[eye]->GetD3DResource(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+                resBar = CD3DX12_RESOURCE_BARRIER::Transition(pEyeRenderTexture[eye]->GetD3DResource(),
+                                                              D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                                              D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1, &resBar);
 
                 // Commit rendering to the swap chain
                 pEyeRenderTexture[eye]->Commit();
 
                 // kick off eye render command lists before ovr_SubmitFrame()
                 DIRECTX.SubmitCommandList(DIRECTX.ActiveContext);
-		    }
+            }
+
+            // Initialize our single full screen Fov layer.
+            ovrLayerEyeFov ld = {};
+            ld.Header.Type = ovrLayerType_EyeFov;
+            ld.Header.Flags = 0;
+
+            for (int eye = 0; eye < 2; ++eye)
+            {
+                ld.ColorTexture[eye] = pEyeRenderTexture[eye]->TextureChain;
+                ld.Viewport[eye] = eyeRenderViewport[eye];
+                ld.Fov[eye] = hmdDesc.DefaultEyeFov[eye];
+                ld.RenderPose[eye] = EyeRenderPose[eye];
+                ld.SensorSampleTime = sensorSampleTime;
+            }
+
+            ovrLayerHeader* layers = &ld.Header;
+            result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
+            // exit the rendering loop if submit returns an error, will retry on ovrError_DisplayLost
+            if (!OVR_SUCCESS(result))
+                goto Done;
+            
+            frameIndex++;
         }
-
-        // Initialize our single full screen Fov layer.
-        ovrLayerEyeFov ld = {};
-        ld.Header.Type = ovrLayerType_EyeFov;
-        ld.Header.Flags = 0;
-
-        for (int eye = 0; eye < 2; ++eye)
-        {
-            ld.ColorTexture[eye] = pEyeRenderTexture[eye]->TextureChain;
-            ld.Viewport[eye] = eyeRenderViewport[eye];
-            ld.Fov[eye] = hmdDesc.DefaultEyeFov[eye];
-            ld.RenderPose[eye] = EyeRenderPose[eye];
-            ld.SensorSampleTime = sensorSampleTime;
-        }
-
-        ovrLayerHeader* layers = &ld.Header;
-        result = ovr_SubmitFrame(session, frameIndex, nullptr, &layers, 1);
-        // exit the rendering loop if submit returns an error, will retry on ovrError_DisplayLost
-        if (!OVR_SUCCESS(result))
-            goto Done;
         
         if (drawMirror)
         {
@@ -351,44 +365,45 @@ static bool MainLoop(bool retryCreate)
 
             DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->CopyResource(DIRECTX.CurrentFrameResources().SwapChainBuffer, mirrorTexRes);
 
-            DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1,
-                &CD3DX12_RESOURCE_BARRIER::Transition(mirrorTexRes, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET));
+            CD3DX12_RESOURCE_BARRIER resBar = CD3DX12_RESOURCE_BARRIER::Transition(mirrorTexRes,
+                                                                                   D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                                                                   D3D12_RESOURCE_STATE_RENDER_TARGET);
+            DIRECTX.CurrentFrameResources().CommandLists[DIRECTX.ActiveContext]->ResourceBarrier(1, &resBar);
         }
 
         DIRECTX.SubmitCommandListAndPresent(drawMirror);
-
-        frameIndex++;
     }
 
-	// Release resources
+    // Release resources
 Done:
     delete mainCam;
     delete roomScene;
-	if (mirrorTexture)
+    if (mirrorTexture)
         ovr_DestroyMirrorTexture(session, mirrorTexture);
 
     for (int eye = 0; eye < 2; ++eye)
     {
-	    delete pEyeRenderTexture[eye];
+        delete pEyeRenderTexture[eye];
     }
-	DIRECTX.ReleaseDevice();
+    DIRECTX.ReleaseDevice();
     ovr_Destroy(session);
 
     // Retry on ovrError_DisplayLost
-    return retryCreate || OVR_SUCCESS(result) || (result == ovrError_DisplayLost);
+    return retryCreate || (result == ovrError_DisplayLost);
 }
 
 //-------------------------------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE, LPSTR, int)
 {
-	// Initializes LibOVR, and the Rift
-	ovrResult result = ovr_Initialize(nullptr);
-	VALIDATE(OVR_SUCCESS(result), "Failed to initialize libOVR.");
+    // Initializes LibOVR, and the Rift
+	ovrInitParams initParams = { ovrInit_RequestVersion, OVR_MINOR_VERSION, NULL, 0, 0 };
+	ovrResult result = ovr_Initialize(&initParams);
+    VALIDATE(OVR_SUCCESS(result), "Failed to initialize libOVR.");
 
     VALIDATE(DIRECTX.InitWindow(hinst, L"Oculus Room Tiny (DX12)"), "Failed to open window.");
 
     DIRECTX.Run(MainLoop);
 
-	ovr_Shutdown();
-	return(0);
+    ovr_Shutdown();
+    return(0);
 }

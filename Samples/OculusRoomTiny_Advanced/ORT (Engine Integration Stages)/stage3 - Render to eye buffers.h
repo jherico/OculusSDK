@@ -26,8 +26,8 @@
 	                               DIRECTX.SetViewport((float)eyeRenderViewport[eye].Pos.x, (float)eyeRenderViewport[eye].Pos.y,               \
                                                        (float)eyeRenderViewport[eye].Size.w, (float)eyeRenderViewport[eye].Size.h);            
                                                                                                                                                
-#define STAGE3_RenderEyeBuffers    renderLeftEyeTexture.Render (&XMMatrixIdentity(),1,1,1,1,true);                                             \
-	                               renderRightEyeTexture.Render(&XMMatrixIdentity(), 1, 1, 1, 1, true);
+#define STAGE3_RenderEyeBuffers    renderLeftEyeTexture.Render (XMMatrixIdentity(),1,1,1,1,true);                                             \
+	                               renderRightEyeTexture.Render(XMMatrixIdentity(), 1, 1, 1, 1, true);
 
 
 // Actual code

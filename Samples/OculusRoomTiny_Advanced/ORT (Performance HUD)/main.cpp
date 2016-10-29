@@ -120,8 +120,12 @@ limitations under the License.
 ///         This includes timewarp and distortion of all the layers submitted by the application. The amount of
 ///         active layers, their resolution and the requested sampling quality can all affect the GPU times.
 ///
-///     Left-side graph:    Plots "Compositor Frame-rate"
-///     Right-side graph:   Plots "Compositor GPU Time"
+///     Comp Gpu-End to Present
+///         The amount of time between when the GPU completes the compositor rendering to the point in time when
+///         that buffer is latched in the swap chain to be scanned out on the HMD.
+///
+///     Left-side graph:    Plots "Compositor GPU Time"
+///     Right-side graph:   Plots "Comp Gpu-End to Present"
 ///
 ///Version Info :
 ///     

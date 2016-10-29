@@ -92,7 +92,7 @@ Recti RenderProfiler::DrawOverlay(RenderDevice* prender, float centerX, float ce
       //case Sample_AfterFlush         :     pName = "AfterFlush         "; break;
         }
         char bufTemp[256];
-        OVR_sprintf ( bufTemp, sizeof(bufTemp), "\nRaw: %.2lfms\t400Ave: %.2lfms\t800%s",
+        snprintf( bufTemp, sizeof(bufTemp), "\nRaw: %.2lfms\t400Ave: %.2lfms\t800%s",
                         lastSampleSet[timerNum] * 1000.0, averages[timerNum] * 1000.0, pName );
         OVR_strcat ( buf, sizeof(buf), bufTemp );
     }

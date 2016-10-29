@@ -43,10 +43,10 @@ namespace OVR { namespace Util {
 
 // This thread runs long-polling subsystems that wake up every second or so
 // The motivation is to reduce the number of threads that are running to minimize the risk of deadlock
-class LongPollThread : public Thread, public SystemSingletonBase<LongPollThread>
+class LongPollThread : public SystemSingletonBase<LongPollThread>
 {
     OVR_DECLARE_SINGLETON(LongPollThread);
-    virtual void OnThreadDestroy();
+    virtual void OnThreadDestroy() override;
 
 public:
     typedef Delegate0<void> PollFunc;
@@ -59,11 +59,13 @@ public:
 protected:
     CallbackEmitter<PollFunc> PollSubject;
 
-    bool Terminated;
+    std::atomic<bool> Terminated;
     Event WakeEvent;
+    std::unique_ptr<std::thread> LongPollThreadHandle;
+
     void fireTermination();
 
-    virtual int Run();
+    void Run();
 };
 
 

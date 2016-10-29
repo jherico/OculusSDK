@@ -56,8 +56,8 @@ public:
 
 protected:
     // Use 32 bit int so assignment and comparison is atomic
-    AtomicInt<uint32_t> WhenLastFedMilliseconds;
-    AtomicInt<int>      ThreshholdMilliseconds;
+    std::atomic<uint32_t> WhenLastFedMilliseconds = { 0 };
+    std::atomic<int>      ThreshholdMilliseconds = { 0 };
 
     String              ThreadName;
     bool                Listed;
@@ -67,12 +67,14 @@ protected:
 //-----------------------------------------------------------------------------
 // WatchDogObserver
 
-class WatchDogObserver : public Thread, public SystemSingletonBase<WatchDogObserver>
+class WatchDogObserver : public SystemSingletonBase<WatchDogObserver>
 {
     OVR_DECLARE_SINGLETON(WatchDogObserver);
-    virtual void OnThreadDestroy();
+    virtual void OnThreadDestroy() override;
 
     friend class WatchDog;
+
+    std::unique_ptr<std::thread> WatchdogThreadHandle;
 
 public:
     // Uses the exception logger to write deadlock reports
@@ -119,7 +121,7 @@ protected:
     void OnDeadlock(const String& deadlockedThreadName);
 
 protected:
-    virtual int Run();
+    int Run();
 
     void Add(WatchDog* dog);
     void Remove(WatchDog* dog);

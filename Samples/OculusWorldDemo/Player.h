@@ -27,17 +27,17 @@ limitations under the License.
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_Allocator.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Nullptr.h"
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_SysFile.h"
 #include "Extras/OVR_Math.h"
 
 #include "Kernel/OVR_KeyCodes.h"
 #include "../CommonSrc/Render/Render_Device.h"
+
+#include <vector>
+#include <string>
 
 using namespace OVR;
 using namespace OVR::Render;
@@ -74,8 +74,8 @@ public:
     // Handle directional movement. Returns 'true' if movement was processed.
     bool    HandleMoveKey(OVR::KeyCode key, bool down);
 
-    void    HandleMovement(double dt, Array<Ptr<CollisionModel> >* collisionModels,
-                                       Array<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
+    void    HandleMovement(double dt, std::vector<Ptr<CollisionModel> >* collisionModels,
+                                      std::vector<Ptr<CollisionModel> >* groundCollisionModels, bool shiftDown);
 
     // Accounts for ComfortTurn setting.
     Anglef  GetApparentBodyYaw();

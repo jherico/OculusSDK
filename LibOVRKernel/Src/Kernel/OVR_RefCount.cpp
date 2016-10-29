@@ -72,11 +72,11 @@ void RefCountNTSImplCore::reportInvalidDelete(void *pmem)
 
 void    RefCountImpl::AddRef()
 {
-    RefCount.ExchangeAdd_NoSync(1);
+    RefCount.fetch_add(1, std::memory_order_relaxed);
 }
 void    RefCountImpl::Release()
 {
-    if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
+    if (RefCount.fetch_add(-1, std::memory_order_relaxed) - 1 == 0)
         delete this;
 }
 
@@ -84,11 +84,11 @@ void    RefCountImpl::Release()
 
 void    RefCountVImpl::AddRef()
 {
-    RefCount.ExchangeAdd_NoSync(1);
+    RefCount.fetch_add(1, std::memory_order_relaxed);
 }
 void    RefCountVImpl::Release()
 {
-    if ((RefCount.ExchangeAdd_NoSync(-1) - 1) == 0)
+    if (RefCount.fetch_add(-1, std::memory_order_relaxed) - 1 == 0)
         delete this;
 }
 

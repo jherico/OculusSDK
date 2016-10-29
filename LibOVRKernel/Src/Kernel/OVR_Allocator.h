@@ -599,6 +599,8 @@ public:
     bool IsMallocRedirectEnabled() const
         { return MallocRedirectEnabled; }
 
+    static bool IsHeapTrackingRegKeyEnabled(bool defaultValue);
+
     // IterateHeapBegin succeeds only if tracking is enabled.
     // Once IterateHeapBegin is called, the heap is thread-locked until IterateHeapEnd is called.
     // If the heap has no allocations, IterateHeapBegin returns nullptr.
@@ -691,20 +693,20 @@ protected:
     // Tracked allocations
     #if defined(OVR_BUILD_DEBUG)
         typedef std::map<const void*, AllocMetadata, std::less<const void*>, // map is slower but in debug builds we can read its sorted contents easier.
-                          StdAllocatorSysMem<std::pair<const void*, AllocMetadata> > > TrackedAllocMap; 
+                          StdAllocatorSysMem<std::pair<const void* const, AllocMetadata> > > TrackedAllocMap;
     #else
         typedef std::unordered_map<const void*, AllocMetadata, std::hash<const void*>, std::equal_to<const void*>, 
-                          StdAllocatorSysMem<std::pair<const void*, AllocMetadata> > > TrackedAllocMap; 
+                          StdAllocatorSysMem<std::pair<const void* const, AllocMetadata> > > TrackedAllocMap;
     #endif
 
     // Per-thread tag stack
     typedef std::vector<const char*, StdAllocatorSysMem<const char*>> ConstCharVector;
     #if defined(OVR_BUILD_DEBUG)
         typedef std::map<uint32_t, ConstCharVector, std::less<uint32_t>, 
-                          StdAllocatorSysMem<ConstCharVector>> ThreadIdToTagVectorMap; 
+                          StdAllocatorSysMem<std::pair<const uint32_t,ConstCharVector>>> ThreadIdToTagVectorMap;
     #else
         typedef std::unordered_map<uint32_t, ConstCharVector, std::hash<uint32_t>, std::equal_to<uint32_t>, 
-                          StdAllocatorSysMem<ConstCharVector>> ThreadIdToTagVectorMap; 
+                          StdAllocatorSysMem<std::pair<const uint32_t,ConstCharVector>>> ThreadIdToTagVectorMap;
     #endif
 
     char                            AllocatorName[64];           // The name of this allocator. Useful because we could have multiple instances within a process.

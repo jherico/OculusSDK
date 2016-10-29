@@ -80,7 +80,7 @@ enum { LockInitMarker = 0xFFFFFFFF };
 
 Lock* SharedLock::GetLockAddRef()
 {
-    int oldUseCount;
+    int oldUseCount, oldUseCount_tmp;
 
     do {
         oldUseCount = UseCount;
@@ -90,17 +90,20 @@ Lock* SharedLock::GetLockAddRef()
         if (oldUseCount == 0)
         {
             // Initialize marker
-            if (UseCount.CompareAndSet_Sync(0, LockInitMarker))
+            int tmp_zero = 0;
+            int tmp_LockInitMarker = LockInitMarker;
+            if (UseCount.compare_exchange_strong(tmp_zero, LockInitMarker))
             {
                 Construct<Lock>(Buffer);
                 do { }
-                while (UseCount.CompareAndSet_Sync(LockInitMarker, 1));
+                while (UseCount.compare_exchange_weak(tmp_LockInitMarker, 1));
                 return toLock();
             }
             continue;
         }
-
-    } while (!UseCount.CompareAndSet_NoSync(oldUseCount, oldUseCount + 1));
+        oldUseCount_tmp = oldUseCount;
+    } while (!UseCount.compare_exchange_weak(oldUseCount_tmp, oldUseCount + 1,
+        std::memory_order_relaxed));
 
     return toLock();
 }
@@ -110,7 +113,7 @@ void SharedLock::ReleaseLock(Lock* plock)
     OVR_UNUSED(plock);
     OVR_ASSERT(plock == toLock());
 
-    int oldUseCount;
+    int oldUseCount, oldUseCount_tmp;
 
     do {
         oldUseCount = UseCount;
@@ -119,19 +122,23 @@ void SharedLock::ReleaseLock(Lock* plock)
         if (oldUseCount == 1)
         {
             // Initialize marker
-            if (UseCount.CompareAndSet_Sync(1, LockInitMarker))
+            int tmp_one = 1;
+            int tmp_LockInitMarker = LockInitMarker;
+            if (UseCount.compare_exchange_strong(tmp_one, LockInitMarker))
             {
                 Destruct<Lock>(toLock());
 
                 do { }
-                while (!UseCount.CompareAndSet_Sync(LockInitMarker, 0));
+                while (!UseCount.compare_exchange_weak(tmp_LockInitMarker, 0));
 
                 return;
             }
             continue;
         }
 
-    } while (!UseCount.CompareAndSet_NoSync(oldUseCount, oldUseCount - 1));
+        oldUseCount_tmp = oldUseCount;
+    } while (!UseCount.compare_exchange_weak(oldUseCount_tmp, oldUseCount - 1,
+        std::memory_order_relaxed));
 }
 
 } // OVR

@@ -24,10 +24,10 @@ limitations under the License.
 #include "Kernel/OVR_Win32_IncludeWindows.h"
 #include <mmsystem.h>
 #include <vector>
+#include <string>
+#include <codecvt>
 
 #include "Kernel/OVR_System.h"
-#include "Kernel/OVR_Array.h"
-#include "Kernel/OVR_String.h"
 
 #include "Win32_Platform.h"
 #include "Win32_Gamepad.h"
@@ -66,10 +66,7 @@ void* PlatformCore::SetupWindow(int w, int h)
 
     RegisterClassW(&wc);
 
-    Array<wchar_t> buffer;
-    intptr_t       textLength = UTF8Util::GetLength(WindowTitle);
-    buffer.Resize(textLength + 1);
-    UTF8Util::Strlcpy(&buffer[0], buffer.GetSize(), WindowTitle);
+    std::wstring wWindowTitle = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(WindowTitle);
 
     Width = w;
     Height = h;
@@ -79,7 +76,7 @@ void* PlatformCore::SetupWindow(int w, int h)
     winSize.bottom = Height;
     AdjustWindowRect(&winSize, WS_OVERLAPPEDWINDOW, false);
     // WS_CLIPCHILDREN is needed to support NotificationOverlay.
-    hWnd = CreateWindowW(WindowClassName, &buffer[0], WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+    hWnd = CreateWindowW(WindowClassName, wWindowTitle.c_str(), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                           CW_USEDEFAULT, CW_USEDEFAULT,
                         //  1950, 10,
                           winSize.right-winSize.left, winSize.bottom-winSize.top,
@@ -184,7 +181,7 @@ void PlatformCore::SetWindowTitle(const char* title)
     ::SetWindowTextA(hWnd, title);
 }
 
-String PlatformCore::GetContentDirectory() const
+std::string PlatformCore::GetContentDirectory() const
 {
     std::vector<WCHAR> path(MAX_PATH);
 
@@ -205,7 +202,7 @@ String PlatformCore::GetContentDirectory() const
     }
     path[last] = '\0';
 
-    return String(&path[0]);
+    return std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t>().to_bytes(&(path[0]));
 }
 
 static uint8_t KeyMap[][2] = 
@@ -461,7 +458,7 @@ LRESULT PlatformCore::WindowProc(UINT msg, WPARAM wp, LPARAM lp)
             if (pRender)
                 pRender->SetWindowSize(Width, Height);
 
-            for (int i = 0; i < NotificationOverlays.GetSizeI(); i++)
+            for (size_t i = 0; i < NotificationOverlays.size(); i++)
             {
                 if (NotificationOverlays[i])
                     NotificationOverlays[i]->UpdateOnWindowSize();
@@ -561,14 +558,14 @@ void  PlatformCore::SetNotificationOverlay(int index, int fontHeightPixels,
     // If null text, destroy overlay.
     if (!text)
     {
-        if (index < NotificationOverlays.GetSizeI())
+        if (index < (int) NotificationOverlays.size())
             NotificationOverlays[index].Clear();
         return;
     }
 
     // Otherwise create new overlay in this slot.
-    if (index >= NotificationOverlays.GetSizeI())
-        NotificationOverlays.Resize(index+1);
+    if (index >= (int) NotificationOverlays.size())
+        NotificationOverlays.resize(index+1);
     NotificationOverlays[index] = *new NotificationOverlay(this, fontHeightPixels, yoffset, text);
 }
 
@@ -578,10 +575,10 @@ void  PlatformCore::SetNotificationOverlay(int index, int fontHeightPixels,
 NotificationOverlay::NotificationOverlay(PlatformCore* core, int fontHeightPixels,
                                          int yoffset, const char* text)
 {
-    Array<wchar_t> buffer;
+    std::vector<wchar_t> buffer;
     intptr_t       textLength = UTF8Util::GetLength(text);
-    buffer.Resize(textLength + 1);
-    UTF8Util::Strlcpy(&buffer[0], buffer.GetSize(), text);
+    buffer.resize(textLength + 1);
+    UTF8Util::Strlcpy(&buffer[0], buffer.size(), text);
 
     pCore        = core;
     YOffest      = yoffset;
@@ -648,9 +645,9 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 
     // Nested scope for container destructors to shutdown before DestroyApplication.
     {
-        Array<String>      args;
-        Array<const char*> argv;
-        argv.PushBack("app");
+        std::vector<std::string> args;
+        std::vector<const char*> argv;
+        argv.push_back("app");
 
         const char* p = inArgs;
         const char* pstart = inArgs;
@@ -658,7 +655,7 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
         {
             if (*p == ' ')
             {
-                args.PushBack(String(pstart, p - pstart));
+                args.push_back(std::string(pstart, p - pstart));
                 while (*p == ' ')
                     p++;
                 pstart = p;
@@ -669,11 +666,11 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
             }
         }
         if (p != pstart)
-            args.PushBack(String(pstart, p - pstart));
-        for (size_t i = 0; i < args.GetSize(); i++)
-            argv.PushBack(args[i].ToCStr());
+            args.push_back(std::string(pstart, p - pstart));
+        for (size_t i = 0; i < args.size(); i++)
+            argv.push_back(args[i].c_str());
 
-        exitCode = g_app->OnStartup((int)argv.GetSize(), &argv[0]);
+        exitCode = g_app->OnStartup((int)argv.size(), &argv[0]);
         if (!exitCode)
             exitCode = platform->Run();
     }

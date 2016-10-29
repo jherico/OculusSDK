@@ -246,7 +246,7 @@ namespace OVR {
             { return Function; }
 
     protected:
-        const void* CopiedFunction::GetRealFunctionLocation(const void* pFunction);
+        const void* GetRealFunctionLocation(const void* pFunction);
 
         void* Function;
     };
@@ -565,7 +565,7 @@ namespace OVR {
 protected:
         // Runtime constants
         bool                enabled;
-        OVR::AtomicInt<int> pauseCount;                  // 0 means unpaused. 1+ means paused.
+        std::atomic<int>    pauseCount = { 0 };          // 0 means unpaused. 1+ means paused.
         bool                reportPrivacyEnabled;        // Defaults to true.
         ExceptionResponse   exceptionResponse;           // Defaults to kERHandle
         ExceptionListener*  exceptionListener;
@@ -580,7 +580,7 @@ protected:
 
         // Runtime variables
         bool                     exceptionOccurred;
-        OVR::AtomicInt<uint32_t> handlingBusy;
+        std::atomic<uint32_t> handlingBusy = { 0 };
         char                     reportFilePathActual[OVR_MAX_PATH];
         char                     minidumpFilePathActual[OVR_MAX_PATH];
         int                      terminateReturnValue;

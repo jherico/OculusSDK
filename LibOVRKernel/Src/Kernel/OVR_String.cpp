@@ -29,6 +29,7 @@ limitations under the License.
 
 #include <stdlib.h>
 #include <ctype.h>
+#include <atomic>
 
 #ifdef OVR_OS_QNX
 # include <strings.h>
@@ -71,7 +72,7 @@ static size_t StringStrlcpy(wchar_t* pDestUCS, size_t destCharCountNotIncludingN
 
 #define String_LengthIsSize (size_t(1) << String::Flag_LengthIsSizeShift)
 
-String::DataDesc String::NullData = {String_LengthIsSize, AtomicInt<int32_t>(1), {0} };
+String::DataDesc String::NullData = { String_LengthIsSize, {1}, {0} };
 
 String::String()
 {

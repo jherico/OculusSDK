@@ -32,6 +32,7 @@ limitations under the License.
 #include "Kernel/OVR_Allocator.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <memory>
 
 
 namespace OVR { namespace Util {
@@ -41,27 +42,25 @@ bool DisplayMessageBoxVaList(const char* pTitle, const char* pFormat, va_list ar
 {
     char  buffer[512];
     char* pBuffer = buffer;
-    char* pAllocated = nullptr;
+    std::unique_ptr<char[]> pAllocated;
 
     va_list argListSaved;
     OVR_VA_COPY(argListSaved, argList);
 
-    int result = OVR_vsnprintf(buffer, OVR_ARRAY_COUNT(buffer), pFormat, argList); // Returns the required strlen of buffer.
+    int result = vsnprintf(buffer, OVR_ARRAY_COUNT(buffer), pFormat, argList); // Returns the required strlen of buffer.
 
     if(result >= (int)OVR_ARRAY_COUNT(buffer)) // If there was insufficient capacity...
     {
-        pAllocated = new char[result + 1];
-        pBuffer    = pAllocated;
+        pAllocated = std::make_unique<char[]>(result + 1);
+        pBuffer    = pAllocated.get();
 
         va_end(argList); // The caller owns argList and will call va_end on it.
         OVR_VA_COPY(argList, argListSaved);
 
-        OVR_vsnprintf(pBuffer, (size_t)result + 1, pFormat, argList);
+        vsnprintf(pBuffer, (size_t)result + 1, pFormat, argList);
     }
 
     bool returnValue = DisplayMessageBox(pTitle, pBuffer);
-
-    delete[] pAllocated; // OK if it's nullptr.
 
     return returnValue;
 }
@@ -102,7 +101,7 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 
         static WORD* WordUp(WORD* pIn){ return (WORD*)((((uintptr_t)pIn + 3) >> 2) << 2); }
 
-        static BOOL CALLBACK Proc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+        static INT_PTR CALLBACK Proc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
         {
             switch (iMsg)
             {
@@ -115,9 +114,9 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
 
                     HFONT hFont = CreateFontW(-11, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, L"Courier New");
                     if(hFont)
-                        SendMessage(hWndEdit, WM_SETFONT, WPARAM(hFont), TRUE);
+                        SendMessageW(hWndEdit, WM_SETFONT, WPARAM(hFont), TRUE);
 
-                    SendMessage(hWndEdit, EM_SETSEL, (WPARAM)0, (LPARAM)0);
+                    SendMessageW(hWndEdit, EM_SETSEL, (WPARAM)0, (LPARAM)0);
 
                     return TRUE;
                 }
@@ -129,7 +128,7 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
                         {
                             // Handle messages from the edit control here.
                             HWND hWndEdit = GetDlgItem(hDlg, ID_EDIT);
-                            SendMessage(hWndEdit, EM_SETSEL, (WPARAM)0, (LPARAM)0);
+                            SendMessageW(hWndEdit, EM_SETSEL, (WPARAM)0, (LPARAM)0);
                             return TRUE;
                         }
 
@@ -247,7 +246,7 @@ bool DisplayMessageBox(const char* pTitle, const char* pText)
     if(textBuffW)
     {
         OVR::UTF8Util::Strlcpy(textBuffW, textBuffWCapacity, pText, textLength);
-        ret = DialogBoxIndirectParamW(NULL, (LPDLGTEMPLATEW)pDlg, NULL, (DLGPROC)Dialog::Proc, (LPARAM)textBuffW);
+        ret = DialogBoxIndirectParamW(NULL, (LPDLGTEMPLATEW)pDlg, NULL, Dialog::Proc, (LPARAM)textBuffW);
         OVR::SafeMMapFree(textBuffW, textBuffWCapacity * sizeof(wchar_t));
     }
 

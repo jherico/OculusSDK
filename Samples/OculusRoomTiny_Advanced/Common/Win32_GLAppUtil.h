@@ -41,6 +41,8 @@ struct DepthBuffer
 
     DepthBuffer(Sizei size, int sampleCount)
     {
+        UNREFERENCED_PARAMETER(sampleCount);
+
         assert(sampleCount <= 1); // The code doesn't currently handle MSAA textures.
 
         glGenTextures(1, &texId);
@@ -86,6 +88,8 @@ struct TextureBuffer
         fboId(0),
         texSize(0, 0)
     {
+        UNREFERENCED_PARAMETER(sampleCount);
+
         assert(sampleCount <= 1); // The code doesn't currently handle MSAA textures.
 
         texSize = size;
@@ -335,6 +339,8 @@ struct OGL
     // Note: currently there is no way to get GL to use the passed pLuid
     bool InitDevice(int vpW, int vpH, const LUID* /*pLuid*/, bool windowed = true)
     {
+        UNREFERENCED_PARAMETER(windowed);
+
         WinSizeW = vpW;
         WinSizeH = vpH;
 
@@ -447,8 +453,6 @@ struct OGL
 
     void Run(bool (*MainLoop)(bool retryCreate))
     {
-        // false => just fail on any error
-        VALIDATE(MainLoop(false), "Oculus Rift not detected.");
         while (HandleMessages())
         {
             // true => we'll attempt to retry for ovrError_DisplayLost
@@ -477,6 +481,13 @@ struct OGL
 
     static void GLAPIENTRY DebugGLCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
     {
+        UNREFERENCED_PARAMETER(source);
+        UNREFERENCED_PARAMETER(type);
+        UNREFERENCED_PARAMETER(id);
+        UNREFERENCED_PARAMETER(severity);
+        UNREFERENCED_PARAMETER(length);
+        UNREFERENCED_PARAMETER(message);
+        UNREFERENCED_PARAMETER(userParam);
         OVR_DEBUG_LOG(("Message from OpenGL: %s\n", message));
     }
 };

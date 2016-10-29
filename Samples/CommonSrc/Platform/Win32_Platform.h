@@ -26,7 +26,9 @@ limitations under the License.
 
 #include "Platform.h"
 #include "Kernel/OVR_Win32_IncludeWindows.h"
-#include "Kernel/OVR_Array.h"
+
+#include <vector>
+#include <string>
 
 namespace OVR { namespace Render {
     class RenderDevice;
@@ -65,18 +67,18 @@ private:
 
 class PlatformCore : public OvrPlatform::PlatformCore
 {
-    HWND        hWnd;
-    HINSTANCE   hInstance;
-    bool        Quit;
-    int         ExitCode;
-    int         Width, Height;
+    HWND             hWnd;
+    HINSTANCE        hInstance;
+    bool             Quit;
+    int              ExitCode;
+    int              Width, Height;
 
-    MouseMode   MMode;
-    UINT_PTR    MouseWheelTimer;
-    POINT       WindowCenter; // In desktop coordinates
-    HCURSOR     Cursor;
-    int         Modifiers;
-    String      WindowTitle;
+    MouseMode        MMode;
+    UINT_PTR         MouseWheelTimer;
+    POINT            WindowCenter; // In desktop coordinates
+    HCURSOR          Cursor;
+    int              Modifiers;
+    std::string      WindowTitle;
 
     friend class NotificationOverlay;
 
@@ -85,16 +87,16 @@ class PlatformCore : public OvrPlatform::PlatformCore
 
     LRESULT     WindowProc(UINT msg, WPARAM wp, LPARAM lp);
 
-    OVR::Array<OVR::Ptr<NotificationOverlay> > NotificationOverlays;
+    std::vector<OVR::Ptr<NotificationOverlay> > NotificationOverlays;
 
 public:
     PlatformCore(Application* app, HINSTANCE hinst);
     ~PlatformCore();
 
-    void*	  SetupWindow(int w, int h) OVR_OVERRIDE;
-    void      DestroyWindow() OVR_OVERRIDE;
-    void      ShowWindow(bool visible) OVR_OVERRIDE;
-    void      Exit(int exitcode) OVR_OVERRIDE
+    void*     SetupWindow(int w, int h) override;
+    void      DestroyWindow() override;
+    void      ShowWindow(bool visible) override;
+    void      Exit(int exitcode) override
 	{
         // On some AMD cards, additional events may cause crashing after exit.
 		//for (MSG msg; PeekMessage(&msg, NULL, 0, 0, PM_REMOVE); )
@@ -105,22 +107,22 @@ public:
     RenderDevice* SetupGraphics(ovrSession session, const SetupGraphicsDeviceSet& setupGraphicsDesc,
                                 const char* type,
                                 const Render::RendererParams& rp,
-                                ovrGraphicsLuid luid) OVR_OVERRIDE;
+                                ovrGraphicsLuid luid) override;
 
-    void      SetMouseMode(MouseMode mm) OVR_OVERRIDE;
-    void      GetWindowSize(int* w, int* h) const OVR_OVERRIDE;
-    void      SetWindowSize(int w, int h) OVR_OVERRIDE;
+    void                SetMouseMode(MouseMode mm) override;
+    void                GetWindowSize(int* w, int* h) const override;
+    void                SetWindowSize(int w, int h) override;
 
-    void      SetWindowTitle(const char*title) OVR_OVERRIDE;
-    void	  PlayMusicFile(const char *fileName) OVR_OVERRIDE;
-    String    GetContentDirectory() const OVR_OVERRIDE;
+    void                SetWindowTitle(const char*title) override;
+    void                PlayMusicFile(const char *fileName) override;
+    std::string         GetContentDirectory() const override;
 
-    int       GetDisplayCount();
-    Render::DisplayId    GetDisplay(int screen);
+    int                 GetDisplayCount();
+    Render::DisplayId   GetDisplay(int screen);
 
     // Creates notification overlay text box over the top of OS window.
     virtual void        SetNotificationOverlay(int index, int fontHeightPixels,
-                                               int yoffset, const char* text) OVR_OVERRIDE;
+                                               int yoffset, const char* text) override;
 
     int       Run();
 };

@@ -129,7 +129,7 @@ protected:
 #endif
 
     // Is the cache dirty?  This avoids locking and memory allocation in steady state.
-    AtomicInt<uint32_t> DirtyListenersCache;
+    std::atomic<uint32_t> DirtyListenersCache = { 0 };
 
     // Cache of listeners used by the Call() function.
     ListenerPtrArray ListenersCacheForCalls;

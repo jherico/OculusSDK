@@ -28,7 +28,6 @@ limitations under the License.
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_Std.h"
 
 #include "Util/Util_Direct3D.h"
@@ -36,7 +35,8 @@ limitations under the License.
 
 #include "Render_D3D11_Device.h"
 #include "Util/Util_ImageWindow.h"
-#include "Kernel/OVR_Log.h"
+
+#include "../Util/Logger.h"
 
 namespace OVR { namespace Render { namespace D3D11 {
 
@@ -691,7 +691,7 @@ void RenderDevice::SetDepthMode(bool enable, bool write, CompareFunc func)
 
 Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms, TextureFormat depthFormat)
 {
-    for (unsigned i = 0; i < DepthBuffers.GetSize(); i++)
+    for (size_t i = 0; i < DepthBuffers.size(); i++)
     {
         if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height &&
             ms == DepthBuffers[i]->Samples)
@@ -707,11 +707,11 @@ Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms, TextureFormat depthF
     Ptr<Texture> newDepth = *CreateTexture(depthFormat | ms, w, h, NULL);
     if (newDepth == NULL)
     {
-        OVR_DEBUG_LOG(("Failed to get depth buffer."));
+        WriteLog("Failed to get depth buffer.");
         return NULL;
     }
 
-    DepthBuffers.PushBack(newDepth);
+    DepthBuffers.push_back(newDepth);
     return newDepth.GetPtr();
 }
 
@@ -968,7 +968,7 @@ ShaderBase::~ShaderBase()
 
 bool ShaderBase::SetUniform(const char* name, int n, const float* v)
 {
-    for (int i = 0; i < UniformInfo.GetSizeI(); i++)
+    for (size_t i = 0; i < UniformInfo.size(); i++)
     {
         if (UniformInfo[i].Name == name)
         {
@@ -1017,7 +1017,7 @@ void ShaderBase::InitUniforms(ID3D10Blob* s)
             u.Name = vd.Name;
             u.Offset = vd.StartOffset;
             u.Size = vd.Size;
-            UniformInfo.PushBack(u);
+            UniformInfo.push_back(u);
         }
     }
 
@@ -1470,7 +1470,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         hr = Device->CreateShaderResourceView(NewTex->Tex, NULL, &srv.GetRawRef());
         OVR_D3D_CHECK_RET_NULL(hr);
 
-        NewTex->TexSv.PushBack(srv);
+        NewTex->TexSv.push_back(srv);
 
         NewTex->AddRef();
         return NewTex;
@@ -1701,14 +1701,14 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                 hr = Device->CreateShaderResourceView(NewTex->Tex, &srvd, &srv.GetRawRef());
                 OVR_D3D_CHECK_RET_NULL(hr);
 
-                NewTex->TexSv.PushBack(srv);
+                NewTex->TexSv.push_back(srv);
             }
             else
             {
                 Ptr<ID3D11ShaderResourceView> srv;
                 hr = Device->CreateShaderResourceView(NewTex->Tex, nullptr, &srv.GetRawRef());
                 OVR_D3D_CHECK_RET_NULL(hr);
-                NewTex->TexSv.PushBack(srv);
+                NewTex->TexSv.push_back(srv);
             }
 
             NewTex->AddRef();
@@ -1753,6 +1753,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             {
                 desc.MiscFlags |= ovrTextureMisc_AllowGenerateMips;
                 desc.BindFlags |= ovrTextureBind_DX_RenderTarget;   // ovrTextureMisc_AllowGenerateMips requires ovrTextureBind_DX_RenderTarget
+            }
+            if ((format & Texture_Hdcp) > 0)
+            {
+                desc.MiscFlags |= ovrTextureMisc_ProtectedContent;
             }
 
             Ptr<IDXGIDevice> dxgiDevice;
@@ -1824,7 +1828,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                     OVR_D3D_CHECK_RET_NULL(hr);
                 }
 
-                NewTex->TexSv.PushBack(srv);
+                NewTex->TexSv.push_back(srv);
             }
 
             if (data)
@@ -1945,7 +1949,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                     Ptr<ID3D11DepthStencilView> dsv;
                     hr = Device->CreateDepthStencilView(tex, &depthDsv, &dsv.GetRawRef());
                     OVR_D3D_CHECK_RET_NULL(hr);
-                    NewTex->TexDsv.PushBack(dsv);
+                    NewTex->TexDsv.push_back(dsv);
                 }
                 else if (format & Texture_RenderTarget)
                 {
@@ -1957,7 +1961,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
                     Ptr<ID3D11RenderTargetView> rtv;
                     hr = Device->CreateRenderTargetView(tex, &rtvd, &rtv.GetRawRef());
                     OVR_D3D_CHECK_RET_NULL(hr);
-                    NewTex->TexRtv.PushBack(rtv);
+                    NewTex->TexRtv.push_back(rtv);
                 }
             }
         }
@@ -2025,7 +2029,7 @@ void RenderDevice::SetRenderTarget(Render::Texture* color, Render::Texture* dept
         Texture* newDepthBuffer = GetDepthBuffer(WindowWidth, WindowHeight, 1, Texture_Depth32f);
         if (newDepthBuffer == NULL)
         {
-            OVR_DEBUG_LOG(("New depth buffer creation failed."));
+            WriteLog("New depth buffer creation failed.");
         }
         if (newDepthBuffer != NULL)
         {
@@ -2069,7 +2073,7 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
     if (!model->VertexBuffer)
     {
         Ptr<Buffer> vb = *CreateBuffer();
-        if (!vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex)))
+        if (!vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.size() * sizeof(Vertex)))
         {
             OVR_ASSERT(false);
         }
@@ -2078,7 +2082,7 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
     if (!model->IndexBuffer)
     {
         Ptr<Buffer> ib = *CreateBuffer();
-        if (!ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.GetSize() * 2))
+        if (!ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.size() * 2))
         {
             OVR_ASSERT(false);
         }
@@ -2087,7 +2091,7 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
 
     Render(model->Fill ? model->Fill : DefaultFill,
         model->VertexBuffer, model->IndexBuffer,
-        matrix, 0, (unsigned)model->Indices.GetSize(), model->GetPrimType());
+        matrix, 0, (unsigned)model->Indices.size(), model->GetPrimType());
 }
 
 void RenderDevice::RenderWithAlpha(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,

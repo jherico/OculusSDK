@@ -206,10 +206,8 @@ limitations under the License.
             // Example GL_VERSION strings:
             //   "1.5 ATI-1.4.18"
             //   "OpenGL ES-CM 3.2"
-            OVR_DISABLE_MSVC_WARNING(4996) // "scanf may be unsafe"
-            fields = sscanf(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
+            fields = sscanf_s(version, isdigit(*version) ? "%d.%d" : "%*[^0-9]%d.%d", &major, &minor);
             isGLES = (strstr(version, "OpenGL ES") != NULL);
-            OVR_RESTORE_MSVC_WARNING()
         }
         else
         {

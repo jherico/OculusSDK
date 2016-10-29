@@ -28,11 +28,8 @@ limitations under the License.
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_Allocator.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Nullptr.h"
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_DebugHelp.h"
 #include "Extras/OVR_Math.h"
@@ -43,11 +40,15 @@ limitations under the License.
 #include "../CommonSrc/Platform/Gamepad.h"
 #include "../CommonSrc/Util/OptionMenu.h"
 #include "../CommonSrc/Util/RenderProfiler.h"
+#include "../CommonSrc/Util/StringHelper.h"
+#include "../CommonSrc/Util/Logger.h"
 
 
 #include "Player.h"
 #include "Tracker.h"
 
+#include <vector>
+#include <string>
 
 // Filename to be loaded by default, searching specified paths.
 #define WORLDDEMO_ASSET_FILE  "Tuscany.xml"
@@ -127,7 +128,7 @@ public:
     void         PopulatePreloadScene();
     void		 ClearScene();
     void         PopulateOptionMenu();
-    bool         SetMenuValue ( String menuFullName, String newValue );
+    bool         SetMenuValue ( std::string menuFullName, std::string newValue );
 
 
     // Computes all of the Hmd values and configures render targets.
@@ -187,6 +188,7 @@ public:
 
     void HmdSettingChangeFreeRTs(OptionVar* = 0);
     void RendertargetFormatChange(OptionVar* = 0);
+    void RendertargetResolutionModeChange(OptionVar* = 0);
     void ForceAssetReloading(OptionVar* = 0);
     void CenterPupilDepthChange(OptionVar* = 0);
     void DistortionClearColorChange(OptionVar* = 0);
@@ -269,9 +271,9 @@ protected:
     double              LastUpdate;
 
     // Loaded data.
-    String	                    MainFilePath;
-    Array<Ptr<CollisionModel> > CollisionModels;
-    Array<Ptr<CollisionModel> > GroundCollisionModels;
+    std::string	                          MainFilePath;
+    std::vector<Ptr<CollisionModel> >     CollisionModels;
+    std::vector<Ptr<CollisionModel> >     GroundCollisionModels;
 
     // Loading process displays screenshot in first frame
     // and then proceeds to load until finished.
@@ -300,7 +302,6 @@ protected:
     Player				ThePlayer;
     Matrix4f            ViewFromWorld[2];   // One per eye.
     Scene               MainScene;
-    Scene               LoadingScene;
     Scene               SmallGreenCube;
     Scene               SmallOculusCube;
     Scene               SmallOculusGreenCube;
@@ -312,6 +313,12 @@ protected:
     Scene               RedCubesScene;
     Scene               YellowCubesScene;
 
+    //Boundary information related
+    Scene               BoundaryScene;
+    void                PopulateBoundaryScene(Scene* scene);
+    void                RenderBoundaryScene(Matrix4f& view);
+    void                HandleBoundaryControls();
+
     // Small floor models used to visualize seated floor level under player.
     // We allow switching between two modes: [0] = solid, [1] = donut shaped.
     Scene				OculusRoundFloor[2];
@@ -321,7 +328,9 @@ protected:
 
     Ptr<Texture>        TextureOculusCube;
 
+    Ptr<Texture>        HdcpTexture;
     Ptr<Texture>        CockpitPanelTexture;
+    Ptr<Texture>        LoadingTexture;
 
     // Last frame asn sensor data reported by BeginFrame().
     double              HmdFrameTiming;
@@ -339,19 +348,27 @@ protected:
 
     // Render Target - affecting state.
     bool                RendertargetIsSharedByBothEyes;
-    bool                DynamicRezScalingEnabled;
+
+    enum ResolutionScalingModeEnum
+    {
+        ResolutionScalingMode_Off,
+        ResolutionScalingMode_Dynamic,
+        ResolutionScalingMode_Adaptive,
+    };
+    ResolutionScalingModeEnum ResolutionScalingMode;
 
 
 
 
 
-    String              ShutterType;
+    std::string         ShutterType;
 
 
 
     // Recorded tracking and input state, for rendering and reporting the state.
     bool                HasInputState;
     unsigned int        ConnectedControllerTypes;
+    ovrInputState       LastInputState;
     ovrInputState       InputState;
     ovrInputState       GamepadInputState;
     ovrInputState       ActiveControllerState;
@@ -397,6 +414,7 @@ protected:
     float               PositionTrackingScale;
     bool                ScaleAffectsEyeHeight;
     float               DesiredPixelDensity;
+    float               AdaptivePixelDensity;
     float               FovScaling;
 
     float               NearClip;
@@ -479,6 +497,7 @@ protected:
     bool                Layer2HighQuality;
     bool                Layer3Enabled;
     bool                Layer3HighQuality;
+    bool                Layer3HdcpEnabled;
     bool                Layer4Enabled;
     bool                Layer4HighQuality;
     float               Layer234Size;
@@ -487,6 +506,7 @@ protected:
     bool                LayerCockpitHighQuality;
     bool                LayerHudMenuEnabled;        // So you can hide the menu with Shift+Tab while toggling visual things.
     bool                LayerHudMenuHighQuality;
+    bool                LayerLoadingHighQuality;
 
     // Other global settings.
     float               CenterPupilDepthMeters;
@@ -575,6 +595,8 @@ protected:
         Text_None,
         Text_Info,
         Text_Timing,
+        Text_PerfStats,
+        Text_BoundaryInfo,
         Text_TouchState,
         Text_GamepadState,
         Text_ActiveControllerState,
@@ -647,6 +669,7 @@ protected:
         LayerNum_Layer4 = 4,
         LayerNum_CockpitFirst = 5,
         LayerNum_CockpitLast = 5 + 4,
+        LayerNum_Loading = 10,
 
         LayerNum_Hud = ovrMaxLayerCount - 2,
         LayerNum_Menu = ovrMaxLayerCount - 1,
@@ -666,6 +689,7 @@ protected:
     ovrLayerQuad        CockpitLayer[LayerNum_CockpitLast - LayerNum_CockpitFirst + 1];
     ovrLayerQuad        HudLayer;
     ovrLayerQuad        MenuLayer;
+    ovrLayerQuad        LoadingLayer;
     
     // Menu position & state info.
     Posef               MenuPose;

@@ -39,7 +39,7 @@ void Menu_SetColorGammaCurveAndBrightness(float colorGammaCurve, Vector3f bright
 //-------------------------------------------------------------------------------------
 bool OptionShortcut::MatchKey(OVR::KeyCode key, bool shift) const
 {
-    for (uint32_t i = 0; i < Keys.GetSize(); i++)
+    for (size_t i = 0; i < Keys.size(); i++)
     {
         if (Keys[i].Key != key)
             continue;
@@ -65,7 +65,7 @@ bool OptionShortcut::MatchKey(OVR::KeyCode key, bool shift) const
 
 bool OptionShortcut::MatchGamepadButton(uint32_t gamepadButtonMask) const
 {
-    for (uint32_t i = 0; i < GamepadButtons.GetSize(); i++)
+    for (size_t i = 0; i < GamepadButtons.size(); i++)
     {
         if (GamepadButtons[i] & gamepadButtonMask)
         {
@@ -81,48 +81,48 @@ bool OptionShortcut::MatchGamepadButton(uint32_t gamepadButtonMask) const
 
 
 //-------------------------------------------------------------------------------------
-String OptionMenuItem::PopNamespaceFrom(OptionMenuItem* menuItem)
+std::string OptionMenuItem::PopNamespaceFrom(OptionMenuItem* menuItem)
 {
-    String label = menuItem->Label;
-    for (uint32_t i = 0; i < label.GetLength(); i++)
+    std::string label = menuItem->Label;
+    for (size_t i = 0; i < label.length(); i++)
     {
-        if (label.GetCharAt(i) == '.')
+        if (label.at(i) == '.')
         {
-            String ns = label.Substring(0, i);
-            menuItem->Label = label.Substring(i + 1, label.GetLength());
+            std::string ns = label.substr(0, i);
+            menuItem->Label = label.substr(i + 1, label.length());
             return ns;
         }
     }
     return "";
 }
 
-OptionMenuItem *OptionSelectionMenu::FindMenuItem(String menuItemLabel)
+OptionMenuItem *OptionSelectionMenu::FindMenuItem(std::string menuItemLabel)
 {
-    String menuName = menuItemLabel;
-    String rest = "";
+    std::string menuName = menuItemLabel;
+    std::string rest = "";
     // Split at the first . (if there is one)
-    for (uint32_t i = 0; i < menuItemLabel.GetLength(); i++)
+    for (uint32_t i = 0; i < (int) menuItemLabel.length(); i++)
     {
-        if (menuItemLabel.GetCharAt(i) == '.')
+        if (menuItemLabel.at(i) == '.')
         {
-            menuName = menuItemLabel.Substring(0, i);
-            rest = menuItemLabel.Substring(i + 1, menuItemLabel.GetLength());
+            menuName = menuItemLabel.substr(0, i);
+            rest = menuItemLabel.substr(i + 1, menuItemLabel.length());
             break;
         }
     }
 
     // And now go find that submenu.
-    for (uint32_t i = 0; i < Items.GetSize(); i++)
+    for (size_t i = 0; i < Items.size(); i++)
     {
         OptionMenuItem *subItem = Items[i];
-        String subName = subItem->Label;
-        size_t menuNameLength = menuName.GetLength();
+        std::string subName = subItem->Label;
+        size_t menuNameLength = menuName.length();
         bool namesMatch = false;
-        if ( 0 == OVR_strnicmp ( subName, menuName, menuNameLength ) )
+        if (0 == strncmp ( subName.c_str(), menuName.c_str(), menuNameLength ) )
         {
             // The actual name may have a keyboard shortcut after it, which we want to ignore.
             // So we need to make "Hello" match "Hello 'Shift+H'" but not "HelloWorld"
-            if ( subName.GetLength() > menuNameLength )
+            if ( subName.length() > menuNameLength )
             {
                 if ( ( ( subName[menuNameLength] == ' ' ) && ( subName[menuNameLength+1] == '\'' ) ) ||
                      ( subName[menuNameLength] == '\'' ) )
@@ -154,34 +154,34 @@ OptionMenuItem *OptionSelectionMenu::FindMenuItem(String menuItemLabel)
 
 //-------------------------------------------------------------------------------------
 
-String OptionVar::FormatEnum(OptionVar* var)
+std::string OptionVar::FormatEnum(OptionVar* var)
 {
     uint32_t index = var->GetEnumIndex();
-    if (index < var->EnumValues.GetSize())
+    if (index < var->EnumValues.size())
         return var->EnumValues[index].Name;
-    return String("<Bad enum index>");    
+    return std::string("<Bad enum index>");    
 }
 
-String OptionVar::FormatInt(OptionVar* var)
+std::string OptionVar::FormatInt(OptionVar* var)
 {
     char buff[64];
-    OVR_sprintf(buff, sizeof(buff), var->FormatString, *var->AsInt());
-    return String(buff);
+    snprintf(buff, sizeof(buff), var->FormatString, *var->AsInt());
+    return std::string(buff);
 }
 
-String OptionVar::FormatFloat(OptionVar* var)
+std::string OptionVar::FormatFloat(OptionVar* var)
 {
     char buff[64];
-    OVR_sprintf(buff, sizeof(buff), var->FormatString, *var->AsFloat() * var->FormatScale);
-    return String(buff);
+    snprintf(buff, sizeof(buff), var->FormatString, *var->AsFloat() * var->FormatScale);
+    return std::string(buff);
 }
 
-String OptionVar::FormatBool(OptionVar* var)
+std::string OptionVar::FormatBool(OptionVar* var)
 {
     return *var->AsBool() ? "On" : "Off";
 }
 
-String OptionVar::FormatTrigger(OptionVar* var)
+std::string OptionVar::FormatTrigger(OptionVar* var)
 {
 	OVR_UNUSED(var);
     return "[Trigger]";
@@ -287,7 +287,7 @@ void OptionVar::NextValue(bool* pFastStep)
     switch (Type)
     {
     case Type_Enum:
-        *AsInt() = EnumValues[((GetEnumIndex() + 1) % EnumValues.GetSize())].Value;
+        *AsInt() = EnumValues[((GetEnumIndex() + 1) % EnumValues.size())].Value;
         break;
 
     case Type_Int:
@@ -319,7 +319,7 @@ void OptionVar::PrevValue(bool* pFastStep)
     {
     case Type_Enum:
     {
-        uint32_t size = (uint32_t)(EnumValues.GetSize() ? EnumValues.GetSize() : 1);
+        uint32_t size = (uint32_t)(EnumValues.size() ? EnumValues.size() : 1);
         *AsInt() = EnumValues[((GetEnumIndex() + (size - 1)) % size)].Value;
         break;
     }
@@ -347,7 +347,7 @@ void OptionVar::PrevValue(bool* pFastStep)
 }
 
 // Set value from a string. Returns true on success.
-bool OptionVar::SetValue(String newVal)
+bool OptionVar::SetValue(std::string newVal)
 {
     bool success = false;
     switch (Type)
@@ -357,7 +357,7 @@ bool OptionVar::SetValue(String newVal)
         success = false;
         for ( auto enumVal : EnumValues )
         {
-            if ( 0 == enumVal.Name.CompareNoCase ( newVal ) )
+            if ( 0 == _stricmp (enumVal.Name.c_str(), newVal.c_str() ) )
             {
                 *AsInt() = enumVal.Value;
                 success = true;
@@ -369,7 +369,7 @@ bool OptionVar::SetValue(String newVal)
     
     case Type_Int:
     {
-        int newIntVal = OVR_strtol ( newVal, nullptr, 10 );
+        int newIntVal = std::stoi ( newVal, nullptr, 10 );
         *AsInt() = newIntVal;
         success = true;
         break;
@@ -377,16 +377,16 @@ bool OptionVar::SetValue(String newVal)
 
     case Type_Float:
     {
-        float newFloatVal = (float)OVR_strtod ( newVal, nullptr );
+        float newFloatVal = std::stof ( newVal, nullptr );
         *AsFloat() = newFloatVal;
         success = true;
         break;
     }
 
     case Type_Bool:
-        if ( ( 0 == newVal.CompareNoCase ( "false" ) ) ||
-             ( 0 == newVal.CompareNoCase ( "0" ) ) ||
-             ( 0 == newVal.CompareNoCase ( "" ) ) )
+        if ( ( 0 == _stricmp (newVal.c_str(), "false" ) ) ||
+             ( 0 == _stricmp (newVal.c_str(), "0" ) ) ||
+             ( 0 == _stricmp (newVal.c_str(), "" ) ) )
         {
             *AsBool() = false;
         }
@@ -409,7 +409,7 @@ bool OptionVar::SetValue(String newVal)
 }
 
 
-String OptionVar::HandleShortcutUpdate()
+std::string OptionVar::HandleShortcutUpdate()
 {
     if(Type != Type_Trigger)
     {
@@ -418,27 +418,27 @@ String OptionVar::HandleShortcutUpdate()
     else
     {
         // Avoid double trigger (shortcut key already triggers NextValue())
-        return String("Triggered: ") + Label;
+        return std::string("Triggered: ") + Label;
     }
 }
 
-String OptionVar::ProcessShortcutKey(OVR::KeyCode key, bool shift)
+std::string OptionVar::ProcessShortcutKey(OVR::KeyCode key, bool shift)
 {
     if (ShortcutUp.MatchKey(key, shift) || ShortcutDown.MatchKey(key, shift))
     {
         return HandleShortcutUpdate();
     }
 
-    return String();
+    return std::string();
 }
 
-String OptionVar::ProcessShortcutButton(uint32_t buttonMask)
+std::string OptionVar::ProcessShortcutButton(uint32_t buttonMask)
 {
     if (ShortcutUp.MatchGamepadButton(buttonMask) || ShortcutDown.MatchGamepadButton(buttonMask))
     {
         return HandleShortcutUpdate();
     }
-    return String();
+    return std::string();
 }
 
 
@@ -447,14 +447,14 @@ OptionVar& OptionVar::AddEnumValue(const char* displayName, int32_t value)
     EnumEntry entry;
     entry.Name = displayName;
     entry.Value = value;
-    EnumValues.PushBack(entry);
+    EnumValues.push_back(entry);
     return *this;
 }
 
-String OptionVar::GetValue()
+std::string OptionVar::GetValue()
 {
     if(fFormat == NULL)
-        return String();
+        return std::string();
     else
         return fFormat(this);
 }
@@ -462,10 +462,10 @@ String OptionVar::GetValue()
 uint32_t OptionVar::GetEnumIndex()
 {
     OVR_ASSERT(Type == Type_Enum);
-    OVR_ASSERT(EnumValues.GetSize() > 0);
+    OVR_ASSERT(EnumValues.size() > 0);
 
     // TODO: Change this from a linear search to binary or a hash.
-    for (uint32_t i = 0; i < EnumValues.GetSize(); i++)
+    for (uint32_t i = 0; i < EnumValues.size(); i++)
     {
         if (EnumValues[i].Value == *AsInt())
             return i;
@@ -528,7 +528,7 @@ OptionSelectionMenu::OptionSelectionMenu(OptionSelectionMenu* parentMenu)
 
 OptionSelectionMenu::~OptionSelectionMenu()
 {
-    for (uint32_t i = 0; i < Items.GetSize(); i++)
+    for (size_t i = 0; i < Items.size(); i++)
         delete Items[i];
 }
 
@@ -538,8 +538,8 @@ bool OptionSelectionMenu::OnKey(OVR::KeyCode key, int chr, bool down, int modifi
        
     if (down)
     {
-        String s = ProcessShortcutKey(key, shift);
-        if (!s.IsEmpty())
+        std::string s = ProcessShortcutKey(key, shift);
+        if (!s.empty())
         {
             PopupMessage  = s;
             PopupMessageTimeout = ovr_GetTimeInSeconds() + 4.0f;
@@ -578,8 +578,8 @@ bool OptionSelectionMenu::OnKey(OVR::KeyCode key, int chr, bool down, int modifi
 bool OptionSelectionMenu::OnGamepad(uint32_t buttonMask)
 {
     // Check global shortcuts first.
-    String s = ProcessShortcutButton(buttonMask);
-    if (!s.IsEmpty())
+    std::string s = ProcessShortcutButton(buttonMask);
+    if (!s.empty())
     {
         PopupMessage  = s;
         PopupMessageTimeout = ovr_GetTimeInSeconds() + 4.0f;
@@ -607,11 +607,11 @@ bool OptionSelectionMenu::OnGamepad(uint32_t buttonMask)
     return false;
 }
 
-String OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
+std::string OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
 {
-    String s;
+    std::string s;
 
-    for (size_t i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
+    for (size_t i = 0; (i < Items.size()) && s.empty(); i++)
     {
         s = Items[i]->ProcessShortcutKey(key, shift);
     }
@@ -619,11 +619,11 @@ String OptionSelectionMenu::ProcessShortcutKey(OVR::KeyCode key, bool shift)
     return s;
 }
 
-String OptionSelectionMenu::ProcessShortcutButton(uint32_t buttonMask)
+std::string OptionSelectionMenu::ProcessShortcutButton(uint32_t buttonMask)
 {
-    String s;
+    std::string s;
 
-    for (size_t i = 0; (i < Items.GetSize()) && s.IsEmpty(); i++)
+    for (size_t i = 0; (i < Items.size()) && s.empty(); i++)
     {
         s = Items[i]->ProcessShortcutButton(buttonMask);
     }
@@ -673,7 +673,7 @@ Color ApplyGammaCurveAndBrightness(Color inColor, float gammaCurve, Vector3f bri
     return inColor;
 }
 
-Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float textSize, float centerX, float centerY)
+Recti OptionSelectionMenu::Render(RenderDevice* prender, std::string title, float textSize, float centerX, float centerY)
 {
     // If we are invisible, render shortcut notifications.
     // Both child and parent have visible == true even if only child is shown.
@@ -691,7 +691,7 @@ Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float tex
     // Delegate to sub-menu if active.
     if (GetSubmenu() != NULL)
     {
-        if (title.GetSize() > 0)
+        if (title.size() > 0)
             title += " > ";
 
         return GetSubmenu()->Render(prender, title, textSize, centerX, centerY);
@@ -723,21 +723,21 @@ Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float tex
 
     prender->MeasureText(&DejaVu, "      ", textSize, bufferSize);
 
-    String values;
-    String menuItems;
+    std::string values;
+    std::string menuItems;
 
     int highlightIndex = 0;
     if (DisplayState == Display_Menu)
     {
         highlightIndex = SelectedIndex;
-        for (uint32_t i = 0; i < Items.GetSize(); i++)
+        for (size_t i = 0; i < Items.size(); i++)
         {
             if (i > 0)
                 values += "\n";
             values += Items[i]->GetValue();
         }
 
-        for (uint32_t i = 0; i < Items.GetSize(); i++)
+        for (size_t i = 0; i < Items.size(); i++)
         {
             if (i > 0)
                 menuItems += "\n";
@@ -751,14 +751,14 @@ Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float tex
     }
 
     // Measure labels
-    const char* menuItemsCStr = menuItems.ToCStr();
+    const char* menuItemsCStr = menuItems.c_str();
     bool havelLabelSelection = FindLineCharRange(menuItemsCStr, highlightIndex, selection);
 	OVR_UNUSED(havelLabelSelection);
     prender->MeasureText(&DejaVu, menuItemsCStr, textSize, labelsSize,
                          selection, labelSelectionRect);
 
     // Measure label-to-value gap
-    const char* valuesCStr = values.ToCStr();
+    const char* valuesCStr = values.c_str();
     bool haveValueSelection = FindLineCharRange(valuesCStr, highlightIndex, selection);
 	OVR_UNUSED(haveValueSelection);
     prender->MeasureText(&DejaVu, valuesCStr, textSize, valuesSize, selection, valueSelectionRect);
@@ -817,14 +817,14 @@ Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float tex
     }
 
     // Measure and draw title
-    if ( title.GetLength() == 0 )
+    if ( title.length() == 0 )
     {
         title = "Main menu";
     }
-    if (DisplayState == Display_Menu && title.GetLength() > 0)
+    if (DisplayState == Display_Menu && title.length() > 0)
     {
         Vector2f titleDimensions;
-        prender->MeasureText(&DejaVu, title.ToCStr(), textSize, &titleDimensions.x);
+        prender->MeasureText(&DejaVu, title.c_str(), textSize, &titleDimensions.x);
         Vector2f titleTopLeft = topLeft - Vector2f(0, borderSize.y) * 2 - Vector2f(0, titleDimensions.y);
         titleDimensions.x = totalDimensions.x;
         
@@ -838,7 +838,7 @@ Recti OptionSelectionMenu::Render(RenderDevice* prender, String title, float tex
                           titleTopLeft.y + borderSize.y / 2 + titleDimensions.y,
                           titleColor);
                           
-        prender->RenderText(&DejaVu, title.ToCStr(), titleTopLeft.x + borderSize.x,
+        prender->RenderText(&DejaVu, title.c_str(), titleTopLeft.x + borderSize.x,
                             titleTopLeft.y + borderSize.y, textSize, textColor);
 
 
@@ -859,7 +859,7 @@ Recti OptionSelectionMenu::renderShortcutChangeMessage(RenderDevice* prender, fl
 {
     if (ovr_GetTimeInSeconds() < PopupMessageTimeout)
     {
-        return DrawTextBox(prender, centerX, centerY + 120.0f, textSize, PopupMessage.ToCStr(),
+        return DrawTextBox(prender, centerX, centerY + 120.0f, textSize, PopupMessage.c_str(),
                            DrawText_Center | (PopupMessageBorder ? DrawText_Border : 0));
     }
     return Recti(0, 0, 0, 0);
@@ -897,11 +897,11 @@ void OptionSelectionMenu::SetShortcutChangeMessageEnable ( bool enabled )
 
 void OptionSelectionMenu::AddItem(OptionMenuItem* menuItem)
 {
-    String ns = PopNamespaceFrom(menuItem);
+    std::string ns = PopNamespaceFrom(menuItem);
 
-    if (ns.GetLength() == 0)
+    if (ns.length() == 0)
     {
-        Items.PushBack(menuItem);
+        Items.push_back(menuItem);
     }
     else
     {
@@ -929,9 +929,9 @@ OptionSelectionMenu* OptionSelectionMenu::GetSubmenu()
 }
 
 
-OptionSelectionMenu* OptionSelectionMenu::GetOrCreateSubmenu(String submenuName)
+OptionSelectionMenu* OptionSelectionMenu::GetOrCreateSubmenu(std::string submenuName)
 {
-    for (uint32_t i = 0; i < Items.GetSize(); i++)
+    for (size_t i = 0; i < Items.size(); i++)
     {
         if (!Items[i]->IsMenu())
             continue;
@@ -947,13 +947,13 @@ OptionSelectionMenu* OptionSelectionMenu::GetOrCreateSubmenu(String submenuName)
     // Submenu doesn't exist, create it.
     OptionSelectionMenu* newSubmenu = new OptionSelectionMenu(this);
     newSubmenu->Label = submenuName;
-    Items.PushBack(newSubmenu);
+    Items.push_back(newSubmenu);
     return newSubmenu;
 }
 
 void OptionSelectionMenu::HandleUp(bool* pFast)
 {
-    int numItems = (int)Items.GetSize();
+    int numItems = (int)Items.size();
     if (SelectionActive)
         Items[SelectedIndex]->NextValue(pFast);
     else
@@ -965,7 +965,7 @@ void OptionSelectionMenu::HandleDown(bool* pFast)
     if (SelectionActive)
         Items[SelectedIndex]->PrevValue(pFast);
     else
-        SelectedIndex = ((SelectedIndex + 1) % Items.GetSize());
+        SelectedIndex = ((SelectedIndex + 1) % Items.size());
 }
 
 void OptionSelectionMenu::HandleLeft()

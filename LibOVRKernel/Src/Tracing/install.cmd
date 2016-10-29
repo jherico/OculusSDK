@@ -17,13 +17,24 @@ echo Failed to set cacls, installation may fail
 
 :CaclsOk
 
+for /f "delims=" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -v "ProductName"') do set PRODUCT_NAME=%%a
+set PRODUCT_NAME=%PRODUCT_NAME: =%
+set PRODUCT_NAME=%PRODUCT_NAME:ProductNameREG_SZ=%
+set PRODUCT_NAME=%PRODUCT_NAME:dows=%
+set PRODUCT_NAME=%PRODUCT_NAME:Enterprise=%
+set PRODUCT_NAME=%PRODUCT_NAME:Professional=%
+set SHORT_PRODUCT_NAME=%PRODUCT_NAME:.1=%
+echo Installing %PRODUCT_NAME% manifests:
+
+rem we only support x64 oses these days
 set OSTYPE=x64
-set OCUSBVID_SYS=%windir%\System32\drivers\OCUSBVID.sys
+set OCUSBVID_SYS=%windir%\System32\drivers\ocusbvid111.sys
+if "%SHORT_PRODUCT_NAME%"=="Win7" set OCUSBVID_SYS=%windir%\System32\drivers\ocusbvid109.sys
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" goto GotOSTYPE
 if "%PROCESSOR_ARCHITEW6432%"=="AMD64" goto GotOSTYPE
-set OSTYPE=x86
-REM XXX is this right?
-set OCUSBVID_SYS=%windir%\System32\drivers\OCUSBVID.sys
+
+echo 32-bit OS not supported
+exit /b 1
 
 :GotOSTYPE
 
@@ -91,4 +102,4 @@ echo   cd %SCRIPTDIR%..\..\..\Tools\TraceScript\ovrtap
 echo   .\startovrtap.cmd
 echo or (command-line):
 echo   cd %SCRIPTDIR%..\..\..\Tools\Xperf
-echo   log
+echo   ovrlog

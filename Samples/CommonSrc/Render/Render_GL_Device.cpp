@@ -22,7 +22,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "../Render/Render_GL_Device.h"
-#include "Kernel/OVR_Log.h"
+#include "../Util/Logger.h"
 #include <assert.h>
 
 namespace OVR { namespace Render { namespace GL {
@@ -299,31 +299,31 @@ static bool CheckFramebufferStatus(GLenum target)
     switch (status)
     {
     case GL_FRAMEBUFFER_UNDEFINED:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_UNDEFINED - returned if the specified framebuffer is the default read or draw framebuffer, but the default framebuffer does not exist."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_UNDEFINED - returned if the specified framebuffer is the default read or draw framebuffer, but the default framebuffer does not exist.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT - returned if any of the framebuffer attachment points are framebuffer incomplete."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT - returned if any of the framebuffer attachment points are framebuffer incomplete.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT - returned if the framebuffer does not have at least one image attached to it."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT - returned if the framebuffer does not have at least one image attached to it.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER - returned if the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for any color attachment point named by GL_DRAW_BUFFERi."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER - returned if the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for any color attachment point named by GL_DRAW_BUFFERi.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER - returned if GL_READ_BUFFER is not GL_NONE and the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for the color attachment point named by GL_READ_BUFFER."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER - returned if GL_READ_BUFFER is not GL_NONE and the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for the color attachment point named by GL_READ_BUFFER.");
         break;
     case GL_FRAMEBUFFER_UNSUPPORTED:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_UNSUPPORTED - returned if the combination of internal formats of the attached images violates an implementation-dependent set of restrictions."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_UNSUPPORTED - returned if the combination of internal formats of the attached images violates an implementation-dependent set of restrictions.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE - returned if the value of GL_RENDERBUFFER_SAMPLES is not the same for all attached renderbuffers; if the value of GL_TEXTURE_SAMPLES is the not same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, the value of GL_RENDERBUFFER_SAMPLES does not match the value of GL_TEXTURE_SAMPLES. also returned if the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not the same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not GL_TRUE for all attached textures."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE - returned if the value of GL_RENDERBUFFER_SAMPLES is not the same for all attached renderbuffers; if the value of GL_TEXTURE_SAMPLES is the not same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, the value of GL_RENDERBUFFER_SAMPLES does not match the value of GL_TEXTURE_SAMPLES. also returned if the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not the same for all attached textures; or, if the attached images are a mix of renderbuffers and textures, the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not GL_TRUE for all attached textures.");
         break;
     case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
-        OVR_DEBUG_LOG(("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS - returned if any framebuffer attachment is layered, and any populated attachment is not layered, or if all populated color attachments are not from textures of the same target."));
+        WriteLog("framebuffer not complete: GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS - returned if any framebuffer attachment is layered, and any populated attachment is not layered, or if all populated color attachments are not from textures of the same target.");
         break;
     default:
-        OVR_DEBUG_LOG(("framebuffer not complete: status 0x%x (unknown)", status));
+        WriteLog("framebuffer not complete: status 0x%x (unknown)", status);
         break;
     case GL_FRAMEBUFFER_COMPLETE:
         return true;
@@ -449,7 +449,7 @@ void RenderDevice::Shutdown()
     }
 
     DefaultFill.Clear();
-    DepthBuffers.Clear();
+    DepthBuffers.clear();
 
     DebugCallbackControl.Shutdown();
 }
@@ -562,12 +562,14 @@ void RenderDevice::DeleteFills()
 
 Texture* RenderDevice::GetDepthBuffer(int w, int h, int ms)
 {
-    for (unsigned i = 0; i < DepthBuffers.GetSize(); i++)
-        if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height && ms == DepthBuffers[i]->GetSamples())
-            return DepthBuffers[i];
+	for (size_t i = 0; i < DepthBuffers.size(); i++)
+    {
+		if (w == DepthBuffers[i]->Width && h == DepthBuffers[i]->Height && ms == DepthBuffers[i]->GetSamples())
+			return DepthBuffers[i];
+    }
 
     Ptr<Texture> newDepth = *CreateTexture(Texture_Depth32f|Texture_RenderTarget|ms, w, h, NULL);
-    DepthBuffers.PushBack(newDepth);
+    DepthBuffers.push_back(newDepth);
     return newDepth.GetPtr();
 }
 
@@ -706,20 +708,20 @@ void RenderDevice::Render(const Matrix4f& matrix, Model* model)
     if (!model->VertexBuffer)
     {
         Ptr<Render::Buffer> vb = *CreateBuffer();
-        vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.GetSize() * sizeof(Vertex));
+        vb->Data(Buffer_Vertex | Buffer_ReadOnly, &model->Vertices[0], model->Vertices.size() * sizeof(Vertex));
         model->VertexBuffer = vb;
     }
 
     if (!model->IndexBuffer)
     {
         Ptr<Render::Buffer> ib = *CreateBuffer();
-        ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.GetSize() * 2);
+        ib->Data(Buffer_Index | Buffer_ReadOnly, &model->Indices[0], model->Indices.size() * 2);
         model->IndexBuffer = ib;
     }
 
     Render(model->Fill ? (const Fill*)model->Fill : (const Fill*)DefaultFill,
            model->VertexBuffer, model->IndexBuffer,
-           matrix, 0, (int)model->Indices.GetSize(), model->GetPrimType());
+           matrix, 0, (int)model->Indices.size(), model->GetPrimType());
 }
 
 void RenderDevice::Render(const Fill* fill, Render::Buffer* vertices, Render::Buffer* indices,
@@ -861,7 +863,7 @@ bool Shader::Compile(const char* src)
         GLchar msg[1024];
         glGetShaderInfoLog(GLShader, sizeof(msg), 0, msg);
         if (msg[0])
-            OVR_DEBUG_LOG(("Compiling shader\n%s\nfailed: %s\n", src, msg));
+            WriteLog("Compiling shader\n%s\nfailed: %s\n", src, msg);
         if (!r)
             return 0;
     }
@@ -918,13 +920,13 @@ bool ShaderSet::Link()
     {
         GLchar msg[1024];
         glGetProgramInfoLog(Prog, sizeof(msg), 0, msg);
-        OVR_DEBUG_LOG(("Linking shaders failed: %s\n", msg));
+        WriteLog("Linking shaders failed: %s\n", msg);
         if (!r)
             return 0;
     }
     glUseProgram(Prog);
 
-    UniformInfo.Clear();
+    UniformInfo.clear();
     LightingVer = 0;
     UsesLighting = 0;
 
@@ -965,7 +967,7 @@ bool ShaderSet::Link()
             default:
                 continue;
             }
-            UniformInfo.PushBack(u);
+            UniformInfo.push_back(u);
             if (!strcmp(name, "LightCount"))
                 UsesLighting = 1;
         }
@@ -979,7 +981,7 @@ bool ShaderSet::Link()
     for (int i = 0; i < 8; i++)
     {
         char texv[32];
-        OVR_sprintf(texv, 10, "Texture%d", i);
+        snprintf(texv, 10, "Texture%d", i);
         TexLoc[i] = glGetUniformLocation(Prog, texv);
         if (TexLoc[i] < 0)
             break;
@@ -998,7 +1000,7 @@ void ShaderSet::Set(PrimitiveType) const
 
 bool ShaderSet::SetUniform(const char* name, int n, const float* v)
 {
-    for (unsigned int i = 0; i < UniformInfo.GetSize(); i++)
+    for (size_t i = 0; i < UniformInfo.size(); i++)
         if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
         {
             OVR_ASSERT(UniformInfo[i].Location >= 0);
@@ -1016,13 +1018,13 @@ bool ShaderSet::SetUniform(const char* name, int n, const float* v)
             return 1;
         }
 
-    OVR_DEBUG_LOG(("Warning: uniform %s not present in selected shader", name));
+    WriteLog("Warning: uniform %s not present in selected shader", name);
     return 0;
 }
 
 bool ShaderSet::SetUniform4x4f(const char* name, const Matrix4f& m)
 {
-    for (unsigned int i = 0; i < UniformInfo.GetSize(); i++)
+    for (size_t i = 0; i < UniformInfo.size(); i++)
         if (!strcmp(UniformInfo[i].Name.ToCStr(), name))
         {
             glUseProgram(Prog);
@@ -1030,7 +1032,7 @@ bool ShaderSet::SetUniform4x4f(const char* name, const Matrix4f& m)
             return 1;
         }
 
-    OVR_DEBUG_LOG(("Warning: uniform %s not present in selected shader", name));
+    WriteLog("Warning: uniform %s not present in selected shader", name);
     return 0;
 }
 
@@ -1187,31 +1189,91 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         OVR_ASSERT ( ( format & Texture_SRGB ) == 0 );
     }
 
-    GLenum   glformat, gltype = GL_UNSIGNED_BYTE;
+    GLenum   glformat = GL_RGBA, gltype = GL_UNSIGNED_BYTE;
+    GLenum internalFormat = glformat;
     ovrTextureFormat ovrFormat = OVR_FORMAT_UNKNOWN;
     switch(format & Texture_TypeMask)
     {
-    case Texture_B5G6R5:            glformat = GL_RGB565;   ovrFormat = OVR_FORMAT_B5G6R5_UNORM; break;
-    case Texture_BGR5A1:            glformat = GL_RGB5_A1;  ovrFormat = OVR_FORMAT_B5G5R5A1_UNORM; break;
-    case Texture_BGRA4:             glformat = GL_RGBA4;    ovrFormat = OVR_FORMAT_B4G4R4A4_UNORM; break;
-    case Texture_RGBA8:             glformat = GL_RGBA;     ovrFormat = isSRGB ? OVR_FORMAT_R8G8B8A8_UNORM_SRGB : OVR_FORMAT_R8G8B8A8_UNORM; break;
-    case Texture_BGRA8:             glformat = GL_BGRA;     ovrFormat = isSRGB ? OVR_FORMAT_B8G8R8A8_UNORM_SRGB : OVR_FORMAT_B8G8R8A8_UNORM; break;
-    case Texture_BGRX:              glformat = GL_BGR;      ovrFormat = isSRGB ? OVR_FORMAT_B8G8R8X8_UNORM_SRGB : OVR_FORMAT_B8G8R8X8_UNORM; break;
-    case Texture_RGBA16f:           glformat = GL_RGBA16F;  ovrFormat = OVR_FORMAT_R16G16B16A16_FLOAT;  break;
+    case Texture_B5G6R5:            
+        glformat = GL_RGB565;
+        ovrFormat = OVR_FORMAT_B5G6R5_UNORM;
+        break;
+    case Texture_BGR5A1:
+        glformat = GL_RGB5_A1;
+        ovrFormat = OVR_FORMAT_B5G5R5A1_UNORM;
+        break;
+    case Texture_BGRA4:
+        glformat = GL_RGBA4;
+        ovrFormat = OVR_FORMAT_B4G4R4A4_UNORM;
+        break;
+    case Texture_RGBA8:
+        glformat = GL_RGBA;
+        ovrFormat = isSRGB ? OVR_FORMAT_R8G8B8A8_UNORM_SRGB : OVR_FORMAT_R8G8B8A8_UNORM;
+        break;
+    case Texture_BGRA8:
+        glformat = GL_BGRA;
+        ovrFormat = isSRGB ? OVR_FORMAT_B8G8R8A8_UNORM_SRGB : OVR_FORMAT_B8G8R8A8_UNORM;
+        break;
+    case Texture_BGRX:
+        glformat = GL_BGR;
+        ovrFormat = isSRGB ? OVR_FORMAT_B8G8R8X8_UNORM_SRGB : OVR_FORMAT_B8G8R8X8_UNORM;
+        break;
+    case Texture_RGBA16f:
+        glformat = GL_RGBA16F;
+        ovrFormat = OVR_FORMAT_R16G16B16A16_FLOAT;
+        break;
 
-    case Texture_R:                 glformat = GL_RED;   break;
-    case Texture_A:                 glformat = GL_ALPHA; break;
-    case Texture_Depth32f:          glformat = GL_DEPTH_COMPONENT;     ovrFormat = OVR_FORMAT_D32_FLOAT; gltype = GL_FLOAT; break;
-    case Texture_Depth16:           OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH_COMPONENT16;   gltype = GL_UNSIGNED_SHORT; break;
-    case Texture_Depth24Stencil8:   OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH24_STENCIL8;    gltype = GL_UNSIGNED_INT; break;
-    case Texture_Depth32fStencil8:  OVR_ASSERT(false); /* untested */ glformat = GL_DEPTH32F_STENCIL8;   gltype = GL_FLOAT; break;
-    case Texture_BC1:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; break;
-    case Texture_BC2:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; break;
-    case Texture_BC3:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; break;
-    case Texture_BC6U:              glformat = GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB; break;
-    case Texture_BC6S:              glformat = GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB; break;
-    case Texture_BC7:               glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB : GL_COMPRESSED_RGBA_BPTC_UNORM_ARB; break;
-    default: OVR_FAIL();            return NULL;
+    case Texture_R:
+        glformat = GL_RED;
+        break;
+    case Texture_A:
+        glformat = GL_ALPHA;
+        break;
+    case Texture_Depth32f:
+        glformat = GL_DEPTH_COMPONENT;
+        internalFormat = GLE_ARB_depth_buffer_float ? GL_DEPTH_COMPONENT32F : GL_DEPTH_COMPONENT;
+        ovrFormat = OVR_FORMAT_D32_FLOAT;
+        gltype = GL_FLOAT;
+        break;
+    case Texture_Depth16:
+        glformat = GL_DEPTH_COMPONENT;
+        internalFormat = GL_DEPTH_COMPONENT16;
+        ovrFormat = OVR_FORMAT_D16_UNORM;  
+        gltype = GL_UNSIGNED_INT;
+        break;
+    case Texture_Depth24Stencil8:
+        glformat = GL_DEPTH_STENCIL;
+        internalFormat = GL_DEPTH24_STENCIL8;
+        ovrFormat = OVR_FORMAT_D24_UNORM_S8_UINT;
+        gltype = GL_UNSIGNED_INT_24_8;
+        break;
+    case Texture_Depth32fStencil8:
+        glformat = GL_DEPTH_STENCIL;
+        internalFormat = GL_DEPTH32F_STENCIL8;
+        ovrFormat = OVR_FORMAT_D32_FLOAT_S8X24_UINT;
+        gltype = GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
+        break;
+    case Texture_BC1:
+        glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+        break;
+    case Texture_BC2:
+        glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+        break;
+    case Texture_BC3:
+        glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+        break;
+    case Texture_BC6U:
+        glformat = GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB;
+        break;
+    case Texture_BC6S:
+        glformat = GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB;
+        break;
+    case Texture_BC7:
+        glformat = isSRGB ? GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB : GL_COMPRESSED_RGBA_BPTC_UNORM_ARB;
+        break;
+    default:
+        OVR_FAIL();
+        return NULL;
     }
     int samples = format & Texture_SamplesMask;
     if(samples < 1 || !GLE_ARB_texture_multisample) // disallow MSAA for OpenGL versions that don't support it.
@@ -1223,14 +1285,9 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
 
     Texture* NewTex = new Texture(Session, this, format, width, height, samples);
         
-    GLenum internalFormat = glformat;
     if (isSRGB)
     {
         internalFormat = GL_SRGB8_ALPHA8;
-    }
-    else if (isDepth)
-    {
-        internalFormat = GLE_ARB_depth_buffer_float ? GL_DEPTH_COMPONENT32F : GL_DEPTH_COMPONENT;
     }
 
     if (format & Texture_Compressed)
@@ -1320,6 +1377,7 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             desc.SampleCount = 1;
             desc.StaticImage = (format & Texture_SwapTextureSetStatic) ? 1 : 0;
             desc.Format = ovrFormat;
+            desc.MiscFlags |= (format & Texture_Hdcp) ? ovrTextureMisc_ProtectedContent : 0;
 
             // Can do this with rendertargets, depth buffers, or normal textures, but *not* MSAA.
             OVR_ASSERT ( samples == 1);
@@ -1508,7 +1566,7 @@ void DebugCallback::DebugCallbackInternal(Severity s, const char* pSource, const
 {
     if(s >= MinLogSeverity)
     {
-        OVR::LogError("{ERR-xxxx} [GL Error] %s %s %#x %s: %s", pSource, pType, id, pSeverity, message);
+        WriteLog("{ERR-xxxx} [GL Error] %s %s %#x %s: %s", pSource, pType, id, pSeverity, message);
     }
 
     if(s >= MinAssertSeverity)
@@ -1542,14 +1600,14 @@ void DebugCallback::Initialize()
                 err = glGetError();
                 if(err)
                 {
-                	OVR_DEBUG_LOG(("glDebugMessageCallback error: %x (%d)\n", err, err));
+                    WriteLog("glDebugMessageCallback error: %x (%d)\n", err, err);
             	}
 
                 glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
                 err = glGetError();
                 if(err)
                 {
-                	OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
+                    WriteLog("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err);
                 }
 
                 // To consider: disable marker/push/pop
@@ -1565,14 +1623,14 @@ void DebugCallback::Initialize()
                 err = glGetError();
                 if(err)
                 {
-                    OVR_DEBUG_LOG(("glDebugMessageCallbackARB error: %x (%d)\n", err, err));
+                    WriteLog("glDebugMessageCallbackARB error: %x (%d)\n", err, err);
                 }
 
                 glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
                 err = glGetError();
                 if(err)
                 {
-                    OVR_DEBUG_LOG(("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err));
+                    WriteLog("GL_DEBUG_OUTPUT_SYNCHRONOUS error: %x (%d)\n", err, err);
                 }
 
                 // To consider: disable marker/push/pop
@@ -1586,7 +1644,7 @@ void DebugCallback::Initialize()
                 err = glGetError();
                 if(err)
                 {
-                    OVR_DEBUG_LOG(("glDebugMessageCallbackAMD error: %x (%d)\n", err, err));
+                    WriteLog("glDebugMessageCallbackAMD error: %x (%d)\n", err, err);
                 }
 				// There is no control for synchronous/asynchronous with AMD_debug_output.
 		    }
@@ -1801,7 +1859,7 @@ void GLVersionAndExtensions::ParseGLVersion()
     OVR_ASSERT(version);
     if (version)
     {
-        OVR_DEBUG_LOG(("GL_VERSION: %s", (const char*)version));
+        WriteLog("GL_VERSION: %s", (const char*)version);
 
         // Skip all leading non-digits before reading %d.
         // Example GL_VERSION strings:
@@ -1814,7 +1872,7 @@ void GLVersionAndExtensions::ParseGLVersion()
     }
     else
     {
-        LogText("Warning: GL_VERSION was NULL\n");
+        WriteLog("Warning: GL_VERSION was NULL\n");
     }
 
     // If two fields were not found,
@@ -1907,12 +1965,12 @@ void GLVersionAndExtensions::ParseGLExtensions()
         if (!extensions)
         {
             extensions = ""; // Note: glGetString() can return null
-            LogText("Warning: GL_EXTENSIONS was NULL\n");
+            WriteLog("Warning: GL_EXTENSIONS was NULL\n");
         }
         else
         {
             // Cannot print this to debug log: It's too long!
-            //OVR_DEBUG_LOG(("GL_EXTENSIONS: %s", (const char*)extensions));
+            //WriteLog("GL_EXTENSIONS: %s", (const char*)extensions);
         }
 
         Extensions = extensions;

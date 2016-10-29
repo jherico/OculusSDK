@@ -21,20 +21,21 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef OVR_Gamepad_h
-#define OVR_Gamepad_h
+#pragma once
 
 #include "Kernel/OVR_Types.h"
 #include "Kernel/OVR_Allocator.h"
 #include "Kernel/OVR_RefCount.h"
-#include "Kernel/OVR_Log.h"
 #include "Kernel/OVR_System.h"
 #include "Kernel/OVR_Nullptr.h"
-#include "Kernel/OVR_String.h"
-#include "Kernel/OVR_Array.h"
 #include "Kernel/OVR_Timer.h"
 #include "Kernel/OVR_SysFile.h"
 #include "Extras/OVR_Math.h"
+
+#include "../Util/Logger.h"
+
+#include <vector>
+#include <string>
 
 namespace OVR { namespace OvrPlatform {
 
@@ -87,7 +88,7 @@ struct GamepadState
     }
 	void Debug() const
 	{
-		OVR_DEBUG_LOG(("Buttons:0x%4x LX:%.2f LY:%.2f RX:%.2f RY:%.2f LT:%.2f RT:%.2f", Buttons, LX, LY, RX, RY, LT, RT));
+        WriteLog("Buttons:0x%4x LX:%.2f LY:%.2f RX:%.2f RY:%.2f LT:%.2f RT:%.2f", Buttons, LX, LY, RX, RY, LT, RT);
 	}
 };
 
@@ -108,5 +109,3 @@ public:
 };
 
 }} // OVR::OvrPlatform
-
-#endif // OVR_Gamepad_h

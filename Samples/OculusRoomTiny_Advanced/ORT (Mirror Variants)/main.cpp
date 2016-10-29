@@ -141,7 +141,7 @@ struct MirrorVariants : BasicVR
                 // Now we render the eye texture into the full window
                 DIRECTX.SetAndClearRenderTarget(DIRECTX.BackBufferRT, DIRECTX.MainDepthBuffer);
                 DIRECTX.SetViewport(0, 0, float(DIRECTX.WinSizeW), float(DIRECTX.WinSizeH));
-                renderEyeTexture->Render(&XMMatrixIdentity(), 1, 1, 1, 1, true);
+                renderEyeTexture->Render(XMMatrixIdentity(), 1, 1, 1, 1, true);
                 DIRECTX.SwapChain->Present(0, 0);
                 break;
             }

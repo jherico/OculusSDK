@@ -157,14 +157,6 @@ void System::Destroy()
             listener->OnThreadDestroy();
         }
 
-        Logger.LogInfo("Graceful shutdown: FinishAllThreads");
-
-        #ifdef OVR_ENABLE_THREADS
-            // Wait for all threads to finish; this must be done so that memory
-            // allocator and all destructors finalize correctly.
-            Thread::FinishAllThreads();
-        #endif
-
         Logger.LogInfo("Graceful shutdown: OnSystemDestroy");
 
         // Invoke all of the post-finish callbacks (normal case)

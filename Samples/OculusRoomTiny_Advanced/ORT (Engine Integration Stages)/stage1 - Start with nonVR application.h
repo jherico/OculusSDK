@@ -9,24 +9,25 @@
                                       DIRECTX.InitDevice(1280, 720, reinterpret_cast<LUID*>(pLuid));
 
 #define STAGE1_InitModelsAndCamera    Scene roomScene(false); \
-	                                  Camera mainCam(&XMVectorSet(0.0f, 1.6f, +5.0f, 0), &XMQuaternionIdentity()); \
-                                      bool isVisible = true;
+                                      Camera mainCam(XMVectorSet(0.0f, 1.6f, +5.0f, 0), XMQuaternionIdentity()); \
+                                      bool isVisible = true; \
+                                      UNREFERENCED_PARAMETER(isVisible);
 
 #define STAGE1_MainLoopReadingInput   while (DIRECTX.HandleMessages())
 
 #define STAGE1_MoveCameraFromInputs   static float Yaw = 0; \
                                       if (DIRECTX.Key[VK_LEFT])  mainCam.Rot = XMQuaternionRotationRollPitchYaw(0, Yaw += 0.02f, 0); \
                                       if (DIRECTX.Key[VK_RIGHT]) mainCam.Rot = XMQuaternionRotationRollPitchYaw(0, Yaw -= 0.02f, 0); \
-									  XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, -0.05f, 0), mainCam.Rot); \
-									  if (DIRECTX.Key[VK_UP])	 mainCam.Pos = XMVectorAdd(mainCam.Pos, forward); \
-									  if (DIRECTX.Key[VK_DOWN])  mainCam.Pos = XMVectorSubtract(mainCam.Pos, forward);
+                                      XMVECTOR forward = XMVector3Rotate(XMVectorSet(0, 0, -0.05f, 0), mainCam.Rot); \
+                                      if (DIRECTX.Key[VK_UP])	 mainCam.Pos = XMVectorAdd(mainCam.Pos, forward); \
+                                      if (DIRECTX.Key[VK_DOWN])  mainCam.Pos = XMVectorSubtract(mainCam.Pos, forward);
 
 #define STAGE1_SetScreenRenderTarget  DIRECTX.SetAndClearRenderTarget(DIRECTX.BackBufferRT, DIRECTX.MainDepthBuffer); \
                                       DIRECTX.SetViewport(0,0,(float)DIRECTX.WinSizeW,(float)DIRECTX.WinSizeH);
 
 #define STAGE1_GetMatrices            Camera finalCam(&mainCam.Pos, &mainCam.Rot); \
                                       XMMATRIX view = finalCam.GetViewMatrix(); \
-									  XMMATRIX proj = XMMatrixPerspectiveFovRH(1.0f, 1.0f, 0.2f, 1000.0f);
+                                      XMMATRIX proj = XMMatrixPerspectiveFovRH(1.0f, 1.0f, 0.2f, 1000.0f);
 
 #define STAGE1_RenderModels           XMMATRIX viewProj = XMMatrixMultiply(view, proj); \
 	                                  roomScene.Render(&viewProj,1,1,1,1,true); 

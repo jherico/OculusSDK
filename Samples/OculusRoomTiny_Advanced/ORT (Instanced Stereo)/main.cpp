@@ -183,7 +183,7 @@ static bool MainLoop(bool retryCreate)
     if (!pEyeRenderTexture->TextureChain)
     {
         if (retryCreate) goto Done;
-        VALIDATE(false, "Failed to create texture.");
+        FATALERROR("Failed to create texture.");
     }
 
     // Create a mirror to see on the monitor.
@@ -194,14 +194,14 @@ static bool MainLoop(bool retryCreate)
     if (!OVR_SUCCESS(result))
     {
         if (retryCreate) goto Done;
-        VALIDATE(false, "Failed to create mirror texture.");
+        FATALERROR("Failed to create mirror texture.");
     }
 
     // Create the room model
     roomScene = new Scene(false);
 
     // Create camera
-    mainCam = new Camera(&XMVectorSet(0.0f, 1.6f, 5.0f, 0), &XMQuaternionIdentity());
+    mainCam = new Camera(XMVectorSet(0.0f, 1.6f, 5.0f, 0), XMQuaternionIdentity());
 
     // Setup VR components, filling out description
     ovrEyeRenderDesc eyeRenderDesc[2];
@@ -259,7 +259,7 @@ static bool MainLoop(bool retryCreate)
 
                 // Get view and projection matrices for the Rift camera
                 XMVECTOR CombinedPos = XMVectorAdd(mainCam->Pos, XMVector3Rotate(eyePos, mainCam->Rot));
-                Camera finalCam(&CombinedPos, &(XMQuaternionMultiply(eyeQuat, mainCam->Rot)));
+                Camera finalCam(CombinedPos, XMQuaternionMultiply(eyeQuat, mainCam->Rot));
                 XMMATRIX view = finalCam.GetViewMatrix();
                 ovrMatrix4f p = ovrMatrix4f_Projection(eyeRenderDesc[eye].Fov, 0.1f, 100.0f, ovrProjection_None);
                 XMMATRIX proj = XMMatrixSet(p.M[0][0], p.M[1][0], p.M[2][0], p.M[3][0],

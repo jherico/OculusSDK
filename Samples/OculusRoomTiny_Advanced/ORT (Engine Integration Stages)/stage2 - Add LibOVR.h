@@ -10,7 +10,8 @@
 						   ovrGraphicsLuid luid;                                                           \
                            result = ovr_Create(&session, &luid);                                           \
                            VALIDATE(result == ovrSuccess, "Oculus Rift not detected.");                    \
-                           ovrHmdDesc HMDInfo = ovr_GetHmdDesc(session);
+                           ovrHmdDesc HMDInfo = ovr_GetHmdDesc(session);                                   \
+                           UNREFERENCED_PARAMETER(HMDInfo);
 
 #define STAGE2_ReleaseSDK  ovr_Destroy(session);                                                           \
                            ovr_Shutdown();

@@ -40,7 +40,7 @@ void LongPollThread::AddPollFunc(CallbackListener<PollFunc>* func)
 LongPollThread::LongPollThread() :
     Terminated(false)
 {
-    Start();
+    LongPollThreadHandle = std::make_unique<std::thread>([this] { this->Run(); });
 
     // Must be at end of function
     PushDestroyCallbacks();
@@ -48,14 +48,14 @@ LongPollThread::LongPollThread() :
 
 LongPollThread::~LongPollThread()
 {
-    fireTermination();
-
-    Join();
+    OVR_ASSERT(!LongPollThreadHandle->joinable());
 }
 
 void LongPollThread::OnThreadDestroy()
 {
     fireTermination();
+
+    LongPollThreadHandle->join();
 }
 
 void LongPollThread::Wake()
@@ -65,18 +65,19 @@ void LongPollThread::Wake()
 
 void LongPollThread::fireTermination()
 {
-    Terminated = true;
+    Terminated.store(true, std::memory_order_relaxed);
     Wake();
 }
 
 void LongPollThread::OnSystemDestroy()
 {
-    Release();
+
+    delete this;
 }
 
-int LongPollThread::Run()
+void LongPollThread::Run()
 {
-    SetThreadName("LongPoll");
+    Thread::SetCurrentThreadName("LongPoll");
     WatchDog watchdog("LongPoll");
 
     // While not terminated,
@@ -88,9 +89,7 @@ int LongPollThread::Run()
 
         WakeEvent.Wait(WakeupInterval);
         WakeEvent.ResetEvent();
-    } while (!Terminated);
-
-    return 0;
+    } while (!Terminated.load(std::memory_order_acquire));
 }
 
 

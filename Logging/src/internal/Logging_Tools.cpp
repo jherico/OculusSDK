@@ -114,10 +114,6 @@ bool Terminator::WaitSleep(int milliseconds)
 // Lock
 
 Lock::Lock() :
-#if defined(IPC_DEBUG_BUILD)
-    LockStartTime(0.),
-    LimitTime(1.),
-#endif
     cs()
 {
     static const DWORD kSpinCount = 1000;
@@ -131,31 +127,17 @@ Lock::~Lock()
 
 bool Lock::TryEnter()
 {
-#if defined(IPC_DEBUG_BUILD)
-    LockStartTime = GetTimeSeconds();
-#endif
     return ::TryEnterCriticalSection(&cs) != FALSE;
 }
 
 void Lock::Enter()
 {
-#if defined(IPC_DEBUG_BUILD)
-    LockStartTime = GetTimeSeconds();
-#endif
     ::EnterCriticalSection(&cs);
 }
 
 void Lock::Leave()
 {
     ::LeaveCriticalSection(&cs);
-#if defined(IPC_DEBUG_BUILD) && 0
-    double now = GetTimeSeconds();
-    double dt = now - LockStartTime;
-    if (dt > LimitTime)
-    {
-        IPC_DEBUG_BREAK();
-    }
-#endif
 }
 
 
@@ -399,7 +381,7 @@ void ForAllLogFiles(const char* dirPath, const char* fileNamePrefix, uint64_t mi
                     }
                     const std::wstring pathStrW = dirPathW + L'\\' + fileNameW;
 
-                    if (daysAge > minAge) {
+                    if (static_cast<uint64_t>(daysAge) > minAge) {
                         const std::string filePath = UCSStringToUTF8String(pathStrW);
                         logFileFunction(filePath.c_str(), daysAge);
                     }

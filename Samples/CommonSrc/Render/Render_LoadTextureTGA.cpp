@@ -34,6 +34,7 @@ Texture* LoadTextureTgaEitherWay(RenderDevice* ren, File* f, int textureLoadFlag
     bool anisotropic = (textureLoadFlags & TextureLoad_Anisotropic) != 0;
     bool generatePremultAlpha = (textureLoadFlags & TextureLoad_MakePremultAlpha) != 0;
     bool createSwapTextureSet = (textureLoadFlags & TextureLoad_SwapTextureSet) != 0;
+    bool isHdcp = (textureLoadFlags & TextureLoad_Hdcp) != 0;
 
     f->SeekToBegin();
 
@@ -160,6 +161,10 @@ Texture* LoadTextureTgaEitherWay(RenderDevice* ren, File* f, int textureLoadFlag
     if (createSwapTextureSet)
     {
         format |= Texture_SwapTextureSetStatic;
+    }
+    if(isHdcp)
+    {
+        format |= Texture_Hdcp;
     }
 
     // TODO: This should just be a suggestion. In theory we should use a property set by the texture to actually

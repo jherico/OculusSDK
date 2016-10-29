@@ -22,7 +22,7 @@ limitations under the License.
 ************************************************************************************/
 
 #include "Render_XmlSceneLoader.h"
-#include "Kernel/OVR_Log.h"
+#include "../Util/Logger.h"
 
 namespace OVR { namespace Render {
 
@@ -42,9 +42,9 @@ XmlHandler::~XmlHandler()
 }
 
 bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRender,
-	                      OVR::Render::Scene* pScene,
-                          OVR::Array<Ptr<CollisionModel> >* pCollisions,
-	                      OVR::Array<Ptr<CollisionModel> >* pGroundCollisions,
+                          OVR::Render::Scene* pScene,
+                          std::vector<Ptr<CollisionModel> >* pCollisions,
+                          std::vector<Ptr<CollisionModel> >* pGroundCollisions,
                           bool srgbAware /*= false*/,
                           bool anisotropic /*= false*/)
 {
@@ -68,7 +68,7 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
     }    
 
     // Load the textures
-	OVR_DEBUG_LOG_TEXT(("Loading textures..."));
+    WriteLog("Loading textures...");
     XMLElement* pXmlTexture = pXmlDocument->FirstChildElement("scene")->FirstChildElement("textures");
     OVR_ASSERT(pXmlTexture);
     if (pXmlTexture)
@@ -85,11 +85,11 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 
 		if (pos == len)
 		{            
-			OVR_sprintf(fname, 300, "%s", textureName);
+            snprintf(fname, 300, "%s", textureName);
 		}
 		else
 		{
-			OVR_sprintf(fname, 300, "%s%s", filePath, textureName);
+            snprintf(fname, 300, "%s%s", filePath, textureName);
 		}
 
         int textureLoadFlags = 0;
@@ -116,28 +116,28 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
 			}
 		}
 
-        Textures.PushBack(texture);
-		pFile->Close();
-		pFile->Release();
+        Textures.push_back(texture);
+        pFile->Close();
+        pFile->Release();
         pXmlTexture = pXmlTexture->NextSiblingElement("texture");
     }
-	OVR_DEBUG_LOG_TEXT(("Done.\n"));
+    WriteLog("Done.\n");
 
     // Load the models
 	pXmlDocument->FirstChildElement("scene")->FirstChildElement("models")->
 		          QueryIntAttribute("count", &modelCount);
 	
-		OVR_DEBUG_LOG(("Loading models... %i models to load...", modelCount));
+    WriteLog("Loading models... %i models to load...", modelCount);
     XMLElement* pXmlModel = pXmlDocument->FirstChildElement("scene")->
 		                                  FirstChildElement("models")->FirstChildElement("model");
     for(int i = 0; i < modelCount; ++i)
     {
 		if (i % 15 == 0)
 		{
-			OVR_DEBUG_LOG_TEXT(("%i models remaining...", modelCount - i));
+            WriteLog("%i models remaining...", modelCount - i);
 		}
         const char* name = pXmlModel->Attribute("name");
-        Models.PushBack(*new Model(Prim_Triangles, name));
+        Models.push_back(*new Model(Prim_Triangles, name));
         bool isCollisionModel = false;
         pXmlModel->QueryBoolAttribute("isCollisionModel", &isCollisionModel);
         Models[i]->IsCollisionModel = isCollisionModel;
@@ -149,33 +149,33 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         bool tree_c = (strcmp(name, "tree_C") == 0) || (strcmp(name, "Object03") == 0);
 
         //read the vertices
-        OVR::Array<Vector3f> *vertices = new OVR::Array<Vector3f>();
+        std::vector<Vector3f> *vertices = new std::vector<Vector3f>();
         ParseVectorString(pXmlModel->FirstChildElement("vertices")->FirstChild()->
 			              ToText()->Value(), vertices);
 
-		for (unsigned int vertexIndex = 0; vertexIndex < vertices->GetSize(); ++vertexIndex)
+		for (size_t vertexIndex = 0; vertexIndex < vertices->size(); ++vertexIndex)
 		{
-			vertices->At(vertexIndex).x *= -1.0f;
+			vertices->at(vertexIndex).x *= -1.0f;
 
             if (tree_c)
             {   // Move the terrace tree closer to the house
-                vertices->At(vertexIndex).z += 0.5;
+                vertices->at(vertexIndex).z += 0.5;
             }
 		}
 
         //read the normals
-        OVR::Array<Vector3f> *normals = new OVR::Array<Vector3f>();
+        std::vector<Vector3f> *normals = new std::vector<Vector3f>();
         ParseVectorString(pXmlModel->FirstChildElement("normals")->FirstChild()->
 			              ToText()->Value(), normals);
 
-		for (unsigned int normalIndex = 0; normalIndex < normals->GetSize(); ++normalIndex)
+		for (size_t normalIndex = 0; normalIndex < normals->size(); ++normalIndex)
 		{
-			normals->At(normalIndex).z *= -1.0f;
+			normals->at(normalIndex).z *= -1.0f;
 		}
 
         //read the textures
-        OVR::Array<Vector3f> *diffuseUVs = new OVR::Array<Vector3f>();
-        OVR::Array<Vector3f> *lightmapUVs = new OVR::Array<Vector3f>();
+        std::vector<Vector3f> *diffuseUVs = new std::vector<Vector3f>();
+        std::vector<Vector3f> *lightmapUVs = new std::vector<Vector3f>();
         int         diffuseTextureIndex = -1;
         int         lightmapTextureIndex = -1;
         XMLElement* pXmlCurMaterial = pXmlModel->FirstChildElement("material");
@@ -232,29 +232,29 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         Models[i]->Fill = shader;
 
         //add all the vertices to the model
-        const size_t numVerts = vertices->GetSize();
+        const size_t numVerts = vertices->size();
         for(size_t v = 0; v < numVerts; ++v)
         {
             if(diffuseTextureIndex > -1)
             {
                 if(lightmapTextureIndex > -1)
                 {
-                    Models[i]->AddVertex(vertices->At(v).z, vertices->At(v).y, vertices->At(v).x, Color(255, 255, 255),
-                                          diffuseUVs->At(v).x, diffuseUVs->At(v).y, lightmapUVs->At(v).x, lightmapUVs->At(v).y,
-                                          normals->At(v).x, normals->At(v).y, normals->At(v).z);
+                    Models[i]->AddVertex(vertices->at(v).z, vertices->at(v).y, vertices->at(v).x, Color(255, 255, 255),
+                                          diffuseUVs->at(v).x, diffuseUVs->at(v).y, lightmapUVs->at(v).x, lightmapUVs->at(v).y,
+                                          normals->at(v).x, normals->at(v).y, normals->at(v).z);
                 }
                 else
                 {
-                    Models[i]->AddVertex(vertices->At(v).z, vertices->At(v).y, vertices->At(v).x, Color(255, 255, 255),
-                                          diffuseUVs->At(v).x, diffuseUVs->At(v).y, 0, 0,
-                                          normals->At(v).x, normals->At(v).y, normals->At(v).z);
+                    Models[i]->AddVertex(vertices->at(v).z, vertices->at(v).y, vertices->at(v).x, Color(255, 255, 255),
+                                          diffuseUVs->at(v).x, diffuseUVs->at(v).y, 0, 0,
+                                          normals->at(v).x, normals->at(v).y, normals->at(v).z);
                 }
             }
             else
             {
-                Models[i]->AddVertex(vertices->At(v).z, vertices->At(v).y, vertices->At(v).x, Color(255, 255, 255, 255),
+                Models[i]->AddVertex(vertices->at(v).z, vertices->at(v).y, vertices->at(v).x, Color(255, 255, 255, 255),
                                       0, 0, 0, 0,
-                                      normals->At(v).x, normals->At(v).y, normals->At(v).z);
+                                      normals->at(v).x, normals->at(v).y, normals->at(v).z);
             }
         }
 
@@ -279,13 +279,13 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
             }
             text[k - j] = '\0';
 
-            Models[i]->Indices.PushBack((unsigned short)atoi(text));
+            Models[i]->Indices.push_back((unsigned short)atoi(text));
             j = k + 1;
         }
 
         // Reverse index order to match original expected orientation
-        Array<uint16_t>& indices    = Models[i]->Indices;
-        size_t         indexCount = indices.GetSize();         
+        std::vector<uint16_t>& indices    = Models[i]->Indices;
+        size_t         indexCount = indices.size();         
 
         for (size_t revIndex = 0; revIndex < indexCount/2; revIndex++)
         {
@@ -300,13 +300,13 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         delete lightmapUVs;
 
         pScene->World.Add(Models[i]);
-        pScene->Models.PushBack(Models[i]);
+        pScene->Models.push_back(Models[i]);
         pXmlModel = pXmlModel->NextSiblingElement("model");
     }
-	OVR_DEBUG_LOG(("Done."));
+    WriteLog("Done.");
 
     //load the collision models
-	OVR_DEBUG_LOG(("Loading collision models... "));
+    WriteLog("Loading collision models... ");
     XMLElement* pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("collisionModels");
     if (pXmlCollisionModel)
     {
@@ -343,14 +343,14 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         }
 
         if (pCollisions)
-        pCollisions->PushBack(cm);
+        pCollisions->push_back(cm);
         pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
     }
     }
-	OVR_DEBUG_LOG(("done."));
+    WriteLog("Done.");
 
     //load the ground collision models
-	OVR_DEBUG_LOG(("Loading ground collision models..."));
+    WriteLog("Loading ground collision models...");
     pXmlCollisionModel = pXmlDocument->FirstChildElement("scene")->FirstChildElement("groundCollisionModels");
     OVR_ASSERT(pXmlCollisionModel);
     if (pXmlCollisionModel)
@@ -380,15 +380,15 @@ bool XmlHandler::ReadFile(const char* fileName, OVR::Render::RenderDevice* pRend
         }
 
         if (pGroundCollisions)
-        pGroundCollisions->PushBack(cm);
+        pGroundCollisions->push_back(cm);
         pXmlCollisionModel = pXmlCollisionModel->NextSiblingElement("collisionModel");
     }
     }
-	OVR_DEBUG_LOG(("done."));
+    WriteLog("Done.");
 	return true;
 }
 
-void XmlHandler::ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *array,
+void XmlHandler::ParseVectorString(const char* str, std::vector<OVR::Vector3f> *array,
 	                               bool is2element)
 {
     size_t stride = is2element ? 2 : 3;
@@ -421,7 +421,7 @@ void XmlHandler::ParseVectorString(const char* str, OVR::Array<OVR::Vector3f> *a
             vect.x = v[0];
             vect.y = v[1];
             vect.z = is2element ? 0.0f : v[2];
-            array->PushBack(vect);
+            array->push_back(vect);
         }
 
         j = k + 1;

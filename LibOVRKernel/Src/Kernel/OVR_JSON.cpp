@@ -85,7 +85,7 @@ static char* PrintInt(int valueint)
     str = (char*)OVR_ALLOC(21);    // 2^64+1 can be represented in 21 chars.
     if (str)
     {
-        OVR_sprintf(str, 21, "%d", valueint);
+        snprintf(str, 21, "%d", valueint);
     }
     return str;
 }
@@ -119,17 +119,17 @@ static char* PrintNumber(double d)
             if ((fabs(floor(d) - d) <= DBL_EPSILON) && (fabs(d) < 1.0e60))
             {
                 // Write integral values with no decimals
-                OVR_sprintf(str, kCapacity, "%.0f", d);
+                snprintf(str, kCapacity, "%.0f", d);
             }
             else if ((fabs(d) < 1.0) || (fabs(d) > 1.0e9))
             {
                 // Write numbers < 1 or larger than 1e9 with 7 significant digits
-                OVR_sprintf(str, kCapacity, "%.7g", d);
+                snprintf(str, kCapacity, "%.7g", d);
             }
             else
             {
                 // Write numbers >= 1 and <= 1e9 with 6 decimals (7 to 15 sig digits)
-                OVR_sprintf(str, kCapacity, "%.6f", d);
+                snprintf(str, kCapacity, "%.6f", d);
             }
 
             // Convert any found ',' or ''' char to '.'. This will happen only if the locale was set to write a ',' 
@@ -451,7 +451,7 @@ char* PrintString(const char* str)
                 case '\r':    *ptr2++='r';    break;
                 case '\t':    *ptr2++='t';    break;
                 default: 
-                    OVR_sprintf(ptr2, buff_size - (ptr2-out), "u%04x",token);
+                    snprintf(ptr2, buff_size - (ptr2-out), "u%04x",token);
                     ptr2+=5;
                     break;    // Escape and print.
             }

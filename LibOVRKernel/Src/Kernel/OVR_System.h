@@ -96,14 +96,19 @@ protected:
 template<class T>
 class SystemSingletonBase : public SystemSingletonInternal
 {
-    static AtomicPtr<T> SingletonInstance;
+    static std::atomic<T*> SingletonInstance;
     static T* SlowGetInstance();
+
+    struct ZeroInitializer {
+        ZeroInitializer() { SingletonInstance = nullptr; }
+    };
+    ZeroInitializer zeroInitializer;
 
 protected:
     ~SystemSingletonBase()
     {
         // Make sure the instance gets set to zero on dtor
-        if (SingletonInstance == this)
+        if (SingletonInstance.load() == this)
             SingletonInstance = nullptr;
     }
 
@@ -111,7 +116,7 @@ public:
     static OVR_FORCE_INLINE T* GetInstance()
     {
         // Fast version
-        // Note: The singleton instance is stored in an AtomicPtr<> to allow it to be accessed
+        // Note: The singleton instance is stored in an std::atomic<> to allow it to be accessed
         // atomically from multiple threads without locks.
         T* instance = SingletonInstance;
         return instance ? instance : SlowGetInstance();
@@ -119,7 +124,7 @@ public:
 };
 
 // For reference, see N3337 14.5.1.3 (Static data members of class templates):
-template<class T> OVR::AtomicPtr<T> OVR::SystemSingletonBase<T>::SingletonInstance;
+template<class T> std::atomic<T*> OVR::SystemSingletonBase<T>::SingletonInstance;
 
 // Place this in the singleton class in the header file
 #define OVR_DECLARE_SINGLETON(T)                \
@@ -127,7 +132,7 @@ template<class T> OVR::AtomicPtr<T> OVR::SystemSingletonBase<T>::SingletonInstan
 private:                                        \
     T();                                        \
     virtual ~T();                               \
-    virtual void OnSystemDestroy();
+    virtual void OnSystemDestroy() override;
 
 // Place this in the singleton class source file
 #define OVR_DEFINE_SINGLETON(T)                                 \
@@ -136,7 +141,7 @@ private:                                        \
         {                                                       \
             static OVR::Lock lock;                              \
             OVR::Lock::Locker locker(&lock);                    \
-            if (!SingletonInstance)                             \
+            if (!SingletonInstance.load())                      \
                 SingletonInstance = new T;                      \
             return SingletonInstance;                           \
         }                                                       \

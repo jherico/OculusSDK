@@ -129,7 +129,7 @@ limitations under the License.
 // addition to operator new.
 //
 #ifndef OVR_REDIRECT_CRT_MALLOC
-    #if defined(_MSC_VER) && defined(_DEBUG) && (_MSC_VER >= 1900) // Enable only for VS2015+ until we get more VS2013 testing done.
+    #if defined(_MSC_VER) && defined(_DEBUG) && (_MSC_VER >= 1900) && OVR_STATIC_CRT_PRESENT // Not supported for DLL CRT until we can figure out how to work around some difficulties.
         #define OVR_REDIRECT_CRT_MALLOC 0 // Disabled until we are confident in it.
     #else
         #define OVR_REDIRECT_CRT_MALLOC 0
@@ -149,34 +149,36 @@ limitations under the License.
             extern "C" void __cdecl __acrt_unlock(int lock);
             extern "C" HANDLE __acrt_heap;
         #endif
-
-        static const uint8_t no_mans_land_fill = 0xFD;
-        static const uint8_t clean_land_fill = 0xCD;
-        static const size_t  no_mans_land_size = 4;
-        static const size_t  align_gap_size = sizeof(void*);
-        static const long    request_number_for_ignore_blocks = 0;
-        static const int     line_number_for_ignore_blocks = static_cast<int>(0xFEDCBABC);
     #else
         // The CRT locks are not accessible from outside the MSVCRT DLL. Maybe it's  
         // privately exported through an export table via ordinal number, though.
         #if (_MSC_VER >= 1900)
-            extern "C" HANDLE __cdecl __acrt_get_msvcrt_heap_handle(); 
+            extern "C" void   __cdecl __acrt_lock(int /*lock*/) { OVR_FAIL(); } // We don't currently have a way to access this, but we don't support this pattern of usage anyway.
+            extern "C" void   __cdecl __acrt_unlock(int /*lock*/) { OVR_FAIL(); }
+            extern "C" HANDLE __cdecl __acrt_get_msvcrt_heap_handle() { OVR_FAIL(); return NULL; }
         #endif
     #endif
+
+    static const uint8_t no_mans_land_fill = 0xFD;
+    static const uint8_t clean_land_fill = 0xCD;
+    static const size_t  no_mans_land_size = 4;
+    static const size_t  align_gap_size = sizeof(void*);
+    static const long    request_number_for_ignore_blocks = 0;
+    static const int     line_number_for_ignore_blocks = static_cast<int>(0xFEDCBABC);
 
     inline HANDLE GetCRTHeapHandle()
     {
         #if OVR_STATIC_CRT_PRESENT
-            #if (_MSC_VER < 1900)
+            #if (_MSC_VER < 1900) // If VS2013 or earlier...
                 return _crtheap;
             #else
                 return __acrt_heap;
             #endif
         #else
-            #if (_MSC_VER < 1900)
-                return __acrt_get_msvcrt_heap_handle();
-            #else
+            #if (_MSC_VER < 1900) // If VS2013 or earlier...
                 #error "Need to find the function that does this"
+            #else
+                return __acrt_get_msvcrt_heap_handle();
             #endif
         #endif
     }
@@ -228,7 +230,7 @@ limitations under the License.
                 }
 
                 size_t const block_size = sizeof(CrtMemBlockHeader) + size + no_mans_land_size;
-                CrtMemBlockHeader* header = static_cast<CrtMemBlockHeader*>(HeapAlloc(__acrt_heap, 0, block_size));
+                CrtMemBlockHeader* header = static_cast<CrtMemBlockHeader*>(HeapAlloc(GetCRTHeapHandle(), 0, block_size));
 
                 if (!header)
                 {
@@ -263,16 +265,19 @@ limitations under the License.
                 }
             #endif
         #endif
-    #else
+    #elif OVR_STATIC_CRT_PRESENT
         extern "C" void* __cdecl _aligned_malloc_base(size_t size, size_t align);
         extern "C" void  __cdecl _free_base(void* p);
       //extern "C" void* __cdecl _realloc_base(void* p, size_t newsize);
         extern "C" void  __cdecl _aligned_free_base(void* p);
         extern "C" void* __cdecl _aligned_realloc_base(void* p, size_t newSize, size_t align);
+    #else
+        extern "C" _ACRTIMP void  __cdecl _free_base(void* p);
+        extern "C" void  __cdecl _aligned_free_base(void* /*p*/) { OVR_FAIL(); }
+        extern "C" void* __cdecl _aligned_realloc_base(void* /*p*/, size_t /*newSize*/, size_t /*align*/){ OVR_FAIL(); return nullptr; }
     #endif
 #endif
  
-
 
 //-----------------------------------------------------------------------------------
 // ***** OVR_ALLOCATOR_UNSPECIFIED_TAG
@@ -460,7 +465,7 @@ bad_alloc::bad_alloc(const char* description) OVR_NOEXCEPT
     for(int i = 0; i < count; ++i)
     {
         char address[(sizeof(void*) * 2) + 1 + 1]; // hex address string plus possible space plus null terminator.
-        OVR_snprintf(address, sizeof(address), "%x%s", backtrace_data[i], (i + 1 < count) ? " " : "");
+        snprintf(address, sizeof(address), "%p%s", backtrace_data[i], (i + 1 < count) ? " " : "");
         OVR_strlcat(addressDescription, address, sizeof(addressDescription));
     }
 
@@ -1178,7 +1183,7 @@ bool Allocator::Init()
             #if OVR_ALLOCATOR_TRACKING_ENABLED
                 TrackingEnabled = true;
             #else
-                TrackingEnabled = OVR::Util::GetRegistryBoolW(L"Software\\Oculus", L"HeapTrackingEnabled", TrackingEnabled); // "HKEY_LOCAL_MACHINE\SOFTWARE\Oculus\HeapTrackingEnabled", REG_DWORD of 0 or 1.
+                TrackingEnabled = IsHeapTrackingRegKeyEnabled(TrackingEnabled);
             #endif
         }
 
@@ -1900,6 +1905,11 @@ bool Allocator::EnableMallocRedirect()
     return result;
 }
 
+bool Allocator::IsHeapTrackingRegKeyEnabled(bool defaultValue)
+{
+    // "HKEY_LOCAL_MACHINE\SOFTWARE\Oculus\HeapTrackingEnabled", REG_DWORD of 0 or 1.
+    return OVR::Util::GetRegistryBoolW(L"Software\\Oculus", L"HeapTrackingEnabled", defaultValue);
+}
 
 const AllocMetadata* Allocator::IterateHeapBegin()
 {
@@ -1944,55 +1954,55 @@ size_t Allocator::DescribeAllocation(const AllocMetadata* amd, int amdFlags, cha
 
     if (amdFlags & AMFAlloc)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "0x%p", amd->Alloc);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), "0x%p", amd->Alloc);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFAllocSize)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", size: %llu", amd->AllocSize);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", size: %llu", amd->AllocSize);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFBlockSize)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", block size: %llu", amd->BlockSize);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", block size: %llu", amd->BlockSize);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFTime)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", time: %llus", amd->TimeNs / UINT64_C(1000000000));
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", time: %llus", amd->TimeNs / UINT64_C(1000000000));
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFCount)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", #: %llu", amd->Count);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", #: %llu", amd->Count);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFTag)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", tag: %s", amd->Tag ? amd->Tag : OVR_ALLOCATOR_UNSPECIFIED_TAG);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", tag: %s", amd->Tag ? amd->Tag : OVR_ALLOCATOR_UNSPECIFIED_TAG);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFThreadId)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", tid: %u", amd->ThreadId);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", tid: %u", amd->ThreadId);
         descriptionString += buffer;
     }
 
     if (amdFlags & AMFThreadName)
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", thread name: %s", amd->ThreadName);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", thread name: %s", amd->ThreadName);
         descriptionString += buffer;
     }
 
     if ((amdFlags & AMFFile) || (amdFlags & AMFLine))
     {
-        OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", file/line: %s(%d)", amd->File, amd->Line);
+        snprintf(buffer, OVR_ARRAY_COUNT(buffer), ", file/line: %s(%d)", amd->File, amd->Line);
         descriptionString += buffer;
     }
 
@@ -2009,13 +2019,13 @@ size_t Allocator::DescribeAllocation(const AllocMetadata* amd, int amdFlags, cha
             if (shouldLookupSymbols && Symbols.LookupSymbol((uint64_t)amd->Backtrace[j], symbolInfo) && (symbolInfo.filePath[0] || symbolInfo.function[0]))
             {
                 if (symbolInfo.filePath[0])
-                    OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: %s(%d): %s\n", (unsigned)j, symbolInfo.filePath, symbolInfo.fileLineNumber, symbolInfo.function[0] ? symbolInfo.function : "(unknown function)");
+                    snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: %s(%d): %s\n", (unsigned)j, symbolInfo.filePath, symbolInfo.fileLineNumber, symbolInfo.function[0] ? symbolInfo.function : "(unknown function)");
                 else
-                    OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: 0x%p (unknown source file): %s\n", (unsigned)j, amd->Backtrace[j], symbolInfo.function);
+                    snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: 0x%p (unknown source file): %s\n", (unsigned)j, amd->Backtrace[j], symbolInfo.function);
             }
             else
             {
-                OVR_snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: 0x%p (symbols unavailable)\n", (unsigned)j, amd->Backtrace[j]);
+                snprintf(buffer, OVR_ARRAY_COUNT(buffer), "%2u: 0x%p (symbols unavailable)\n", (unsigned)j, amd->Backtrace[j]);
             }
 
             descriptionString += buffer;
@@ -2071,12 +2081,12 @@ size_t Allocator::TraceTrackedAllocations(AllocationTraceCallback callback, uint
         leakReportBuffer[0] = '\0';
 
         char line[2048];
-        OVR_snprintf(line, OVR_ARRAY_COUNT(line), "\n0x%p, size: %u, tag: %.64s\n", p, (unsigned)amd.AllocSize, amd.Tag ? amd.Tag : "none"); // Limit the tag length so that this can't exhaust the dest buffer. We need more dest buffer space below.
+        snprintf(line, OVR_ARRAY_COUNT(line), "\n0x%p, size: %u, tag: %.64s\n", p, (unsigned)amd.AllocSize, amd.Tag ? amd.Tag : "none"); // Limit the tag length so that this can't exhaust the dest buffer. We need more dest buffer space below.
         size_t currentStrlen = OVR_strlcat(leakReportBuffer, line, leakReportBufferSize);
 
         if (amd.Backtrace.empty())
         {
-            OVR_snprintf(line, OVR_ARRAY_COUNT(line), "(backtrace unavailable)\n");
+            snprintf(line, OVR_ARRAY_COUNT(line), "(backtrace unavailable)\n");
             OVR_strlcat(leakReportBuffer, line, leakReportBufferSize);
         }
         else
@@ -2110,7 +2120,7 @@ size_t Allocator::TraceTrackedAllocations(AllocationTraceCallback callback, uint
     }
 
     char summaryBuffer[128];
-    OVR_snprintf(summaryBuffer, OVR_ARRAY_COUNT(summaryBuffer), "Measured leak count: %llu, Reported leak count: %llu\n", (uint64_t)measuredLeakCount, (uint64_t)reportedLeakCount);
+    snprintf(summaryBuffer, OVR_ARRAY_COUNT(summaryBuffer), "Measured leak count: %llu, Reported leak count: %llu\n", (uint64_t)measuredLeakCount, (uint64_t)reportedLeakCount);
 
     if (callback)
         callback(context, summaryBuffer);
@@ -2191,13 +2201,15 @@ bool HeapIterationFilterRPN::Compile(const char* filter)
         Instruction instruction{};
         char        tempDataType[12], tempCompare[8], tempComparand[256], tempOperation[8], *nextChar;
         size_t      i;
-        bool        isOperandLine = strnicmp(filter, "and", 3) && strnicmp(filter, "or", 2); // To consider: Find a cleaner way to discern which of the two kinds of lines this is (operand or operation).
+        bool        isOperandLine = _strnicmp(filter, "and", 3) && _strnicmp(filter, "or", 2); // To consider: Find a cleaner way to discern which of the two kinds of lines this is (operand or operation).
 
         if ((*filter == '\r') || (*filter == '\n') || (*filter == '/'))
         {
             // Ignore lines that are empty or begin with / 
         }
-        else if (isOperandLine && (sscanf(filter, "%11s %7s %255[^;]s", tempDataType, tempCompare, tempComparand) == 3)) // If this line looks like an operand (e.g. AllocSize > 100)...
+        else if (isOperandLine && (sscanf_s(filter, "%11s %7s %255[^;]s", tempDataType,  (unsigned)sizeof(tempDataType),
+                                                                          tempCompare,   (unsigned)sizeof(tempCompare),
+                                                                          tempComparand, (unsigned)sizeof(tempComparand)) == 3)) // If this line looks like an operand (e.g. AllocSize > 100)...
         {
             static_assert(sizeof(tempComparand) == 256, "The format string here assumes 256. Fix the format string and this assert if tempComparand changes.");
  
@@ -2237,7 +2249,7 @@ bool HeapIterationFilterRPN::Compile(const char* filter)
             else if ((instruction.operand.metadataType == AMFCount) && (instruction.operand.numValue < 0))  // Handle the case that a negative count was passed, which
                 instruction.operand.numValue += AllocatorInstance->GetCounter();                            //     means to refer to the last N allocations.
         }
-        else if (sscanf(filter, "%7[^;]s", tempOperation) == 1) // If this line looks like an operation (e.g. And or Or).
+        else if (sscanf_s(filter, "%7[^;]s", tempOperation, (unsigned)sizeof(tempOperation)) == 1) // If this line looks like an operation (e.g. And or Or).
         {
             if (OVR_stricmp(tempOperation, "and") == 0)
                 instruction.operation = OpAnd;
@@ -3076,11 +3088,11 @@ void* DebugPageHeap::AllocCommittedPageMemory(size_t blockSize)
                 if (length)
                 {
                     std::string errorBuff = UCSStringToUTF8String(osError, length + 1);
-                    OVR_snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageHeap: VirtualAlloc failed with error: %s", errorBuff);
+                    snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageHeap: VirtualAlloc failed with error: %s", errorBuff.c_str());
                 }
                 else
                 {
-                    OVR_snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageHeap: VirtualAlloc failed with error: %d.", dwLastError);
+                    snprintf(reportedError, OVR_ARRAY_COUNT(reportedError), "DebugPageHeap: VirtualAlloc failed with error: %d.", dwLastError);
                 }
 
                 //LogError("%s", reportedError); Disabled because this call turns around and allocates memory, yet we may be in a broken or exhausted memory situation.
@@ -3190,9 +3202,11 @@ int AllocatorTraceDbgCmd(const std::vector<std::string>& args, std::string* outp
         }
 
         std::string filePath = args[1];
-        FILE* file = fopen(filePath.c_str(), "w");
+        FILE* file;
+        errno_t err;
+        err = fopen_s(&file, filePath.c_str(), "w");
 
-        if (!file)
+        if (err || !file)
         {
             strStream << "Failed to open " << filePath;
             *output = strStream.str();
@@ -3313,7 +3327,7 @@ int AllocatorReportStateDbgCmd(const std::vector<std::string>&, std::string* out
         }
         allocator->IterateHeapEnd();
         #if defined(_DLL)
-        const char* crtName = "DLL CRT"
+        const char* crtName = "DLL CRT";
         #else
         const char* crtName = "static CRT";
         #endif

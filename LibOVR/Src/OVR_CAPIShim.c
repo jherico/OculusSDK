@@ -26,6 +26,7 @@ limitations under the License.
 #include "OVR_CAPI.h"
 #include "OVR_Version.h"
 #include "OVR_ErrorCode.h"
+#include "OVR_CAPI_Prototypes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -64,9 +65,9 @@ limitations under the License.
     #pragma warning(disable: 4996) // 'getenv': This function or variable may be unsafe.
 #endif
 
-static const uint8_t OculusSDKUniqueIdentifier[] = 
+static const uint8_t OculusSDKUniqueIdentifier[] =
 {
-    0x9E, 0xB2, 0x0B, 0x1A, 0xB7, 0x97, 0x09, 0x20, 0xE0, 0xFB, 0x83, 0xED, 0xF8, 0x33, 0x5A, 0xEB, 
+    0x9E, 0xB2, 0x0B, 0x1A, 0xB7, 0x97, 0x09, 0x20, 0xE0, 0xFB, 0x83, 0xED, 0xF8, 0x33, 0x5A, 0xEB,
     0x80, 0x4D, 0x8E, 0x92, 0x20, 0x69, 0x13, 0x56, 0xB4, 0xBB, 0xC4, 0x85, 0xA7, 0x9E, 0xA4, 0xFE,
     OVR_MAJOR_VERSION, OVR_MINOR_VERSION, OVR_PATCH_VERSION
 };
@@ -135,34 +136,6 @@ static const uint8_t OculusSDKUniqueIdentifierXORResult = 0xcb;
     #endif
 #endif
 
-
-
-//-----------------------------------------------------------------------------------
-// ***** OVR_DECLARE_IMPORT
-//
-// Creates typedef and pointer declaration for a function of a given signature.
-// The typedef is <FunctionName>Type, and the pointer is <FunctionName>Ptr.
-//
-// Example usage:
-//     int MultiplyValues(float x, float y);  // Assume this function exists in an external shared library. We don't actually need to redeclare it.
-//     OVR_DECLARE_IMPORT(int, MultiplyValues, (float x, float y)) // This creates a local typedef and pointer for it.
-
-#define OVR_DECLARE_IMPORT(ReturnValue, FunctionName, Arguments)  \
-    typedef ReturnValue (OVR_CDECL *FunctionName##Type)Arguments; \
-    FunctionName##Type FunctionName##Ptr = NULL;
-
-
-
-//-----------------------------------------------------------------------------------
-// ***** OVR_GETFUNCTION
-//
-// Loads <FunctionName>Ptr from hLibOVR if not already loaded.
-// Assumes a variable named <FunctionName>Ptr of type <FunctionName>Type exists which is called <FunctionName> in LibOVR.
-//
-// Example usage:
-//     OVR_GETFUNCTION(MultiplyValues)    // Normally this would be done on library init and not before every usage.
-//     int result = MultiplyValuesPtr(3.f, 4.f);
-
 #if !defined(OVR_DLSYM)
     #if defined(_WIN32)
         #define OVR_DLSYM(dlImage, name) GetProcAddress(dlImage, name)
@@ -170,19 +143,6 @@ static const uint8_t OculusSDKUniqueIdentifierXORResult = 0xcb;
         #define OVR_DLSYM(dlImage, name) dlsym(dlImage, name)
     #endif
 #endif
-
-#define OVR_GETFUNCTION(f)             \
-    if(!f##Ptr)                        \
-    {                                  \
-        union                          \
-        {                              \
-            f##Type p1;                \
-            ModuleFunctionType p2;     \
-        } u;                           \
-        u.p2 = OVR_DLSYM(hLibOVR, #f); \
-        f##Ptr = u.p1;                 \
-    }
-
 
 static size_t OVR_strlcpy(char* dest, const char* src, size_t destsize)
 {
@@ -622,7 +582,7 @@ static HANDLE OVR_Win32_SignCheck(FilePathCharType* fullPath)
             for (chainIndex = 0; chainIndex < CertificateChainCount; ++chainIndex)
             {
                 CertificateEntry* chain = AllowedCertificateChains[chainIndex];
-                if (0 == ValidateCertificateContents(chain, cps))
+                if (VCCRSuccess == ValidateCertificateContents(chain, cps))
                 {
                     verified = 1;
                     break;
@@ -649,25 +609,30 @@ static HANDLE OVR_Win32_SignCheck(FilePathCharType* fullPath)
 
 #endif // #if defined(_WIN32)
 
-static ModuleHandleType OVR_OpenLibrary(const FilePathCharType* libraryPath)
+static ModuleHandleType OVR_OpenLibrary(const FilePathCharType* libraryPath, ovrResult* result)
 {
     #if defined(_WIN32)
         DWORD fullPathNameLen = 0;
         FilePathCharType fullPath[MAX_PATH] = { 0 };
         HANDLE hFilePinned = INVALID_HANDLE_VALUE;
         ModuleHandleType hModule = 0;
+
+        *result = ovrSuccess;
         fullPathNameLen = GetFullPathNameW(libraryPath, MAX_PATH, fullPath, 0);
         if (fullPathNameLen <= 0 || fullPathNameLen >= MAX_PATH)
         {
-            return 0;
+            *result = ovrError_LibPath;
+            return NULL;
         }
         fullPath[MAX_PATH - 1] = 0;
 
         hFilePinned = OVR_Win32_SignCheck(fullPath);
-        if (hFilePinned == INVALID_HANDLE_VALUE)
-        {
-            return 0;
-        }
+
+            if (hFilePinned == INVALID_HANDLE_VALUE)
+            {
+                *result = ovrError_LibSignCheck;
+                return NULL;
+            }
 
         hModule = LoadLibraryW(fullPath);
 
@@ -678,9 +643,12 @@ static ModuleHandleType OVR_OpenLibrary(const FilePathCharType* libraryPath)
 
         return hModule;
     #else
+        *result = ovrSuccess;
+
         // Don't bother trying to dlopen() a file that is not even there.
         if (access(libraryPath, X_OK | R_OK ) != 0)
         {
+            *result = ovrError_LibPath;
             return NULL;
         }
 
@@ -710,9 +678,9 @@ static void OVR_CloseLibrary(ModuleHandleType hLibrary)
     {
         #if defined(_WIN32)
             // We may need to consider what to do in the case that the library is in an exception state.
-            // In a Windows C++ DLL, all global objects (including static members of classes) will be constructed just 
-            // before the calling of the DllMain with DLL_PROCESS_ATTACH and they will be destroyed just after 
-            // the call of the DllMain with DLL_PROCESS_DETACH. We may need to intercept DLL_PROCESS_DETACH and 
+            // In a Windows C++ DLL, all global objects (including static members of classes) will be constructed just
+            // before the calling of the DllMain with DLL_PROCESS_ATTACH and they will be destroyed just after
+            // the call of the DllMain with DLL_PROCESS_DETACH. We may need to intercept DLL_PROCESS_DETACH and
             // have special handling for the case that the DLL is broken.
             FreeLibrary(hLibrary);
         #else
@@ -726,7 +694,7 @@ static void OVR_CloseLibrary(ModuleHandleType hLibrary)
 // The caller is required to eventually call OVR_CloseLibrary on a valid return handle.
 //
 static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int requestedMajorVersion,
-                               FilePathCharType* libraryPath, size_t libraryPathCapacity)
+                               FilePathCharType* libraryPath, size_t libraryPathCapacity, ovrResult* result)
 {
     ModuleHandleType moduleHandle;
     int printfResult;
@@ -750,6 +718,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
 
     (void)requestedProductVersion;
 
+    *result = ovrError_LibLoad;
     moduleHandle = ModuleHandleTypeNull;
     if(libraryPathCapacity)
         libraryPath[0] = '\0';
@@ -857,7 +826,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
             #elif defined(_MSC_VER) && (_MSC_VER == 1800)
                 const char* pCompilerVersion = "VS2013";
             #elif defined(_MSC_VER) && (_MSC_VER == 1900)
-                const char* pCompilerVersion = "VS2014";
+                const char* pCompilerVersion = "VS2015";
             #endif
 
             #if defined(_WIN32)
@@ -869,7 +838,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
                 int count = snprintf(developerDir, OVR_MAX_PATH, "%s/LibOVR/Lib/Mac/%s/",
                                         sdkRoot, pConfigDirName);
             #else
-                int count = snprintf(developerDir, OVR_MAX_PATH, "%s/LibOVR/Lib/Linux/%s/%s/", 
+                int count = snprintf(developerDir, OVR_MAX_PATH, "%s/LibOVR/Lib/Linux/%s/%s/",
                                         sdkRoot, pArchDirName, pConfigDirName);
             #endif
 
@@ -1024,7 +993,7 @@ static ModuleHandleType OVR_FindLibraryPath(int requestedProductVersion, int req
 
             if((printfResult >= 0) && (printfResult < (int)libraryPathCapacity))
             {
-                moduleHandle = OVR_OpenLibrary(libraryPath);
+                moduleHandle = OVR_OpenLibrary(libraryPath, result);
                 if(moduleHandle != ModuleHandleTypeNull)
                     return moduleHandle;
             }
@@ -1054,250 +1023,76 @@ ModuleHandleType ovr_GetLibOVRRTHandle()
 //-----------------------------------------------------------------------------------
 // ***** Function declarations
 //
-// To consider: Move OVR_DECLARE_IMPORT and the declarations below to OVR_CAPI.h
+
+//-----------------------------------------------------------------------------------
+// ***** OVR_DECLARE_IMPORT
 //
-OVR_DECLARE_IMPORT(ovrBool,          ovr_InitializeRenderingShimVersion, (int requestedMinorVersion))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_Initialize, (const ovrInitParams* params))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_Shutdown, ())
-OVR_DECLARE_IMPORT(const char*,      ovr_GetVersionString, ())
-OVR_DECLARE_IMPORT(void,             ovr_GetLastErrorInfo, (ovrErrorInfo* errorInfo))
-OVR_DECLARE_IMPORT(ovrHmdDesc,       ovr_GetHmdDesc, (ovrSession session))
-OVR_DECLARE_IMPORT(unsigned int,     ovr_GetTrackerCount, (ovrSession session))
-OVR_DECLARE_IMPORT(ovrTrackerDesc,   ovr_GetTrackerDesc, (ovrSession session, unsigned int trackerDescIndex))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_Create, (ovrSession* pSession, ovrGraphicsLuid* pLuid))
-OVR_DECLARE_IMPORT(void,             ovr_Destroy, (ovrSession session))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_GetSessionStatus, (ovrSession session, ovrSessionStatus* sessionStatus))
-OVR_DECLARE_IMPORT(ovrResult,         ovr_SetTrackingOriginType, (ovrSession session, ovrTrackingOrigin origin))
-OVR_DECLARE_IMPORT(ovrTrackingOrigin, ovr_GetTrackingOriginType, (ovrSession session))
+// Creates a pointer and loader value union for each entry in OVR_LIST_APIS()
+//
 
-OVR_DECLARE_IMPORT(ovrResult,        ovr_RecenterTrackingOrigin, (ovrSession session))
-OVR_DECLARE_IMPORT(void,             ovr_ClearShouldRecenterFlag, (ovrSession session))
-OVR_DECLARE_IMPORT(ovrTrackingState, ovr_GetTrackingState, (ovrSession session, double absTime, ovrBool latencyMarker))
-OVR_DECLARE_IMPORT(ovrTrackerPose,   ovr_GetTrackerPose, (ovrSession session, unsigned int index))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_GetInputState, (ovrSession session, ovrControllerType controllerType, ovrInputState*))
-OVR_DECLARE_IMPORT(unsigned int,     ovr_GetConnectedControllerTypes, (ovrSession session))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_SetControllerVibration, (ovrSession session, ovrControllerType controllerType, float frequency, float amplitude))
-OVR_DECLARE_IMPORT(ovrSizei,         ovr_GetFovTextureSize, (ovrSession session, ovrEyeType eye, ovrFovPort fov, float pixelsPerDisplayPixel))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_SubmitFrame, (ovrSession session, long long frameIndex, const ovrViewScaleDesc* viewScaleDesc, ovrLayerHeader const * const * layerPtrList, unsigned int layerCount))
-OVR_DECLARE_IMPORT(ovrEyeRenderDesc, ovr_GetRenderDesc, (ovrSession session, ovrEyeType eyeType, ovrFovPort fov))
-OVR_DECLARE_IMPORT(double,           ovr_GetPredictedDisplayTime, (ovrSession session, long long frameIndex))
-OVR_DECLARE_IMPORT(double,           ovr_GetTimeInSeconds, ())
-OVR_DECLARE_IMPORT(ovrBool,          ovr_GetBool, (ovrSession session, const char* propertyName, ovrBool defaultVal))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_SetBool, (ovrSession session, const char* propertyName, ovrBool value))
-OVR_DECLARE_IMPORT(int,              ovr_GetInt, (ovrSession session, const char* propertyName, int defaultVal))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_SetInt, (ovrSession session, const char* propertyName, int value))
-OVR_DECLARE_IMPORT(float,            ovr_GetFloat, (ovrSession session, const char* propertyName, float defaultVal))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_SetFloat, (ovrSession session, const char* propertyName, float value))
-OVR_DECLARE_IMPORT(unsigned int,     ovr_GetFloatArray, (ovrSession session, const char* propertyName, float values[], unsigned int arraySize))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_SetFloatArray, (ovrSession session, const char* propertyName, const float values[], unsigned int arraySize))
-OVR_DECLARE_IMPORT(const char*,      ovr_GetString, (ovrSession session, const char* propertyName, const char* defaultVal))
-OVR_DECLARE_IMPORT(ovrBool,          ovr_SetString, (ovrSession session, const char* propertyName, const char* value))
-OVR_DECLARE_IMPORT(int,              ovr_TraceMessage, (int level, const char* message))
-OVR_DECLARE_IMPORT(ovrResult,        ovr_IdentifyClient, (const char* identity))
+#define OVR_DECLARE_IMPORT(ReturnValue, FunctionName, OptionalVersion, Arguments) \
+    union { \
+        ReturnValue (OVR_CDECL* Ptr) Arguments; \
+        ModuleFunctionType Symbol; \
+    } FunctionName;
 
-#if defined (_WIN32)
-OVR_DECLARE_IMPORT(ovrResult, ovr_CreateTextureSwapChainDX, (ovrSession session, IUnknown* d3dPtr, const ovrTextureSwapChainDesc* desc, ovrTextureSwapChain* outTextureChain))
-OVR_DECLARE_IMPORT(ovrResult, ovr_CreateMirrorTextureDX, (ovrSession session, IUnknown* d3dPtr, const ovrMirrorTextureDesc* desc, ovrMirrorTexture* outMirrorTexture))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetTextureSwapChainBufferDX, (ovrSession session, ovrTextureSwapChain chain, int index, IID iid, void** ppObject))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetMirrorTextureBufferDX, (ovrSession session, ovrMirrorTexture mirror, IID iid, void** ppObject))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceOutWaveId, (UINT* deviceOutId))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceInWaveId, (UINT* deviceInId))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceOutGuidStr, (WCHAR* deviceOutStrBuffer))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceOutGuid, (GUID* deviceOutGuid))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceInGuidStr, (WCHAR* deviceInStrBuffer))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetAudioDeviceInGuid, (GUID* deviceInGuid))
-#endif
+#define OVR_IGNORE_IMPORT(ReturnValue, FunctionName, OptionalVersion, Arguments)
 
-OVR_DECLARE_IMPORT(ovrResult, ovr_CreateTextureSwapChainGL, (ovrSession session, const ovrTextureSwapChainDesc* desc, ovrTextureSwapChain* outTextureChain))
-OVR_DECLARE_IMPORT(ovrResult, ovr_CreateMirrorTextureGL, (ovrSession session, const ovrMirrorTextureDesc* desc, ovrMirrorTexture* outMirrorTexture))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetTextureSwapChainBufferGL, (ovrSession session, ovrTextureSwapChain chain, int index, unsigned int* texId))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetMirrorTextureBufferGL, (ovrSession session, ovrMirrorTexture mirror, unsigned int* texId))
+//-----------------------------------------------------------------------------------
+// ***** API - a structure with each API entrypoint as a FunctionName.Ptr and FunctionName.Symbol union
+//
 
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetTextureSwapChainLength, (ovrSession session, ovrTextureSwapChain chain, int* length))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetTextureSwapChainCurrentIndex, (ovrSession session, ovrTextureSwapChain chain, int* currentIndex))
-OVR_DECLARE_IMPORT(ovrResult, ovr_GetTextureSwapChainDesc, (ovrSession session, ovrTextureSwapChain chain, ovrTextureSwapChainDesc* desc))
-OVR_DECLARE_IMPORT(ovrResult, ovr_CommitTextureSwapChain, (ovrSession session, ovrTextureSwapChain chain))
-OVR_DECLARE_IMPORT(void, ovr_DestroyTextureSwapChain, (ovrSession session, ovrTextureSwapChain chain))
-OVR_DECLARE_IMPORT(void, ovr_DestroyMirrorTexture, (ovrSession session, ovrMirrorTexture texture))
-OVR_DECLARE_IMPORT(ovrResult, ovr_SetQueueAheadFraction, (ovrSession session, float queueAheadFraction))
+static struct
+{
+    OVR_LIST_APIS(OVR_DECLARE_IMPORT, OVR_IGNORE_IMPORT)
+} API = { NULL };
 
-OVR_DECLARE_IMPORT(ovrResult, ovr_Lookup, (const char* name, void** data));
+static void OVR_UnloadSharedLibrary()
+{
+    memset(&API, 0, sizeof(API));
+    if (hLibOVR)
+        OVR_CloseLibrary(hLibOVR);
+    hLibOVR = NULL;
+}
 
 static ovrResult OVR_LoadSharedLibrary(int requestedProductVersion, int requestedMajorVersion)
 {
     FilePathCharType filePath[OVR_MAX_PATH];
+    const char *SymbolName = NULL;
+    ovrResult result = ovrSuccess;
 
-    if(hLibOVR)
-        return ovrSuccess;
+    if (hLibOVR)
+        return result;
 
-    hLibOVR = OVR_FindLibraryPath(requestedProductVersion, requestedMajorVersion,
-                             filePath, sizeof(filePath) / sizeof(filePath[0]));
-    if(!hLibOVR)
-        return ovrError_LibLoad;
+    hLibOVR = OVR_FindLibraryPath(requestedProductVersion, requestedMajorVersion, filePath, sizeof(filePath) / sizeof(filePath[0]), &result);
 
-    OVR_GETFUNCTION(ovr_InitializeRenderingShimVersion)
-    OVR_GETFUNCTION(ovr_Initialize)
-    OVR_GETFUNCTION(ovr_Shutdown)
-    OVR_GETFUNCTION(ovr_GetVersionString)
-    OVR_GETFUNCTION(ovr_GetLastErrorInfo)
-    OVR_GETFUNCTION(ovr_GetHmdDesc)
-    OVR_GETFUNCTION(ovr_GetTrackerCount)
-    OVR_GETFUNCTION(ovr_GetTrackerDesc)
-    OVR_GETFUNCTION(ovr_Create)
-    OVR_GETFUNCTION(ovr_Destroy)
-    OVR_GETFUNCTION(ovr_GetSessionStatus)
-    OVR_GETFUNCTION(ovr_SetTrackingOriginType)
-    OVR_GETFUNCTION(ovr_GetTrackingOriginType)
-    OVR_GETFUNCTION(ovr_RecenterTrackingOrigin)
-    OVR_GETFUNCTION(ovr_ClearShouldRecenterFlag)
-    OVR_GETFUNCTION(ovr_GetTrackingState)
-    OVR_GETFUNCTION(ovr_GetTrackerPose)
-    OVR_GETFUNCTION(ovr_GetInputState)
-    OVR_GETFUNCTION(ovr_GetConnectedControllerTypes)
-    OVR_GETFUNCTION(ovr_SetControllerVibration)
-    OVR_GETFUNCTION(ovr_GetFovTextureSize)
-    OVR_GETFUNCTION(ovr_SubmitFrame)
-    OVR_GETFUNCTION(ovr_GetRenderDesc)
-    OVR_GETFUNCTION(ovr_GetPredictedDisplayTime)
-    OVR_GETFUNCTION(ovr_GetTimeInSeconds)
-    OVR_GETFUNCTION(ovr_GetBool)
-    OVR_GETFUNCTION(ovr_SetBool)
-    OVR_GETFUNCTION(ovr_GetInt)
-    OVR_GETFUNCTION(ovr_SetInt)
-    OVR_GETFUNCTION(ovr_GetFloat)
-    OVR_GETFUNCTION(ovr_SetFloat)
-    OVR_GETFUNCTION(ovr_GetFloatArray)
-    OVR_GETFUNCTION(ovr_SetFloatArray)
-    OVR_GETFUNCTION(ovr_GetString)
-    OVR_GETFUNCTION(ovr_SetString)
-    OVR_GETFUNCTION(ovr_TraceMessage)
-    OVR_GETFUNCTION(ovr_IdentifyClient)
-#if defined (_WIN32)
-    OVR_GETFUNCTION(ovr_CreateTextureSwapChainDX)
-    OVR_GETFUNCTION(ovr_CreateMirrorTextureDX)
-    OVR_GETFUNCTION(ovr_GetTextureSwapChainBufferDX)
-    OVR_GETFUNCTION(ovr_GetMirrorTextureBufferDX)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceOutWaveId)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceInWaveId)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceOutGuidStr)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceOutGuid)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceInGuidStr)
-    OVR_GETFUNCTION(ovr_GetAudioDeviceInGuid)
-#endif
-    OVR_GETFUNCTION(ovr_CreateTextureSwapChainGL)
-    OVR_GETFUNCTION(ovr_CreateMirrorTextureGL)
-    OVR_GETFUNCTION(ovr_GetTextureSwapChainBufferGL)
-    OVR_GETFUNCTION(ovr_GetMirrorTextureBufferGL)
+    if (!hLibOVR)
+        return result;
 
-    OVR_GETFUNCTION(ovr_GetTextureSwapChainLength)
-    OVR_GETFUNCTION(ovr_GetTextureSwapChainCurrentIndex)
-    OVR_GETFUNCTION(ovr_GetTextureSwapChainDesc)
-    OVR_GETFUNCTION(ovr_CommitTextureSwapChain)
-    OVR_GETFUNCTION(ovr_DestroyTextureSwapChain)
-    OVR_GETFUNCTION(ovr_DestroyMirrorTexture)
-    OVR_GETFUNCTION(ovr_SetQueueAheadFraction)
-    OVR_GETFUNCTION(ovr_Lookup)
+    // Zero the API table just to be paranoid
+    memset(&API, 0, sizeof(API));
 
-    return ovrSuccess;
+    // Load the current API entrypoint using the catenated FunctionName and OptionalVersion
+    #define OVR_GETFUNCTION(ReturnValue, FunctionName, OptionalVersion, Arguments) \
+        SymbolName = #FunctionName #OptionalVersion; \
+        API.FunctionName.Symbol = OVR_DLSYM(hLibOVR, SymbolName); \
+        if (!API.FunctionName.Symbol) \
+        {\
+            result = ovrError_LibSymbols; \
+            goto FailedToLoadSymbol; \
+        }
+
+    OVR_LIST_APIS(OVR_GETFUNCTION, OVR_IGNORE_IMPORT)
+
+    #undef OVR_GETFUNCTION
+
+    return result;
+
+FailedToLoadSymbol:
+    // Check SymbolName for the name of the API which failed to load
+    OVR_UnloadSharedLibrary();
+    return result;
 }
-
-static void OVR_UnloadSharedLibrary()
-{
-    // To consider: Make all pointers be part of a struct and memset the struct to 0 here.
-    ovr_InitializeRenderingShimVersionPtr = NULL;
-    ovr_InitializePtr = NULL;
-    ovr_ShutdownPtr = NULL;
-    ovr_GetVersionStringPtr = NULL;
-    ovr_GetLastErrorInfoPtr = NULL;
-    ovr_GetHmdDescPtr = NULL;
-    ovr_GetTrackerCountPtr = NULL;
-    ovr_GetTrackerDescPtr = NULL;
-    ovr_CreatePtr = NULL;
-    ovr_DestroyPtr = NULL;
-    ovr_GetSessionStatusPtr = NULL;
-    ovr_SetTrackingOriginTypePtr = NULL;
-    ovr_GetTrackingOriginTypePtr = NULL;
-    ovr_RecenterTrackingOriginPtr = NULL;
-    ovr_GetTrackingStatePtr = NULL;
-    ovr_GetTrackerPosePtr = NULL;
-    ovr_GetInputStatePtr = NULL;
-    ovr_GetConnectedControllerTypesPtr = NULL;
-    ovr_SetControllerVibrationPtr = NULL;
-    ovr_GetFovTextureSizePtr = NULL;
-    ovr_SubmitFramePtr = NULL;
-    ovr_GetRenderDescPtr = NULL;
-    ovr_GetPredictedDisplayTimePtr = NULL;
-    ovr_GetTimeInSecondsPtr = NULL;
-    ovr_GetBoolPtr = NULL;
-    ovr_SetBoolPtr = NULL;
-    ovr_GetIntPtr = NULL;
-    ovr_SetIntPtr = NULL;
-    ovr_GetFloatPtr = NULL;
-    ovr_SetFloatPtr = NULL;
-    ovr_GetFloatArrayPtr = NULL;
-    ovr_SetFloatArrayPtr = NULL;
-    ovr_GetStringPtr = NULL;
-    ovr_SetStringPtr = NULL;
-    ovr_TraceMessagePtr = NULL;
-    ovr_IdentifyClientPtr = NULL;
-#if defined (_WIN32)
-    ovr_CreateTextureSwapChainDXPtr = NULL;
-    ovr_CreateMirrorTextureDXPtr = NULL;
-    ovr_GetTextureSwapChainBufferDXPtr = NULL;
-    ovr_GetMirrorTextureBufferDXPtr = NULL;
-    ovr_GetAudioDeviceInWaveIdPtr = NULL;
-    ovr_GetAudioDeviceOutWaveIdPtr = NULL;
-    ovr_GetAudioDeviceInGuidStrPtr = NULL;
-    ovr_GetAudioDeviceOutGuidStrPtr = NULL;
-    ovr_GetAudioDeviceInGuidPtr = NULL;
-    ovr_GetAudioDeviceOutGuidPtr = NULL;
-#endif
-    ovr_CreateTextureSwapChainGLPtr = NULL;
-    ovr_CreateMirrorTextureGLPtr = NULL;
-    ovr_GetTextureSwapChainBufferGLPtr = NULL;
-    ovr_GetMirrorTextureBufferGLPtr = NULL;
-
-    ovr_GetTextureSwapChainLengthPtr = NULL;
-    ovr_GetTextureSwapChainCurrentIndexPtr = NULL;
-    ovr_GetTextureSwapChainDescPtr = NULL;
-    ovr_CommitTextureSwapChainPtr = NULL;
-    ovr_DestroyTextureSwapChainPtr = NULL;
-    ovr_DestroyMirrorTexturePtr = NULL;
-    ovr_SetQueueAheadFractionPtr = NULL;
-    ovr_LookupPtr = NULL;
-
-    OVR_CloseLibrary(hLibOVR);
-    hLibOVR = NULL;
-}
-
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShim()
-{
-#if 1
-    return ovrTrue;
-#else
-    return ovr_InitializeRenderingShimVersion(OVR_MINOR_VERSION);
-#endif
-}
-
-
-OVR_PUBLIC_FUNCTION(ovrBool) ovr_InitializeRenderingShimVersion(int requestedMinorVersion)
-{
-    // By design we ignore the build version in the library search.
-    ovrBool initializeResult;
-    ovrResult result = OVR_LoadSharedLibrary(OVR_PRODUCT_VERSION, OVR_MAJOR_VERSION);
-
-    if (result != ovrSuccess)
-        return ovrFalse;
-
-    initializeResult = ovr_InitializeRenderingShimVersionPtr(requestedMinorVersion);
-
-    if (initializeResult == ovrFalse)
-        OVR_UnloadSharedLibrary();
-
-    return initializeResult;
-}
-
 
 // These defaults are also in CAPI.cpp
 static const ovrInitParams DefaultParams = {
@@ -1364,7 +1159,7 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_Initialize(const ovrInitParams* inputParams)
     if (result != ovrSuccess)
        return result;
 
-    result = ovr_InitializePtr(&params);
+    result = API.ovr_Initialize.Ptr(&params);
     if (result != ovrSuccess)
         OVR_UnloadSharedLibrary();
 
@@ -1386,25 +1181,25 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_Initialize(const ovrInitParams* inputParams)
 
 OVR_PUBLIC_FUNCTION(void) ovr_Shutdown()
 {
-    if (!ovr_ShutdownPtr)
+    if (!API.ovr_Shutdown.Ptr)
         return;
-    ovr_ShutdownPtr();
+    API.ovr_Shutdown.Ptr();
     OVR_UnloadSharedLibrary();
 }
 
 OVR_PUBLIC_FUNCTION(const char*) ovr_GetVersionString()
 {
-    // We don't directly return the value of the DLL ovr_GetVersionStringPtr call,
-    // because that call returns a pointer to memory within the DLL. If the DLL goes 
+    // We don't directly return the value of the DLL API.ovr_GetVersionString.Ptr call,
+    // because that call returns a pointer to memory within the DLL. If the DLL goes
     // away then that pointer becomes invalid while the process may still be holding
     // onto it. So we save a local copy of it which is always valid.
     static char dllVersionStringLocal[32];
     const char* dllVersionString;
 
-    if (!ovr_GetVersionStringPtr)
+    if (!API.ovr_GetVersionString.Ptr)
         return "(Unable to load LibOVR)";
 
-    dllVersionString = ovr_GetVersionStringPtr(); // Guaranteed to always be valid.
+    dllVersionString = API.ovr_GetVersionString.Ptr(); // Guaranteed to always be valid.
     assert(dllVersionString != NULL);
     OVR_strlcpy(dllVersionStringLocal, dllVersionString, sizeof(dllVersionStringLocal));
 
@@ -1413,18 +1208,18 @@ OVR_PUBLIC_FUNCTION(const char*) ovr_GetVersionString()
 
 OVR_PUBLIC_FUNCTION(void) ovr_GetLastErrorInfo(ovrErrorInfo* errorInfo)
 {
-    if (!ovr_GetLastErrorInfoPtr)
+    if (!API.ovr_GetLastErrorInfo.Ptr)
     {
         memset(errorInfo, 0, sizeof(ovrErrorInfo));
-        errorInfo->Result = ovrError_LibLoad;
+        errorInfo->Result = ovrError_NotInitialized;
     }
     else
-        ovr_GetLastErrorInfoPtr(errorInfo);
+        API.ovr_GetLastErrorInfo.Ptr(errorInfo);
 }
 
 OVR_PUBLIC_FUNCTION(ovrHmdDesc) ovr_GetHmdDesc(ovrSession session)
 {
-    if (!ovr_GetHmdDescPtr)
+    if (!API.ovr_GetHmdDesc.Ptr)
     {
         ovrHmdDesc hmdDesc;
         memset(&hmdDesc, 0, sizeof(hmdDesc));
@@ -1432,48 +1227,48 @@ OVR_PUBLIC_FUNCTION(ovrHmdDesc) ovr_GetHmdDesc(ovrSession session)
         return hmdDesc;
     }
 
-    return ovr_GetHmdDescPtr(session);
+    return API.ovr_GetHmdDesc.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(unsigned int) ovr_GetTrackerCount(ovrSession session)
 {
-    if (!ovr_GetTrackerCountPtr)
+    if (!API.ovr_GetTrackerCount.Ptr)
     {
         return 0;
     }
-    
-    return ovr_GetTrackerCountPtr(session);
+
+    return API.ovr_GetTrackerCount.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(ovrTrackerDesc) ovr_GetTrackerDesc(ovrSession session, unsigned int trackerDescIndex)
 {
-    if (!ovr_GetTrackerDescPtr)
+    if (!API.ovr_GetTrackerDesc.Ptr)
     {
         ovrTrackerDesc trackerDesc;
         memset(&trackerDesc, 0, sizeof(trackerDesc));
         return trackerDesc;
     }
-    
-    return ovr_GetTrackerDescPtr(session, trackerDescIndex);
+
+    return API.ovr_GetTrackerDesc.Ptr(session, trackerDescIndex);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_Create(ovrSession* pSession, ovrGraphicsLuid* pLuid)
 {
-    if (!ovr_CreatePtr)
+    if (!API.ovr_Create.Ptr)
         return ovrError_NotInitialized;
-    return ovr_CreatePtr(pSession, pLuid);
+    return API.ovr_Create.Ptr(pSession, pLuid);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovr_Destroy(ovrSession session)
 {
-    if (!ovr_DestroyPtr)
+    if (!API.ovr_Destroy.Ptr)
         return;
-    ovr_DestroyPtr(session);
+    API.ovr_Destroy.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetSessionStatus(ovrSession session, ovrSessionStatus* sessionStatus)
 {
-    if (!ovr_GetSessionStatusPtr)
+    if (!API.ovr_GetSessionStatus.Ptr)
     {
         if (sessionStatus)
         {
@@ -1488,105 +1283,208 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetSessionStatus(ovrSession session, ovrSessi
         return ovrError_NotInitialized;
     }
 
-    return ovr_GetSessionStatusPtr(session, sessionStatus);
+    return API.ovr_GetSessionStatus.Ptr(session, sessionStatus);
 }
 
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_SetTrackingOriginType(ovrSession session, ovrTrackingOrigin origin)
 {
-    if (!ovr_SetTrackingOriginTypePtr)
+    if (!API.ovr_SetTrackingOriginType.Ptr)
         return ovrError_NotInitialized;
-    return ovr_SetTrackingOriginTypePtr(session, origin);
+    return API.ovr_SetTrackingOriginType.Ptr(session, origin);
 }
 
 OVR_PUBLIC_FUNCTION(ovrTrackingOrigin) ovr_GetTrackingOriginType(ovrSession session)
 {
-    if (!ovr_GetTrackingOriginTypePtr)
+    if (!API.ovr_GetTrackingOriginType.Ptr)
         return ovrTrackingOrigin_EyeLevel;
-    return ovr_GetTrackingOriginTypePtr(session);
+    return API.ovr_GetTrackingOriginType.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_RecenterTrackingOrigin(ovrSession session)
 {
-    if (!ovr_RecenterTrackingOriginPtr)
+    if (!API.ovr_RecenterTrackingOrigin.Ptr)
         return ovrError_NotInitialized;
-    return ovr_RecenterTrackingOriginPtr(session);
+    return API.ovr_RecenterTrackingOrigin.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovr_ClearShouldRecenterFlag(ovrSession session)
 {
-    if (!ovr_ClearShouldRecenterFlagPtr)
+    if (!API.ovr_ClearShouldRecenterFlag.Ptr)
         return;
-    ovr_ClearShouldRecenterFlagPtr(session);
+    API.ovr_ClearShouldRecenterFlag.Ptr(session);
 }
 
 OVR_PUBLIC_FUNCTION(ovrTrackingState) ovr_GetTrackingState(ovrSession session, double absTime, ovrBool latencyMarker)
 {
-    if (!ovr_GetTrackingStatePtr)
+    if (!API.ovr_GetTrackingState.Ptr)
     {
         ovrTrackingState nullTrackingState;
         memset(&nullTrackingState, 0, sizeof(nullTrackingState));
         return nullTrackingState;
     }
 
-    return ovr_GetTrackingStatePtr(session, absTime, latencyMarker);
+    return API.ovr_GetTrackingState.Ptr(session, absTime, latencyMarker);
 }
 
+OVR_PUBLIC_FUNCTION(ovrTrackingState) ovr_GetTrackingStateWithSensorData(ovrSession session, double absTime, ovrBool latencyMarker, ovrSensorData* sensorData)
+{
+    if (!API.ovr_GetTrackingStateWithSensorData.Ptr)
+    {
+        ovrTrackingState nullTrackingState;
+        memset(&nullTrackingState, 0, sizeof(nullTrackingState));
+        if (sensorData)
+            memset(&sensorData, 0, sizeof(sensorData));
+        return nullTrackingState;
+    }
+
+    return API.ovr_GetTrackingStateWithSensorData.Ptr(session, absTime, latencyMarker, sensorData);
+}
 
 OVR_PUBLIC_FUNCTION(ovrTrackerPose) ovr_GetTrackerPose(ovrSession session, unsigned int trackerPoseIndex)
 {
-    if (!ovr_GetTrackerPosePtr)
+    if (!API.ovr_GetTrackerPose.Ptr)
     {
         ovrTrackerPose nullTrackerPose;
         memset(&nullTrackerPose, 0, sizeof(nullTrackerPose));
         return nullTrackerPose;
     }
 
-    return ovr_GetTrackerPosePtr(session, trackerPoseIndex);
+    return API.ovr_GetTrackerPose.Ptr(session, trackerPoseIndex);
 }
 
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetInputState(ovrSession session, ovrControllerType controllerType, ovrInputState* inputState)
 {
-    if (!ovr_GetInputStatePtr)
+    if (!API.ovr_GetInputState.Ptr)
     {
         if (inputState)
             memset(inputState, 0, sizeof(ovrInputState));
         return ovrError_NotInitialized;
     }
-    return ovr_GetInputStatePtr(session, controllerType, inputState);
+    return API.ovr_GetInputState.Ptr(session, controllerType, inputState);
 }
 
 OVR_PUBLIC_FUNCTION(unsigned int) ovr_GetConnectedControllerTypes(ovrSession session)
 {
-    if (!ovr_GetConnectedControllerTypesPtr)
+    if (!API.ovr_GetConnectedControllerTypes.Ptr)
     {
         return 0;
     }
-    return ovr_GetConnectedControllerTypesPtr(session);
+    return API.ovr_GetConnectedControllerTypes.Ptr(session);
+}
+
+OVR_PUBLIC_FUNCTION(ovrTouchHapticsDesc) ovr_GetTouchHapticsDesc(ovrSession session, ovrControllerType controllerType)
+{
+    if (!API.ovr_GetTouchHapticsDesc.Ptr)
+    {
+        ovrTouchHapticsDesc nullDesc;
+        memset(&nullDesc, 0, sizeof(nullDesc));
+        return nullDesc;
+    }
+
+    return API.ovr_GetTouchHapticsDesc.Ptr(session, controllerType);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_SetControllerVibration(ovrSession session, ovrControllerType controllerType, float frequency, float amplitude)
 {
-    if (!ovr_SetControllerVibrationPtr)
-    {
+    if (!API.ovr_SetControllerVibration.Ptr)
         return ovrError_NotInitialized;
-    }
-    return ovr_SetControllerVibrationPtr(session, controllerType, frequency, amplitude);
+
+    return API.ovr_SetControllerVibration.Ptr(session, controllerType, frequency, amplitude);
 }
 
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_SubmitControllerVibration(ovrSession session, ovrControllerType controllerType, const ovrHapticsBuffer* buffer)
+{
+    if (!API.ovr_SubmitControllerVibration.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_SubmitControllerVibration.Ptr(session, controllerType, buffer);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetControllerVibrationState(ovrSession session, ovrControllerType controllerType, ovrHapticsPlaybackState* outState)
+{
+    if (!API.ovr_GetControllerVibrationState.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_GetControllerVibrationState.Ptr(session, controllerType, outState);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_TestBoundary(ovrSession session, ovrTrackedDeviceType deviceBitmask, ovrBoundaryType singleBoundaryType, ovrBoundaryTestResult* outTestResult)
+{
+    if (!API.ovr_TestBoundary.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_TestBoundary.Ptr(session, deviceBitmask, singleBoundaryType, outTestResult);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_TestBoundaryPoint(ovrSession session, const ovrVector3f* point, ovrBoundaryType singleBoundaryType, ovrBoundaryTestResult* outTestResult)
+{
+    if (!API.ovr_TestBoundaryPoint.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_TestBoundaryPoint.Ptr(session, point, singleBoundaryType, outTestResult);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_SetBoundaryLookAndFeel(ovrSession session, const ovrBoundaryLookAndFeel* lookAndFeel)
+{
+    if (!API.ovr_SetBoundaryLookAndFeel.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_SetBoundaryLookAndFeel.Ptr(session, lookAndFeel);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_ResetBoundaryLookAndFeel(ovrSession session)
+{
+    if (!API.ovr_ResetBoundaryLookAndFeel.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_ResetBoundaryLookAndFeel.Ptr(session);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetBoundaryGeometry(ovrSession session, ovrBoundaryType singleBoundaryType, ovrVector3f* outFloorPoints, int* outFloorPointsCount)
+{
+    if (!API.ovr_GetBoundaryGeometry.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_GetBoundaryGeometry.Ptr(session, singleBoundaryType, outFloorPoints, outFloorPointsCount);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetBoundaryDimensions(ovrSession session, ovrBoundaryType singleBoundaryType, ovrVector3f* outDimensions)
+{
+    if (!API.ovr_GetBoundaryDimensions.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_GetBoundaryDimensions.Ptr(session, singleBoundaryType, outDimensions);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetBoundaryVisible(ovrSession session, ovrBool* outIsVisible)
+{
+    if (!API.ovr_GetBoundaryVisible.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_GetBoundaryVisible.Ptr(session, outIsVisible);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_RequestBoundaryVisible(ovrSession session, ovrBool visible)
+{
+    if (!API.ovr_RequestBoundaryVisible.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_RequestBoundaryVisible.Ptr(session, visible);
+}
 
 OVR_PUBLIC_FUNCTION(ovrSizei) ovr_GetFovTextureSize(ovrSession session, ovrEyeType eye, ovrFovPort fov,
                                              float pixelsPerDisplayPixel)
 {
-    if (!ovr_GetFovTextureSizePtr)
+    if (!API.ovr_GetFovTextureSize.Ptr)
     {
         ovrSizei nullSize;
         memset(&nullSize, 0, sizeof(nullSize));
         return nullSize;
     }
 
-    return ovr_GetFovTextureSizePtr(session, eye, fov, pixelsPerDisplayPixel);
+    return API.ovr_GetFovTextureSize.Ptr(session, eye, fov, pixelsPerDisplayPixel);
 }
 
 #if defined (_WIN32)
@@ -1595,10 +1493,10 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_CreateTextureSwapChainDX(ovrSession session,
                                                             const ovrTextureSwapChainDesc* desc,
                                                             ovrTextureSwapChain* outTextureSet)
 {
-    if (!ovr_CreateTextureSwapChainDXPtr)
+    if (!API.ovr_CreateTextureSwapChainDX.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_CreateTextureSwapChainDXPtr(session, d3dPtr, desc, outTextureSet);
+    return API.ovr_CreateTextureSwapChainDX.Ptr(session, d3dPtr, desc, outTextureSet);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_CreateMirrorTextureDX(ovrSession session,
@@ -1606,10 +1504,10 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_CreateMirrorTextureDX(ovrSession session,
                                                          const ovrMirrorTextureDesc* desc,
                                                          ovrMirrorTexture* outMirrorTexture)
 {
-    if (!ovr_CreateMirrorTextureDXPtr)
+    if (!API.ovr_CreateMirrorTextureDX.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_CreateMirrorTextureDXPtr(session, d3dPtr, desc, outMirrorTexture);
+    return API.ovr_CreateMirrorTextureDX.Ptr(session, d3dPtr, desc, outMirrorTexture);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainBufferDX(ovrSession session,
@@ -1618,10 +1516,10 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainBufferDX(ovrSession sessio
                                                                IID iid,
                                                                void** ppObject)
 {
-    if (!ovr_GetTextureSwapChainBufferDXPtr)
+    if (!API.ovr_GetTextureSwapChainBufferDX.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetTextureSwapChainBufferDXPtr(session, chain, index, iid, ppObject);
+    return API.ovr_GetTextureSwapChainBufferDX.Ptr(session, chain, index, iid, ppObject);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetMirrorTextureBufferDX(ovrSession session,
@@ -1629,58 +1527,58 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetMirrorTextureBufferDX(ovrSession session,
                                                             IID iid,
                                                             void** ppObject)
 {
-    if (!ovr_GetMirrorTextureBufferDXPtr)
+    if (!API.ovr_GetMirrorTextureBufferDX.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetMirrorTextureBufferDXPtr(session, mirror, iid, ppObject);
+    return API.ovr_GetMirrorTextureBufferDX.Ptr(session, mirror, iid, ppObject);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceOutWaveId(unsigned int* deviceOutId)
 {
-    if (!ovr_GetAudioDeviceOutWaveIdPtr)
+    if (!API.ovr_GetAudioDeviceOutWaveId.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceOutWaveIdPtr(deviceOutId);
+    return API.ovr_GetAudioDeviceOutWaveId.Ptr(deviceOutId);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceInWaveId(unsigned int* deviceInId)
 {
-    if (!ovr_GetAudioDeviceInWaveIdPtr)
+    if (!API.ovr_GetAudioDeviceInWaveId.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceInWaveIdPtr(deviceInId);
+    return API.ovr_GetAudioDeviceInWaveId.Ptr(deviceInId);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceOutGuidStr(WCHAR* deviceOutStrBuffer)
 {
-    if (!ovr_GetAudioDeviceOutGuidStrPtr)
+    if (!API.ovr_GetAudioDeviceOutGuidStr.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceOutGuidStrPtr(deviceOutStrBuffer);
+    return API.ovr_GetAudioDeviceOutGuidStr.Ptr(deviceOutStrBuffer);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceOutGuid(GUID* deviceOutGuid)
 {
-    if (!ovr_GetAudioDeviceOutGuidPtr)
+    if (!API.ovr_GetAudioDeviceOutGuid.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceOutGuidPtr(deviceOutGuid);
+    return API.ovr_GetAudioDeviceOutGuid.Ptr(deviceOutGuid);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceInGuidStr(WCHAR* deviceInStrBuffer)
 {
-    if (!ovr_GetAudioDeviceInGuidStrPtr)
+    if (!API.ovr_GetAudioDeviceInGuidStr.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceInGuidStrPtr(deviceInStrBuffer);
+    return API.ovr_GetAudioDeviceInGuidStr.Ptr(deviceInStrBuffer);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetAudioDeviceInGuid(GUID* deviceInGuid)
 {
-    if (!ovr_GetAudioDeviceInGuidPtr)
+    if (!API.ovr_GetAudioDeviceInGuid.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetAudioDeviceInGuidPtr(deviceInGuid);
+    return API.ovr_GetAudioDeviceInGuid.Ptr(deviceInGuid);
 }
 
 #endif
@@ -1689,20 +1587,20 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_CreateTextureSwapChainGL(ovrSession session,
                                                             const ovrTextureSwapChainDesc* desc,
                                                             ovrTextureSwapChain* outTextureSet)
 {
-    if (!ovr_CreateTextureSwapChainGLPtr)
+    if (!API.ovr_CreateTextureSwapChainGL.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_CreateTextureSwapChainGLPtr(session, desc, outTextureSet);
+    return API.ovr_CreateTextureSwapChainGL.Ptr(session, desc, outTextureSet);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_CreateMirrorTextureGL(ovrSession session,
                                                          const ovrMirrorTextureDesc* desc,
                                                          ovrMirrorTexture* outMirrorTexture)
 {
-    if (!ovr_CreateMirrorTextureGLPtr)
+    if (!API.ovr_CreateMirrorTextureGL.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_CreateMirrorTextureGLPtr(session, desc, outMirrorTexture);
+    return API.ovr_CreateMirrorTextureGL.Ptr(session, desc, outMirrorTexture);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainBufferGL(ovrSession session,
@@ -1710,215 +1608,222 @@ OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainBufferGL(ovrSession sessio
                                                                int index,
                                                                unsigned int* texId)
 {
-    if (!ovr_GetTextureSwapChainBufferGLPtr)
+    if (!API.ovr_GetTextureSwapChainBufferGL.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetTextureSwapChainBufferGLPtr(session, chain, index, texId);
+    return API.ovr_GetTextureSwapChainBufferGL.Ptr(session, chain, index, texId);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetMirrorTextureBufferGL(ovrSession session,
                                                             ovrMirrorTexture mirror,
                                                             unsigned int* texId)
 {
-    if (!ovr_GetMirrorTextureBufferGLPtr)
+    if (!API.ovr_GetMirrorTextureBufferGL.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetMirrorTextureBufferGLPtr(session, mirror, texId);
+    return API.ovr_GetMirrorTextureBufferGL.Ptr(session, mirror, texId);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainLength(ovrSession session,
                                                              ovrTextureSwapChain chain,
                                                              int* length)
 {
-    if (!ovr_GetTextureSwapChainLengthPtr)
+    if (!API.ovr_GetTextureSwapChainLength.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetTextureSwapChainLengthPtr(session, chain, length);
+    return API.ovr_GetTextureSwapChainLength.Ptr(session, chain, length);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainCurrentIndex(ovrSession session,
                                                                    ovrTextureSwapChain chain,
                                                                    int* currentIndex)
 {
-    if (!ovr_GetTextureSwapChainCurrentIndexPtr)
+    if (!API.ovr_GetTextureSwapChainCurrentIndex.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetTextureSwapChainCurrentIndexPtr(session, chain, currentIndex);
+    return API.ovr_GetTextureSwapChainCurrentIndex.Ptr(session, chain, currentIndex);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetTextureSwapChainDesc(ovrSession session,
                                                            ovrTextureSwapChain chain,
                                                            ovrTextureSwapChainDesc* desc)
 {
-    if (!ovr_GetTextureSwapChainDescPtr)
+    if (!API.ovr_GetTextureSwapChainDesc.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_GetTextureSwapChainDescPtr(session, chain, desc);
+    return API.ovr_GetTextureSwapChainDesc.Ptr(session, chain, desc);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_CommitTextureSwapChain(ovrSession session,
                                                           ovrTextureSwapChain chain)
 {
-    if (!ovr_CommitTextureSwapChainPtr)
+    if (!API.ovr_CommitTextureSwapChain.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_CommitTextureSwapChainPtr(session, chain);
+    return API.ovr_CommitTextureSwapChain.Ptr(session, chain);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovr_DestroyTextureSwapChain(ovrSession session, ovrTextureSwapChain chain)
 {
-    if (!ovr_DestroyTextureSwapChainPtr)
+    if (!API.ovr_DestroyTextureSwapChain.Ptr)
         return;
 
-    ovr_DestroyTextureSwapChainPtr(session, chain);
+    API.ovr_DestroyTextureSwapChain.Ptr(session, chain);
 }
 
 OVR_PUBLIC_FUNCTION(void) ovr_DestroyMirrorTexture(ovrSession session, ovrMirrorTexture mirrorTexture)
 {
-    if (!ovr_DestroyMirrorTexturePtr)
+    if (!API.ovr_DestroyMirrorTexture.Ptr)
         return;
 
-    ovr_DestroyMirrorTexturePtr(session, mirrorTexture);
-}
-
-OVR_PUBLIC_FUNCTION(ovrResult) ovr_SetQueueAheadFraction(ovrSession session, float queueAheadFraction)
-{
-    if (!ovr_SetQueueAheadFractionPtr)
-        return ovrError_NotInitialized;
-
-    return ovr_SetQueueAheadFractionPtr(session, queueAheadFraction);
+    API.ovr_DestroyMirrorTexture.Ptr(session, mirrorTexture);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_SubmitFrame(ovrSession session, long long frameIndex, const ovrViewScaleDesc* viewScaleDesc, ovrLayerHeader const * const * layerPtrList, unsigned int layerCount)
 {
-    if (!ovr_SubmitFramePtr)
+    if (!API.ovr_SubmitFrame.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_SubmitFramePtr(session, frameIndex, viewScaleDesc, layerPtrList, layerCount);
+    return API.ovr_SubmitFrame.Ptr(session, frameIndex, viewScaleDesc, layerPtrList, layerCount);
 }
 
 OVR_PUBLIC_FUNCTION(ovrEyeRenderDesc) ovr_GetRenderDesc(ovrSession session, ovrEyeType eyeType, ovrFovPort fov)
 {
-    if (!ovr_GetRenderDescPtr)
+    if (!API.ovr_GetRenderDesc.Ptr)
     {
         ovrEyeRenderDesc nullEyeRenderDesc;
         memset(&nullEyeRenderDesc, 0, sizeof(nullEyeRenderDesc));
         return nullEyeRenderDesc;
     }
-    return ovr_GetRenderDescPtr(session, eyeType, fov);
+    return API.ovr_GetRenderDesc.Ptr(session, eyeType, fov);
 }
 
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GetPerfStats(ovrSession session, ovrPerfStats* outPerfStats)
+{
+    if (!API.ovr_GetPerfStats.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_GetPerfStats.Ptr(session, outPerfStats);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_ResetPerfStats(ovrSession session)
+{
+    if (!API.ovr_ResetPerfStats.Ptr)
+        return ovrError_NotInitialized;
+
+    return API.ovr_ResetPerfStats.Ptr(session);
+}
 
 OVR_PUBLIC_FUNCTION(double) ovr_GetPredictedDisplayTime(ovrSession session, long long frameIndex)
 {
-    if (!ovr_GetPredictedDisplayTimePtr)
+    if (!API.ovr_GetPredictedDisplayTime.Ptr)
         return 0.0;
 
-    return ovr_GetPredictedDisplayTimePtr(session, frameIndex);
+    return API.ovr_GetPredictedDisplayTime.Ptr(session, frameIndex);
 }
 
 OVR_PUBLIC_FUNCTION(double) ovr_GetTimeInSeconds()
 {
-    if (!ovr_GetTimeInSecondsPtr)
+    if (!API.ovr_GetTimeInSeconds.Ptr)
         return 0.;
-    return ovr_GetTimeInSecondsPtr();
+    return API.ovr_GetTimeInSeconds.Ptr();
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_GetBool(ovrSession session, const char* propertyName, ovrBool defaultVal)
 {
-    if (!ovr_GetBoolPtr)
+    if (!API.ovr_GetBool.Ptr)
         return ovrFalse;
-    return ovr_GetBoolPtr(session, propertyName, defaultVal);
+    return API.ovr_GetBool.Ptr(session, propertyName, defaultVal);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_SetBool(ovrSession session, const char* propertyName, ovrBool value)
 {
-    if (!ovr_SetBoolPtr)
+    if (!API.ovr_SetBool.Ptr)
         return ovrFalse;
-    return ovr_SetBoolPtr(session, propertyName, value);
+    return API.ovr_SetBool.Ptr(session, propertyName, value);
 }
 
 OVR_PUBLIC_FUNCTION(int) ovr_GetInt(ovrSession session, const char* propertyName, int defaultVal)
 {
-    if (!ovr_GetIntPtr)
+    if (!API.ovr_GetInt.Ptr)
         return 0;
-    return ovr_GetIntPtr(session, propertyName, defaultVal);
+    return API.ovr_GetInt.Ptr(session, propertyName, defaultVal);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_SetInt(ovrSession session, const char* propertyName, int value)
 {
-    if (!ovr_SetIntPtr)
+    if (!API.ovr_SetInt.Ptr)
         return ovrFalse;
-    return ovr_SetIntPtr(session, propertyName, value);
+    return API.ovr_SetInt.Ptr(session, propertyName, value);
 }
 
 OVR_PUBLIC_FUNCTION(float) ovr_GetFloat(ovrSession session, const char* propertyName, float defaultVal)
 {
-    if (!ovr_GetFloatPtr)
+    if (!API.ovr_GetFloat.Ptr)
         return 0.f;
-    return ovr_GetFloatPtr(session, propertyName, defaultVal);
+    return API.ovr_GetFloat.Ptr(session, propertyName, defaultVal);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_SetFloat(ovrSession session, const char* propertyName, float value)
 {
-    if (!ovr_SetFloatPtr)
+    if (!API.ovr_SetFloat.Ptr)
         return ovrFalse;
-    return ovr_SetFloatPtr(session, propertyName, value);
+    return API.ovr_SetFloat.Ptr(session, propertyName, value);
 }
 
 OVR_PUBLIC_FUNCTION(unsigned int) ovr_GetFloatArray(ovrSession session, const char* propertyName,
                                             float values[], unsigned int arraySize)
 {
-    if (!ovr_GetFloatArrayPtr)
+    if (!API.ovr_GetFloatArray.Ptr)
         return 0;
-    return ovr_GetFloatArrayPtr(session, propertyName, values, arraySize);
+    return API.ovr_GetFloatArray.Ptr(session, propertyName, values, arraySize);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_SetFloatArray(ovrSession session, const char* propertyName,
                                              const float values[], unsigned int arraySize)
 {
-    if (!ovr_SetFloatArrayPtr)
+    if (!API.ovr_SetFloatArray.Ptr)
         return ovrFalse;
-    return ovr_SetFloatArrayPtr(session, propertyName, values, arraySize);
+    return API.ovr_SetFloatArray.Ptr(session, propertyName, values, arraySize);
 }
 
 OVR_PUBLIC_FUNCTION(const char*) ovr_GetString(ovrSession session, const char* propertyName,
                                         const char* defaultVal)
 {
-    if (!ovr_GetStringPtr)
+    if (!API.ovr_GetString.Ptr)
         return "(Unable to load LibOVR)";
-    return ovr_GetStringPtr(session, propertyName, defaultVal);
+    return API.ovr_GetString.Ptr(session, propertyName, defaultVal);
 }
 
 OVR_PUBLIC_FUNCTION(ovrBool) ovr_SetString(ovrSession session, const char* propertyName,
                                     const char* value)
 {
-    if (!ovr_SetStringPtr)
+    if (!API.ovr_SetString.Ptr)
         return ovrFalse;
-    return ovr_SetStringPtr(session, propertyName, value);
+    return API.ovr_SetString.Ptr(session, propertyName, value);
 }
 
 OVR_PUBLIC_FUNCTION(int) ovr_TraceMessage(int level, const char* message)
 {
-    if (!ovr_TraceMessagePtr)
+    if (!API.ovr_TraceMessage.Ptr)
         return -1;
 
-    return ovr_TraceMessagePtr(level, message);
+    return API.ovr_TraceMessage.Ptr(level, message);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_IdentifyClient(const char* identity)
 {
-    if (!ovr_IdentifyClientPtr)
+    if (!API.ovr_IdentifyClient.Ptr)
         return ovrError_NotInitialized;
 
-    return ovr_IdentifyClientPtr(identity);
+    return API.ovr_IdentifyClient.Ptr(identity);
 }
 
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_Lookup(const char* name, void** data)
 {
-    if (!ovr_LookupPtr)
+    if (!API.ovr_Lookup.Ptr)
         return ovrError_NotInitialized;
-    return ovr_LookupPtr(name, data);
+    return API.ovr_Lookup.Ptr(name, data);
 }
 
 #if defined(_MSC_VER)
