@@ -57,6 +57,7 @@ const char* HapticsModeDesc[] = {
     "[BUFFR] Low-Latency:  LR-touch 20 samples (ButtonA)",
     "[BUFFR] High-Latency: LR-touch 2 samples [0, 800ms] (ButtonA)",
     "[BUFFR] Low-Latency:  LR-touch 4 interleaved samples (ButtonA)",
+    "[BUFFR] Low-Latency:  Audio WAV playback (ButtonA)",
 };
 const int32_t kMaxHapticsModes = _countof(HapticsModeDesc);
 
@@ -117,6 +118,8 @@ OculusWorldDemoApp::OculusWorldDemoApp() :
     FPS(0.f),
     LastFpsUpdate(0.0),
     LastUpdate(0.0),
+
+    TouchHapticsPlayIndex(0),
 
     MainFilePath(),
     CollisionModels(),
@@ -324,6 +327,8 @@ OculusWorldDemoApp::OculusWorldDemoApp() :
     ViewFromWorld[1].SetIdentity();
 
 
+    // Touch Haptics
+    memset(&TouchHapticsClip, 0, sizeof(TouchHapticsClip));
 
     for ( int i = 0; i < Rendertarget_LAST; i++ )
     {
@@ -624,6 +629,26 @@ int OculusWorldDemoApp::InitializeRendering(bool firstTime)
     InitMainFilePath();
     PopulatePreloadScene();
 
+    // Load Haptics audio WAV file
+    FILE* file = fopen("./song1.wav", "rb");
+    if (file != nullptr)
+    {
+        // Read all WAV file data
+        fseek(file, 0, SEEK_END);
+        int32_t fileSize = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        std::unique_ptr<uint8_t[]> wavData(new uint8_t[fileSize]);
+        fread(wavData.get(), fileSize, 1, file);
+
+        // Get audio channel data
+        ovrAudioChannelData channelData;
+        ovr_ReadWavFromBuffer(&channelData, wavData.get(), fileSize, 0);
+
+        // Generate haptics data from audio channel
+        ovr_GenHapticsFromAudioData(&TouchHapticsClip, &channelData, ovrHapticsGenMode_PointSample);
+        ovr_ReleaseAudioChannelData(&channelData);
+    }
+
     SetCommandLineMenuOption(Argc, Argv);
 
     LastUpdate = ovr_GetTimeInSeconds();
@@ -633,7 +658,6 @@ int OculusWorldDemoApp::InitializeRendering(bool firstTime)
     // demonstrate/test the API.
     //OVR_ASSERT ( pCockpitLayerList == nullptr );
     //pCockpitLayerList = ovr_CreateLayerList ( Session );
-
 
     return 0;
 }
@@ -940,6 +964,7 @@ void OculusWorldDemoApp::PopulateOptionMenu()
         //AddEnumValue("BGRA8",       EyeTextureFormat_BGRA8).
         //AddEnumValue("BGRX8",       EyeTextureFormat_BGRX8).
         AddEnumValue("RGBA16F",     EyeTextureFormat_RGBA16F).
+        AddEnumValue("R11G11B10F",  EyeTextureFormat_R11G11B10F).
         AddEnumValue("RGBA8_SRGB",  EyeTextureFormat_RGBA8_SRGB).
         //AddEnumValue("BGRA8_SRGB",  EyeTextureFormat_BGRA8_SRGB).
         //AddEnumValue("BGRX8_SRGB",  EyeTextureFormat_BGRX8_SRGB).
@@ -1407,6 +1432,7 @@ bool OculusWorldDemoApp::ShouldLoadedTexturesBeSrgb(EyeTextureFormatOpt eyeTextu
     //case EyeTextureFormat_BGRA8_SRGB:   // fall-thru
     //case EyeTextureFormat_BGRX8_SRGB:   // fall-thru
     case EyeTextureFormat_RGBA16F:      return true;    // works as if it's an sRGB format
+    case EyeTextureFormat_R11G11B10F:   return true;    // works as if it's an sRGB format
 
     //case EyeTextureFormat_B5G6R5:       // fall-thru
     //case EyeTextureFormat_BGR5A1:       // fall-thru
@@ -1434,6 +1460,7 @@ int OculusWorldDemoApp::GetRenderDeviceTextureFormatForEyeTextureFormat(EyeTextu
     //case EyeTextureFormat_BGRX8:        return Texture_BGRX;
     //case EyeTextureFormat_BGRX8_SRGB:   return Texture_BGRX | Texture_SRGB;
     case EyeTextureFormat_RGBA16F:      return Texture_RGBA16f;
+    case EyeTextureFormat_R11G11B10F:   return Texture_R11G11B10f;
     }
 
     OVR_FAIL();
@@ -1829,7 +1856,7 @@ void OculusWorldDemoApp::HandleBoundaryControls()
     }
 }
 
-void handleHaptics(ovrSession Session, const ovrInputState LastInputState, const ovrInputState InputState)
+void OculusWorldDemoApp::HandleHaptics()
 {
     // The hardware Haptics engine oscillates at 320hz (3.125ms per-sample)
     // The engine can queue up to 256 samples (800ms), longer queue yields higher latency
@@ -1979,6 +2006,28 @@ void handleHaptics(ovrSession Session, const ovrInputState LastInputState, const
                 for (int32_t i = 0; i < 20; ++i)
                     samples.push_back( (i/4 % 2) * 255 );
             break;
+
+        // Test ovrHapticsClip playback
+        case 9:
+            if (!buttonPressed_A || TouchHapticsClip.Samples == nullptr || TouchHapticsClip.SamplesCount <= 0)
+                continue;
+
+            result = ovr_GetControllerVibrationState(Session, touchController[t], &state);
+            if (result != ovrSuccess || state.SamplesQueued >= kLowLatencyBufferSizeInSamples)
+            {
+                WriteLog("%s Haptics skipped. Queue size %d", kTouchStr[t], state.SamplesQueued);
+                continue;
+            }
+
+            const uint8_t* hapticsSamples = (const uint8_t*)TouchHapticsClip.Samples;
+            for (int32_t i = 0; i < kLowLatencyBufferSizeInSamples; ++i)
+            {
+                int32_t hapticsPlayIndex = (TouchHapticsPlayIndex + i) % TouchHapticsClip.SamplesCount;
+                samples.push_back(*(hapticsSamples + hapticsPlayIndex));
+            }
+            TouchHapticsPlayIndex = (TouchHapticsPlayIndex + (int32_t)samples.size()) % TouchHapticsClip.SamplesCount;
+            break;
+
         }
 
         if (samples.size() > 0)
@@ -2096,7 +2145,7 @@ void OculusWorldDemoApp::OnIdle()
 
     if ( HasInputState )
     {
-        handleHaptics(Session, LastInputState, InputState);
+        HandleHaptics();
         HandleBoundaryControls();
     }
 
@@ -4012,7 +4061,7 @@ Recti OculusWorldDemoApp::RenderControllerStateHud(float cx, float cy, float tex
 
     // Haptics
     snprintf(strBuffer, sizeof(strBuffer), "\n\nHaptics Mode: %d/%d (Press X change)\n%s",
-        HapticsMode, kMaxHapticsModes, HapticsModeDesc[HapticsMode]);
+        HapticsMode, kMaxHapticsModes-1, HapticsModeDesc[HapticsMode]);
     s += strBuffer;
 
     }

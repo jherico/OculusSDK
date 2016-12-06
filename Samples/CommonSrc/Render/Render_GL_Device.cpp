@@ -1183,7 +1183,8 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         isSRGB = true;
     }
 
-    if ( (format & Texture_TypeMask) == Texture_RGBA16f )
+    if ( (format & Texture_TypeMask) == Texture_RGBA16f ||
+         (format & Texture_TypeMask) == Texture_R11G11B10f)
     {
         // Shouldn't try to set sRGB on a float16.
         OVR_ASSERT ( ( format & Texture_SRGB ) == 0 );
@@ -1222,7 +1223,10 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
         glformat = GL_RGBA16F;
         ovrFormat = OVR_FORMAT_R16G16B16A16_FLOAT;
         break;
-
+    case Texture_R11G11B10f:
+        glformat = GL_R11F_G11F_B10F;
+        ovrFormat = OVR_FORMAT_R11G11B10_FLOAT;
+        break;
     case Texture_R:
         glformat = GL_RED;
         break;

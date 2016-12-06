@@ -411,6 +411,28 @@ String GetProcessorInfo()
 #endif //OVR_OS_MAC
 #endif // WIN32
 
+//-----------------------------------------------------------------------------
+// Get a path under BaseOVRPath
+
+String GetOVRPath(const wchar_t* subPath, bool create_dir)
+{
+    wchar_t fullPath[MAX_PATH];
+    SHGetFolderPathW(0, CSIDL_LOCAL_APPDATA, NULL, 0, fullPath);
+    PathAppendW(fullPath, L"\\Oculus");
+    PathAppendW(fullPath, subPath);
+
+    if (create_dir)
+    {
+        DWORD attrib = ::GetFileAttributesW(fullPath);
+        bool exists = attrib != INVALID_FILE_ATTRIBUTES && (attrib & FILE_ATTRIBUTE_DIRECTORY);
+        if (!exists)
+        {
+            ::CreateDirectoryW(fullPath, NULL);
+        }
+    }
+
+    return String(fullPath);
+}
 
 //-----------------------------------------------------------------------------
 // Get the path for local app data.

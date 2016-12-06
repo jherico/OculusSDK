@@ -609,11 +609,14 @@ bool RenderDevice::RecreateSwapChain()
     {
         SwapChain = NULL;
     }
-
+    
     Ptr<IDXGISwapChain> newSC;
      hr = DXGIFactory->CreateSwapChain(Device, &scDesc, &newSC.GetRawRef());
     OVR_D3D_CHECK_RET_FALSE(hr);
     SwapChain = newSC;
+
+    hr = DXGIFactory->MakeWindowAssociation(Window, DXGI_MWA_NO_ALT_ENTER);
+    OVR_D3D_CHECK_RET_FALSE(hr);
 
     BackBuffer = NULL;
     BackBufferRT = NULL;
@@ -1583,6 +1586,12 @@ Texture* RenderDevice::CreateTexture(int format, int width, int height, const vo
             d3dformat = DXGI_FORMAT_R16G16B16A16_FLOAT;
             srvFormat = d3dformat;
             break;
+        case Texture_R11G11B10f:
+            bpp = 4;
+            ovrFormat = OVR_FORMAT_R11G11B10_FLOAT;
+            d3dformat = DXGI_FORMAT_R11G11B10_FLOAT;
+            srvFormat = d3dformat;
+            break;
         case Texture_R:
             bpp = 1;
             ovrFormat = OVR_FORMAT_UNKNOWN;
@@ -1990,6 +1999,7 @@ void RenderDevice::ResolveMsaa(OVR::Render::Texture* msaaTex, OVR::Render::Textu
     case Texture_BGRA8:     resolveFormat = format & Texture_SRGB ? DXGI_FORMAT_B8G8R8A8_UNORM_SRGB : DXGI_FORMAT_B8G8R8A8_UNORM; break;
     case Texture_BGRX:      resolveFormat = format & Texture_SRGB ? DXGI_FORMAT_B8G8R8X8_UNORM_SRGB : DXGI_FORMAT_B8G8R8X8_UNORM; break;
     case Texture_RGBA16f:   resolveFormat = DXGI_FORMAT_R16G16B16A16_FLOAT; break;
+    case Texture_R11G11B10f: resolveFormat = DXGI_FORMAT_R11G11B10_FLOAT; break;
     default:    OVR_FAIL(); break;
     }
 

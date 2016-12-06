@@ -220,7 +220,7 @@ limitations under the License.
 
 // Disable MSVC warnings
 #if defined(OVR_CC_MSVC)
-#  pragma warning(disable : 4127)    // Inconsistent dll linkage
+#  pragma warning(disable : 4127)    // Conditional expression is constant
 #  pragma warning(disable : 4530)    // Exception handling
 #  if (OVR_CC_MSVC<1300)
 #    pragma warning(disable : 4514)  // Unreferenced inline function has been removed

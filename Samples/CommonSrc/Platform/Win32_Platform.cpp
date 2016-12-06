@@ -651,9 +651,13 @@ int WINAPI WinMain(HINSTANCE hinst, HINSTANCE prevInst, LPSTR inArgs, int show)
 
         const char* p = inArgs;
         const char* pstart = inArgs;
+        bool inQuotes = false;
         while (*p)
         {
-            if (*p == ' ')
+            if (*p == '\"')
+                inQuotes = !inQuotes;
+
+            if (!inQuotes && *p == ' ')
             {
                 args.push_back(std::string(pstart, p - pstart));
                 while (*p == ' ')

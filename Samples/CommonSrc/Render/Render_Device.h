@@ -140,6 +140,7 @@ enum TextureFormat
     Texture_BGRA8           = 0x50, // allows sRGB
     Texture_BGRX            = 0x60, // allows sRGB
     Texture_RGBA16f         = 0x70,
+    Texture_R11G11B10f      = 0x80,
     // End of OVR_FORMAT corresponding formats
     //////////////////////////////////////////////////////////////////////////
 

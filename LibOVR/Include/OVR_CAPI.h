@@ -658,34 +658,37 @@ typedef enum ovrTextureBindFlags_
 ///
 typedef enum ovrTextureFormat_
 {
-    OVR_FORMAT_UNKNOWN,
-    OVR_FORMAT_B5G6R5_UNORM,    ///< Not currently supported on PC. Would require a DirectX 11.1 device.
-    OVR_FORMAT_B5G5R5A1_UNORM,  ///< Not currently supported on PC. Would require a DirectX 11.1 device.
-    OVR_FORMAT_B4G4R4A4_UNORM,  ///< Not currently supported on PC. Would require a DirectX 11.1 device.
-    OVR_FORMAT_R8G8B8A8_UNORM,
-    OVR_FORMAT_R8G8B8A8_UNORM_SRGB,
-    OVR_FORMAT_B8G8R8A8_UNORM,
-    OVR_FORMAT_B8G8R8A8_UNORM_SRGB, ///< Not supported for OpenGL applications
-    OVR_FORMAT_B8G8R8X8_UNORM,      ///< Not supported for OpenGL applications
-    OVR_FORMAT_B8G8R8X8_UNORM_SRGB, ///< Not supported for OpenGL applications
-    OVR_FORMAT_R16G16B16A16_FLOAT,
-    OVR_FORMAT_D16_UNORM,
-    OVR_FORMAT_D24_UNORM_S8_UINT,
-    OVR_FORMAT_D32_FLOAT,
-    OVR_FORMAT_D32_FLOAT_S8X24_UINT,
+    OVR_FORMAT_UNKNOWN              = 0,
+    OVR_FORMAT_B5G6R5_UNORM         = 1,    ///< Not currently supported on PC. Would require a DirectX 11.1 device.
+    OVR_FORMAT_B5G5R5A1_UNORM       = 2,    ///< Not currently supported on PC. Would require a DirectX 11.1 device.
+    OVR_FORMAT_B4G4R4A4_UNORM       = 3,    ///< Not currently supported on PC. Would require a DirectX 11.1 device.
+    OVR_FORMAT_R8G8B8A8_UNORM       = 4,
+    OVR_FORMAT_R8G8B8A8_UNORM_SRGB  = 5,
+    OVR_FORMAT_B8G8R8A8_UNORM       = 6,
+    OVR_FORMAT_B8G8R8A8_UNORM_SRGB  = 7,    ///< Not supported for OpenGL applications
+    OVR_FORMAT_B8G8R8X8_UNORM       = 8,    ///< Not supported for OpenGL applications
+    OVR_FORMAT_B8G8R8X8_UNORM_SRGB  = 9,    ///< Not supported for OpenGL applications
+    OVR_FORMAT_R16G16B16A16_FLOAT   = 10,
+    OVR_FORMAT_R11G11B10_FLOAT      = 25,   ///< Introduced in v1.10
+
+    // Depth formats
+    OVR_FORMAT_D16_UNORM            = 11,
+    OVR_FORMAT_D24_UNORM_S8_UINT    = 12,
+    OVR_FORMAT_D32_FLOAT            = 13,
+    OVR_FORMAT_D32_FLOAT_S8X24_UINT = 14,
 
     // Added in 1.5 compressed formats can be used for static layers
-    OVR_FORMAT_BC1_UNORM,
-    OVR_FORMAT_BC1_UNORM_SRGB,
-    OVR_FORMAT_BC2_UNORM,
-    OVR_FORMAT_BC2_UNORM_SRGB,
-    OVR_FORMAT_BC3_UNORM,
-    OVR_FORMAT_BC3_UNORM_SRGB,
-    OVR_FORMAT_BC6H_UF16,
-    OVR_FORMAT_BC6H_SF16,
-    OVR_FORMAT_BC7_UNORM,
-    OVR_FORMAT_BC7_UNORM_SRGB,
-
+    OVR_FORMAT_BC1_UNORM            = 15,
+    OVR_FORMAT_BC1_UNORM_SRGB       = 16,
+    OVR_FORMAT_BC2_UNORM            = 17,
+    OVR_FORMAT_BC2_UNORM_SRGB       = 18,
+    OVR_FORMAT_BC3_UNORM            = 19,
+    OVR_FORMAT_BC3_UNORM_SRGB       = 20,
+    OVR_FORMAT_BC6H_UF16            = 21,
+    OVR_FORMAT_BC6H_SF16            = 22,
+    OVR_FORMAT_BC7_UNORM            = 23,
+    OVR_FORMAT_BC7_UNORM_SRGB       = 24,
+    
     OVR_FORMAT_ENUMSIZE = 0x7fffffff  ///< \internal Force type int32_t.
 } ovrTextureFormat;
 
@@ -820,12 +823,11 @@ typedef enum ovrTouch_
     // Derived internally based on distance, proximity to sensors and filtering.
     ovrTouch_RIndexPointing = 0x00000020,
     ovrTouch_RThumbUp       = 0x00000040,
+    ovrTouch_LIndexPointing = 0x00002000,
+    ovrTouch_LThumbUp       = 0x00004000,
 
     // Bit mask of all right controller poses
     ovrTouch_RPoseMask      = ovrTouch_RIndexPointing | ovrTouch_RThumbUp,
-
-    ovrTouch_LIndexPointing = 0x00002000,
-    ovrTouch_LThumbUp       = 0x00004000,
 
     // Bit mask of all left controller poses
     ovrTouch_LPoseMask      = ovrTouch_LIndexPointing | ovrTouch_LThumbUp,
@@ -877,8 +879,11 @@ typedef enum ovrHapticsBufferSubmitMode_
 /// Haptics buffer descriptor, contains amplitude samples used for Touch vibration
 typedef struct ovrHapticsBuffer_
 {
+    /// Samples stored in opaque format
     const void* Samples;
+    /// Number of samples
     int SamplesCount;
+    /// How samples are submitted to the hardware
     ovrHapticsBufferSubmitMode SubmitMode;
 } ovrHapticsBuffer;
 

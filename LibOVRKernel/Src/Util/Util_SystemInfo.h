@@ -135,7 +135,7 @@ String GetSystemFileVersionStringW(wchar_t filePath[MAX_PATH]);
 // Get the path for local app data.
 
 String GetBaseOVRPath(bool create_dir);
-
+String GetOVRPath(const wchar_t* subPath, bool create_dir);
 
 
 //-----------------------------------------------------------------------------

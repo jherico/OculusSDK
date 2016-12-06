@@ -371,7 +371,13 @@ void ForAllLogFiles(const char* dirPath, const char* fileNamePrefix, uint64_t mi
 
                 if ((wcsstr(fileNameW.c_str(), fileNamePrefixW.c_str()) == fileNameW.c_str()))
                 {
-                    auto lastWriteTime = fs::last_write_time(entry);
+                    std::error_code errCode{}; // Pass in a default constructed error code to avoid throwing
+                    auto lastWriteTime = fs::last_write_time(entry, errCode);
+
+                    // If there was an error reading the entry, skip it
+                    if (errCode)
+                        continue;
+
                     int daysAge = std::chrono::duration_cast<std::chrono::hours>(
                         std::chrono::system_clock::now() - lastWriteTime
                     ).count() / 24;

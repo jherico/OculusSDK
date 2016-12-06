@@ -270,6 +270,10 @@ protected:
     // Times a single frame.
     double              LastUpdate;
 
+    // Touch Haptics
+    ovrHapticsClip      TouchHapticsClip;
+    int                 TouchHapticsPlayIndex;
+
     // Loaded data.
     std::string	                          MainFilePath;
     std::vector<Ptr<CollisionModel> >     CollisionModels;
@@ -318,6 +322,7 @@ protected:
     void                PopulateBoundaryScene(Scene* scene);
     void                RenderBoundaryScene(Matrix4f& view);
     void                HandleBoundaryControls();
+    void                HandleHaptics();
 
     // Small floor models used to visualize seated floor level under player.
     // We allow switching between two modes: [0] = solid, [1] = donut shaped.
@@ -392,6 +397,7 @@ protected:
         //EyeTextureFormat_BGRA8,       - sRGB format is not supported in OpenGL mode, so don't use this either
         //EyeTextureFormat_BGRX8,       - Not supported in OpenGL mode
         EyeTextureFormat_RGBA16F,
+        EyeTextureFormat_R11G11B10F,
         // Srgb formats below here to minimize srgb-to-linear switching and
         // avoid unnecessary texture asset reloading with each switch
         EyeTextureFormat_RGBA8_SRGB,

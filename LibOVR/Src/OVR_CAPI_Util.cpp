@@ -24,6 +24,14 @@ limitations under the License.
 #include <Extras/OVR_CAPI_Util.h>
 #include <Extras/OVR_StereoProjection.h>
 
+#include <algorithm>
+#include <limits.h>
+#include <memory>
+
+#if defined(_MSC_VER) && _MSC_VER < 1800 // MSVC < 2013
+    #define round(dbl) (dbl) >= 0.0 ? (int)((dbl) + 0.5) : (((dbl) - (double)(int)(dbl)) <= -0.5 ? (int)(dbl) : (int)((dbl) - 0.5))
+#endif
+
 
 #if defined(_MSC_VER)
     #include <emmintrin.h>
@@ -224,4 +232,152 @@ OVR_PUBLIC_FUNCTION(void) ovrPosef_FlipHandedness(const ovrPosef* inPose, ovrPos
     outPose->Position.x = -inPose->Position.x;
     outPose->Position.y = inPose->Position.y;
     outPose->Position.z = inPose->Position.z;
+}
+
+static float wavPcmBytesToFloat(const void* data, int32_t sizeInBits, bool swapBytes) {
+    // TODO Support big endian
+    (void)swapBytes;
+    
+    // There's not a strong standard to convert 8/16/32b PCM to float.
+    // For 16b: MSDN says range is [-32760, 32760], Pyton Scipy uses [-32767, 32767] and Audacity outputs the full range [-32768, 32767].
+    // We use the same range on both sides and clamp to [-1, 1].
+
+    float result = 0.0f;
+    if (sizeInBits == 8)
+        // uint8_t is a special case, unsigned where 128 is zero
+        result = (*((uint8_t*)data) / (float)UCHAR_MAX) * 2.0f - 1.0f;
+    else if (sizeInBits == 16)
+        result = *((int16_t*)data) / (float)SHRT_MAX;
+    //else if (sizeInBits == 24) {
+    //    int value = data[0] | data[1] << 8 | data[2] << 16; // Need consider 2's complement
+    //    return value / 8388607.0f;
+    //}
+    else if (sizeInBits == 32)
+        result = *((int32_t*)data) / (float)INT_MAX;
+
+    return std::max(-1.0f, result);
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_GenHapticsFromAudioData(ovrHapticsClip* outHapticsClip, const ovrAudioChannelData* audioChannel, ovrHapticsGenMode genMode)
+{
+    if (!outHapticsClip || !audioChannel || genMode != ovrHapticsGenMode_PointSample)
+        return ovrError_InvalidParameter;
+    // Validate audio channel
+    if (audioChannel->Frequency <= 0 || audioChannel->SamplesCount <= 0 || audioChannel->Samples == nullptr)
+        return ovrError_InvalidParameter;
+
+    const int32_t kHapticsFrequency = 320;
+    const int32_t kHapticsMaxAmplitude = 255;
+    float samplesPerStep = audioChannel->Frequency / (float)kHapticsFrequency;
+    int32_t hapticsSampleCount = (int32_t)ceil(audioChannel->SamplesCount / samplesPerStep);
+    
+    uint8_t* hapticsSamples = new uint8_t[hapticsSampleCount];
+    for (int32_t i = 0; i < hapticsSampleCount; ++i)
+    {
+        float sample = audioChannel->Samples[(int32_t)(i * samplesPerStep)];
+        uint8_t hapticSample = (uint8_t)std::min(UCHAR_MAX, (int)round(abs(sample) * kHapticsMaxAmplitude));
+        hapticsSamples[i] = hapticSample;
+    }
+
+    outHapticsClip->Samples = hapticsSamples;
+    outHapticsClip->SamplesCount = hapticsSampleCount;
+
+    return ovrSuccess;
+}
+
+OVR_PUBLIC_FUNCTION(ovrResult) ovr_ReadWavFromBuffer(ovrAudioChannelData* outAudioChannel, const void* inputData, int dataSizeInBytes, int stereoChannelToUse)
+{
+    // We don't support any format other than PCM and IEEE Float
+    enum WavFormats {
+        kWavFormatUnknown     = 0x0000,
+        kWavFormatLPCM        = 0x0001,
+        kWavFormatFloatIEEE   = 0x0003,
+        kWavFormatExtensible  = 0xFFFE
+    };
+
+    struct WavHeader {
+        char RiffId[4];             // "RIFF" = little-endian, "RIFX" = big-endian
+        int32_t Size;               // 4 + (8 + FmtChunkSize) + (8 + DataChunkSize)
+        char WavId[4];              // Must be "WAVE"
+
+        char FmtChunckId[4];        // Must be "fmt "
+        uint32_t FmtChunkSize;      // Remaining size of this chunk (16B)
+        uint16_t Format;            // WavFormats: PCM or Float supported
+        uint16_t Channels;          // 1 = Mono, 2 = Stereo
+        uint32_t SampleRate;        // e.g. 44100
+        uint32_t BytesPerSec;       // SampleRate * BytesPerBlock
+        uint16_t BytesPerBlock;     // (NumChannels * BitsPerSample/8)
+        uint16_t BitsPerSample;     // 8, 16, 32
+
+        char DataChunckId[4];       // Must be "data"
+        uint32_t DataChunkSize;     // Remaining size of this chunk
+    };
+
+    const int32_t kMinWavFileSize = sizeof(WavHeader) + 1;
+    if (!outAudioChannel || !inputData || dataSizeInBytes < kMinWavFileSize)
+        return ovrError_InvalidParameter;
+
+    WavHeader* header = (WavHeader*)inputData;
+    uint8_t* data = (uint8_t*)inputData + sizeof(WavHeader);
+
+    // Validate
+    const char* wavId = header->RiffId;
+    // TODO We need to support RIFX when supporting big endian formats
+    //bool isValidWav = (wavId[0] == 'R' && wavId[1] == 'I' && wavId[2] == 'F' && (wavId[3] == 'F' || wavId[3] == 'X')) &&
+    bool isValidWav = (wavId[0] == 'R' && wavId[1] == 'I' && wavId[2] == 'F' && wavId[3] == 'F') &&
+        memcmp(header->WavId, "WAVE", 4) == 0;
+    bool hasValidChunks = memcmp(header->FmtChunckId, "fmt ", 4) == 0 && 
+        memcmp(header->DataChunckId, "data ", 4) == 0;
+    if (!isValidWav || !hasValidChunks) {
+        return ovrError_InvalidOperation;
+    }
+
+    // We only support PCM
+    bool isSupported = (header->Format == kWavFormatLPCM || header->Format == kWavFormatFloatIEEE) &&
+        (header->Channels == 1 || header->Channels == 2) && 
+        (header->BitsPerSample == 8 || header->BitsPerSample == 16 || header->BitsPerSample == 32);
+    if (!isSupported) {
+        return ovrError_Unsupported;
+    }
+
+    // Channel selection
+    bool useSecondChannel = (header->Channels == 2 && stereoChannelToUse == 1);
+    int32_t channelOffset = (useSecondChannel)? header->BytesPerBlock / 2  : 0;
+    
+    // TODO Support big-endian
+    int32_t blockCount = header->DataChunkSize / header->BytesPerBlock;
+    float* samples = new float[blockCount];
+
+    for (int32_t i = 0; i < blockCount; i++) {
+        int32_t dataIndex = i * header->BytesPerBlock;
+        uint8_t* dataPtr = &data[dataIndex + channelOffset];
+        float sample = (header->Format == kWavFormatLPCM)?
+            wavPcmBytesToFloat(dataPtr, header->BitsPerSample, false) :
+            *(float*)dataPtr;
+        
+        samples[i] = sample;
+    }
+
+    // Output
+    outAudioChannel->Samples = samples;
+    outAudioChannel->SamplesCount = blockCount;
+    outAudioChannel->Frequency = header->SampleRate;
+
+    return ovrSuccess;
+}
+
+OVR_PUBLIC_FUNCTION(void) ovr_ReleaseAudioChannelData(ovrAudioChannelData* audioChannel)
+{
+    if (audioChannel != nullptr && audioChannel->Samples != nullptr) {
+        delete[] audioChannel->Samples;
+        memset(audioChannel, 0, sizeof(ovrAudioChannelData));
+    }
+}
+
+OVR_PUBLIC_FUNCTION(void) ovr_ReleaseHapticsClip(ovrHapticsClip* hapticsClip)
+{
+    if (hapticsClip != nullptr && hapticsClip->Samples != nullptr) {
+        delete[] hapticsClip->Samples;
+        memset(hapticsClip, 0, sizeof(ovrHapticsClip));
+    }
 }

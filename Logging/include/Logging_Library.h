@@ -217,7 +217,7 @@ enum class WriteOption : Write_Option_t
 
 // Iterate through the list of channels before the CRT has initialized
 #pragma pack(push,1)
-struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; ChannelNode* Next, *Prev; };
+struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; bool *UserOverrodeMinimumOutputLevel; ChannelNode* Next, *Prev; };
 #pragma pack(pop)
 
 // Export the function to access OutputWorker::Write(). This is used by the Channel class
@@ -367,7 +367,10 @@ public:
         CompletelySilenceLogs = 2,
 
         // OVR::MakeError will not assert when errors are set
-        PreventErrorAsserts = 4
+        PreventErrorAsserts = 4,
+
+        // All logs at a level > Debug will be set to Debug level
+        DemoteToDebug = 8
     };
 
     // Stop silencing errors.
@@ -545,8 +548,12 @@ public:
                 return;
             }
 
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+            if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+            {
+                // Demote to debug
+                level = Level::Debug;
+            }
+            else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
             {
                 // Demote to warning
                 level = Level::Warning;
@@ -580,12 +587,14 @@ private:
 
     // Channel name string
     const char* SubsystemName;
-    
+
     // Optional prefix
     std::string Prefix;
 
     // So changing Prefix is threadsafe
     mutable Lock PrefixLock;
+
+    bool UserOverrodeMinimumOutputLevel;
 
     // Target of doLog function
     static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;
@@ -624,8 +633,12 @@ private:
             return;
         }
 
-        // If the log message is at error level and errors are silenced,
-        if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+        {
+            // Demote to debug
+            level = Level::Debug;
+        }
+        else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
         {
             // Demote to warning
             level = Level::Warning;
@@ -680,8 +693,12 @@ private:
             return;
         }
 
-        // If the log message is at error level and errors are silenced,
-        if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+        {
+            // Demote to debug
+            level = Level::Debug;
+        }
+        else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
         {
             // Demote to warning
             level = Level::Warning;
@@ -794,7 +811,7 @@ private:
     uint32_t GlobalMinimumLogLevel;
     std::shared_ptr<ConfiguratorPlugin> Plugin;
 
-    void SetChannelNoLock(std::string channelName, Level level);
+    void SetChannelNoLock(std::string channelName, Level level, bool overrideUser);
 };
 
 

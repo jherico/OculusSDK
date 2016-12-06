@@ -133,14 +133,14 @@ void AddFloorCircleModelVertices(Model* m, float radius)
 
     // Center vertex
     m->AddVertex(0.0f, my, 0.0f, Color(255, 255, 255, 255),
-                 0.5f, 0.5f); // u, v	
+                 0.5f, 0.5f); // u, v
 
     for (int i = 0; i < totalSteps; i++)
     {
         float deltaAngle = (MATH_FLOAT_PI * 2.0f) / totalSteps;
         float x = cosf(deltaAngle * i);
         float z = sinf(deltaAngle * i);
-        
+
         m->AddVertex(x * radius, my, z * radius, Color(255, 255, 255, 255),
                      0.5f + x * 0.5f, 0.5f + z * 0.5f); // u, v
 
@@ -161,7 +161,7 @@ void AddFloorCircleDonutModelVertices(Model* m, float radius)
     float	my		   = 0.0f;
     int		totalSteps = 60;
 
-    // "Donut"	
+    // "Donut"
     for (int i = 0; i < totalSteps; i++)
     {
         float deltaAngle = (MATH_FLOAT_PI * 2.0f) / totalSteps;
@@ -186,7 +186,7 @@ void AddFloorCircleDonutModelVertices(Model* m, float radius)
             m->AddTriangle(uint16_t(t), uint16_t(t + 3), uint16_t(t + 1));
             m->AddTriangle(uint16_t(t), uint16_t(t + 2), uint16_t(t + 3));
         }
-    }	
+    }
 }
 
 
@@ -217,7 +217,7 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
 
     Ptr<Fill> fillB = *CreateTextureFill(pRender, mainFilePathNoExtension + "_redCube.tga", fillTextureLoadFlags);
     PopulateCubeFieldScene(&RedCubesScene, fillB.GetPtr(), 10, 10, 10, Vector3f(0.0f, 0.0f, 0.0f), 0.4f);
-    
+
     Ptr<Fill> fillY = *CreateTextureFill(pRender, mainFilePathNoExtension + "_yellowCube.tga", fillTextureLoadFlags);
     PopulateCubeFieldScene(&YellowCubesScene, fillY.GetPtr(), 10, 10, 10, Vector3f(0.0f, 0.0f, 0.0f), 0.4f);
 
@@ -271,12 +271,12 @@ void OculusWorldDemoApp::PopulateScene(const char *fileName)
     ControllerScene.AddLight(Vector3f(0, -10.0f, 0), Color4f(.2f, .2f, .2f, 1.0f));
 
 
-    // Load "Floor Circle" models and textures - used to display floor for seated configuration.	
+    // Load "Floor Circle" models and textures - used to display floor for seated configuration.
     Ptr<File>	 floorImageFile    = *new SysFile((mainFilePathNoExtension + "_SitFloorConcrete.tga").c_str());
     Ptr<Texture> roundFloorTexture = *LoadTextureTgaTopDown(pRender, floorImageFile, textureLoadFlags, 220);
     if (roundFloorTexture)
         roundFloorTexture->SetSampleMode(Sample_Anisotropic | Sample_Repeat);
-    
+
     Ptr<ShaderFill> fill = *new ShaderFill(*pRender->CreateShaderSet());
     fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Vertex, VShader_MVP));
     fill->GetShaders()->SetShader(pRender->LoadBuiltinShader(Shader_Fragment, FShader_Texture));
@@ -322,6 +322,7 @@ void OculusWorldDemoApp::ClearScene()
     SmallOculusRedCube.Clear();
     GreenCubesScene.Clear();
     RedCubesScene.Clear();
+    YellowCubesScene.Clear();
     OculusCubesScene.Clear();
     ControllerScene.Clear();
     BoundaryScene.Clear();

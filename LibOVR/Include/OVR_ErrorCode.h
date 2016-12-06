@@ -121,6 +121,7 @@ typedef enum ovrErrorType_
     ovrError_LibSignCheck               = -3021,   ///< LibOVRRT signature check failure.
     ovrError_LibPath                    = -3022,   ///< LibOVRRT path failure.
     ovrError_LibSymbols                 = -3023,   ///< LibOVRRT symbol resolution failure.
+    ovrError_RemoteSession              = -3024,   ///< Failed to connect to the service because remote connections to the service are not allowed.
 
     /* Rendering errors */
     ovrError_DisplayLost                = -6000,   ///< In the event of a system-wide graphics reset or cable unplug this is returned to the app.

@@ -170,7 +170,7 @@ void System::Destroy()
         SystemShutdownListenerList = nullptr;
 
         Timer::shutdownTimerSystem();
-    }
+        }
     else
     {
         Logger.LogDebug("Destroy recursively called; depth = ", System_Init_Count);

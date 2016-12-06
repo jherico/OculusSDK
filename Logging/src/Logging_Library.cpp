@@ -757,12 +757,14 @@ void Channel::GetFunctionPointers()
 
 Channel::Channel(const char* nameString) :
     MinimumOutputLevel((Log_Level_t)Level::Info),
-    SubsystemName(nameString)
+    SubsystemName(nameString),
+    UserOverrodeMinimumOutputLevel(false)
 {
     SubsystemName = nameString;
 
     Node.SubsystemName = SubsystemName;
     Node.Level = &MinimumOutputLevel;
+    Node.UserOverrodeMinimumOutputLevel = &UserOverrodeMinimumOutputLevel;
 
     GetFunctionPointers();
 
@@ -773,6 +775,7 @@ Channel::Channel(const Channel& other)
 {
     SubsystemName = other.SubsystemName;
     MinimumOutputLevel = other.MinimumOutputLevel;
+    UserOverrodeMinimumOutputLevel = other.UserOverrodeMinimumOutputLevel;
 
     {
         Locker locker(PrefixLock);
@@ -781,6 +784,7 @@ Channel::Channel(const Channel& other)
 
     Node.SubsystemName = SubsystemName;
     Node.Level = &MinimumOutputLevel;
+    Node.UserOverrodeMinimumOutputLevel = &UserOverrodeMinimumOutputLevel;
 
     ConfiguratorRegister(&Node);
 }
@@ -813,6 +817,7 @@ void Channel::SetMinimumOutputLevel(Level newLevel)
 void Channel::SetMinimumOutputLevelNoSave(Level newLevel)
 {
     MinimumOutputLevel = (Log_Level_t)newLevel;
+    UserOverrodeMinimumOutputLevel = true;
 }
 
 const char* Channel::GetName() const
@@ -942,7 +947,7 @@ void Configurator::RestoreChannelLogLevel(const char* channelName)
 
     const std::string stdChannelName(channelName);
 
-    SetChannelNoLock(stdChannelName, level);
+    SetChannelNoLock(stdChannelName, level, false);
 }
 
 void Configurator::RestoreChannelLogLevel(ChannelNode* channelNode)
@@ -955,7 +960,11 @@ void Configurator::RestoreChannelLogLevel(ChannelNode* channelNode)
         Plugin->RestoreChannelLevel(channelNode->SubsystemName, level);
     }
 
-    *(channelNode->Level) = (Log_Level_t)level;
+    // Don't undo user calls to SetMinimumOutputLevelNoSave()
+    if (*(channelNode->UserOverrodeMinimumOutputLevel) == false)
+    {
+        *(channelNode->Level) = (Log_Level_t)level;
+    }
 }
 
 void Configurator::RestoreAllChannelLogLevels()
@@ -997,19 +1006,22 @@ void Configurator::GetChannels(std::vector< std::pair<std::string, Level> > &cha
 void Configurator::SetChannel(std::string channelName, Level level)
 {
     Locker locker(OutputWorker::GetInstance()->GetChannelsLock());
-    SetChannelNoLock(channelName, level);
+    SetChannelNoLock(channelName, level, true);
 }
 
 // Should be locked already when calling this function!
-void Configurator::SetChannelNoLock(std::string channelName, Level level)
+void Configurator::SetChannelNoLock(std::string channelName, Level level, bool overrideUser)
 {
     for (ChannelNode* channelNode = ChannelNodeHead; channelNode; channelNode = channelNode->Next)
     {
         if (std::string(channelNode->SubsystemName) == channelName)
         {
-            *(channelNode->Level) = (Log_Level_t)level;
+            if (*(channelNode->UserOverrodeMinimumOutputLevel) == false || overrideUser)
+            {
+                *(channelNode->Level) = (Log_Level_t)level;
 
-            // Purposely no break, channels may have duplicate names
+                // Purposely no break, channels may have duplicate names
+            }
         }
     }
 }

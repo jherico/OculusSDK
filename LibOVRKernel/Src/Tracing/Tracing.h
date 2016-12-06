@@ -153,7 +153,7 @@ limitations under the License.
             ); \
         }
 
-    #define TracePhaseSyncEnd(Frame, Thread, SyncQueueAheadSec, SyncDistortionSec, CurrentSec, CompositeSec, VSyncSec, LastVSyncSec, FrameSec, FrameCPUSec, FrameSecVariance, QueueAheadSec) \
+    #define TracePhaseSyncEnd(Frame, Thread, SyncQueueAheadSec, SyncDistortionSec, CurrentSec, CompositeSec, VSyncSec, LastVSyncSec, FrameSec, FrameCPUSec, FrameVarianceSec, QueueAheadSec) \
         if (EventEnabledPhaseSyncEnd()) \
         { \
             uint32_t framesMissed = (uint32_t)((float)((VSyncSec) - (LastVSyncSec)) / (Frame).FrameInterval - 0.5f); \
@@ -168,12 +168,12 @@ limitations under the License.
                 (VSyncSec), \
                 (FrameSec) * 1000.0f, \
                 (FrameCPUSec) * 1000.0f, \
-                (FrameSecVariance) * 1000.0f * 1000.0f, \
+                (FrameVarianceSec), \
                 (QueueAheadSec), \
                 framesMissed, \
                 (Thread).FrameTime * 1000.0f, \
                 (Thread).FrameTimeCPU * 1000.0f, \
-                (Thread).FrameTimeVariance * 1000.0f * 1000.0f, \
+                (Thread).FrameVariance, \
                 (Thread).QueueAhead, \
                 syncFrameTime, \
                 syncQueueAhead, \
