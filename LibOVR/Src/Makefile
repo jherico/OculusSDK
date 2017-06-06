@@ -7,7 +7,7 @@
 
 INCDIR=../Include
 INSTALL_DIR=/usr/local/lib64
-TARGET=libOVR.so
+TARGET=libovr.so
 
 ${TARGET}: OVR_CAPIShim.o OVR_CAPI_Util.o OVR_StereoProjection.o
 	gcc -o $@ -shared $^
