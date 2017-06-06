@@ -1,7 +1,9 @@
 
 # Makefile for LibOVR
 # Miguel Leitao, 2017
-
+#
+# Allows building LibOVR in a Linux system.
+# Optionaly install lin and headers into ${INSTALL_DIR}
 
 INCDIR=../Include
 INSTALL_DIR=/usr/local/lib64
