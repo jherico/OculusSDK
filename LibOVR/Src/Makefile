@@ -21,6 +21,7 @@ OVR_StereoProjection.o: OVR_StereoProjection.cpp
 
 .PHONY: install clean
 install: $(TARGET)
+	mkdir -p ${INSTALL_DIR}
 	cp -p $^ ${INSTALL_DIR}
 
 clean:
