@@ -1,6 +1,9 @@
+## README.md
+
+## LICENSE
 Oculus VR, LLC Software Development Kit License Agreement
 
-Copyright © 2014-2016 Oculus VR, LLC All rights reserved.
+Copyright ¬© 2014-2016 Oculus VR, LLC All rights reserved.
 
 The text of this may be found at: https://developer.oculus.com/licenses 
 
@@ -9,14 +12,14 @@ you may use the Oculus Software Development Kit for PC. If you do not agree to t
 
 OCULUS SDK LICENSE
 
-1. Subject to the terms and conditions of this License Agreement (the ìLicenseî), Oculus VR, LLC (ìOculusî) hereby grants to you a worldwide, non-exclusive, 
+1. Subject to the terms and conditions of this License Agreement (the ‚ÄúLicense‚Äù), Oculus VR, LLC (‚ÄúOculus‚Äù) hereby grants to you a worldwide, non-exclusive, 
 no-charge, royalty-free, sublicenseable copyright license to use, reproduce and redistribute (subject to restrictions below) the software contained in this 
-Oculus Rift Software Development Kit (the ìOculus SDKî), including, but not limited to, the samples, headers, LibOVR headers, LibOVR source and, subject to 
+Oculus Rift Software Development Kit (the ‚ÄúOculus SDK‚Äù), including, but not limited to, the samples, headers, LibOVR headers, LibOVR source and, subject to 
 your compliance with Section 3, the headers, libraries and APIs to enable the Platform Services. This License is subject to the following terms and 
 conditions:
 
 1.1 This license grants you the non-exclusive license and right to use (i) the Oculus SDK to make engines, tools, applications, content, games and demos 
-(collectively and generally referred to as ìDeveloper Contentî) for use on the Oculus approved hardware and software PC products (ìOculus Approved Productsî) 
+(collectively and generally referred to as ‚ÄúDeveloper Content‚Äù) for use on the Oculus approved hardware and software PC products (‚ÄúOculus Approved Products‚Äù) 
 and which may incorporate the Oculus SDK in whole or in part in binary or object code; and (ii) the headers, libraries, APIs and other tools made available by 
 Oculus to enable the use of Platform Services with your Developer Content.
 
@@ -27,9 +30,9 @@ incorporated into your Developer Content.
 
 1.3 You agree that as a condition of this License you will design and distribute your Developer Content to ensure that your Developer Content and any software 
 required to use your Developer Content does not, and you will not, alter or interfere with the normal operation, behavior or functionality of the Oculus 
-hardware or software, including: (i) the behavior of the "Oculus button" and ìXBox buttonî implemented by the Oculus system 
+hardware or software, including: (i) the behavior of the "Oculus button" and ‚ÄúXBox button‚Äù implemented by the Oculus system 
 software; (ii) any on-screen messages or information; (iii) the behavior of the proximity sensor in the Oculus hardware implemented by the Oculus system 
-software; (iv) Oculus hardware or software security features; (v) end userís settings; or (vi) the Oculus Flash Screen Warnings.  You also agree not to commit 
+software; (iv) Oculus hardware or software security features; (v) end user‚Äôs settings; or (vi) the Oculus Flash Screen Warnings.  You also agree not to commit 
 any act intended to interfere with the normal operation of the Oculus hardware or software, or provide software to Oculus users 
 or developers that would induce breach of any Oculus agreements or that contains malware, viruses, hacks, bots, Trojan horses, or other malicious code.
 
@@ -52,13 +55,13 @@ Developer Content; provided, however, you may only license, sublicense or redist
 The Oculus SDK (including, but not limited to LibOVR), and any Developer Content that includes any portion of the Oculus SDK, may only be used with Oculus 
 Approved Products and may not be used, licensed, or sublicensed to interface with software or hardware or other commercial headsets that are not authorized and approved by Oculus;
 
-2.2 You must include with all such redistributed or sublicensed Oculus SDK code the following copyright notice: ìCopyright © 2014-2016 Oculus VR, LLC. All 
-rights reserved,î 
+2.2 You must include with all such redistributed or sublicensed Oculus SDK code the following copyright notice: ‚ÄúCopyright ¬© 2014-2016 Oculus VR, LLC. All 
+rights reserved,‚Äù 
 
 2.3  You must give any other recipients of the Oculus SDK a copy of this License as such recipients, licensees or sublicensees may only use the Oculus SDK 
 subject to the terms of this License and such recipient's, licensee's or sublicensee's agreement to and acceptance of this License with Oculus; and
 
-2.4 The Oculus SDK includes a ìLICENSEî text file (the ìLicense Noticeî), and any Oculus SDK distribution that you distribute must include a copy of this 
+2.4 The Oculus SDK includes a ‚ÄúLICENSE‚Äù text file (the ‚ÄúLicense Notice‚Äù), and any Oculus SDK distribution that you distribute must include a copy of this 
 License with the License Notice. 
 
 OCULUS PLATFORM SERVICES
@@ -67,25 +70,25 @@ OCULUS PLATFORM SERVICES
 Developer Content.  You agree not to use any API, code or other tools, instruction or service provided by Oculus to enable or use a Platform Service other 
 than in compliance with these terms.  For more information go to https://developer.oculus.com.
 
-    ï   "Oculus Platform Framework" means the suite of Oculus platform services, including but not limited to the Oculus file distribution and update system 
+    ‚Ä¢   "Oculus Platform Framework" means the suite of Oculus platform services, including but not limited to the Oculus file distribution and update system 
         (enabling distribution and updates of Developer Content by Oculus, including through generated activation Keys), entitlement system, and account 
-        authentication, which list may be changed from time to time in Oculusí sole discretion.
+        authentication, which list may be changed from time to time in Oculus‚Äô sole discretion.
 
-    ï   "Application Services" means services provided by Oculus associated with the Platform, including but not limited to in-app purchasing, multiplayer 
-        matchmaking, friends, leader boards, achievements, rooms, voice over IP and cloud saves, which list may be changed from time to time in Oculusí sole 
+    ‚Ä¢   "Application Services" means services provided by Oculus associated with the Platform, including but not limited to in-app purchasing, multiplayer 
+        matchmaking, friends, leader boards, achievements, rooms, voice over IP and cloud saves, which list may be changed from time to time in Oculus‚Äô sole 
         discretion.
 
-    ï   ìPlatformî means the Oculus virtual reality platform, including but not limited to the user experience, user interface, store, and social features, 
+    ‚Ä¢   ‚ÄúPlatform‚Äù means the Oculus virtual reality platform, including but not limited to the user experience, user interface, store, and social features, 
         usable on Oculus approved hardware or any third-party device or operating system, including but not limited to Windows, OS X, Linux.
 
-    ï   ìPlatform Servicesî means the Oculus Platform Framework and the Application Services.  
+    ‚Ä¢   ‚ÄúPlatform Services‚Äù means the Oculus Platform Framework and the Application Services.  
 
 3.1  Oculus Platform Services.  Oculus makes certain Platform Services available to you to include and enable in your Developer Content. Developer Content 
 that enables or includes any Platform Service must implement the Oculus Platform Framework with that Developer Content. Once your Developer Content has been 
 authorized for use of the Platform Services, you are not required to update your Developer Content to include new Platform Services Oculus may make available 
 as part of the Oculus Platform Framework.   
 
-3.2  Limited Authorization.  You hereby grant Oculus the limited authorization reasonably necessary for Oculusís exercise of its rights and performance of its 
+3.2  Limited Authorization.  You hereby grant Oculus the limited authorization reasonably necessary for Oculus‚Äôs exercise of its rights and performance of its 
 obligations under this Section 3. You agree that Oculus may use its contractors and affiliates for the purposes of exercising its rights and licenses set forth
 in this Section 3.
 
@@ -119,7 +122,7 @@ agreements or "READ ME" files included with such third-party materials.  To the 
 of this License, the former will control with respect to the applicable third-party materials. 
 
 5.  THE OCULUS SDK AND ANY COMPONENT THEREOF, THE OCULUS HEADERS, LIBRARIES AND APIS, AND THE PLATFORM SERVICES FROM OCULUS AND ITS CONTRIBUTORS ARE PROVIDED 
-ìAS ISî AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+‚ÄúAS IS‚Äù AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
 ARE DISCLAIMED. IN NO EVENT SHALL OCULUS AS THE COPYRIGHT OWNER OR ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
 CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
 HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE 
@@ -128,7 +131,7 @@ DO NOT PERMIT THE EXCLUSION OR LIMITATION OF IMPLIED WARRANTIES, SO YOU MAY HAVE
 
 6.  This License does not grant permission to use the trade names, trademarks, service marks, or product names of Oculus, except as required for reasonable and 
 customary use in describing the origin of the Oculus SDK, and reproducing the content of the License Notice file. Oculus reserves all rights not expressly 
-granted to you under this License. Neither the name of Oculus VR, LLC nor the names of Oculus VR, LLCís contributors, licensors, employees, or contractors, 
+granted to you under this License. Neither the name of Oculus VR, LLC nor the names of Oculus VR, LLC‚Äôs contributors, licensors, employees, or contractors, 
 may be used to endorse or promote products developed using the Oculus SDK without specific prior written permission of Oculus VR, LLC.
 
 7.  You are responsible for ensuring that your use of the Oculus SDK and your Developer Content, including enabled Platform Services, complies with all 
@@ -190,6 +193,6 @@ with the terms of this License.
 License shall be resolved by binding non-appearance-based arbitration before a neutral arbitrator in Santa Clara, California. The arbitration shall be 
 conducted in accordance with the rules and procedures of JAMS then in effect, and the judgment of the arbitrator shall be final and capable of entry in any 
 court of competent jurisdiction. You and Oculus agree to submit to the personal jurisdiction of the courts located within Santa Clara, California in connection 
-with any entrance of an arbitratorís judgment or decision or any dispute with respect to the arbitration process or procedure or Oculusís exercise of its 
+with any entrance of an arbitrator‚Äôs judgment or decision or any dispute with respect to the arbitration process or procedure or Oculus‚Äôs exercise of its 
 equitable rights or remedies.
 
