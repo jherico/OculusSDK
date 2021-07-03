@@ -1,8 +1,8 @@
 ## README.md
 
 ## OVRRootPath.propa
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<xml version="1.0" encoding="utf-8"?>
+<--
 To load this file your .vcxproj should have the following Import tag before all others:
 <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props" />
 Unfortunately there is currently no way to add this via the VS GUI, you'll have to edit
