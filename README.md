@@ -1,1 +1,3 @@
 ## README.md
+
+## LICENSE.txt
