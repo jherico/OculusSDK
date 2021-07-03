@@ -11,8 +11,13 @@ OVRRootPath.props
 
 
 
-<Import Project='"$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props"/`
-<-- BigGuy573/Master/.vcx 
+<Import Project=
+'"$
+([MSBuild]:
+:GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory),
+OVRRootPath.props))\OVRRootPath.props"/`
+='"$
+`{BigGuy573/Master/.vcx 
                  <--
 -to load this file your
 
