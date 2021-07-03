@@ -1,15 +1,15 @@
 ## README.md
 
 ## OVR Root Path
--OVRRootPath.props
-{ 
- {
-  {
-  {{ }}
-   }
-{
+OVRRootPath.props
 
-}
+ 
+ 
+
+  
+
+
+
 
 <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props" /
 {<--
