@@ -2,13 +2,16 @@
 
 ## OVR Root Path
 -OVRRootPath.props
-~</_
-   
-   
-   
-  
-   <xml version="1.0" encoding="utf-8"?>
-<--
+{ 
+ {
+  {
+  {{ }}
+   }
+{
+
+}
+ '  {'''<xml version="1.0" encoding="utf-8"?>}
+{<--
 To load this file your .vcxproj should have the following Import tag before all others:
 <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props" />
 Unfortunately there is currently no way to add this via the VS GUI, you'll have to edit
@@ -33,5 +36,5 @@ new .vcxproj files manually or copy an existing project.
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
-</Project> 
+</Project> '''}`
 
