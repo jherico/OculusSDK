@@ -10,7 +10,8 @@
 {
 
 }
- '  {'''<xml version="1.0" encoding="utf-8"?>}
+
+<Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props" /
 {<--
 To load this file your .vcxproj should have the following Import tag before all others:
 <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), OVRRootPath.props))\OVRRootPath.props" />
